@@ -269,8 +269,8 @@ def parse(str, errors = None, warnings = None):
     indent_stack = [-1, None]
 
     for token in tokens:
-        #print [t and t.tagName for t in stack], token.tag
-        #print indent_stack, token.indent
+        #print ''.join(['%11s' % (t and t.tagName) for t in stack]),':',token.tag
+        #print ''.join(['%11s' % i for i in indent_stack]),':',token.indent
         
         # Pop any completed blocks off the stack.
         _pop_completed_blocks(token, stack, indent_stack)
@@ -322,24 +322,44 @@ def _pop_completed_blocks(token, stack, indent_stack):
     Pop any completed blocks off the stack.  This includes any
     blocks that we have dedented past, as well as any list item
     blocks that we've dedented to.  The top element on the stack 
-    should only be \"list\" if we're about to start a new list
+    should only be a list if we're about to start a new list
     item (i.e., if the next token is a bullet).
     """
     indent = token.indent
     if indent != None:
-        while ((len(stack) > 2) and
-               ((indent_stack[-1]!=None and indent<indent_stack[-1]) or
-                (indent_stack[-1]==None and indent<indent_stack[-2]) or
-                (stack[-1].tagName in ('li', 'field') and
-                 indent_stack[-1]==None and
-                 indent==indent_stack[-2]))):
+        while (len(stack) > 2):
+            pop = 0
+            
+            # Dedent past a block
+            if indent_stack[-1]!=None and indent<indent_stack[-1]: pop=1
+            elif indent_stack[-1]==None and indent<indent_stack[-2]: pop=1
+
+            # Dedent to a list item
+            elif indent==indent_stack[-2] and stack[-1].tagName=='li': pop=1
+
+            # Dedent to a field list item, if it is followed by
+            # another field list item.
+            elif (token.tag == 'bullet' and token.contents[-1] == ':' and
+                  indent==indent_stack[-2] and
+                  stack[-1].tagName in ('field', 'li')): pop=1
+
+            # End of a list (no more list items available)
+            elif (stack[-1].tagName in ('ulist', 'olist') and
+                  (token.tag != 'bullet' or token.contents[-1] == ':')):
+                pop=1
+
+            # Pop the block, if it's complete.  Otherwise, we're done.
+            if pop == 0: return
             stack.pop()
             indent_stack.pop()
-            
-    if (stack[-1].tagName in ('ulist', 'olist', 'fieldlist') and
-        token.tag != 'bullet'):
-        stack.pop()
-        indent_stack.pop()
+
+    ## If we dedent back to a field list, and there's another field
+    ## list bullet, then end this field list item.
+    #if token.tag == 'bullet' and token.contents[-1] == ':':
+    #    while (indent==indent_stack[-2] and
+    #           stack[-1].tagName in ('field', 'li')):
+    #        stack.pop()
+    #        indent_stack.pop()
 
 def _add_para(para_token, stack, indent_stack, errors, warnings):
     """Colorize the given paragraph, and add it to the DOM tree."""
@@ -577,7 +597,7 @@ class Token:
             C{Token}s have formal representaitons of the form:: 
                 <Token: para at line 12>
         """
-        return '<Token: '+str(self.tag)+' at line '+`self.startline`+'>'
+        return '<Token: %s at line %s>' % (self.tag, self.startline)
 
     def to_dom(self):
         """
@@ -598,6 +618,7 @@ _BULLET_RE = re.compile(_ULIST_BULLET + '|' +
                         _OLIST_BULLET + '|' +
                         _FIELD_BULLET)
 _LIST_BULLET_RE = re.compile(_ULIST_BULLET + '|' + _OLIST_BULLET)
+_FIELD_BULLET_RE = re.compile(_FIELD_BULLET)
 del _ULIST_BULLET, _OLIST_BULLET, _FIELD_BULLET
 
 def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
@@ -732,6 +753,11 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
     para_indent = None
     brace_level = lines[start].count('{') - lines[start].count('}')
     if brace_level < 0: brace_level = 0
+
+    # Get the contents of the bullet.
+    para_start = _BULLET_RE.match(lines[start], bullet_indent).end()
+    bcontents = lines[start][bullet_indent:para_start].strip()
+    
     while linenum < len(lines):
         # Find the indentation of this line.
         line = lines[linenum]
@@ -755,9 +781,13 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
         if brace_level < 0: brace_level = 0
 
         if indent == bullet_indent:
-            if brace_level == 0 and _BULLET_RE.match(line, indent):
-                # Don't complain if it's a field.??
-                break
+            # Next list item?
+            if _BULLET_RE.match(line, indent): break
+                
+            # Field item contents don't have to be indented.
+            elif _FIELD_BULLET_RE.match(bcontents): pass
+            
+            # List contents need to be indented.
             else:
                 estr = ("List item contents should be indented; "+
                         "Paragraphs should be separated from "+
@@ -776,8 +806,6 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
         linenum += 1
 
     # Add the bullet token.
-    para_start = _BULLET_RE.match(lines[start], bullet_indent).end()
-    bcontents = lines[start][bullet_indent:para_start].strip()
     tokens.append(Token(Token.BULLET, start, bcontents, bullet_indent))
 
     # Add the paragraph token.
@@ -832,8 +860,10 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
 
         # List bullets end paragraphs
         if brace_level == 0 and _BULLET_RE.match(line, indent):
-            estr = "Lists should be indented or separated by blank lines."
-            warnings.append(TokenizationError(estr, linenum, line))
+            # Field lists don't need to be separated/indented.
+            if _LIST_BULLET_RE.match(line, indent):
+                estr = "Lists should be indented or separated by blank lines."
+                warnings.append(TokenizationError(estr, linenum, line))
             break
         brace_level += line.count('{')        
         brace_level -= line.count('}')
@@ -918,7 +948,7 @@ def _tokenize(str, warnings):
             linenum = _tokenize_doctest(lines, linenum, indent,
                                         tokens, warnings)
         elif _BULLET_RE.match(line, indent):
-            # blocks starting with a bullet are LIStart tokens.
+            # blocks starting with a bullet are LI start tokens.
             linenum = _tokenize_listart(lines, linenum, indent,
                                         tokens, warnings)
             if tokens[-1].indent != None:
@@ -1204,10 +1234,10 @@ def to_epytext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'field':
         if (len(tree.childNodes) > 1 and
             tree.childNodes[1].tagName == 'arg'):
-            return (indent*' '+children[0]+'('+
+            return (indent*' '+'@'+children[0]+'('+
                     children[1]+'):\n'+''.join(children[2:]))
         else:
-            return (indent*' '+children[0]+':\n'+
+            return (indent*' '+'@'+children[0]+':\n'+
                     ''.join(children[1:]))
     elif tree.tagName == 'target':
         return '<%s>' % childstr
@@ -1351,10 +1381,10 @@ def to_debug(tree, indent=4, seclevel=0):
     elif tree.tagName == 'field':
         if (len(tree.childNodes) > 1 and
             tree.childNodes[1].tagName == 'arg'):
-            return (indent*' '+children[0]+'('+
+            return (' FLD>|'+(indent-6)*' '+'@'+children[0]+'('+
                     children[1]+'):\n'+''.join(children[2:]))
         else:
-            return (indent*' '+children[0]+':\n'+
+            return (' FLD>|'+(indent-6)*' '+'@'+children[0]+':\n'+
                     ''.join(children[1:]))
     elif tree.tagName == 'target':
         return '<%s>' % childstr
@@ -1648,4 +1678,3 @@ class ColorizingError(ParseError):
                ' at line ' + `self.linenum` + ':\n' +
                wordwrap(self.descr, 2) + '  ' +
                left+right + '\n  '+ (' '*len(left)) +'^')
-
