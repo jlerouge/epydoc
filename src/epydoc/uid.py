@@ -888,6 +888,7 @@ def _find_builtin_obj_module(obj, show_warnings=1):
         if module in so_modules: continue
         if module in builtin_modules: continue
         if module in py_modules: continue
+        if not hasattr(module, '__name__'): continue
         if module.__name__ == '__main__': continue
         
         for (key, val) in module.__dict__.items():
