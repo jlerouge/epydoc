@@ -616,15 +616,15 @@ class LatexFormatter:
 
         if var.descr() or var.has_value():
             str += '\\raggedright '
-        if var.has_value():
-            str += '\\textbf{Value:} \n'
-            if var.descr():
-                str += self._pprint_var_value(var, 40)
-            else:
-                str += self._pprint_var_value(var, 90)
-            if var.descr(): str += '\n\n'
         if var.descr():
             str += self._docstring_to_latex(var.descr(), 10).strip()
+            if var.has_value() or var.type(): str += '\n\n'
+        if var.has_value():
+            str += '\\textbf{Value:} \n'
+            str += self._pprint_var_value(var, 80)
+        if var.type():
+            ptype = self._docstring_to_latex(var.type(), 12).strip()
+            str += '%s\\textit{(type=%s)}' % (' '*12, ptype)
         str += '&\\\\\n'
         str += '\\cline{1-2}\n'
         return str
