@@ -30,32 +30,60 @@ def find_modules(dirname):
     @param dirname: The directory name to search.
     """
     if not os.path.isdir(dirname): return []
-    found_init = 0
-    modules = {}
-    dirs = []
 
-    # Search for directories & modules, and check for __init__.py.
-    # Don't include duplicates (like foo.py and foo.pyc), and give
-    # precedance to the .py files.
-    for file in os.listdir(dirname):
-        filepath = os.path.join(dirname, file)
-        if os.path.isdir(filepath): dirs.append(filepath)
+    # Find and import the __init__.py file.  We need to do this to get
+    # its __path__ variable.
+    try:
+        if os.path.isfile(os.path.join(dirname, '__init__.py')):
+            pkg = import_module(os.path.join(dirname, '__init__.py'))
+        elif os.path.isfile(os.path.join(dirname, '__init__.pyw')):
+            pkg = import_module(os.path.join(dirname, '__init__.pyw'))
+        elif os.path.isfile(os.path.join(dirname, '__init__.pyc')):
+            pkg = import_module(os.path.join(dirname, '__init__.pyc'))
+        else:
+            return [] # Not a package
+    except:
+        return [] # Error importing package
+
+    modules = _find_modules(pkg).keys()
+    modules.sort()
+    return [pkg.__name__] + modules
+
+def _find_modules(pkg):
+    """
+    Helper function for L{find_modules}.
+    """
+    pkgname = pkg.__name__
+    
+    # Get a list of all files/directories on the package's path.
+    paths = []
+    for dir in pkg.__path__:
+        if os.path.isdir(dir):
+            paths += [os.path.join(dir, file) for
+                      file in os.listdir(dir)]
+
+    # Search the files/directories for modules & subdirs.
+    modules = {}  # a set (dict from name to [1,0])
+    subdirectories = []
+    for filepath in paths:
+        file = os.path.split(filepath)[-1]
+        if os.path.isdir(filepath):
+            if re.match(r'\w+', file):
+                subpkgname = '%s.%s' % (pkg.__name__, file)
+                try: subpkg = _import_module(subpkgname)
+                except: continue
+                if not hasattr(subpkg, '__path__'): continue
+                modules[subpkgname] = 1
+                modules.update(_find_modules(subpkg))
         elif not re.match(r'\w+.py.?', file):
             continue # Ignore things like ".#foo.py" or "a-b.py"
+        elif file == '__init__.py' or file[:-1] == '__init__.py':
+            continue
         elif file[-3:] == '.py':
-            modules[file] = os.path.join(dirname, file)
-            if file == '__init__.py': found_init = 1
+            modules['%s.%s' % (pkgname, file[:-3])] = 1
         elif file[-4:-1] == '.py':
-            modules.setdefault(file[:-1], file)
-            if file[:-1] == '__init__.py': found_init = 1
-    modules = modules.values()
-
-    # If there was no __init__.py, then this isn't a package
-    # directory; return nothing.
-    if not found_init: return []
-
-    # Recurse to the child directories.
-    for d in dirs: modules += find_modules(d)
+            modules['%s.%s' % (pkgname, file[:-4])] = 1
+        
     return modules
 
 def import_module(name_or_filename):
@@ -167,9 +195,12 @@ def _import_module(name):
     finally:
         # Restore the important values that we saved.
         if type(__builtins__) == types.DictionaryType:
+            __builtins__.clear()
             __builtins__.update(old_builtins)
         else:
+            __builtins__.__dict__.clear()
             __builtins__.__dict__.update(old_builtins)
+        sys.__dict__.clear()
         sys.__dict__.update(old_sys)
         sys.path = old_sys_path
 
