@@ -372,8 +372,9 @@ class Raise:
         @param descr: A description of the circumstances under which
             this exception is raised.
         @type descr: L{markup.ParsedDocstring}
-        @param uid: The UID of the exception, or None.
-        @type uid: C{None} or L{UID}
+        @param container: The UID of the raising function or method (used
+            to find the UID of the raised exception).
+        @type container: C{None} or L{UID}
         """
         self._name = name
         self._descr = descr
