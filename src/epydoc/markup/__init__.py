@@ -141,7 +141,7 @@ class ParsedDocstring:
         @return: An HTML fragment that encodes this docstring.
         @rtype: C{string}
         """
-        raise NotImplementedError, 'ParsedDocstring.to_html()'
+        return plaintext_to_html(to_plaintext(docstring_linker))
 
     def to_latex(self, docstring_linker):
         """
@@ -153,7 +153,7 @@ class ParsedDocstring:
         @return: A LaTeX fragment that encodes this docstring.
         @rtype: C{string}
         """
-        raise NotImplementedError, 'ParsedDocstring.to_latex()'
+        return plaintext_to_latex(to_plaintext(docstring_linker))
 
     def to_plaintext(self, docstring_linker):
         """
@@ -213,6 +213,86 @@ class DocstringLinker:
         @return: The translated crossreference link.
         """
         raise NotImplementedError, 'DocstringLinker.translate_xref()'
+
+##################################################
+## Misc helpers
+##################################################
+# These are used by multiple markup parsers
+
+def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
+    """
+    Word-wrap the given string.  All sequences of whitespace are
+    converted into spaces, and the string is broken up into lines,
+    where each line begins with C{indent} spaces, followed by one or
+    more (space-deliniated) words whose length is less than
+    C{right-indent}.  If a word is longer than C{right-indent}
+    characters, then it is put on its own line.
+
+    @param str: The string that should be word-wrapped.
+    @type str: C{int}
+    @param indent: The left margin of the string.  C{indent} spaces
+        will be inserted at the beginning of every line.
+    @type indent: C{int}
+    @param right: The right margin of the string.
+    @type right: C{int}
+    @type startindex: C{int}
+    @param startindex: The index at which the first line starts.  This
+        is useful if you want to include other contents on the first
+        line. 
+    @return: A word-wrapped version of C{str}.
+    @rtype: C{string}
+    """
+    words = str.split()
+    out_str = ' '*(indent-startindex)
+    charindex = max(indent, startindex)
+    for word in words:
+        if charindex+len(word) > right and charindex > 0:
+            out_str += '\n' + ' '*indent
+            charindex = indent
+        out_str += word+' '
+        charindex += len(word)+1
+    return out_str.rstrip()+'\n'
+
+def plaintext_to_html(str):
+    str = str.replace('&', '&amp;')
+    str = str.replace('<', '&lt')
+    str = str.replace('>', '&gt')
+    str = str.replace('"', '&quot')
+    return str
+
+def plaintext_to_latex(str, nbsp=0, breakany=0):
+    """
+    @param breakany: Insert hyphenation marks, so that LaTeX can
+    break the resulting string at any point.  This is useful for
+    small boxes (e.g., the type box in the variable list table).
+    """
+    # These get converted to hyphenation points later
+    if breakany: str = re.sub('(.)', '\\1\1', str)
+
+    # These get converted to \textbackslash later.
+    str = str.replace('\\', '\0')
+
+    # Expand tabs
+    str = str.expandtabs()
+
+    # These elements need to be backslashed.
+    str = re.sub(r'([#$&%_\${}])', r'\\\1', str)
+
+    # These elements have special names.
+    str = str.replace('|', '{\\textbar}')
+    str = str.replace('<', '{\\textless}')
+    str = str.replace('>', '{\\textgreater}')
+    str = str.replace('^', '{\\textasciicircum}')
+    str = str.replace('~', '{\\textasciitilde}')
+    str = str.replace('\0', r'{\textbackslash}')
+
+    # replace spaces with non-breaking spaces
+    if nbsp: str = str.replace(' ', '~')
+
+    # Convert \1's to hyphenation points.
+    if breakany: str = str.replace('\1', r'\-')
+    
+    return str
 
 ##################################################
 ## Foo
