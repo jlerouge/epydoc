@@ -87,7 +87,8 @@ class ParsedRstDocstring(ParsedDocstring):
         return ''.join(visitor.body)
 
     def to_plaintext(self, docstring_linker, **options):
-        raise NotImplementedError, 'ParsedDocstring.to_plaintext()'
+        # This is should be replaced by something better:
+        return self._document.astext() 
 
     def __repr__(self): return '<ParsedRstDocstring: ...>'
 
