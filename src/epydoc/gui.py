@@ -191,8 +191,12 @@ def document(options, progress, cancel):
     """
     progress[0] = 0.02
     from epydoc.html import HTMLFormatter
-    from epydoc.objdoc import DocMap
+    from epydoc.objdoc import DocMap, report_param_mismatches
     from epydoc.imports import import_module, find_modules
+    from epydoc.objdoc import set_default_docformat
+
+    # Set the default docformat.
+    set_default_docformat(options.get('docformat', 'epytext'))
 
     try:
         # Import the modules.
@@ -217,7 +221,13 @@ def document(options, progress, cancel):
             progress[0] += (IMPORT_PROGRESS*0.98)/len(modnames)
         
         # Create the documentation map.
-        d = DocMap()
+        verbosity = 0
+        document_bases = 1
+        document_autogen_vars = 1
+        inheritance_groups = (options['inheritance'] == 'grouped')
+        inherit_groups = (options['inheritance'] != 'grouped')
+        d = DocMap(verbosity, document_bases, document_autogen_vars,
+                   inheritance_groups, inherit_groups)
     
         # Build the documentation.
         for (module, num) in zip(modules, range(len(modules))):
@@ -225,13 +235,17 @@ def document(options, progress, cancel):
             sys.stderr.write('***Building docs for %s\n***' % module.__name__)
             d.add(module)
             progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
-    
+
+        # Report any param inheritance mismatches.
+        report_param_mismatches(d)
+
+        # Create the HTML formatter.
         htmldoc = HTMLFormatter(d, **options)
         numfiles = htmldoc.num_files()
     
         # Set up the progress callback.
         n = htmldoc.num_files()
-        def progress_callback(path, doc, numfiles=numfiles,
+        def progress_callback(path, numfiles=numfiles,
                               progress=progress, cancel=cancel, num=[1]):
             if cancel[0]: exit_thread()
 
@@ -331,6 +345,9 @@ class EpydocGUI:
 
         # Open the messages pane by default.
         self._messages_toggle()
+
+        ## For testing options:
+        #self._options_toggle()
         
     def _init_menubar(self):
         menubar = Menu(self._root, borderwidth=2,
@@ -372,6 +389,7 @@ class EpydocGUI:
         mframe3 = Frame(mframe1, background=BG_COLOR)
         mframe3.pack(side="bottom", fill='x', expand=0)
         self._module_list = Listbox(mframe2, width=80, height=10,
+                                    selectmode='multiple',
                                     **LISTBOX_CONFIG)
         self._module_list.pack(side="left", fill='both', expand=1)
         sb = Scrollbar(mframe2, orient='vertical',**SB_CONFIG)
@@ -462,7 +480,7 @@ class EpydocGUI:
         self._show_warnings = IntVar(self._root)
         self._show_warnings.set(1)
         self._show_messages = IntVar(self._root)
-        self._show_messages.set(1)
+        self._show_messages.set(0)
         Checkbutton(buttons, text='Show Messages', var=self._show_messages,
                     command=self._update_msg_tags, 
                     **SHOWMSG_CONFIG).pack(side='left')
@@ -472,6 +490,7 @@ class EpydocGUI:
         Checkbutton(buttons, text='Show Errors', var=self._show_errors,
                     command=self._update_msg_tags, 
                     **SHOWERR_CONFIG).pack(side='left')
+        self._update_msg_tags()
 
     def _update_msg_tags(self, *e):
         elide_errors = not self._show_errors.get()
@@ -513,6 +532,8 @@ class EpydocGUI:
         oframe3.pack(fill='x')
         oframe4 = Frame(oframe2, background=BG_COLOR)
         oframe4.pack(fill='x')
+        oframe7 = Frame(oframe2, background=BG_COLOR)
+        oframe7.pack(fill='x')
         div = Frame(oframe2, background=BG_COLOR, border=1, relief='sunk')
         div.pack(ipady=1, fill='x', padx=4, pady=2)
 
@@ -528,40 +549,42 @@ class EpydocGUI:
         oframe6 = Frame(oframe2, background=BG_COLOR)
         oframe6.pack(fill='x')
 
+        #==================== oframe3 ====================
         # -n NAME, --name NAME
         row = 0
         l = Label(oframe3, text="Project Name:", **COLOR_CONFIG)
-        l.grid(row=row, col=0, sticky='e')
+        l.grid(row=row, column=0, sticky='e')
         self._name_entry = Entry(oframe3, **ENTRY_CONFIG)
-        self._name_entry.grid(row=row, col=1, sticky='ew', columnspan=3)
+        self._name_entry.grid(row=row, column=1, sticky='ew', columnspan=3)
 
         # -u URL, --url URL
         row += 1
         l = Label(oframe3, text="Project URL:", **COLOR_CONFIG)
-        l.grid(row=row, col=0, sticky='e')
+        l.grid(row=row, column=0, sticky='e')
         self._url_entry = Entry(oframe3, **ENTRY_CONFIG)
-        self._url_entry.grid(row=row, col=1, sticky='ew', columnspan=3)
+        self._url_entry.grid(row=row, column=1, sticky='ew', columnspan=3)
 
         # -o DIR, --output DIR
         row += 1
         l = Label(oframe3, text="Output Directory:", **COLOR_CONFIG)
-        l.grid(row=row, col=0, sticky='e')
+        l.grid(row=row, column=0, sticky='e')
         self._out_entry = Entry(oframe3, **ENTRY_CONFIG)
-        self._out_entry.grid(row=row, col=1, sticky='ew', columnspan=2)
+        self._out_entry.grid(row=row, column=1, sticky='ew', columnspan=2)
         self._out_browse = Button(oframe3, text="Browse",
                                   command=self._browse_out,
                                   **BUTTON_CONFIG) 
-        self._out_browse.grid(row=row, col=3, sticky='ew', padx=2)
+        self._out_browse.grid(row=row, column=3, sticky='ew', padx=2)
 
+        #==================== oframe4 ====================
         # --no-frames
         row = 0
         self._frames_var = IntVar(self._root)
         self._frames_var.set(1)
         l = Label(oframe4, text="Generate a frame-based table of contents",
                   **COLOR_CONFIG)
-        l.grid(row=row, col=1, sticky='w')
+        l.grid(row=row, column=1, sticky='w')
         cb = Checkbutton(oframe4, var=self._frames_var, **CBUTTON_CONFIG)
-        cb.grid(row=row, col=0, sticky='e')
+        cb.grid(row=row, column=0, sticky='e')
 
         # --no-private
         row += 1
@@ -569,9 +592,9 @@ class EpydocGUI:
         self._private_var.set(1)
         l = Label(oframe4, text="Generate documentation for private objects",
                   **COLOR_CONFIG)
-        l.grid(row=row, col=1, sticky='w')
+        l.grid(row=row, column=1, sticky='w')
         cb = Checkbutton(oframe4, var=self._private_var, **CBUTTON_CONFIG)
-        cb.grid(row=row, col=0, sticky='e')
+        cb.grid(row=row, column=0, sticky='e')
 
         # --show-imports
         row += 1
@@ -579,10 +602,53 @@ class EpydocGUI:
         self._imports_var.set(0)
         l = Label(oframe4, text="List imported classes and functions",
                   **COLOR_CONFIG)
-        l.grid(row=row, col=1, sticky='w')
+        l.grid(row=row, column=1, sticky='w')
         cb = Checkbutton(oframe4, var=self._imports_var, **CBUTTON_CONFIG)
-        cb.grid(row=row, col=0, sticky='e')
+        cb.grid(row=row, column=0, sticky='e')
 
+        #==================== oframe7 ====================
+        # --docformat
+        row += 1
+        l = Label(oframe7, text="Default Docformat:", **COLOR_CONFIG)
+        l.grid(row=row, column=0, sticky='e')
+        df_var = self._docformat_var = StringVar(self._root)
+        self._docformat_var.set('epytext')
+        b = Radiobutton(oframe7, var=df_var, text='Epytext',
+                        value='epytext', **CBUTTON_CONFIG)
+        b.grid(row=row, column=1, sticky='w')
+        b = Radiobutton(oframe7, var=df_var, text='ReStructuredText',
+                        value='restructuredtext', **CBUTTON_CONFIG)
+        b.grid(row=row, column=2, columnspan=2, sticky='w')
+        row += 1
+        b = Radiobutton(oframe7, var=df_var, text='Plaintext',
+                        value='plaintext', **CBUTTON_CONFIG)
+        b.grid(row=row, column=1, sticky='w')
+        b = Radiobutton(oframe7, var=df_var, text='Javadoc',
+                        value='javadoc', **CBUTTON_CONFIG)
+        b.grid(row=row, column=2, columnspan=2, sticky='w')
+        row += 1
+
+        # Separater
+        Frame(oframe7, background=BG_COLOR).grid(row=row, column=1, pady=3)
+        row += 1
+
+        # --inheritance
+        l = Label(oframe7, text="Inheritance Style:", **COLOR_CONFIG)
+        l.grid(row=row, column=0, sticky='e')
+        inh_var = self._inheritance_var = StringVar(self._root)
+        self._inheritance_var.set('grouped')
+        b = Radiobutton(oframe7, var=inh_var, text='Grouped',
+                        value='grouped', **CBUTTON_CONFIG)
+        b.grid(row=row, column=1, sticky='w')
+        b = Radiobutton(oframe7, var=inh_var, text='Listed',
+                        value='listed', **CBUTTON_CONFIG)
+        b.grid(row=row, column=2, sticky='w')
+        b = Radiobutton(oframe7, var=inh_var, text='Included',
+                        value='included', **CBUTTON_CONFIG)
+        b.grid(row=row, column=3, sticky='w')
+        row += 1
+
+        #==================== oframe5 ====================
         # --help-file FILE
         row = 0
         self._help_var = StringVar(self._root)
@@ -590,18 +656,18 @@ class EpydocGUI:
         b = Radiobutton(oframe5, var=self._help_var,
                         text='Default',
                         value='default', **CBUTTON_CONFIG)
-        b.grid(row=row, col=1, sticky='w')
+        b.grid(row=row, column=1, sticky='w')
         row += 1
         b = Radiobutton(oframe5, var=self._help_var,
                         text='Select File',
                         value='-other-', **CBUTTON_CONFIG)
-        b.grid(row=row, col=1, sticky='w')
+        b.grid(row=row, column=1, sticky='w')
         self._help_entry = Entry(oframe5, **ENTRY_CONFIG)
-        self._help_entry.grid(row=row, col=2, sticky='ew')
+        self._help_entry.grid(row=row, column=2, sticky='ew')
         self._help_browse = Button(oframe5, text='Browse',
                                    command=self._browse_help,
                                    **BUTTON_CONFIG)
-        self._help_browse.grid(row=row, col=3, sticky='ew', padx=2)
+        self._help_browse.grid(row=row, column=3, sticky='ew', padx=2)
         
         from epydoc.css import STYLESHEETS
         items = STYLESHEETS.items()
@@ -611,13 +677,14 @@ class EpydocGUI:
             else: return cmp(css1[0], css2[0])
         items.sort(_css_sort)
 
+        #==================== oframe6 ====================
         # -c CSS, --css CSS
         # --private-css CSS
         row = 0
         l = Label(oframe6, text="Public", **COLOR_CONFIG)
-        l.grid(row=row, col=0, sticky='e')
+        l.grid(row=row, column=0, sticky='e')
         l = Label(oframe6, text="Private", **COLOR_CONFIG)
-        l.grid(row=row, col=1, sticky='w')
+        l.grid(row=row, column=1, sticky='w')
         row += 1
         css_var = self._css_var = StringVar(self._root)
         css_var.set('default')
@@ -625,25 +692,25 @@ class EpydocGUI:
         private_css_var.set('default')
         for (name, (sheet, descr)) in items:
             b = Radiobutton(oframe6, var=css_var, value=name, **CBUTTON_CONFIG)
-            b.grid(row=row, col=0, sticky='e')
+            b.grid(row=row, column=0, sticky='e')
             b = Radiobutton(oframe6, var=private_css_var, value=name, 
                             text=name, **CBUTTON_CONFIG)
-            b.grid(row=row, col=1, sticky='w')
+            b.grid(row=row, column=1, sticky='w')
             l = Label(oframe6, text=descr, **COLOR_CONFIG)
-            l.grid(row=row, col=2, sticky='w')
+            l.grid(row=row, column=2, sticky='w')
             row += 1
         b = Radiobutton(oframe6, var=css_var, value='-other-', 
                         **CBUTTON_CONFIG)
-        b.grid(row=row, col=0, sticky='e')
+        b.grid(row=row, column=0, sticky='e')
         b = Radiobutton(oframe6, text='Select File', var=private_css_var, 
                         value='-other-', **CBUTTON_CONFIG)
-        b.grid(row=row, col=1, sticky='w')
+        b.grid(row=row, column=1, sticky='w')
         self._css_entry = Entry(oframe6, **ENTRY_CONFIG)
-        self._css_entry.grid(row=row, col=2, sticky='ew')
+        self._css_entry.grid(row=row, column=2, sticky='ew')
         self._css_browse = Button(oframe6, text="Browse",
                                   command=self._browse_css,
                                   **BUTTON_CONFIG) 
-        self._css_browse.grid(row=row, col=3, sticky='ew', padx=2)
+        self._css_browse.grid(row=row, column=3, sticky='ew', padx=2)
 
     def _init_bindings(self):
         self._root.bind('<Delete>', self._delete_module)
@@ -782,6 +849,8 @@ class EpydocGUI:
         options['modules'] = self._module_list.get(0, 'end')
         options['prj_name'] = self._name_entry.get() or ''
         options['prj_url'] = self._url_entry.get() or None
+        options['docformat'] = self._docformat_var.get()
+        options['inheritance'] = self._inheritance_var.get()
         options['outdir'] = self._out_entry.get() or 'html'
         options['frames'] = self._frames_var.get()
         options['private'] = self._private_var.get()
@@ -868,7 +937,7 @@ class EpydocGUI:
                 elif self._in_header:
                     self._messages.insert('end', data, 'header')
                     self._last_tag = 'header'
-                elif re.match(r'\s*L\d+: Warning: ', data):
+                elif re.match(r'\s*(L\d+:|-)?\s*Warning: ', data):
                     self._messages.insert('end', data, 'warning')
                     self._last_tag = 'warning'
                 else:
@@ -907,6 +976,8 @@ class EpydocGUI:
         self._module_list.delete(0, 'end')
         self._name_entry.delete(0, 'end')
         self._url_entry.delete(0, 'end')
+        self._docformat_var.set('epytext')
+        self._inheritance_var.set('grouped')
         self._out_entry.delete(0, 'end')
         self._module_entry.delete(0, 'end')
         self._css_entry.delete(0, 'end')
@@ -948,6 +1019,9 @@ class EpydocGUI:
             self._url_entry.delete(0, 'end')
             if opts.get('prj_url'):
                 self._url_entry.insert(0, opts['prj_url'])
+
+            self._docformat_var.set(opts.get('docformat', 'epytext'))
+            self._inheritance_var.set(opts.get('inheritance', 'grouped'))
 
             self._help_entry.delete(0, 'end')
             if opts.get('help') is None:
