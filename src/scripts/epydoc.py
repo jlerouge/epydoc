@@ -8,7 +8,7 @@
 # real epydoc package.  So sys.path[0], which contains the directory
 # of the script.
 import sys
-del sys[0]
+del sys.path[0]
 
 from epydoc.cli import cli
 cli()
