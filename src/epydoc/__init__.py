@@ -34,7 +34,7 @@ produce API documentation using the following steps:
 
 @group Interface Modules: cli, gui
 @group Inspection Modules: uid, objdoc, imports
-@group Docstring Parsing Modules: epytext
+@group Docstring Parsing Modules: epytext, rst, javaoc
 @group Documentation Output Modules: html, css, help, colorize,
        latex, man
 @group Testing Modules: checker, test
@@ -45,21 +45,18 @@ produce API documentation using the following steps:
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
-@version: 2.0 alpha
+@version: 2.0S{alpha}
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Add support for groups to the latex outputter (for vars,
-     classes, modules, & properties).
-@todo 2.0: Finish the man-page style outputter. (epyman)
 @todo 2.0: Create a better default top_page than trees.html
-@todo 2.0: Add more symbols (like E{E}{->}).
 
-@todo 2.1: Add --no-inheritance? (don't inherit docs)
+@todo 2.1: Improve ModuleDoc._find_imported_variables.
 @todo 2.1: Modify L{epydoc.html} to write directly to streams,
            rather than building up strings.
     
+@todo 3.0: Add the man-page style outputter. (epyman)
 @todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}: ObjDoc will just
            contain info about objects, but not gather it.  An
            'inspection' module will be responsible for gathering the
@@ -101,7 +98,7 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 # Changes needed for docs:
 #   - document the method for deciding what's public/private
 #   - fields are defined slightly differently (@group)
-#   - new fields (@group: order is significant; @sort)
+#   - new fields (@group: order is significant??; @sort)
 #   - depreciated __epydoc_sort__
 #   - staticmethod/classmethod
 #   - document __extra_epydoc_fields__ and @newfield
