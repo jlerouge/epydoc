@@ -46,16 +46,10 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
                     'Bruce Mitchener <bruce@cubik.org>']
 
 # Sort order
-__epydoc_sort__ = ['cli',
-                   'gui',
-                   'imports',
-                   'objdoc',
-                   'epytext',
-                   'uid',
-                   'html',
-                   'css',
-                   'checker',
-                   ]
+__epydoc_sort__ = ['cli', 'gui', 'imports', 
+                   'objdoc', 'epytext', 'uid',
+                   'html', 'css', 'help',
+                   'checker']
 
 # To do:
 #   - better doc inheritence?
