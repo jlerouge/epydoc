@@ -27,11 +27,19 @@ L{epytext} module.
 Each Python object is identified by a globally unique identifier,
 implemented with the L{UID} class.  These identifiers are also used by
 the C{Link} class to implement crossreferencing between C{ObjDoc}s.
-"""
 
-# This can get changed by other modules (e.g., by epydoc.cli in
-# response to command-line arguments)
-DEFAULT_DOCFORMAT = 'epytext'
+@var DEFAULT_DOCFORMAT: The default value for C{__docformat__}, if it
+is not specified by modules.  C{__docformat__} is a module variable
+that specifies the markup language for the docstrings in a module.
+Its value is a string, consisting the name of a markup language,
+optionally followed by a language code (such as C{en} for English).
+Some typical values for C{__docformat__} are:
+
+    >>> __docformat__ = 'plaintext'
+    >>> __docformat__ = 'epytext'
+    >>> __docformat__ = 'epytext en'
+"""
+__docformat__ = 'epytext en'
 
 ##################################################
 ## Imports
@@ -135,6 +143,25 @@ def _find_docstring(uid):
 
     # We couldn't find a docstring line number.
     return (None, None)
+
+##################################################
+## __docformat__
+##################################################
+
+DEFAULT_DOCFORMAT = 'epytext'
+def set_default_docformat(new_format):
+    """
+    Change the default value for C{__docformat__} to the given value.
+    The current default value for C{__docformat__} is recorded in
+    C{DEFAULT_DOCFORMAT}.
+
+    @param new_format: The new default value for C{__docformat__}
+    @type new_format: C{string}
+    @see: L{DEFAULT_DOCFORMAT}
+    @rtype: C{None}
+    """
+    global DEFAULT_DOCFORMAT
+    DEFAULT_DOCFORMAT = new_format
 
 ##################################################
 ## ObjDoc
@@ -397,6 +424,17 @@ class ObjDoc:
     @ivar _field_warnings: Warnings generated when processing the
         object's docstring's fields.
     """
+    # The following field tags are currently under consideration:
+    #     - @group: ...
+    #     - @attention: ...
+    #     - @note: ...
+    #     - @bug: ...
+    #     - @depreciated: ...
+    #     - @invariant: ...
+    #     - @precondition: ...
+    #     - @postcondition: ...
+    #     - @since: ...
+    #     - @todo: ...
     def __init__(self, obj, verbosity=0):
         """
         Create the documentation for the given object.
@@ -438,14 +476,30 @@ class ObjDoc:
         else: module = self._uid.module()
         self._docformat = DEFAULT_DOCFORMAT
         if module is not None:
-            try: self._docformat = module.value().__docformat__
+            try: self._docformat = module.value().__docformat__.lower()
             except: pass
+            
+        # Ignore __docformat__ region codes.
+        try: self._docformat = self._docformat.split()[0]
+        except: pass
+
+        # Check that it's an acceptable format.
+        if (self._docformat not in ('epytext', 'plaintext') and
+            self._uid.is_module()):
+            estr = ("Unknown __docformat__ value %s; " % self._docformat +
+                    "treating as plaintext.")
+            self._field_warnings.append(estr)
+            self._docformat = 'plaintext'
 
         # If there's a doc string, parse it.
         docstring = _getdoc(obj)
+        if type(docstring) == type(''): docstring = docstring.strip()
         if docstring:
             self._documented = 1
-            self.__parse_docstring(docstring)
+            if self._docformat == 'epytext':
+                self.__parse_docstring(docstring)
+            else:
+                self._descr = epytext.parse_as_literal(docstring)
         else:
             self._documented = 0
     
@@ -571,7 +625,8 @@ class ObjDoc:
         # If there were any errors, handle them by simply treating
         # the docstring as a single literal block.
         if parse_errors:
-            pdoc = epytext.parse_as_literal(docstring)
+            self._descr = epytext.parse_as_literal(docstring)
+            return
 
         # Extract and process any fields
         if (pdoc.hasChildNodes() and pdoc.childNodes[0].hasChildNodes() and
