@@ -152,6 +152,36 @@ def _find_docstring(uid):
     # We couldn't find a docstring line number.
     return (None, None)
 
+_IDENTIFIER_LIST_REGEXP = re.compile(r'^([\w.]+[\s,:;]?\s*)*[\w.]+\s*$')
+def _descr_to_identifiers(descr):
+    """
+    Given the XML DOM tree for a fragment of epytext that contains a
+    list of identifiers, return a list of those identifier names.
+    This is used by fields such as C{@group} and C{@sort}, which expect
+    lists of identifiers as their values.
+
+    @rtype: C{list} of C{string}
+    @return: A list of the identifier names contained in C{descr}.
+    @param descr: The DOM tree for a fragment of epytext containing
+        a list of identifiers.  C{descr} must contain a single para
+        element, whose contents consist of a list of identifiers,
+        separated by spaces, commas, colons, or semicolons.  C{descr}
+        should not contain any inline markup.
+    @raise ValueError: If C{descr} does not contain a valid value (a
+        single paragraph with no in-line markup)
+    """
+    if len(descr.childNodes) != 1:
+        raise ValueError, 'Expected a single paragraph'
+    para = descr.childNodes[0]
+    if para.tagName != 'para':
+        raise ValueError, 'Expected a para; got a %s' % para.tagName
+    if len(para.childNodes) != 1:
+        raise ValueError, 'Colorization is not allowed'
+    idents = para.childNodes[0].data
+    if not _IDENTIFIER_LIST_REGEXP.match(idents):
+        raise ValueError, 'Bad Identifier list: %r' % idents
+    return re.split('[ ?:;,]+', idents)
+
 ##################################################
 ## __docformat__
 ##################################################
@@ -392,6 +422,36 @@ class Raise:
         return self._descr
         
 #////////////////////////////////////////////////////////
+#// Generalized Fields
+#////////////////////////////////////////////////////////
+
+class DocField:
+    """
+    A documentation field for the object.
+    """
+    def __init__(self, tags, singular, plural=None,
+                 multivalue=1, short=0):
+        if type(tags) in (type(()), type([])):
+            self.tags = tuple(tags)
+        elif type(tags) == type(''):
+            self.tags = (tags,)
+        else: raise TypeError('Bad tags: %s' % tags)
+        self.singular = singular
+        self.plural = plural
+        self.multivalue = multivalue
+        self.short = short
+
+    def __cmp__(self, other):
+        return (isinstance(other, DocField) and
+                self.tags == other.tags)
+    
+    def __hash__(self):
+        return hash(self.tags)
+
+    def __repr__(self):
+        return '<Field: %s>' % self.tags[0]
+
+#////////////////////////////////////////////////////////
 #// Base ObjDoc Class
 #////////////////////////////////////////////////////////
 class ObjDoc:
@@ -402,12 +462,10 @@ class ObjDoc:
 
         - X{uid}: The object's unique identifier
         - X{descr}: A description of the object
-        - X{authors}: A list of the object's authors
-        - X{version}: The object's version
-        - X{seealsos}: A list of the object's see-also links
-        - X{requires}: Requirements for using the object
-        - X{warnings}: Warnings about the object
-        - X{notes}: Notes about the object
+        - X{fields}: A dictionary containing standard fields,
+          such as authors, version, and notes.  The complete
+          list of fields is defined by the variable
+          L{ObjDoc.FIELDS}.
         - X{sortorder}: The object's sort order, as defined by its
           C{__epydoc_sort__} variable.
 
@@ -415,17 +473,22 @@ class ObjDoc:
     @type _uid: L{UID}
     @ivar _descr: The object's description, encoded as epytext.
     @type _descr: L{xml.dom.minidom.Document}
-    @ivar _authors: Author(s) of the object
-    @type _authors: C{list} of L{xml.dom.minidom.Element}
-    @ivar _version: Version of the object
-    @type _version: L{xml.dom.minidom.Element}
-    @ivar _seealsos: See also entries
-    @type _seealsos: C{list} of L{xml.dom.minidom.Element}
-    @ivar _requires: Requirements of the object
-    @type _requires: C{list} of L{xml.dom.minidom.Element}
-    @ivar _warnings: Warnings about the object
-    @type _warnings: C{list} of L{xml.dom.minidom.Element}
 
+    @ivar _fields: Documentation fields that were extracted from
+        the object's docstring.  The list of fields that are
+        accepted by epydoc is defined by L{ObjDoc.FIELDS}.
+    @type _fields: C{dictionary} from L{DocField} to C{list} of
+                   L{xml.dom.minidom.Element}
+    @cvar FIELDS: The set of standard docstring fields that
+        epydoc accepts.  The order of fields is significant:
+        when the fields are rendered, they will be listed in
+        the order that they are given in here.  Note that this
+        list does X{not} include special fields, such as
+        \"group\"; it just includes \"standard\" fields, which
+        contain a single textual description or a list of
+        textual descriptions.
+    @type FIELDS: C{List} of L{DocField}
+                   
     @ivar _parse_warnings: Warnings generated when parsing the
         object's docstring.
     @ivar _parse_errors: Errors generated when parsing the object's
@@ -433,16 +496,23 @@ class ObjDoc:
     @ivar _field_warnings: Warnings generated when processing the
         object's docstring's fields.
     """
-    # The following field tags are currently under consideration:
-    #     - @group: ...
-    #     - @attention: ...
-    #     - @bug: ...
-    #     - @depreciated: ...
-    #     - @invariant: ...
-    #     - @precondition: ...
-    #     - @postcondition: ...
-    #     - @since: ...
-    #     - @todo: ...
+    FIELDS = [
+        DocField(['version'], 'Version', multivalue=0),
+        DocField(['author', 'authors'], 'Author', 'Authors', short=1),
+        DocField(['requires', 'require', 'requirement'], 'Requires'),
+        DocField(['warn', 'warning'], 'Warning', 'Warnings'),
+        DocField(['note'], 'Note', 'Notes'),
+        DocField(['bug'], 'Bug', 'Bugs'),
+        DocField(['depreciated'], 'Depreciated', multivalue=0),
+        DocField(['precondition', 'precond'], 'Precondition', 'Preconditions'),
+        DocField(['postcondition', 'postcond'], 'Postcondition',
+                  'Postconditions'),
+        DocField(['since'], 'Since', multivalue=0),
+        DocField(['todo'], 'To Do'),
+        DocField(['see', 'seealso'], 'See Also', short=1),
+        DocField(['attention'], 'Attention'),
+        DocField(['invariant'], 'Invariant'),
+        ]
     def __init__(self, obj, verbosity=0):
         """
         Create the documentation for the given object.
@@ -457,14 +527,8 @@ class ObjDoc:
         """
         self._uid = make_uid(obj)
 
-        # Initialize fields.
-        self._authors = []
-        self._version = None
-        self._seealsos = []
+        # Default: no description
         self._descr = None
-        self._requires = []
-        self._warnings = []
-        self._notes = []
 
         # Initialize errors/warnings, and remember verbosity.
         self.__verbosity = verbosity
@@ -472,17 +536,29 @@ class ObjDoc:
         self._parse_warnings = []
         self._field_warnings = []
 
-        # If there's an __epydoc_sort__ attribute, keep it.
-        if hasattr(obj, '__epydoc_sort__'):
-            self._sortorder = obj.__epydoc_sort__
-        elif hasattr(obj, '__all__'):
-            self._sortorder = obj.__all__
-        else:
-            self._sortorder = None
-
-        # Look up __docformat__
+        # Look up our module.  We use this to look up both
+        # __docformat__ and __extra_epydoc_fields__.
         if self._uid.is_module(): module = self._uid
         else: module = self._uid.module()
+        
+        # Initialize fields.  Add any extra fields.
+        self._fields = self.FIELDS[:]
+        if module is not None:
+            try:
+                for field in module.value().__extra_epydoc_fields__:
+                    if type(field) == type(''):
+                        self._fields.append(DocField(field.lower(), field))
+                    else:
+                        self._fields.append(DocField(*field))
+            except: self._fields = self.FIELDS
+
+        # Initialize the fields map.  This is where field values are
+        # actually kept.
+        self._fields_map = {}
+        for field in self._fields:
+            self._fields_map[field] = []
+
+        # Look up __docformat__
         self._docformat = DEFAULT_DOCFORMAT
         if module is not None:
             try: self._docformat = module.value().__docformat__.lower()
@@ -499,6 +575,14 @@ class ObjDoc:
                     "treating as plaintext.")
             self._field_warnings.append(estr)
             self._docformat = 'plaintext'
+
+        # If there's an __epydoc_sort__ attribute, keep it.
+        if hasattr(obj, '__epydoc_sort__'):
+            self._sortorder = obj.__epydoc_sort__
+        elif hasattr(obj, '__all__'):
+            self._sortorder = obj.__all__
+        else:
+            self._sortorder = None
 
         # If there's a doc string, parse it.
         docstring = _getdoc(obj)
@@ -538,55 +622,19 @@ class ObjDoc:
         @rtype: L{xml.dom.minidom.Document}
         """
         return self._descr
+
+    def fields(self):
+        """
+        @return: A dictionary mapping from fields to lists of
+            descriptions.
+        @rtype: C{dictionary} from L{DocField} to C{list} of
+                L{xml.dom.minidom.Document}
+        """
+        return [f for f in self._fields if self._fields_map[f]]
+
+    def field_value(self, field):
+        return self._fields_map[field]
     
-    def authors(self):
-        """
-        @return: A list of the authors of the object documented by
-        this C{ObjDoc}.
-        @rtype: C{list} of L{xml.dom.minidom.Element}
-        """
-        return self._authors
-    
-    def version(self):
-        """
-        @return: The version of the object documented by this
-        C{ObjDoc}.
-        @rtype: L{xml.dom.minidom.Element}
-        """
-        return self._version
-    
-    def seealsos(self):
-        """
-        @return: A list of descriptions of resources that are related
-        to the object documented by this C{ObjDoc}.
-        @rtype: C{list} of L{xml.dom.minidom.Element}
-        """
-        return self._seealsos
-
-    def requires(self):
-        """
-        @return: A list of requirements for using the object
-        documented by this C{ObjDoc}.
-        @rtype: C{list} of L{xml.dom.minidom.Element}
-        """
-        return self._requires
-
-    def warnings(self):
-        """
-        @return: A list of warnings about the object documented by
-        this C{ObjDoc}.
-        @rtype: C{list} of L{xml.dom.minidom.Element}
-        """
-        return self._warnings
-
-    def notes(self):
-        """
-        @return: A list of notes about the object documented by
-        this C{ObjDoc}.
-        @rtype: C{list} of L{xml.dom.minidom.Element}
-        """
-        return self._notes
-
     def sortorder(self):
         """
         @return: The object's C{__epydoc_sort__} list.
@@ -603,35 +651,17 @@ class ObjDoc:
         This method should be overridden, and called as the default
         case.
         """
-        if tag == 'author':
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            self._authors.append(descr)
-        elif tag == 'version':
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            if self._version != None:
-                warnings.append('Version redefined')
-            self._version = descr
-        elif tag in ('see', 'seealso'):
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            self._seealsos.append(descr)
-        elif tag in ('requires', 'require', 'requirement'):
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            self._requires.append(descr)
-        elif tag in ('warn', 'warning'):
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            self._warnings.append(descr)
-        elif tag in ('note',):
-            if arg != None:
-                warnings.append(tag+' did not expect an argument')
-            self._notes.append(descr)
-        else:
-            warnings.append('Unknown field tag %r' %tag)
-    
+        for field, values in self._fields_map.items():
+            if tag in field.tags:
+                if arg is not None:
+                    warnings.append(tag+' did not expect an argument')
+                if not field.multivalue and len(values) > 0:
+                    warnings.append(tag+ ' redefined')
+                    del values[:]
+                values.append(descr)
+                return
+        warnings.append('Unknown field tag %r' %tag)
+        
     #////////////////////////////
     #// Private
     #////////////////////////////
@@ -771,6 +801,8 @@ class ModuleDoc(ObjDoc):
     def __init__(self, mod, verbosity=0):
         self._tmp_var = {}
         self._tmp_type = {}
+        self._tmp_groups = {}
+        self._tmp_group_order = []
         ObjDoc.__init__(self, mod, verbosity)
 
         # If mod is a package, then it will contain a __path__
@@ -834,21 +866,36 @@ class ModuleDoc(ObjDoc):
         del self._tmp_var
         del self._tmp_type
 
+        # Wait until later to handle groups (after all modules have
+        # been registered.)
+        self._groups = None
+
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
-        if tag in ('variable', 'var'):
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+        if tag == 'group':
+            if arg is None:
+                warnings.append(tag+' expected an argument (group name)')
+            else:
+                try:
+                    idents = _descr_to_identifiers(descr)
+                except ValueError, e:
+                    warnings.append('Bad group identifier list')
+                    return
+                self._tmp_groups[arg] = idents
+                self._tmp_group_order.append(arg)
+        elif tag in ('variable', 'var'):
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_var.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_var[arg] = descr
         elif tag == 'type':
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_type.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
@@ -870,9 +917,39 @@ class ModuleDoc(ObjDoc):
             str += `len(self._variables)`+' variables; '
         return str[:-2]+')>'
 
+    def _find_groups(self):
+        # Put together groups
+        self._groups = []
+        if self._tmp_groups:
+            elts = {}
+            if self.ispackage():
+                for m in self.modules(): elts[m.name()] = m.target()
+            for c in self.classes(): elts[c.name()] = c.target()
+            for f in self.functions(): elts[f.name()] = f.target()
+            for v in self.variables(): elts[v.name()] = v.uid()
+            for name in self._tmp_group_order:
+                members = self._tmp_groups[name]
+                group = []
+                for member in members:
+                    try:
+                        group.append(elts[member])
+                    except KeyError:
+                        estr = ('Group member not found: %s.%s' %
+                                (self.uid(), member))
+                        self._field_warnings.append(estr)
+                if group:
+                    self._groups.append((name, group))
+                else:
+                    estr = 'Empty group %r deleted' % name
+                    self._field_warnings.append(estr)
+
     #////////////////////////////
     #// Accessors
     #////////////////////////////
+
+    def groups(self):
+        if self._groups is None: self._find_groups()
+        return self._groups
         
     def functions(self):
         """
@@ -1016,6 +1093,8 @@ class ClassDoc(ObjDoc):
         self._tmp_ivar = {}
         self._tmp_cvar = {}
         self._tmp_type = {}
+        self._tmp_groups = {}
+        self._tmp_group_order = []
         ObjDoc.__init__(self, cls, verbosity)
 
         # Handle methods & class variables
@@ -1130,28 +1209,42 @@ class ClassDoc(ObjDoc):
         self._inh_cvariables = []
         self._inh_ivariables = []
 
+        # Put together the groups
+        self._find_groups()
+
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
-        if tag in ('cvariable', 'cvar'):
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+        if tag == 'group':
+            if arg is None:
+                warnings.append(tag+' expected an argument (group name)')
+            else:
+                try:
+                    idents = _descr_to_identifiers(descr)
+                except ValueError, e:
+                    warnings.append('Bad group identifier list: %s' % e)
+                    return
+                self._tmp_groups[arg] = idents
+                self._tmp_group_order.append(arg)
+        elif tag in ('cvariable', 'cvar'):
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_cvar.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_cvar[arg] = descr
         elif tag in ('ivariable', 'ivar'):
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_ivar.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_ivar[arg] = descr
         elif tag == 'type':
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_type.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
@@ -1218,6 +1311,50 @@ class ClassDoc(ObjDoc):
 #         print self.uid(), 'IC', self._inh_cvariables
 #         print self.uid(), 'IV', self._inh_ivariables
 
+    def _find_groups(self):
+        # Put together groups
+        self._groups = []
+        
+        if self._tmp_groups:
+            elts = {}
+            for m in self.allmethods(): elts[m.name()] = m.target()
+            for v in self.ivariables(): elts[v.name()] = v.uid()
+            for v in self.cvariables(): elts[v.name()] = v.uid()
+            for c in self.subclasses(): elts[c.name()] = c.uid()
+            for name in self._tmp_group_order:
+                members = self._tmp_groups[name]
+                group = []
+                for member in members:
+                    try:
+                        group.append(elts[member])
+                    except KeyError:
+                        estr = ('Group member not found: %s.%s' %
+                                (self.uid(), member))
+                        self._field_warnings.append(estr)
+                if group:
+                    self._groups.append((name, group))
+                else:
+                    estr = 'Empty group %r deleted' % name
+                    self._field_warnings.append(estr)
+
+        # Add a special group: inherited
+        for (groupname, groupmembers) in self._groups:
+            if groupname.startswith('Inherited'):
+                estr = '"Inherited..." is a reserved group name.'
+                self._field_warnings.append(estr)
+
+        inh_groups = {}
+        for m in self.allmethods():
+            if m.target().cls() != self._uid:
+                name = 'Inherited from %s' % m.target().cls().shortname()
+                if not inh_groups.has_key(name): inh_groups[name] = []
+                inh_groups[name].append(m.target())
+
+        inh_groupnames = inh_groups.keys()
+        inh_groupnames.sort()
+        for groupname in inh_groupnames:
+            self._groups.append((groupname, inh_groups[groupname]))
+
     #////////////////////////////
     #// Accessors
     #////////////////////////////
@@ -1225,6 +1362,9 @@ class ClassDoc(ObjDoc):
 #     def inherited_cvariables(self): return self._inh_cvariables 
 #     def inherited_ivariables(self): return self._inh_ivariables
 
+    def groups(self):
+        return self._groups
+        
     def is_exception(self):
         """
         @return: True if this C{ClassDoc} documents an exception
@@ -1641,35 +1781,35 @@ class FuncDoc(ObjDoc):
     def _process_field(self, tag, arg, descr, warnings):
         # return, rtype, arg, type, raise
         if tag in ('return', 'returns'):
-            if arg != None:
+            if arg is not None:
                 warnings.append(tag+' did not expect an argument')
             if self._tmp_param.has_key('return'):
                 warnings.append('Redefinition of @%s' % tag)
             self._tmp_param['return'] = descr
         elif tag in ('returntype', 'rtype'):
-            if arg != None:
+            if arg is not None:
                 warnings.append(tag+' did not expect an argument')
             if self._tmp_type.has_key('return'):
                 warnings.append('Redefinition of @%s' % tag)
             self._tmp_type['return'] = descr
         elif tag in ('param', 'parameter', 'arg', 'argument'):
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_param.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_param[arg] = descr
         elif tag == 'type':
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             if self._tmp_type.has_key(arg):
                 warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
         elif tag in ('raise', 'raises', 'exception', 'except'):
-            if arg == None:
-                warnings.append(tag+' expected an argument')
-                arg = ''
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
             self._raises.append(Raise(arg, descr))
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
