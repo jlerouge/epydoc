@@ -412,6 +412,11 @@ class ObjectUID(UID):
                 else: self._module = ObjectUID(module)
             elif typ is _TypeType and hasattr(obj, '__module__'):
                 self._module = ObjectUID(import_module(obj.__module__))
+                if (self._module is not None and
+                    obj not in self._module.value().__dict__.values()):
+                    # The __module__ attribute lied; try finding it ourselves.
+                    module = _find_builtin_obj_module(obj)
+                    if module is not None: self._module = ObjectUID(module)
             elif typ is _TypeType:
                 module = _find_builtin_obj_module(obj)
                 if module is None: self._module = None
@@ -703,6 +708,7 @@ def _find_builtin_obj_module(obj, show_warnings=1):
                     py_modules.append(module)
                 break # Stop looking in this module.
 
+    # If it's in a .so module, use that.
     if so_modules:
         if len(so_modules) > 1:
             if show_warnings:
@@ -710,6 +716,8 @@ def _find_builtin_obj_module(obj, show_warnings=1):
                 print >>sys.stderr, ('Warning: '+`obj`+
                                  ' appears in multiple .so modules')
         module = so_modules[0]
+
+    # Otherwise, check the builtin modules.
     elif builtin_modules:
         if len(builtin_modules) > 1:
             print builtin_modules
@@ -718,9 +726,13 @@ def _find_builtin_obj_module(obj, show_warnings=1):
                 print >>sys.stderr, ('Warning: '+`obj`+
                                  ' appears in multiple builtin modules')
         module = builtin_modules[0]
+
+    # Give precedence to the "types" module over other py modules
+    elif types in py_modules:
+        module = types
+        
+    # Otherwise, check the python modules.
     elif py_modules:
-        # Give precedence to the "types" module.
-        if types in py_modules: py_modules = [types]
         if len(py_modules) > 1:
             if show_warnings:
                 if sys.stderr.softspace: print >>sys.stderr
