@@ -7,77 +7,203 @@
 <body>
 <h1>Using Epydoc</h1>
 
-<h2> Command Line Usage </h2>
+<h2> Command Line Interface </h2>
 
+<p> The <code>epydoc</code> script can be used to create API
+documentation for a set of modules and packages: </p>
 
+<div class="box">
+<pre>
+epydoc [-o <code class="user">DIR</code>] [-n <code class="user">NAME</code>] [-u <code class="user">URL</code>] [-c <code class="user">SHEET</code>] [-v] <code class="user">MODULES...</code>
+</pre>
+
+<dl>
+  <dt><code><code class="user">MODULES...</code></code></dt>
+  <dd>
+    A list of the modules that should be documented.  Modules may be
+    specified using either filenames (such as
+    "<code>epydoc/epytext.py</code>") or module names (such as
+    "<code>os.path</code>").  The filename for a package is its
+    "<code>__init__.py</code>" file.
+  </dd>
+  
+  <dt><code>-o <code class="user">DIR</code></code>, <code>--output <code class="user">DIR</code></code>, <code>--target <code class="user">DIR</code></code></dt>
+  <dd>Output directory for HTML files.
+  </dd>
+
+  <dt><code>-n <code class="user">NAME</code></code>, <code>--name <code class="user">NAME</code></code></dt>
+  <dd>Project name (for HTML header/footer).
+  </dd>
+
+  <dt><code>-u <code class="user">URL</code></code>, <code>--url <code class="user">URL</code></code></dt>
+  <dd>Project URL (for HTML header/footer).
+  </dd>
+
+  <dt><code>-c <code class="user">CSS</code></code>, <code>--css <code class="user">SHEET</code></code></dt>
+  <dd>CSS stylesheet for HTML files.  If <code class="user">SHEET</code> is a file, then the
+    stylesheet is copied from that file; otherwise, <code class="user">SHEET</code> is taken
+    to be the name of a built-in stylesheet.  For a list of the
+    built-in stylesheets, run "<code>epydoc --help css</code>".
+  </dd>
+
+  <dt><code>-v</code>, <code>--verbose</code></dt>
+  <dd>Produce verbose output.
+  </dd>
+
+  <dt><code>-vv</code>, <code>-vvv</code>, <code>-vvvv</code></dt>
+  <dd>Produce successively more verbose output.
+  </dd>
+</dl>
+</div>
+
+<p> For example, the following command is used to produce the API
+documentation for epydoc itself: </p>
+
+<pre class="screen">
+<code class="prompt">[epydoc]$</code> epydoc src/epydoc/*.py -o api -n epydoc \
+<code class="prompt">         </code>        -u http://epydoc.sf.net -css blue
+</pre>
+
+<p> For a complete description of the command line usage of
+<code>epydoc</code>, call "<code>epydoc --help</code>". </p>
 
 <h2> Graphical Interface </h2>
 
 <p> Epydoc also includes a graphical interface implemented in Tkinter,
 for systems where command line interfaces are not convenient (such as
-Windows). </p>
+Windows).  </p>
+
+<a name="gui"/>
+<center><p><img src="epydoc_gui.png"></p>
+</center>
+
+<p> Use the "Add" field to specify what modules you wish to document.
+You can specify modules using filenames (such as
+"<code>epydoc/epytext.py</code>") or module names (such as
+"<code>os.path</code>").  Once you have added all of the modules that
+you wish to document, press the "Go!" button.  Epydoc's progress will
+be displayed on the progress bar. </p>
+
+<p> To specify the package's name and URL, the output directory, and
+the CSS stylesheet, click on the "Options" arrow at the bottom of the
+window.  This opens the options pane, which contains fields
+corresponding to each command line option. </p>
+
+<a name="guiconfig"/>
+<center><p><img src="epydoc_guiconfig.png"></p>
+</center>
+
+<p> The epydoc graphical interface can save and load "project files",
+which can be used to record the set of modules and the options that
+you have selected.  Select "<code>File&rarr;Save</code>" to save the
+current modules and options to a project file; and
+"<code>File&rarr;Open</code>" to open a previously saved project
+file. </p>
 
 <h2> Documentation Completeness Checks </h2>
 
-<h2> Stylesheets and Help Files </h2>
+<p> The <code>epydoc</code> script can be used to check the
+completeness of the reference documentation.  In particular, it will
+check that every module, class, method, and function has a
+description; that every parameter has a description and a type; and
+that every variable has a type.  If the "<code>-p</code>" option is
+used, then these checks are run on both public and private objects;
+otherwise, the checks are only run on public objects. </p>
 
-<h2> Usage </h2>
-
-<pre code="screen">
-    epydoc [-o DIR] [-n NAME] [-p] [--css SHEET] [-v] MODULE...
-    epydoc --check [-p] [-a] [-v] MODULE...
-    epydoc --help
-    epydoc --version
-
-    MODULE...
-        List of filenames containing modules to process.  When
-        documenting packages, the filename must include the package
-        directory (i.e., you can't run epydoc within the package
-        directory, using relative filenames).
-        
-    --help, --usage, -h, -?
-        Display this usage message.
-
-    --version, -V
-        Print the version of Epydoc.
-
-    -o DIR, --output DIR, --target DIR
-        Output directory for HTML files
-        
-    -n NAME, --name NAME
-        Package name (for HTML header/footer)
-
-    -u URL, --url URL
-        Package URL (for HTML header/footer)
-
-    --css SHEET
-        CSS stylesheet for HTML files.  If SHEET is a file, then the
-        stylesheet is copied from that file; otherwise, SHEET is taken
-        to be the name of a built-in stylesheet.  For a list of the
-        built-in stylesheets, run "epydoc --help css".
-        
-    --check
-        Perform completeness checks on the documentation
-
-    -p
-        Check private objects (those that start with _)
-
-    -a
-        Run all checks.
-
-    -v, --verbose
-        Produce verbose output
-
-    -vv, -vvv, -vvvv
-        Produce successively more verbose output
+<div class="box">
+<pre>
+epydoc --check [-p] [-v] <code class="user">MODULES...</code>
 </pre>
+
+<dl>
+  <dt><code><code class="user">MODULES...</code></code></dt>
+  <dd>
+    A list of the modules that should be checked.  Modules may be
+    specified using either filenames (such as
+    "<code>epydoc/epytext.py</code>") or module names (such as
+    "<code>os.path</code>").  The filename for a package is its
+    "<code>__init__.py</code>" file.
+  </dd>
+  
+  <dt><code>--help</code>, <code>--usage</code>, <code>-h</code>, <code>-?</code></dt>
+  <dd>Display this usage message.
+  </dd>
+
+  <dt><code>--version</code>, <code>-V</code></dt>
+  <dd>Print the version of Epydoc.
+  </dd>
+
+  <dt><code>--check</code></dt>
+  <dd>Perform completeness checks on the documentation.
+  </dd>
+
+  <dt><code>-p</code></dt>
+  <dd>Check private objects (those that start with a single
+  underscore).
+  </dd>
+
+  <dt><code>-v</code>, <code>--verbose</code></dt>
+  <dd>Produce verbose output.
+  </dd>
+
+  <dt><code>-vv</code>, <code>-vvv</code>, <code>-vvvv</code></dt>
+  <dd>Produce successively more verbose output.
+  </dd>
+</dl>
+</div>
+
+<p> For each object that fails a check, epydoc will print a warning.
+For example, some of the warnings generated when the completeness of
+the documentation for epydoc's private objects are: </p>
+
+<pre class="screen">
+epydoc.html.HTML_Doc._dom_link_to_html........No docs
+epydoc.html.HTML_Doc._module..................No type
+epydoc.html.HTML_Doc._link_to_html.link.......No descr
+epydoc.html.HTML_Doc._author.return...........No type
+epydoc.html.HTML_Doc._author.authors..........No descr, No type
+epydoc.html.HTML_Doc._author.container........No descr, No type
+epydoc.html.HTML_Doc._base_tree.uid...........No descr, No type
+epydoc.html.HTML_Doc._base_tree.width.........No descr, No type
+epydoc.html.HTML_Doc._base_tree.postfix.......No descr, No type
+</pre>
+
+<p> If you'd like more fine-grained control over what gets checked, or
+you would like to check other fields (such as the author or version),
+then you should use the <a
+href="api/epydoc.checker.DocChecker.html"><code>DocChecker</code></a>
+class directly. </p>
+
+<h2> CSS Stylesheets </h2>
+
+<p> Epydoc creates a CSS stylesheet (<code>epydoc.css</code>) when it
+builds the API documentation for a project.  You can specify which
+stylesheet should be used using the <code>-c</code> command-line
+option.  If you do not specify a stylesheet, and one is already
+present, epydoc will use that stylesheet; otherwise, it will use the
+default stylesheet.  For a list of the CSS classes used by epydoc, see
+the <a href="stylesheet.html">default stylesheet</a>.
+
+<h2> Help File </h2>
+
+<p> Epydoc will create a help file (<code>epydoc-help.html</code>)
+when it builds the API documentation for a project.  However, if a
+help file is already present in the target directory, epydoc will not
+overwrite it.
+
+<p> Note: Currently, the help file is not very helpful; if someone
+wants to contribute a new default helpfile, I'd happily accept it.
+</p>
+
 
 <table width="100%" class="navbox" cellpadding="1" cellspacing="0">
   <tr>
   <td align="center" width="20%">
     <a class="nav" href="index.html">[Epydoc]</a></td>
   <td align="center" width="20%">
-    <a class="nav" href="http://sourceforge.net/project/showfiles.php?group_id=32455">[Download]</a></td>
+    <a class="nav" href="installing.html">[Installing]</a></td>
+<!--  <td align="center" width="20%">
+    <a class="nav" href="using.html">[Using]</a></td>-->
   <td align="center" width="20%">
     <a class="nav" href="epytext.html">[Epytext]</a></td>
   <td align="center" width="20%">
@@ -91,7 +217,7 @@ Windows). </p>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Mon Sep 23 06:37:30 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Sep 25 03:45:01 EDT 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
