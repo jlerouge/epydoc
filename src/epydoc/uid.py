@@ -946,7 +946,7 @@ def findUID(name, container=None, docmap=None):
         if _is_variable_in(name, container, docmap):
             val = None # it may not be a real object
             return make_uid(val, container, name)
-    
+
         # Is it an object in the containing module?
         try:
             obj = module
@@ -994,7 +994,7 @@ def findUID(name, container=None, docmap=None):
     modcomponents = container_name.split('.')
     components = name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
-        for j in range(len(components)-1, 1, -1):
+        for j in range(len(components)-1, 0, -1):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:-1])
@@ -1007,6 +1007,21 @@ def findUID(name, container=None, docmap=None):
                 field = getattr(obj, fieldname)
                 return make_uid(field, make_uid(obj), fieldname)
             except: pass
+
+    # If the name starts with 'self.', then try leaving that off.
+    if name.startswith('self.'):
+        return findUID(name[5:], container, docmap)
+
+    ## Is it a parameter of a function/method?  If so, return the UID
+    ## of the function/method.
+    #if '.' in name and docmap:
+    #    components = name.split('.')
+    #    parent = '.'.join(components[:-1])
+    #    param = components[-1]
+    #    parent = findUID(parent, container, docmap)
+    #    if parent is not None and parent.is_routine():
+    #        if _is_parameter_for(param, parent, docmap):
+    #            return parent
 
     # We couldn't find it; return None.
     return None
@@ -1035,4 +1050,11 @@ def _is_variable_in(name, container, docmap):
             if var.uid().shortname() == name: return 1
         for var in container_doc.cvariables(): 
             if var.uid().shortname() == name: return 1
+    return 0
+
+def _is_parameter_for(name, container, docmap):
+    container_doc = docmap.get(container)
+    if container.is_routine():
+        for param in container_doc.parameter_list():
+            if param.name == name: return 1
     return 0
