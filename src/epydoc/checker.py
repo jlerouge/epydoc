@@ -372,22 +372,6 @@ class DocChecker:
             check_type):
             self._warn('No type', name+'.'+var.name())
             
-    def _documented_ancestor(self, doc):
-        """
-        @return: The closest documented ancestor of C{doc} (including
-            C{doc}).
-        @rtype: L{ObjDoc}
-        @param doc: The UID of the object whose documented ancestor
-            should be returned.
-        @type doc: L{UID}
-        """
-        if isinstance(doc, FuncDoc):
-            while (not doc.documented() and
-                   doc.overrides() and
-                   self._docmap.has_key(doc.overrides())):
-                doc = self._docmap[doc.overrides()]
-        return doc
-            
     def _check_func(self, doc):
         """
         Run checks on the function whose UID is C{doc}.
@@ -398,7 +382,7 @@ class DocChecker:
         """
         name = doc.uid().name()
         if not self._check_name_publicity(name): return
-        if doc != self._documented_ancestor(doc): return
+        if doc != self._docmap.documented_ancestor(doc.uid()): return
 
         if (self._checks & DocChecker.FUNC and
             not doc.documented() and
