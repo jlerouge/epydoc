@@ -8,7 +8,7 @@
 ## Configuration variables
 ##//////////////////////////////////////////////////////////////////////
 
-# Python source files
+# Python source files (don't include src/epydoc/test)
 PY_SRC = $(wildcard src/epydoc/*.py)
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
@@ -63,7 +63,7 @@ clean:
 ##//////////////////////////////////////////////////////////////////////
 
 distributions: .distributions.up2date
-.distributions.up2date: $(PY_SRC) .html.up2date $(DOCS)
+.distributions.up2date: test $(PY_SRC) .html.up2date $(DOCS)
 	$(MAKE) -C src distributions
 	touch .distributions.up2date
 
@@ -73,7 +73,7 @@ distributions: .distributions.up2date
 
 web: xfer
 webpage: xfer
-xfer: .html.up2date stdlib-html
+xfer: test .html.up2date stdlib-html
 	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
 	rsync -arzv -e ssh ${STDLIB}/ $(HOST):$(DIR)/stdlib
 
