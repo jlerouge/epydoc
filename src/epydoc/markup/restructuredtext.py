@@ -43,7 +43,14 @@ from epydoc.markup import *
 
 CONSOLIDATED_FIELDS = {
     'parameters': 'param',
+    'arguments': 'arg',
     'exceptions': 'except',
+    'variables': 'var',
+    'ivariables': 'ivar',
+    'cvariables': 'cvar',
+    'groups': 'group',
+    'types': 'type',
+    'keywords': 'keyword',
     }
 
 def parse_docstring(docstring, errors, **options):
