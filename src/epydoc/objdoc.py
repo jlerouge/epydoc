@@ -1007,16 +1007,26 @@ class ClassDoc(ObjDoc):
         self._staticmethods = []
         self._classmethods = []
 
-        try:
-            items = [(f, getattr(cls, f)) for f in dir(cls)]
-        except:
-            try: items = cls.__dict__.items()
-            except AttributeError: items = []
+        try: items = cls.__dict__.items()
+        except AttributeError: items = []
         for (field, val) in items:
             # Convert functions to methods.  (Since we're getting
             # values via __dict__)
             if type(val) is types.FunctionType:
                 val = new.instancemethod(val, None, cls)
+
+            # Deal with static/class methods. (Python 2.2)
+            try:
+                if isinstance(val, staticmethod):
+                    vuid = make_uid(getattr(cls, field))
+                    self._staticmethods.append(Link(field, vuid))
+                    continue
+                elif isinstance(val, classmethod):
+                    vuid = make_uid(getattr(cls, field))
+                    self._classmethods.append(Link(field, vuid))
+                    continue
+            except NameError: pass
+                
             vuid = make_uid(val, self._uid, field)
             
             # Don't do anything for these special variables:
@@ -1027,18 +1037,6 @@ class ClassDoc(ObjDoc):
             if vuid is None: continue
             # Don't do anything for modules.
             if vuid.is_module(): continue
-
-            # Try to categorize it as a static/class method.
-            try:
-                if not cls.__dict__.has_key(field): pass
-                elif type(cls.__dict__[field]) == staticmethod:
-                    self._staticmethods.append(Link(field, vuid))
-                    continue
-                elif type(cls.__dict__[field]) == classmethod:
-                    self._classmethods.append(Link(field, vuid))
-                    continue
-            except NameError:
-                pass # We're in Python 2.0 or 2.1
 
             # Is it a method?  
             if vuid.is_routine():
@@ -1227,6 +1225,17 @@ class ClassDoc(ObjDoc):
         @rtype: C{list} of L{Link}
         """
         return self._staticmethods
+
+    def allmethods(self):
+        """
+        @return: A list of all instance, class, and static methods
+            defined by the class documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        @see: L{methods}
+        @see: L{staticmethods}
+        @see: L{classmethods}
+        """
+        return self._methods + self._classmethods + self._staticmethods
     
     def cvariables(self):
         """
@@ -1330,6 +1339,9 @@ class FuncDoc(ObjDoc):
             raise TypeError("Can't document %s" % func)
         if self._uid.is_method() and not self.documented():
             self._find_override(self._uid.cls().value())
+            if self._overrides == self._uid:
+                raise ValueError('Circular override')
+                self._overrides = None
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
@@ -1539,7 +1551,7 @@ class FuncDoc(ObjDoc):
                                % (self.uid(), make_uid(base_method)))
                         self._field_warnings.append(estr)
                         return 0
-                
+
                 # We've found the method that we override.
                 self._overrides = make_uid(base_method)
                 return 0
@@ -1803,40 +1815,22 @@ class DocMap(UserDict.UserDict):
 
         # Add ourselves.
         self.add_one(obj)
+        doc = self.get(objID)
+        if not doc: return
 
         # Recurse to any related objects.
         if objID.is_module():
-            for (field, val) in obj.__dict__.items():
-                vuid = make_uid(val, objID, field)
-
-                # Skip any imported values.
-                if vuid.is_class() or vuid.is_function():
-                    if vuid.module() != objID: continue
-
-                if vuid.is_class():
-                    self.add(val)
-                elif vuid.is_routine():
-                    self.add(val)
+            for link in doc.functions() + doc.classes():
+                self.add(link.target().value())
         elif objID.is_class():
-            try:
-                items = [(f, getattr(obj, f)) for f in dir(obj)]
-            except:
-                try: items = obj.__dict__.items()
-                except AttributeError: items = []
-            for (field, val) in items:
-                # Convert functions to methods.  (Since we're getting
-                # values via __dict__)
-                if type(val) is types.FunctionType:
-                    val = new.instancemethod(val, None, obj)
-
-                vuid = make_uid(val, objID, field)
-                if vuid.is_routine():
-                    self.add(val)
-                elif vuid.is_class():
-                    self.add(val)
+            for link in doc.allmethods():
+                self.add(link.target().value())
+            for var in doc.cvariables():
+                if var.uid().is_class():
+                    self.add(var.value())
                     
+            # Make sure all bases are added.
             if self._document_bases:
-                # Make sure all bases are added.
                 for base in self.data[objID].bases():
                     self.add(base.target().value())
 
