@@ -58,15 +58,16 @@ __epydoc_sort__ = ['cli',
                    ]
 
 # To do:
-#   - better checks for private/public in _extract_index
 #   - change epytext field syntax
 #   - add escape characters to epytext
 #   - better doc inheritence?
-#   - refactor inheritance
-#   - turn off function doc inheritance?
-#   - add --check for doc inheritance?
+#     - refactor inheritance
+#     - turn off function doc inheritance?
+#     - add --check for doc inheritance?
 #   - add option: list vars that have no descr?
 #   - use __all__ when determining whether a name is private???
+#     - change _is_private to only take uids?  or var+uid?
+#   - report eptext errors with real line numbers
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
