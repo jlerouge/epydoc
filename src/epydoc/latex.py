@@ -495,12 +495,14 @@ class LatexFormatter:
     
     def _pprint_var_value(self, var, maxwidth=100):
         val = var.uid().value()
-        try:
-            val = `val`
-            if len(val) > maxwidth: val = val[:maxwidth-3] + '...'
-            val = self._text_to_latex(val, 1, 1)
+        try: val = `val`
         except: val = '...'
-        return '\\texttt{%s}' % val
+        if len(val) > maxwidth: val = val[:maxwidth-3] + '...'
+        if '\n' in val:
+            return ('\\begin{alltt}\n%s\\end{alltt}' %
+                    self._text_to_latex(val, 0, 1))
+        else:
+            return '{\\tt %s}' % self._text_to_latex(val, 1, 1)
     
     #////////////////////////////////////////////////////////////
     # Function List
@@ -759,9 +761,9 @@ class LatexFormatter:
         elif tree.tagName == 'heading':
             return ' '*(indent-2) + '(section) %s\n\n' % childstr
         elif tree.tagName == 'doctestblock':
-            return '\\begin{alltt}\n%s\n\\end{alltt}\n\n' % childstr
+            return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
         elif tree.tagName == 'literalblock':
-            return '\\begin{alltt}\n%s\n\\end{alltt}\n\n' % childstr
+            return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
         elif tree.tagName == 'fieldlist':
             return indent*' '+'{omitted fieldlist}\n'
         elif tree.tagName == 'olist':
