@@ -360,13 +360,12 @@ def _add_list(doc, bullet_token, stack, indent_stack, errors, warnings):
 
         if (list_type != 'fieldlist' and indent_stack[-1] is not None and
             bullet_token.indent == indent_stack[-1]):
-            estr = "Lists must be indented."
-            if bullet_token.startline == 1 and bullet_token.indent == 0:
-                estr += (' (When you include text on the same line as '+
-                         'the comment-opening quote, epytext cannot '+
-                         'determine its indentation; so a blank line '+
-                         'must be used in this case.)')
-            errors.append(StructuringError(estr, bullet_token))
+            # Ignore this error if there's text on the same line as
+            # the comment-opening quote -- epydoc can't reliably
+            # determine the indentation for that line.
+            if bullet_token.startline != 1 or bullet_token.indent != 0:
+                estr = "Lists must be indented."
+                errors.append(StructuringError(estr, bullet_token))
 
         if list_type == 'fieldlist':
             # Fieldlist should be at the top-level.
