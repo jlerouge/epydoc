@@ -10,7 +10,7 @@
 from distutils.core import setup
 
 setup(name="epydoc",
-      version="0.1",
+      version="0.2",
       description="Edloper's Python Documentation Suite",
       author="Edward Loper",
       author_email="ed@loper.org",
