@@ -1516,8 +1516,6 @@ class ClassDoc(ObjDoc):
         try: fields = dir(cls)
         except: fields = []
         for field in fields:
-            val = getattr(cls, field)
-            
             # Don't do anything for these special variables:
             if field in ('__doc__', '__module__', '__dict__', '__weakref__'):
                 continue
@@ -1525,12 +1523,14 @@ class ClassDoc(ObjDoc):
             # Find the class that defines the field; and get the value
             # directly from that class (so methods & variables have
             # the right uids).
-            container = None
             for base in base_order:
                 if base.__dict__.has_key(field):
                     container = make_uid(base)
                     val = getattr(base, field)
                     break
+            else:
+                container = None
+                val = getattr(cls, field)
 
             linkname = field
             private_prefix = '_%s__' % container.shortname()
