@@ -1,0 +1,582 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>The Epytext Markup Language</title>
+<link rel="stylesheet" href="epydoc.css" type="text/css"/>
+</head>
+
+<body>
+<h1>The Epytext Markup Language</h1>
+
+<h2> Overview </h2>
+
+<p> Epytext is a lightweight markup language for Python docstrings.
+The Epytext markup language is used by Epydoc to parse docstrings and
+create structured API documentation.  Epytext markup is broken up into
+the following categories: </p>
+
+<ul>
+  <li> <b><i>Block Structure</i></b> divides the docstring into nested
+  blocks of text, such as paragraphs and lists.
+  <ul>
+    <li> <b><i>Basic Blocks</i></b> are the basic unit of block structure. </li>
+    <li> <b><i>Hierarchical blocks</i></b> represent the nesting structure
+    of the docstring. </li>
+  </ul> </li>
+  <li> <b><i>Inline Markup</i></b> marks regions of text within a basic block
+  with properties, such as italics and hyperlinks. </li>
+</ul>
+
+<!--
+<p> Epytext defines markup for the following constructs: </p>
+
+<ul>
+  <li> <b>Block Structure</b>
+  <ul>
+    <li> <b>Basic Blocks</b>
+    <ul>
+      <li> Paragraphs </li> 
+      <li> Section headings </li>
+      <li> Literal blocks </li>
+      <li> Doctest blocks </li>
+    </ul> </li>
+    <li> <b>Hierarchical blocks</b>
+    <ul>
+      <li> Unordered lists </li>
+      <li> Ordered lists </li>
+      <li> Sections </li>
+      <li> Field lists </li>
+    </ul> </li>
+  </ul> </li>
+  <li> <b>Inline Markup</b>
+  <ul>
+    <li> Documentation crossreference links </li>
+    <li> External hyperlinks </li>
+    <li> Bold text </li>
+    <li> Italic text </li>
+    <li> Code text </li>
+    <li> Indexed terms </li>
+    <li> Mathematical expressions </li>
+    <li> Escaping mechanism </li>
+  </ul> </li>
+</ul>
+-->
+
+<!-- =========== BLOCK STRUCTURE ============= -->
+<h2> Block Structure </h2>
+
+<p> Block structure is encoded using indentation, blank lines, and a
+handful of special character sequences. </p>
+
+<ul>
+  <li> Indentation is used to encode the nesting structure of
+  hierarchical blocks.  The indentation of a line is defined as the
+  number of leading spaces on that line; and the indentation of a
+  block is typically the indentation of its first line. </li>
+
+  <li> Blank lines are used to separate blocks.  A blank line is a
+  line that only contains whitespace. </li>
+
+  <li> Special character sequences are used to mark the beginnings of
+  some blocks.  For example, "<code>-</code>" is used as a bullet for
+  unordered list items, and "<code>&gt;&gt;&gt;</code>" is used to
+  mark doctest blocks. </li>
+</ul>
+  
+<p> The following sections describe how to use each type of block
+structure. </p>
+
+<h3> Paragraphs </h3>
+
+<p> A paragraph is the simplest type of basic block.  It consists of
+one or more lines of text.  Paragraphs must be left justified (i.e.,
+every line must have the same indentation).  The following example
+illustrates how paragraphs can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This is a paragraph.  Paragraphs can
+    span multiple lines, and can contain
+    I{inline markup}.
+    
+
+    This is another paragraph.  Paragraphs
+    are separated by blank lines.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <p> This is a paragraph.  Paragraphs can span multiple lines, and
+  contain <i>inline markup</i>. </p>
+  <p> This is another paragraph.  Paragraphs are separated from each
+  other by blank lines. </p>
+  </td></tr>
+</table>
+  
+  
+<h3> Lists </h3>
+
+<p> Epytext supports both ordered and unordered lists.  A list
+consists of one or more consecutive <i>list items</i> of the same type
+(ordered or unordered), with the same indentation.  Each list items is
+marked by a <i>bullet</i>.  The bullet for unordered list items is a
+single dash character ("<code>-</code>").  Bullets for ordered list
+items consist of a series of numbers followed by periods, such as
+"<code>12.</code>" or "<code>1.2.8.</code>". </p>
+
+<p> List items typically consist of a bullet followed by a space and a
+single paragraph.  The paragraph must be indented more than the list
+item's bullet.  Typically, the paragraph is intended two or three
+characters, so that its left margin lines up with the right side of
+the bullet.  The following example illustrates a simple ordered
+list. </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    1. This is an ordered list item.
+
+    2. This is another list item.  Note that
+       this paragraph is indented three spaces
+       past the indentation of the list.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <ol>
+    <li> This is an ordered list item. </li>
+    <li> This is another list item.  Note that this paragraph is
+    indented three spaces past the indentation of the list. </li>
+  </td></tr>
+</table>
+
+<p> List items can contain more than one paragraph; and they can also
+contain sublists, literal blocks, and doctest blocks.  All of the
+blocks contained by a list item must all have equal indentation, and
+that indentation must be greater than the indentation of th list
+item's bullet.  If the first contained block is a paragraph, it may
+appear on the same line as the bullet, separated from the bullet by
+one or more spaces, as shown in the previous example.  All other block
+types must follow on separate lines. </p>
+
+<p> Any line that begins with a bullet followed by a space or a
+newline is considered a list item.  Therefore, list items do not need
+to be separated by blank lines.  However, if a list follows a
+paragraph, it is recommended that you either separate it by a blank
+line, or indent it.  If a paragraph is immediately followed by an
+unindented list item, Epydoc will generate a warning.  This helps to
+avoid accidentally placing a dash, minus sign, or sentence-final
+number at the beginning of a line. </p>
+
+<p> The following example illustrates how lists can be
+used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    1. This is a list item.
+      - This is a sublist.
+      - The sublist contains two list items.
+        - The second item of the sublist has
+          its own own sublist.
+
+    2. This list item contains two paragraphs
+       and a doctest block.
+
+       >>> print 'This is a doctest block'
+       This is a doctest block
+
+       This is the second paragraph.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <ol>
+    <li> This is a list item. </li>
+    <ul>
+      <li> This is a sublist. </li>
+      <li> The sublist contains two list items. </li>
+      <ul>
+        <li> The second item of the sublist has its own own sublist. </li>
+      </ul>
+    </ul>
+    <li> This list item contains two paragraphs and a doctest block.
+    <pre>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="user">print 'This is a doctest block'</code>
+<code class="output">This is a doctest block</code></pre>
+    <p> This is the second paragraph. </p> </li>
+  </ol>
+  </td></tr>
+</table>
+
+<h3> Sections </h3>
+
+<p> A section consists of a heading followed by one or more
+child blocks. </p>
+
+<ul>
+  <li> The heading is a single underlined line of text.  Top-level
+  section headings are underlined with the "=" character; subsection
+  headings are underlined with the "-" character; and subsubsection
+  headings are underlined with the "~" character.  The length of the
+  underline must exactly match the length of the heading.</li>
+
+  <li> The child blocks can be paragraphs, lists, literal blocks,
+  doctest blocks, or sections.  Each child must have equal
+  indentation, and that indentation must be greater than or equal to
+  the heading's indentation. </li>
+</ul>
+
+<p> The following example illustrates how sections can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This paragraph is not in any section.
+
+    Section 1
+    =========
+      This is a paragraph in section 1.
+
+      Section 1.1
+      -----------
+      This is a paragraph in section 1.1.
+
+    Section 2
+    =========
+      This is a paragraph in section 2.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <b><font size="+2">Section 1</font></b><br>
+  This is a paragraph in section 1. <br><br>
+  <b><font size="+1">Section 1.1</font></b><br>
+  This is a paragraph in section 1.1. <br><br>
+  <b><font size="+2">Section 2</font></b><br>
+  This is a paragraph in section 2.
+</table>
+
+<h3> Literal Blocks </h3>
+
+<p> Literal blocks are used to represent "preformatted" text.
+Everything within a literal block should be displayed exactly as it
+appears in plaintext.  In particular: </p>
+
+<ul>
+  <li> Spaces and newlines are preserved. </li>
+  <li> Text is shown in a monospaced font. </li>
+  <li> Inline markup is not detected. </li>
+</ul>
+
+<p> Literal blocks are introduced by paragraphs ending in the special
+sequence "<code>::</code>".  Literal blocks end at the first line
+whose indentation is equal to or less than that of the paragraph that
+introduced them.  The following examples shows how literal blocks can
+be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    The following is a literal block::
+    
+        Literal /
+               / Block
+
+    This is a paragraph following the
+    literal block.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <p>The following is a literal block:</p>
+<pre>
+    Literal /
+           / Block
+</pre>
+  <p>This is a paragraph following the literal block.</p>
+</table>
+
+<p> Literal blocks are indented relative to the paragraphs that
+introduced them; for example, in the previous example, the word
+"Literal" is displayed with four leading spaces, not eight.  Also,
+note that the double colon ("<code>::</code>") that introduces the
+literal block is rendered as a single colon. </p>
+
+<h3> Doctest Blocks </h3>
+
+<p> Doctest blocks contain examples consisting of Python expressions
+and their output.  Doctest blocks can be used by the <a
+href="http://www.python.org/doc/current/lib/module-doctest.html">doctest</a>
+module to test the documented object.  Doctest blocks begin with the
+special sequence "<code>&gt;&gt;&gt;</code>".  Doctest blocks are
+delimited from surrounding blocks by blank lines.  Doctest blocks may
+not contain blank lines.  The following examples shows how doctest
+blocks can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    The following is a doctest block:
+    
+        >>> print (1+3,
+        ...        3+5)
+        (4, 8)
+        >>> 'a-b-c-d-e'.split('-')
+        ['a', 'b', 'c', 'd', 'e']
+
+    This is a paragraph following the
+    doctest block.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+<p> The following is a doctest block: </p>
+<pre>
+    <code class="prompt">&gt;&gt;&gt;</code> <code class="user">print (1+3,</code>
+    <code class="prompt">...</code>        <code class="user">3+5)</code>
+    <code class="output">(4, 8)</code>
+    <code class="prompt">&gt;&gt;&gt;</code> <code class="user">'a-b-c-d-e'.split('-')</code>
+    <code class="output">['a', 'b', 'c', 'd', 'e']</code>
+</pre>
+  <p>This is a paragraph following the doctest block.</p>
+</table>
+
+<p> Doctest blocks are indented relative to the paragraphs that
+introduced them; for example, in the previous example, the doctest
+block is displayed with four leading spaces, not eight. </p>
+
+<h3> Fields </h3>
+
+<p> Fields are used to describe specific properties of a documented
+object.  For example, fields can be used to define the parameters and
+return value of a function; the instance variables of a class; and the
+author of a module.  Each Field is marked by a <i>field tag</i>, which
+consist of an at sign ("<code>@</code>") followed by a <i>field
+name</i>, optionally followed by a space and a <i>field argument</i>,
+followed by a colon ("<code>:</code>").  For example,
+"<code>return:</code>" and "<code>param&nbsp;x</code>" are field
+tags. </p>
+
+<p> Fields can contain paragraphs, lists, literal blocks, and doctest
+blocks.  All of the blocks contained by a field must all have equal
+indentation, and that indentation must be greater than the indentation
+of the field's tag.  If the first contained block is a paragraph, it
+may appear on the same line as the field tag, separated from the field
+tag by one or more spaces.  All other block types must follow on
+separate lines. </p>
+
+<p> Fields should be placed at the end of the docstring, after the
+description of the object.  Fields may be included in any order. </p>
+
+<p> Any line that begins with a field tag followed by a space or
+newline is considered a field.  Therefore, fields do not need to be
+separated by blank lines.  However, if a field follows a paragraph, it
+is recommended that you separate it by a blank line. </p>
+
+<p> The following example illustrates how lists can be
+used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    @param x: This is a description of
+        the parameter x to a function.
+        Note that the description is
+        indented four spaces.
+    @type x: This is a description of
+        x's type.
+    @return: This is a description of
+        the function's return value.
+
+        It contains two paragraphs.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+    <dl><dt><b>Parameters:</b></dt>
+      <dd><code><b>x</b></code> -
+         This is a description of the parameter x to a function. Note that the 
+        description is indented four spaces.
+        <br><i>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+        (type=This is a description of x's type.)</i>
+      </dd>
+    </dl>
+    <dl><dt><b>Returns:</b></dt>
+      <dd>
+        This is a description of the function's return value.
+        <p>It contains two paragraphs.</p>
+      </dd>
+</td></tr>
+</table>
+
+<p> Epydoc currently recognizes the following fields: </p>
+
+<table border="1" cellspacing="0" cellpadding="3">
+
+  <tr><th width="10%" align="left"> <code>@<b>param</b>
+  <i>p</i>:</code>&nbsp;... </th><td> A description of parameter
+  <code><i>p</i></code> for a function or method. </td></tr>
+  
+  <tr><th width="10%" align="left">
+  <code>@<b>return</b>:</code>&nbsp;... </th><td> The
+  return value for a function or method. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>ivar</b>
+  <i>v</i>:</code>&nbsp;... </th><td> A description of the class
+  instance variable <code><i>v</i></code>. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>cvar</b>
+  <i>v</i>:</code>&nbsp;... </th><td> A description of the static
+  class variable <code><i>v</i></code>. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>var</b>
+  <i>v</i>:</code>&nbsp;... </th><td> A description of the module
+  variable <code><i>v</i></code>. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>type</b>
+  <i>x</i>:</code>&nbsp;... </th><td> The type of the
+  parameter or variable <code><i>x</i></code>. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>rtype</b>:</code>&nbsp;... </th><td>
+  The return value type for a function or method. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>raise</b>
+  <i>e</i>:</code>&nbsp;... </th><td> A description of the
+  circumstances under which a function or method raises exception
+  <code><i>e</i></code>. </td></tr>
+
+  <tr><th width="10%" align="left">
+  <code>@<b>author</b>:</code>&nbsp;... </th><td> The author(s) of a
+  module, class, function, or method.  Multiple <code>author</code>
+  fields may be used if an object has multiple authors.</td></tr>
+  
+  <tr><th width="10%" align="left">
+  <code>@<b>version</b>:</code>&nbsp;... </th><td> The version of a
+  module, class, function, or method. </td></tr>
+  
+  <tr><th width="10%" align="left"> <code>@<b>see</b>:</code>&nbsp;... </th><td> A
+  description of a related topic.  <code>see</code> fields typically
+  use documentation crossreference links or external hyperlinks to
+  link to the related topic. </td></tr>
+
+</table>
+
+<p> Several fields have "synonyms," or alternate field names: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="10%" align="left"> <b><code>@param&nbsp;<i>p</i>:</code>&nbsp;...</b> </th>
+  <td><code>@parameter&nbsp;<i>p</i>:</code>&nbsp;...</td>
+  <td><code>@arg&nbsp;<i>p</i>:</code>&nbsp;...</td>
+  <td><code>@argument&nbsp;<i>p</i>:</code>&nbsp;...</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@return:</code>&nbsp;...</b> </th><td>
+  <code>@returns:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@ivar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
+  <code>@ivariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@cvar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
+  <code>@cvariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@var&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
+  <code>@variable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@rtype:</code>&nbsp;...</b> </th><td>
+  <code>@returntype:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@raise&nbsp;<i>e</i>:</code>&nbsp;...</b> </th>
+  <td><code>@raises&nbsp;<i>e</i>:</code>&nbsp;...</td>
+  <td><code>@except&nbsp;<i>e</i>:</code>&nbsp;...</td>
+  <td><code>@exception&nbsp;<i>e</i>:</code>&nbsp;...</td></tr>
+  <tr><th width="10%" align="left"> <b><code>@see:</code>&nbsp;...</b> </th><td>
+  <code>@seealso:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+</table>
+
+<div class="box"> <p> <b>Note</b>: Currently, fields are parsed using
+the same algorithm used for lists.  In principle, this allows fields
+to be nested, and to be included anywhere in the docstring.  However,
+Epydoc does not make use of these features.  I will likely make some
+minor modifications to the field parsing algorithm in the future.  In
+particular, I may remove the restriction that the blocks contained by
+a field have indentation greater than the indentation of the field
+tag; and the recommendation that field lists be separated from
+paragraphs by a blank line. </p> </div>
+
+<!-- =========== INLINE MARKUP ============= -->
+<h2> Inline Markup </h2>
+
+<h3> Linking </h3>
+
+<p> Two inline markup constructs can use a special syntax: L and
+U.. </p>
+
+<!-- =========== CHARACTERS ============= -->
+<h2> Characters </h2>
+
+<h3> Valid Characters </h3>
+
+<p> Valid characters for a formatted documentation string are space
+("\040"); newline ("\012"); and any letter, digit, or punctuation, as
+defined by the current locale.  Control characters ("\000"-"\010" and
+"\013"-"\037") are not valid content characters.  Tabs ("\011") are
+expanded to spaces, using the same algorithm used by the Python
+parser.  Carridge-return/newline pairs ("\015\012") are converted to
+newlines. </p>
+
+<h3> Content Characters </h3>
+
+<p> Characters in a docstring that are not involved in markup are
+called <i>content characters</i>.  Content characters are always
+displayed as-is.  In particular, HTML codes are <i>not</i> passed
+through.  For example, consider the following example: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"&lt;B&gt;hi&lt;/B&gt;"</code>
+    <code class="keyword">return</code> x**2
+</pre>
+</td><td>
+  &lt;B&gt;hi&lt;/B&gt;
+</table>
+
+<p> The docstring is rendered as "&lt;B&gt;hi&lt;/B&gt;", and not
+as the word "hi" in bold face. </p>
+
+<h3> Spaces and Newlines </h3>
+
+<p> In general spaces and newlines within the docstring are treated as
+<i>soft spaces</i>.  In other words, sequences of spaces and newlines
+(that do not contain a blank line) are rendered as a single space, and
+words may wrapped at spaces.  However, within literal blocks and
+doctest blocks, spaces and newlines are preserved, and no
+word-wrapping occurs. </p>
+
+<table width="100%" class="navbox">
+  <tr><td align="left">
+<!-- hhmts start --> Last modified: Sat Sep 21 23:50:11 EDT 2002 <!-- hhmts end -->
+  </td><td align="right">
+<A href="http://sourceforge.net/projects/epydoc"> 
+<IMG src="http://sourceforge.net/sflogo.php?group_id=32455&type=1" 
+width="88" height="31" border="0" alt="SourceForge Logo"
+align="top"/></A>
+  </td></tr>
+</table>

@@ -1,0 +1,201 @@
+/* 
+ * Cascading Style Sheet for edloper's webpage
+ * Copyright (C) 2002 Edward Loper
+ *
+ * This stylesheet is used to give my webpage a consistant feel.
+ * My webpage currently resides at <http://www.cis.upenn.edu/~edloper>
+ */
+
+/*===================================================================*/
+/* Define a simple 3-level color scheme.  These tags aren't usually */
+/* used directly, but they define the basic colors used by many */
+/* other tags (e.g., body = .dark) */
+
+.white   { background: #ffffff; color: #000000; }
+.light   { background: #c0d0d0; color: #000000; }
+.medium  { background: #b2c0c0; color: #000000; }
+.dark    { background: #8098a0; color: #000000; }
+.darkest { background: #607880; color: #b8d0d0; }
+
+/*===================================================================*/
+/* Default body appearance */
+
+body    { background: #8098a0; color: #000000; }        /* = .dark */
+
+@media print {
+  body { font-family: times,serif; font-size: 10pt; }
+}
+
+@media screen {
+  body    { background: #8098a0; color: #000000; }        /* = .dark */
+}
+
+/*===================================================================*/
+/* Headlines. */
+
+h1 { color: #000030; background: transparent; 
+     font-size: 180%; font-weight: bold; text-align: center; }
+h2 { font-size: 150%; font-weight: bold; }
+h3 { font-size: 140%; font-weight: bold; font-style: italic; }
+h4 { font-size: 130%; font-weight: bold; font-style: italic; }
+
+/*===================================================================*/
+/* Font alignment. */
+
+.left { text-align: left; }
+.center { text-align: center; }
+.right { text-align: right; }
+
+/*===================================================================*/
+/* Tables.  td = normal table cell; th = table header cell; */
+/* th.secondary = secondary table header cell. */
+
+/* Add 'border="1" cellspacing="0" cellpadding="3" width="100%"' as */
+/* properties to most tables, rather than defining borders for td, */
+/* etc.  That way, the tables are still legible in old browsers. */
+
+table        { background: #ffffff; color: #000000; }   /* = .white */
+th           { background: #c0d0d0; color: #000000;     /* = .light */
+               font-weight: bold }
+th.secondary { background: #ffffff; color: #000000;      /* = .white */
+               font-weight: bold; font-style: italic }
+
+/* I use tables to show screenshots. */
+.screenshot  { background: #c0d0d0; color: #000000; }   /* = .light */
+
+/* Sometimes we want transparent tables, for positioning. */
+.transparent { background: transparent; }
+
+/*===================================================================*/
+/* Lists. */
+/* I just want to remove the space around lists.. :-/ */
+
+/* UL, OL { margin-top: -0.7em; margin-bottom: -0.5em; } */
+
+/*===================================================================*/
+/* Link colors. */
+
+a:link        { background: transparent; color: #104060; } 
+a:visited     { background: transparent; color: #082840; } 
+
+/*===================================================================*/
+/* Generic box.  Usually used with DIV. */
+
+.box {
+    background: #c0d0d0; color: #000000;                /* = .light */
+    border: 2px solid #000000;
+    margin: 1em 0em 1em 0em;
+    padding: 0em 1em 0em 1em;
+}
+
+.box-title {
+    color: #003800; 
+  /*background: transparent; */  /* (This confuses netscape 4.x) */
+    text-align: center;
+    font-weight: normal; 
+    font-size: 150%;
+    margin: 0em 0em 0.2em 0em;
+    border-style: solid;
+    border-color: #000000;
+    border-width: 0 0 1px 0;
+}
+
+.caption { font-style: italic; text-align: center; }
+
+/*===================================================================*/
+/* Screen output. */
+/*     - prompt: a command prompt or program prompt */
+/*     - user: user input */
+/*     - (more will be added as I use them) */
+
+pre.screen {
+    background: #c0d0d0; color: #000000;                /* = .light */
+    border: 2px solid #000000;
+    margin: 1em 0em 1em 0em;
+    padding: 0.4em 1em 0.4em 1em;
+}
+
+code.prompt { font-weight: bold; }
+code.user { 
+    background: transparent; color: #204020;
+    font-style: italic; font-weight: bold;
+}
+code.string { background: transparent; color: #006000; }
+code.keyword { background: transparent; color: #604000; }
+code.function { background: transparent; color: #000060; }
+code.output { background: transparent; color: #404040; }
+code.field { background: transparent; color: #006040; }
+
+/*===================================================================*/
+/* Navigation box (used as a footer).  Implemented with a table. */
+
+.navbox { 
+    background: #607880; color: #b8d0d0;                /* = .darkest */
+    border: 2px groove #c0d0d0; 
+}
+
+a.nav:link    { background: transparent; color: #b8d0d0; } 
+a.nav:visited { background: transparent; color: #b8d0d0; } 
+
+/*===================================================================*/
+/* Bibliographic entries: */
+/*   - bib-article: DIV containing the description of an article */
+/*   - bib-title: The title of an article */
+/*   - bib-author: The author of an article */
+/*   - bib-box: Box containing info about an aspect of an article */
+/*   - bib-section: A section in the summary of an article */
+/*   - bib-part: The section title for a bib-box */
+/*   - bib-keywords: The contents of the keywords bib-box */
+/*   - bib-seealso: The contents of the see also bib-box */
+/*   - bib-bibtex: The contents of the bibtex bib-box */
+
+.bib-article {
+    background: #c0d0d0; color: #000000;                /* = .light */
+    border: 2px solid #000000;
+    margin: 1em 0em 1em 0em;
+    padding: 0.5em;
+    /* Put each article on a new page when printing */
+    page-break-before: always;
+}
+
+.bib-title {
+    background: transparent; color: #003800;
+    text-align: center;
+    font-weight: normal;
+    font-size: 150%;
+    margin: 0em;
+}
+
+.bib-author {
+    text-align: center;
+    font-weight: normal;
+    font-size: 130%;
+    margin: 0em;
+}
+
+.bib-box {                                              /* = .medium */
+    background: #b2c0c0; color: #000000;
+    border: 2px solid #607880;
+    margin: 0.5em 0em 0em 0em;
+    padding: 0.3em;
+    text-align: justify;
+}
+.bib-section{ font-weight: bold; font-style: italic;}
+
+.bib-part{
+    background: transparent; color: #003030;
+    font-weight: bold;
+    font-size: 120%;
+    margin: 0em 0em -0.5em 0em;
+}
+
+.bib-keywords { margin: 0.8em 0em 0.2em 2em; }
+.bib-seealso { margin: 0.8em 0em 0.2em 2em; }
+.bib-bibtex { font-size: 70%; margin: 1em 0em 0.2em 2em; }
+
+/*===================================================================*/
+/* End of stylesheet */
+
+
+
+
