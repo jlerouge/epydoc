@@ -8,12 +8,16 @@
 #
 
 from distutils.core import setup
+import re, epydoc
+
+VERSION = str(epydoc.__version__)
+(AUTHOR, EMAIL) = re.match('^(.*?)\s*<(.*)>$', epydoc.__author__).groups()
 
 setup(name="epydoc",
-      version="1.0",
       description="Edloper's Python Documentation Suite",
-      author="Edward Loper",
-      author_email="ed@loper.org",
+      version=VERSION,
+      author=AUTHOR,
+      author_email=EMAIL,
       scripts=['scripts/epydoc'],
       packages=['epydoc'])
 
