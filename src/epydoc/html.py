@@ -296,6 +296,15 @@ class HTMLFormatter:
               details sections.  If a line is longer than this length,
               then it will be wrapped to the next line.  The default
               line length is 70 characters.  (type=C{int})
+            - C{variable_summary_linelength}: The maximum line length
+              used for displaying the values of variables in the summary
+              section.  If a line is longer than this length, then it
+              will be truncated.  The default is 40 characters.
+              (type=C{int})
+            - C{variable_tooltip_linelength}: The maximum line length
+              used for tooltips for the values of variables.  If a
+              line is longer than this length, then it will be
+              truncated.  The default is 600 characters.  (type=C{int})
         """
         self._docmap = docmap
 
@@ -313,6 +322,10 @@ class HTMLFormatter:
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
         self._variable_linelen = kwargs.get('variable_linelength', 70)
+        self._variable_summary_linelen = \
+                         kwargs.get('variable_summary_linelength', 40)
+        self._variable_tooltip_linelen = \
+                         kwargs.get('variable_tooltip_linelength', 600)
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
@@ -1683,7 +1696,10 @@ class HTMLFormatter:
         else: vtype = '&nbsp;'
         if var.descr():
             vsum = ' - ' +self._summary(var, container)
-        else: vsum = ''
+        else:
+            title = self._var_value_tooltip(var)
+            val = self._pprint_var_value(var, context='summary')
+            vsum = ' = <span title="%s">%s</span>' % (title, val)
         str = '<tr><td align="right" valign="top" '
         str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
         str += '  <td><code><b>'
@@ -1747,7 +1763,9 @@ class HTMLFormatter:
                 str += self._dom_to_html(vtyp, container)
                 str += '\n      </dd>\n'
 
+            str += '<span title="%s">' % self._var_value_tooltip(var)
             str += self._pprint_var_value(var)
+            str += '</span>'
 
             if vtyp is not None or hasval:
                 str += '    </dl>\n  </dd>\n</dl>'
@@ -1758,12 +1776,19 @@ class HTMLFormatter:
         if numvars == 0: return ''
         return str+'<br />'
 
-    def _pprint_var_value(self, var):
+    def _var_value_tooltip(self, var):
+        val = `var.uid().value()`
+        if len(val) > self._variable_tooltip_linelen:
+            val = val[:self._variable_tooltip_linelen-3]+'...'
+        val = val.replace('&', '&amp;').replace('"', '&quot;')
+        val = val.replace('<', '&lt;').replace('>', '&gt;')
+        return val
+
+    def _pprint_var_value(self, var, context='details'):
         if not var.has_value(): return ''
         val = var.uid().value()
-        linelen = self._variable_linelen
         do_quoting = 1
-        
+
         # For regexps, use colorize_re.
         if type(val).__name__ == 'SRE_Pattern':
             val = colorize_re(val)
@@ -1802,8 +1827,17 @@ class HTMLFormatter:
             val = re.sub('<', '&lt;', val)
             val = re.sub('>', '&gt;', val)
 
+        # For the summary table, just return the value; don't
+        # bother to word-wrap.
+        if context == 'summary':
+            val = re.sub(r'\n', '', val)
+            val = self._nosp_html(val)
+            val = self._linewrap_html(val, self._variable_summary_linelen, 1)
+            return '<code>%s</code>\n' % val
+
         # Do line-wrapping.
-        val = self._linewrap_html(val)
+        val = self._linewrap_html(val, self._variable_linelen,
+                                  self._variable_maxlines)
 
         # Construct the value box.
         str = '      <dt><b>Value:</b></dt>\n' 
@@ -1812,19 +1846,27 @@ class HTMLFormatter:
         str += '        </td></tr></table></dd>\n'
         return str
 
-    def _linewrap_html(self, str):
+    def _nosp_html(self, str):
+        in_elt = 0
+        out = ''
+        for c in str:
+            if c == '<': in_elt = 1
+            elif c == '>': in_elt = 0
+            
+            if c == ' ' and not in_elt: out += '&nbsp;'
+            else: out += c
+        return out
+
+    def _linewrap_html(self, str, linelen, maxlines):
         """
         Add line-wrapping to the HTML string C{str}.  Line length is
-        determined by L{_variable_linelen}; and the maximum number of
-        lines to display is determined by L{_variable_maxlines}.  This
+        determined by C{linelen}; and the maximum number of
+        lines to display is determined by C{maxlines}.  This
         function treats HTML entities (e.g., C{&amp;}) as single
         characters; and ignores HTML tags (e.g., C{<p>}).
         """
         LINEWRAP_MARKER = r'<span class="variable-linewrap">\</span>'
         ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
-        
-        maxlines = self._variable_maxlines
-        linelen = self._variable_linelen
         
         lines = []
         start = end = cnum = 0
@@ -1850,6 +1892,8 @@ class HTMLFormatter:
 
             # Check for line-wrap
             if cnum == linelen and end<len(str) and str[end] != '\n':
+                if maxlines == 1:
+                    return str[start:end]+ELLIPSIS_MARKER
                 lines.append(str[start:end]+LINEWRAP_MARKER)
                 cnum = 0
                 start = end
