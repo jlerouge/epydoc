@@ -2659,20 +2659,20 @@ class PropertyDoc(ObjDoc):
     """
     def __init__(self, uid, typ=None, verbosity=0):
         property = uid.value()
-        cls = uid.cls().value()
+        cls = uid.cls()
         if property.fget is None: self._fget = None
-        else: self._fget = self._make_uid(property.fget, cls)
+        else: self._fget = self._make_uid(property.fget, cls, 'fget')
         if property.fset is None: self._fset = None
-        else: self._fset = self._make_uid(property.fset, cls)
+        else: self._fset = self._make_uid(property.fset, cls, 'fset')
         if property.fdel is None: self._fdel = None
-        else: self._fdel = self._make_uid(property.fdel, cls)
+        else: self._fdel = self._make_uid(property.fdel, cls, 'fdel')
         self._type = typ
         ObjDoc.__init__(self, uid, verbosity)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
-    def _make_uid(self, func, cls):
+    def _make_uid(self, func, cls, functype):
         """
         Return a UID for the given fget/fset/fdel function of the
         property.  This is a heuristic function, which first looks for
@@ -2683,10 +2683,10 @@ class PropertyDoc(ObjDoc):
         level function.
 
         @param func: The function to get a uid for.
-        @param cls: The class containing the property.
+        @param cls: The UID for the class containing the property.
         """
         # Find the order that bases are searched in.
-        base_order = _find_base_order(cls)
+        base_order = _find_base_order(cls.value())
         self._base_order = [make_uid(b) for b in base_order]
 
         # Check if it's a method of the property's class, or any of
@@ -2700,7 +2700,13 @@ class PropertyDoc(ObjDoc):
 
         # Otherwise, make a UID for it as a function (in the
         # containing module).
-        return make_uid(func)
+        try:
+            return make_uid(func)
+        except:
+            # If we get here, then the object is most likely not a
+            # function; create a fake uid for it, so we can at least
+            # display some info about it.
+            return make_uid(func, cls, '-%s-' % functype)
 
     def _process_field(self, tag, arg, descr, warnings):
         if tag == 'type':
