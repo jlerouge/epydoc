@@ -67,7 +67,7 @@ _KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
                      'return', 'returns', 'rtype', 'returntype',
                      'param', 'parameter', 'arg', 'argument',
                      'raise', 'raises', 'exception', 'except',
-                     'summary', 'keyword', 'kwarg')
+                     'summary', 'keyword', 'kwarg', 'kwparam')
 
 ##################################################
 ## __docformat__
@@ -364,9 +364,9 @@ class DocField:
     """
     def __init__(self, tags, label, plural=None,
                  short=0, multivalue=1):
-        if type(tags) in (type(()), type([])):
+        if type(tags) in (types.TupleType, types.ListType):
             self.tags = tuple(tags)
-        elif type(tags) == type(''):
+        elif type(tags) == types.StringType:
             self.tags = (tags,)
         else: raise TypeError('Bad tags: %s' % tags)
         self.singular = label
@@ -505,6 +505,7 @@ class ObjDoc:
 
         # Default: no sort order
         self._sortorder = None
+        self._sortorder_contains_regexp = 0
 
         # Groups:
         self._groupnames = [None]
@@ -536,7 +537,7 @@ class ObjDoc:
             except: extra_fields = []
             for field in extra_fields:
                 try:
-                    if type(field) == type(''):
+                    if type(field) == types.StringType:
                         self._fieldtypes.append(DocField(field.lower(), field))
                     else:
                         self._fieldtypes.append(DocField(*field))
@@ -570,7 +571,7 @@ class ObjDoc:
 
         # If there's a doc string, parse it.
         if docstring is None: docstring = _getdoc(obj)
-        if type(docstring) == type(''): docstring = docstring.strip()
+        if type(docstring) == types.StringType: docstring = docstring.strip()
         if docstring:
             self._documented = 1
             self.__parse_docstring(docstring)
@@ -731,22 +732,38 @@ class ObjDoc:
               - otherwise, alphabetically (case isensitive).
         @type items: C{list} of (L{UID} or L{Link} or L{Var})
         """
-        if items is None: return items
-        if (type(self._sortorder) not in (type(()), type([]))):
-            so_items = []
-        else:
-            so_dict = {}
-            for name in self._sortorder: so_dict[name]=None
-            for item in items:
-                if so_dict.has_key(item.name()):
-                    so_dict[item.name()] = item
-            so_items = []
-            for name in self._sortorder:
-                if so_dict.get(name) is not None:
-                    so_items.append(so_dict[name])
-            items = [item for item in items
-                     if not so_dict.has_key(item.name())]
+        if not items: return items
+        sortorder = self._sortorder
 
+        # If an explicit sort order was given (via @sort), then
+        # use it to sort the objects.
+        so_items = []
+        if sortorder is not None:
+            # Handle regexps in the sort order.  This is done somewhat
+            # inefficently, but it shouldn't be used that much. :)
+            if self._sortorder_contains_regexp:
+                sortorder = []
+                for name in self._sortorder:
+                    if type(name) is types.StringType:
+                        sortorder.append(name)
+                    else:
+                        # If it's a regexp, then find everything that
+                        # it matches.
+                        for item in items:
+                            if name.match(item.name()):
+                                sortorder.append(item.name())
+                                print sortorder
+
+            item_by_name = {}
+            for item in items:
+                item_by_name[item.name()] = item
+            for name in sortorder:
+                item = item_by_name.get(name)
+                if item is not None:
+                    so_items.append(item)
+                    del item_by_name[name]
+            items = item_by_name.values()
+            
         # Use the decorate-sort-undecorate pattern to make sorting
         # more efficient.
         decorated = [(item.name()!='__init__', item.is_private(),
@@ -805,10 +822,15 @@ class ObjDoc:
                 warnings.append(tag+' did not expect an argument')
                 return
             if self._sortorder is None: self._sortorder = []
-            try:
-                self._sortorder += _descr_to_identifiers(descr)
-            except ValueError, e:
-                warnings.append('Bad sort order list')
+            try: idents = _descr_to_identifiers(descr)
+            except ValueError: warnings.append('Bad sort order list')
+            for ident in idents:
+                if '*' in ident:
+                    regexp = '^%s$' % ident.replace('*', '(.*)')
+                    self._sortorder.append(re.compile(regexp))
+                    self._sortorder_contains_regexp = 1
+                else:
+                    self._sortorder.append(ident)
             return
 
         if tag == 'summary':
@@ -903,7 +925,7 @@ class ObjDoc:
 
             # Print parse errors.
             for error in parse_errors:
-                if type(error) == type(''):
+                if type(error) == types.StringType:
                     if startline is None:
                         print >>stream, '       '+error
                     else:
@@ -1074,13 +1096,14 @@ class ModuleDoc(ObjDoc):
         del self._tmp_type
 
         # Put everything in sorted order.
+        self._modules = self._sort(self._modules)
+        self._classes = self._sort(self._classes)
         self._functions = self._sort(self._functions)
         self._variables = self._sort(self._variables)
-        self._imported_functions = self._sort(self._imported_functions)
         self._imported_classes = self._sort(self._imported_classes)
+        self._imported_functions = self._sort(self._imported_functions)
         self._imported_variables = self._sort(self._imported_variables)
         self._imported_modules = self._sort(self._imported_modules)
-        self._modules = self._sort(self._modules)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
@@ -2008,11 +2031,10 @@ class FuncDoc(ObjDoc):
 
     @group Accessors: parameters, vararg, kwarg, returns, raises,
         overrides, matches_override, parameter_list
-    @group Error Reporting: _COLLECT_PARAM_MISMATCHES, 
-        _param_mismatches
+    @group Inheritance: find_override
+    @group Error Reporting: _param_mismatches
     @group Signature Parsing: _init_params, _init_signature,
         _params_to_vars, _signature_match, _init_builtin_signature
-    @group Inheritance: _find_override
 
     @type _params: C{list} of L{Var}
     @ivar _params: A list of this function's normal parameters.
@@ -2030,14 +2052,10 @@ class FuncDoc(ObjDoc):
     @cvar _SIGNATURE_RE: A regular expression that is used to check
         whether a builtin function or method has a signature in its
         docstring.
-    @cvar _COLLECT_PARAM_MISMATCHES: If true, then collect all
-        parameter mismatch errors, and print them at the end;
-        otherwise, print them as they are encountered.
     @cvar _param_mismatches: A dictionary whose keys are pairs
         (uid, base_uid), where uid is a method whose parameters
         do not match the parameters of its base class base_uid.
     """
-    _COLLECT_PARAM_MISMATCHES = 1
     _param_mismatches = []
 
     def __init__(self, uid, verbosity=0):
@@ -2069,16 +2087,7 @@ class FuncDoc(ObjDoc):
         ObjDoc.__init__(self, uid, verbosity, docstring)
 
         self._init_params()
-        if uid.is_method():
-            self._find_override(uid.cls().value())
-            if self._overrides == uid:
-                # Print a warning message, and set overrides=None
-                if sys.stderr.softspace: print >>sys.stderr
-                estr = 'Warning: %s appears to override itself' % uid
-                print >>sys.stderr, estr
-                self._overrides = None
-                #raise ValueError('Circular override: %s' % uid)
-
+        
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
@@ -2242,60 +2251,6 @@ class FuncDoc(ObjDoc):
                 vars.append(self._params_to_vars(params[i], []))
         return vars
 
-    def _find_override(self, cls):
-        """
-        Find the method that this method overrides.
-        @return: True if we should keep looking for an overridden method.
-        @rtype: C{boolean}
-        """
-        name = self.uid().shortname()
-        for base in cls.__bases__:
-            if base.__dict__.has_key(name):
-                # We found a candidate for an overriden method.
-                base_method = base.__dict__[name]
-                if type(base_method) is types.FunctionType:
-                    base_method = getattr(base, name)
-
-                # Make sure it's some kind of method.
-                if type(base_method) not in (types.MethodType,
-                                            types.BuiltinMethodType,
-                                             _WrapperDescriptorType,
-                                             _MethodDescriptorType):
-                    return 0
-
-                # We've found a method that we override.
-                self._overrides = make_uid(base_method)
-
-                # Get the base & child argspecs.  If either fails,
-                # then one is probably a builtin of some sort, so
-                # _matches_overrides should be 0 anyway.
-                try:
-                    basespec = inspect.getargspec(base_method.im_func)
-                    childspec = inspect.getargspec(self._uid.value().im_func)
-                except:
-                    return 0
-
-                # Does the signature of this method match the
-                # signature of the method it overrides?
-                if self._signature_match(basespec, childspec):
-                    self._matches_override = 1
-                elif name != '__init__':
-                    # Issue a warning if the parameters don't match.
-                    if self._COLLECT_PARAM_MISMATCHES:
-                        self._param_mismatches.append((self.uid(),
-                                                       make_uid(base_method)))
-                    else:
-                        estr =(('The parameters of %s do not match the '+
-                                'parameters of the base class method '+
-                                '%s; not inheriting documentation.')
-                               % (self.uid(), make_uid(base_method)))
-                        self._misc_warnings.append(estr)
-                return 0
-            else:
-                # It's not in this base; try its ancestors.
-                if not self._find_override(base): return 0
-        return 1
-
     def _signature_match(self, basespec, childspec):
         """
         @rtype: C{boolean}
@@ -2364,7 +2319,7 @@ class FuncDoc(ObjDoc):
                 if self._tmp_type.has_key(arg):
                     warnings.append('Redefinition of @%s %s' % (tag, arg))
                 self._tmp_type[arg] = descr
-        elif tag in ('keyword', 'kwarg'):
+        elif tag in ('keyword', 'kwarg', 'kwparam'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
@@ -2490,6 +2445,49 @@ class FuncDoc(ObjDoc):
         if not hasattr(self, '_param_list'):
             self._param_list = _flatten(self._params)
         return self._param_list
+
+    #////////////////////////////
+    #// Inheritance
+    #////////////////////////////
+
+    def find_override(self, bases):
+        """
+        Find the method that this method overrides.
+        """
+        name = self.uid().shortname()
+        for base in bases[1:]:
+            if base.value().__dict__.has_key(name):
+                # We found a candidate for an overriden method.
+                base_method = getattr(base.value(), name)
+
+                # Make sure it's some kind of method.
+                if type(base_method) not in (types.MethodType,
+                                            types.BuiltinMethodType,
+                                             _WrapperDescriptorType,
+                                             _MethodDescriptorType):
+                    return
+
+                # We've found a method that we override.
+                self._overrides = make_uid(base_method)
+
+                # Get the base & child argspecs.  If either fails,
+                # then one is probably a builtin of some sort, so
+                # _matches_overrides should be 0 anyway.
+                try:
+                    basespec = inspect.getargspec(base_method.im_func)
+                    childspec = inspect.getargspec(self._uid.value().im_func)
+                except:
+                    return
+
+                # Does the signature of this method match the
+                # signature of the method it overrides?
+                if self._signature_match(basespec, childspec):
+                    self._matches_override = 1
+                elif name != '__init__':
+                    # Issue a warning if the parameters don't match.
+                    self._param_mismatches.append((self.uid(),
+                                                   make_uid(base_method)))
+                return
 
 def report_param_mismatches(docmap):
     mismatches = FuncDoc._param_mismatches
@@ -2756,7 +2754,9 @@ class DocMap(UserDict.UserDict):
                     self._add(var.uid())
             for link in doc.properties():
                 self.add_one(link.target())
-            
+
+        # Perform inheritance-related linking.
+        if objID.is_class():
             # Make sure all bases are added.
             if self._document_bases:
                 for base in doc.bases():
@@ -2764,6 +2764,13 @@ class DocMap(UserDict.UserDict):
 
             doc.inherit([self.data.get(b) for b in doc.base_order()],
                         self._inheritance_groups, self._inherit_groups)
+
+        elif objID.is_any_method():
+            # Make sure the class is documented
+            self._add(objID.cls())
+            classdoc = self.get(objID.cls())
+            if classdoc:
+                doc.find_override(classdoc.base_order())
 
     def _toplevel(self, uid):
         """
@@ -2895,7 +2902,7 @@ def _flatten(tree):
     """
     lst = []
     for elt in tree:
-        if type(elt) in (type(()), type([])):
+        if type(elt) in (types.TupleType, types.ListType):
             lst.extend(_flatten(elt))
         else:
             lst.append(elt)
@@ -3067,7 +3074,7 @@ def _ast_match(pattern, data, vars=None, indent=0):
     """
     if vars is None:
         vars = {}
-    if type(pattern) is types.ListType:       # 'variables' are ['varname']
+    if type(pattern) is types.ListType:  # 'variables' are ['varname']
         vars[pattern[0]] = data
         return 1, vars
     if type(pattern) is not types.TupleType:
