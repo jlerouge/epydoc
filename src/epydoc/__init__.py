@@ -14,12 +14,10 @@
 """
 Automatic Python reference documentation generator.  Epydoc processes
 Python modules and docstrings to generate formatted API documentation,
-in the form of HTML pages.
-
-Epydoc can be used via a command-line interface (L{epydoc.cli}) and a
-graphical interface (L{epydoc.gui}).  Both interfaces let the user
-specify a set of modules to document, and produce API documentation
-using the following steps:
+in the form of HTML pages.  Epydoc can be used via a command-line
+interface (L{epydoc.cli}) and a graphical interface (L{epydoc.gui}).
+Both interfaces let the user specify a set of modules to document, and
+produce API documentation using the following steps:
 
   1. Import the requested modules, using L{epydoc.imports}.
   2. Construct documentation for each object, using L{epydoc.objdoc}.
@@ -34,7 +32,7 @@ using the following steps:
 """
 
 # General info
-__version__ = '1.0'
+__version__ = '1.1'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 
@@ -49,7 +47,7 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 
 # Sort order
 __epydoc_sort__ = ['cli',
-                   'gui',                   
+                   'gui',
                    'imports',
                    'objdoc',
                    'epytext',
@@ -60,9 +58,10 @@ __epydoc_sort__ = ['cli',
                    ]
 
 # To do:
-#   - improve support for builtin functions
-#   - check for builtin modules
-#   - when to inherit documentation?
+#   - improve support for builtin functions/modules [90% done]
+#   - frames [90% done]
+#   - better doc inheritence?
 #   - change epytext field syntax
-#   - add escape characters
-
+#   - add escape characters to epytext
+#   - support contained classes
+#   - better checks for private/public in _extract_index
