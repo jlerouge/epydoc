@@ -14,10 +14,10 @@ have a single unique identifier, because one object may have more than
 one name.  These C{UID}s are used the C{Link} class to implement
 crossreferencing between C{ObjDoc}s.
 
-@see: C{epydoc.objdoc}
+@see: L{epydoc.objdoc}
 """
 
-import inspect, sys, os.path
+import inspect, sys, os.path, new
 from types import ModuleType as _ModuleType
 from types import ClassType as _ClassType
 from types import FunctionType as _FunctionType
@@ -45,10 +45,10 @@ class UID:
     @type _obj: (any)
     """
     def __init__(self, obj):
+        # Special case: create a UID from just a name.
         if type(obj) == _StringType:
             self._obj = self._typ = self._id = None
             self._name = obj
-            raise ValueError(obj)
             return
         
         self._id = id(obj)
@@ -205,3 +205,60 @@ def _find_function_module(func):
             return module
     raise ValueError("Couldn't the find module for this function")
 
+def findUID(name, container):
+    """
+    Attempt to find the UID for the object that can be accessed with
+    the name C{name} from the module C{module}.
+
+    Note: This could be implemented (perhaps mor robustly?) with eval,
+    but I chose not to, for security reasons.
+
+    @type container: C{UID}
+    """
+    if container is None: return None
+    if container.is_class():
+        if container.object().__dict__.has_key(name):
+            cls = container.object()
+            obj = cls.__dict__[name]
+            if type(obj) is _FunctionType:
+                return UID(new.instancemethod(obj, None, cls))
+            else:
+                return UID(obj)
+        else:
+            container = container.module()
+    if not container.is_module():
+        raise ValueError('Bad container %r' % container)
+
+    module = container.object()
+    components = name.split('.')
+
+    # First, try looking for it in the given module.
+    try:
+        obj = module
+        for component in components:
+            obj = obj.__dict__[component]
+        return UID(obj)
+    except KeyError: pass
+
+    # If that doesn't work, try importing it as a module.
+    modcomponents = container.name().split('.')
+    for i in range(len(modcomponents)-1, -1, -1):
+        try:
+            modname = '.'.join(modcomponents[:i]+[name])
+            exec('import %s as rv' % modname)
+            return UID(rv)
+        except ImportError: pass
+        
+    # If that doesn't work, try importing it as an object
+    modcomponents = container.name().split('.')
+    for i in range(len(modcomponents)-1, -1, -1):
+        for j in range(len(components)-1, 0, -1):
+            try:
+                modname = '.'.join(modcomponents[:i]+components[:j])
+                objname = '.'.join(components[j:])
+                exec('from %s import %s as rv' % (modname, objname))
+                return UID(rv)
+            except ImportError: pass
+
+    # We couldn't find it; return None.
+    return None
