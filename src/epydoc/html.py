@@ -341,6 +341,11 @@ class HTMLFormatter:
               used for tooltips for the values of variables.  If a
               line is longer than this length, then it will be
               truncated.  The default is 600 characters.
+        @type property_function_linelength: C{int}
+        @keyword property_function_linelength: The maximum line length
+              used to dispaly property functions (C{fget}, C{fset}, and
+              C{fdel}) that contain something other than a function
+              object.  The dfeault length is 40 characters.
         @type inheritance: C{string}
         @keyword inheritance: How inherited objects should be displayed.
               If C{inheritance='grouped'}, then inherited objects are
@@ -364,6 +369,7 @@ class HTMLFormatter:
         self._frames_index = kwargs.get('frames', 1)
         self._show_imports = kwargs.get('show_imports', 0)
         self._index_parameters = kwargs.get('index_parameters', 0)
+        self._propfunc_linelen = kwargs.get('property_function_linelength', 40)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
         self._variable_linelen = kwargs.get('variable_linelength', 70)
         self._variable_summary_linelen = \
@@ -2228,9 +2234,16 @@ class HTMLFormatter:
                 if fuid:
                     str += '      <dt><b>%s Method:' % name
                     str += '</b></dt>\n      <dd>'
-                    fdoc = self._docmap.get(fuid)
-                    str += self._func_signature(fuid.shortname(), fuid,
-                                                fdoc, 1, 0, 'summary-sig')
+                    if fuid.is_routine():
+                        fdoc = self._docmap.get(fuid)
+                        str += self._func_signature(fuid.shortname(), fuid,
+                                                    fdoc, 1, 0, 'summary-sig')
+                    elif self._docmap.has_key(fuid):
+                        str += self._uid_to_href(fuid)
+                    else:
+                        var = Var(fuid.name(), fuid)
+                        linelen = self._propfunc_linelen
+                        str += self._pprint_var_value(var, 0, linelen)
                     str += '\n      </dd>\n'
             str += '    </dl>\n  </dd>\n</dl>'
 
