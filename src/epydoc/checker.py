@@ -19,7 +19,6 @@ classes of objects are documented.
 import re, sys, os.path, string
 from xml.dom.minidom import Text as _Text
 from types import ModuleType as _ModuleType
-from types import ClassType as _ClassType
 from types import FunctionType as _FunctionType
 from types import BuiltinFunctionType as _BuiltinFunctionType
 from types import BuiltinMethodType as _BuiltinMethodType
