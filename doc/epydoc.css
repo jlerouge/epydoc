@@ -12,7 +12,7 @@
 /* other tags (e.g., body = .dark) */
 
 .white   { background: #ffffff; color: #000000; }
-.light   { background: #c0d0d0; color: #000000; }
+.light   { background: #c8e0e8; color: #000000; }
 .medium  { background: #b2c0c0; color: #000000; }
 .dark    { background: #8098a0; color: #000000; }
 .darkest { background: #607880; color: #b8d0d0; }
@@ -61,14 +61,14 @@ h4 { font-size: 130%; font-weight: bold; font-style: italic; }
 /* etc.  That way, the tables are still legible in old browsers. */
 
 table        { background: #ffffff; color: #000000; }   /* = .white */
-th           { background: #c0d0d0; color: #000000;     /* = .light */
+th           { background: #c8e0e8; color: #000000;     /* = .light */
                font-weight: bold; }
 th.secondary { background: #ffffff; color: #000000;      /* = .white */
                font-weight: bold; font-style: italic; }
 table.transparent { background: transparent; color: #000000; }
 
 /* I use tables to show screenshots. */
-.screenshot  { background: #c0d0d0; color: #000000; }   /* = .light */
+.screenshot  { background: #c8e0e8; color: #000000; }   /* = .light */
 
 /* Sometimes we want transparent tables, for positioning. */
 .transparent { background: transparent; }
@@ -91,7 +91,7 @@ a:visited     { background: transparent; color: #082840; }
 /* Generic box.  Usually used with DIV. */
 
 .box {
-    background: #c0d0d0; color: #000000;                /* = .light */
+    background: #c8e0e8; color: #000000;                /* = .light */
     border: 2px solid #000000;
     margin: 1em 0em 1em 0em;
     padding: 0em 1em 0em 1em;
@@ -118,7 +118,7 @@ a:visited     { background: transparent; color: #082840; }
 /*     - (more will be added as I use them) */
 
 .screen {
-    background: #c0d0d0; color: #000000;                /* = .light */
+    background: #c8e0e8; color: #000000;                /* = .light */
     border: 2px solid #000000;
     margin: 1em 0em 1em 0em;
     padding: 0.4em 1em 0.4em 1em;
@@ -127,20 +127,20 @@ a:visited     { background: transparent; color: #082840; }
 
 code.prompt { font-weight: bold; }
 code.user { 
-    background: transparent; color: #204020;
+    background: transparent; color: #305040;
     font-style: italic; font-weight: bold;
 }
-code.string   { background: transparent; color: #006000; }
-code.keyword  { background: transparent; color: #604000; }
-code.function { background: transparent; color: #000060; }
-code.output   { background: transparent; color: #404040; }
-code.field    { background: transparent; color: #006040; }
-code.comment  { background: transparent; color: #004060;
+code.string   { background: transparent; color: #007000; }
+code.keyword  { background: transparent; color: #705000; }
+code.function { background: transparent; color: #000080; }
+code.output   { background: transparent; color: #505060; }
+code.field    { background: transparent; color: #007060; }
+code.comment  { background: transparent; color: #005080;
                 font-style: italic; }
-code.pycode   { background: transparent; color: #204020; }
+code.pycode   { background: transparent; color: #305040; }
 
-b.error { background: transparent; color: #600000; }
-b.error i { background: transparent; color: #503000; }
+b.error { background: transparent; color: #700000; }
+b.error i { background: transparent; color: #604000; }
 
 /*===================================================================*/
 /* Navigation box (used as a footer).  Implemented with a table. */
