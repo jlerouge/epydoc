@@ -2683,12 +2683,10 @@ class HTMLFormatter:
             decorated_uids.append( (uid.shortname().lower(), uid) )
             if uid.is_module():
                 decorated_uids += [(v.name().lower(), v.uid())
-                                   for v in doc.variables()
-                                   if v.uid().is_public()]
+                                   for v in doc.variables()]
             elif uid.is_class():
                 decorated_uids += [(v.name().lower(), v.uid())
-                                   for v in doc.ivariables() + doc.cvariables()
-                                   if v.uid().is_public()]
+                                   for v in doc.ivariables() + doc.cvariables()]
 
         decorated_uids.sort()        
         return [u[1] for u in decorated_uids]
