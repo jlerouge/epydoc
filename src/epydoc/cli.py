@@ -59,9 +59,16 @@ Usage::
         output.  If no file is specified, then a default help file is
         used.
 
+    --no-private
+        Do not produce documentation for private objects.
+
     --show-imports
         Include a list of the classes and functions that each module
         imports on the module documentation pages.
+
+    --builtins
+        Add the builtin modules (as defined by sys.builtin_module_names)
+        to the list of modules to document.
         
     --check
         Perform completeness checks on the documentation
@@ -168,9 +175,10 @@ def _parse_args():
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:u:Vvpq?:'
     longopts = ('check frames help= usage= helpfile= help-file= '+
-                'help_file= name= output= target= url= version verbose ' +
+                'help_file= output= target= url= version verbose ' +
                 'private-css= private_css= quiet show-imports '+
-                'show_imports css= no_private no-private').split()
+                'show_imports css= no_private no-private name= '+
+                'builtins').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -199,6 +207,9 @@ def _parse_args():
         elif opt in ('--url', '-u'): options['prj_url']=val
         elif opt in ('--verbose', '-v'): options['verbosity'] += 1
         elif opt in ('--version', '-V'): _version()
+        elif opt in ('--builtins',):
+            modules += sys.builtin_module_names
+            modules.remove('__main__')
         else:
             _usage()
 
