@@ -1123,9 +1123,8 @@ def findUID(name, container=None, docmap=None):
 
     # Is it a builtin object?
     builtins = sys.modules.get('__builtin__')
-    if builtins and builtins.__dict__.has_key(name):
-        return make_uid(builtins.__dict__.get(name),
-                        make_uid(builtins), name)
+    if builtins:
+        return _find_object_in_module(name, builtins, docmap)
 
     # We couldn't find it; return None.
     return None
@@ -1141,15 +1140,17 @@ def _find_object_in_module(name, module, docmap):
         
         # Use getattr to follow all components but the last one.
         obj = module
+        obj_uid = make_uid(obj)
         for component in components[:-1]:
             obj_parent = obj
+            obj_parent_uid = obj_uid
             obj_name = component
             try: obj = getattr(obj, component)
             except:
                 try: obj = obj.__getattribute__(obj, component)
                 except: return None
-        obj_uid = make_uid(obj)
-                
+            obj_uid = make_uid(obj, obj_parent_uid, obj_name)
+
         # Is it a variable in obj?
         var = _find_variable_in(components[-1], obj_uid, docmap)
         if var is not None: return var
