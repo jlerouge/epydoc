@@ -171,12 +171,12 @@ class HTMLFormatter:
         side of the window contains documentation pages.  But if the
         --no-frames option is used, then index.html will redirect the
         user to the project's top page.
-      - X{I{module}-module.html}: The API documentation for a module.  module
-        is the complete dotted name of the module, such as sys or
-        epydoc.epytext.
+      - X{I{module}-module.html}: The API documentation for a module.
+        I{module} is the complete dotted name of the module, such as
+        sys or epydoc.epytext.
       - X{I{class}-class.html}: The API documentation for a class, exception,
-        or type.  class is the complete dotted name of the class, such
-        as epydoc.epytext.Token or array.ArrayType.
+        or type.  I{class} is the complete dotted name of the class,
+        such as epydoc.epytext.Token or array.ArrayType.
       - X{trees.html}: The module and class hierarchies.
       - X{indices.html} The term and identifier indices.  
       - X{help.html}: The help page for the project.  This page
@@ -200,8 +200,8 @@ class HTMLFormatter:
       - X{epydoc.css}: The CSS stylesheet used to display all HTML
         pages.
 
-    @type docmap: L{DocMap}
-    @ivar docmap: The documentation object, encoding the objects that
+    @type _docmap: L{DocMap}
+    @ivar _docmap: The documentation map, encoding the objects that
         should be documented.
     @type _prj_name: C{string}
     @ivar _prj_name: A name for the documentation (for the navbar).
@@ -236,9 +236,7 @@ class HTMLFormatter:
     
     def __init__(self, docmap, **kwargs):
         """
-        Construct a new HTML outputter, using the given
-        L{DocMap} object.
-        
+        Construct a new HTML formatter, using the given documentation map.
         @param docmap: The documentation to output.
         @type docmap: L{DocMap}
         @param kwargs: Keyword arguments:
@@ -371,15 +369,13 @@ class HTMLFormatter:
             not exist, it will be created.
         @type progress_callback: C{function}
         @param progress_callback: A callback function that is called
-            before each file is written, with two arguments: the name
-            of the created file (C{string}); and the object documented
-            by the file, if any (L{ObjDoc}).
+            before each file is written, with the name of the created
+            file.
         @rtype: C{None}
-        @raise OSError: If C{directory} cannot be created, or if any
-            file cannot be created or written to. 
+        @raise OSError: If C{directory} cannot be created,
+        @raise OSError: If any file cannot be created or written to.
         """
-        if directory in ('', None): directory = './'
-        if directory[-1] != '/': directory = directory + '/'
+        if not directory: directory = os.curdir
         self._show_private = 0
         
         # Create dest directories, if necessary
@@ -415,7 +411,7 @@ class HTMLFormatter:
             # Create the base directory index.html file.
             self._write_index(directory, progress_callback, 1)
             filename = os.path.join(directory, 'epydoc.css')
-            if progress_callback: progress_callback(filename, None)
+            if progress_callback: progress_callback(filename)
             self._show_private = 0
             self._write_css(filename)
         else:
@@ -434,17 +430,17 @@ class HTMLFormatter:
         
         # Write the tree file (package & class hierarchies)
         filename = os.path.join(directory, 'trees.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         self._write_trees(filename)
 
         # Write the index file.
         filename = os.path.join(directory, 'indices.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         self._write_indices_to_stream(open(filename, 'w'))
 
         # Write the help file.
         filename = os.path.join(directory, 'help.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         self._write_help(filename)
         
         # Write the frames-based table of contents
@@ -455,7 +451,7 @@ class HTMLFormatter:
         
         # Write the CSS file.
         filename = os.path.join(directory, 'epydoc.css')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         self._write_css(filename)
 
     def _write_docs(self, directory, progress_callback):
@@ -470,11 +466,11 @@ class HTMLFormatter:
             doc = self._docmap[uid]
             filename = os.path.join(directory, self._uid_to_uri(uid))
             if isinstance(doc, ModuleDoc):
-                if progress_callback: progress_callback(filename, doc)
+                if progress_callback: progress_callback(filename)
                 str = self._module_to_html(uid)
                 open(filename, 'w').write(str)
             elif isinstance(doc, ClassDoc):
-                if progress_callback: progress_callback(filename, doc)
+                if progress_callback: progress_callback(filename)
                 str = self._class_to_html(uid)
                 open(filename, 'w').write(str)
 
@@ -492,18 +488,18 @@ class HTMLFormatter:
         """
         # Write the frames index file
         filename = os.path.join(directory, 'frames.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         prj_name = self._prj_name or "API Documentation"
         open(filename, 'w').write(FRAMES_INDEX % (prj_name, self._top_page))
 
         # Write the top-level table of contents.
         filename = os.path.join(directory, 'toc.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         open(filename, 'w').write(self._toc_to_html())
 
         # Classes table of contents
         filename = os.path.join(directory, 'toc-everything.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         str = self._project_toc_to_html()
         open(filename, 'w').write(str)
 
@@ -514,22 +510,9 @@ class HTMLFormatter:
                 filename = os.path.join(directory, 'toc-%s' %
                                         self._uid_to_uri(uid))
                 str = self._module_toc_to_html(uid)
-                if progress_callback: progress_callback(filename, doc)
+                if progress_callback: progress_callback(filename)
                 open(filename, 'w').write(str)
 
-    def _write_frames_index(self, directory, progress_callback, frombase=0):
-        # !! OBSOLETE !!
-        raise ValueError('obsolete')
-        top = self._top_page
-        if frombase and not top.startswith('http:') and not '/' in top:
-            top = 'public/%s' % top
-        filename = os.path.join(directory, 'index.html')
-        if progress_callback: progress_callback(filename, None)
-        prj_name = self._prj_name or "API Documentation"
-        frames = FRAMES_INDEX % (prj_name, top)
-        if frombase: frames = re.sub('src="toc', 'src="public/toc', frames)
-        open(filename, 'w').write(frames)
-        
     def _write_index(self, directory, progress_callback, frombase):
         """
         Write the C{index.html} file to the given file.
@@ -541,22 +524,9 @@ class HTMLFormatter:
         @type frombase: C{boolean}
         """
         filename = os.path.join(directory, 'index.html')
-        if progress_callback: progress_callback(filename, None)
+        if progress_callback: progress_callback(filename)
         if self._frames_index: top = 'frames.html'
         else: top = self._top_page
-
-        ## Write a frames index file.  This is basically the same as
-        ## frames.html, but we have to do some redirection if
-        ## frombase=1.
-        #if self._frames_index:
-        #    prj_name = self._prj_name or "API Documentation"
-        #    if frombase and top[:5] != 'http:' and '/' not in top:
-        #        top = 'public/%s' % top
-        #    frames = FRAMES_INDEX % (prj_name, top)
-        #    if frombase:
-        #        frames = re.sub('src="toc', 'src="public/toc', frames)
-        #    open(filename, 'w').write(frames)
-        #    return
 
         # Copy the non-frames index file from top, if it's internal.
         if top[:5] != 'http:' and '/' not in top:
