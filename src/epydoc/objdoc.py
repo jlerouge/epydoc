@@ -927,6 +927,11 @@ class ClassDoc(ObjDoc):
         try: items = cls.__dict__.items()
         except AttributeError: items = []
         for (field, val) in items:
+            # Convert functions to methods.  (Since we're getting
+            # values via __dict__)
+            if type(val) is types.FunctionType:
+                val = new.instancemethod(val, None, cls)
+                
             vuid = make_uid(val, self._uid, field)
             
             # Don't do anything for these special variables:
@@ -937,12 +942,8 @@ class ClassDoc(ObjDoc):
             # Don't do anything for modules.
             if vuid.is_module(): continue
 
-            # Is it a method?  (Since we got it via __dict__, it will
-            # be a function instead of a method.)
-            if vuid.is_function():
-                method = new.instancemethod(val, None, cls)
-                self._methods.append(Link(field, make_uid(method)))
-            elif vuid.is_routine():
+            # Is it a method?  
+            if vuid.is_routine():
                 self._methods.append(Link(field, vuid))
 
             # Is it a class variable?
@@ -1049,16 +1050,16 @@ class ClassDoc(ObjDoc):
 
     def _inherit_methods(self, base):
         for (field, val) in base.__dict__.items():
+            # Convert functions to methods.  (Since we're getting
+            # values via __dict__)
+            if self._methodbyname.has_key(field): continue
+            if type(val) is types.FunctionType:
+                val = new.instancemethod(val, None, self._uid.value())
             vuid = make_uid(val, self._uid, field)
             if vuid is None: continue
             if not vuid.is_routine(): continue
-            if self._methodbyname.has_key(field): continue
             self._methodbyname[field] = 1
-            if vuid.is_function():
-                method = new.instancemethod(val, None, base)
-                self._methods.append(Link(field, make_uid(method)))
-            else:
-                self._methods.append(Link(field, make_uid(val)))
+            self._methods.append(Link(field, make_uid(val)))
 
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
@@ -1560,8 +1561,11 @@ class DocMap(UserDict.UserDict):
         self._top = None
         objID = make_uid(obj)
             
-        #print 'Constructing docs for:', objID
+        # If we've already documented it, don't do anything.
         if self.data.has_key(objID): return
+
+        # If we couldn't find a UID, don't do anything.
+        if objID is None: return
         
         if objID.is_module():
             self.data[objID] = ModuleDoc(obj, self._verbosity)
@@ -1629,11 +1633,13 @@ class DocMap(UserDict.UserDict):
             try: items = obj.__dict__.items()
             except AttributeError: items = []
             for (field, val) in items:
+                # Convert functions to methods.  (Since we're getting
+                # values via __dict__)
+                if type(val) is types.FunctionType:
+                    val = new.instancemethod(val, None, obj)
+
                 vuid = make_uid(val, objID, field)
-                    
-                if vuid.is_function():
-                    self.add(new.instancemethod(val, None, obj))
-                elif vuid.is_routine():
+                if vuid.is_routine():
                     self.add(val)
                 elif vuid.is_class():
                     self.add(val)
