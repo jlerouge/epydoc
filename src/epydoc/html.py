@@ -496,6 +496,24 @@ class HTMLFormatter:
         else:
             self._write_index(directory, frombase=0)
 
+        # Report any failed crossreferences
+        if self._failed_xrefs:
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, ('Warning: Failed identifier '+
+                                  'crossreference targets:')
+            failed_identifiers = self._failed_xrefs.keys()
+            failed_identifiers.sort()
+            for identifier in failed_identifiers:
+                uids = self._failed_xrefs[identifier].keys()
+                uids.sort()
+                estr = '    - %s' % identifier
+                if len(uids)==1 and len(identifier)+len(uid.name())+14 < 70:
+                    estr += ' (from %s)' % uid.name()
+                else:
+                    for uid in uids:
+                        estr += '\n      (from %s)' % uid.name()
+                print >>sys.stderr, estr
+
     def _write(self, write_func, directory, filename,
                progress_callback, is_public, *args):
         """
@@ -1043,11 +1061,8 @@ class HTMLFormatter:
         # Only include objects that come from modules that we
         # documented.  In particular, do not include base classes,
         # inherited methods, and imported objects from other modules
-        # in the index.  But *do* include objects whose modules we
-        # can't determine (when is this check important?).
-        documented = self._docmap.copy()
-        documented[None] = None # <- for module() == None
-        is_documented = documented.has_key
+        # in the index.
+        is_documented = self._docmap.has_key
         classes = [c for c in classes
                    if is_documented(c.target().module())]
         excepts = [e for e in excepts
@@ -1859,8 +1874,6 @@ class HTMLFormatter:
         # Add the parameter descriptions.  Only list parameters that
         # we have extra info for.
         fparams = fdoc.parameter_list()[:]
-        if fdoc.vararg(): fparams.append(fdoc.vararg())
-        if fdoc.kwarg(): fparams.append(fdoc.kwarg())
         str += self._parameter_list(fparams, fdoc)
 
         keywords = fdoc.keywords()
@@ -2619,9 +2632,9 @@ class HTMLFormatter:
                     self._get_index_terms(var.descr(), link, terms, links)
                     self._get_index_terms(var.type(), link, terms, links)
             elif isinstance(doc, FuncDoc):
-                extra_p = [v for v in [doc.vararg(), doc.kwarg(),
-                                       doc.returns()] if v is not None]
-                for param in doc.parameter_list()+extra_p:
+                params = doc.parameter_list()
+                if doc.returns(): params.append(doc.returns())
+                for param in params:
                     self._get_index_terms(param.descr(), link, terms, links)
                     self._get_index_terms(param.type(), link, terms, links)
                 for fraise in doc.raises():
@@ -3243,8 +3256,10 @@ class _HTMLDocstringLinker(markup.DocstringLinker):
         self._docformatter = docformatter
         self._uid = uid
         self._docmap = docformatter._docmap
-        if uid.is_module() or uid.is_class(): self._container = uid
-        else: self._container = uid.cls() or uid.module()
+        if uid.is_module() or uid.is_class() or uid.is_routine():
+            self._container = uid
+        else:
+            self._container = uid.cls() or uid.module()
     def translate_indexterm(self, indexterm):
         key = self._docformatter._term_index_to_anchor(indexterm)
         return ('<a name="%s"></a><i class="indexterm">%s</i>' %
