@@ -822,15 +822,14 @@ class ModuleDoc(ObjDoc):
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_var.has_key(arg):
-                warnings.append('Redefinition of variable')
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_var[arg] = descr
         elif tag == 'type':
             if arg == None:
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of variable '+
-                                'type: '+arg)
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
@@ -1085,22 +1084,21 @@ class ClassDoc(ObjDoc):
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_cvar.has_key(arg):
-                warnings.append('Redefinition of variable')
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_cvar[arg] = descr
         elif tag in ('ivariable', 'ivar'):
             if arg == None:
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_ivar.has_key(arg):
-                warnings.append('Redefinition of variable')
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_ivar[arg] = descr
         elif tag == 'type':
             if arg == None:
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of variable'+\
-                                  'type: '+`arg`)#+' ('+descr+')')
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
@@ -1488,28 +1486,27 @@ class FuncDoc(ObjDoc):
             if arg != None:
                 warnings.append(tag+' did not expect an argument')
             if self._tmp_param.has_key('return'):
-                warnings.append('Redefinition of return value')
+                warnings.append('Redefinition of @%s' % tag)
             self._tmp_param['return'] = descr
         elif tag in ('returntype', 'rtype'):
             if arg != None:
                 warnings.append(tag+' did not expect an argument')
             if self._tmp_type.has_key('return'):
-                warnings.append('Redefinition of return value type')
+                warnings.append('Redefinition of @%s' % tag)
             self._tmp_type['return'] = descr
         elif tag in ('param', 'parameter', 'arg', 'argument'):
             if arg == None:
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_param.has_key(arg):
-                warnings.append('Redefinition of parameter '+`arg`)
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_param[arg] = descr
         elif tag == 'type':
             if arg == None:
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of variable '+\
-                                  'type: '+`arg`)
+                warnings.append('Redefinition of @%s %s' % (tag, arg))
             self._tmp_type[arg] = descr
         elif tag in ('raise', 'raises', 'exception', 'except'):
             if arg == None:
