@@ -1727,7 +1727,7 @@ def summary(epytext_doc):
     epytext.appendChild(para)
     for parachild in parachildren:
         if isinstance(parachild, Text):
-            m = re.match(r'\s*([\w\W]*?\.)(\s|$)', parachild.data)
+            m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', parachild.data)
             if m:
                 para.appendChild(doc.createTextNode(m.group(1)))
                 return doc
