@@ -15,8 +15,8 @@ DIR = /home/groups/e/ep/epydoc/htdocs
 
 # The local location to build the web materials
 WEBDIR = html
-API = api
-EXAMPLES = examples
+API = doc/api
+EXAMPLES = doc/examples
 
 ############################################################
 
@@ -36,6 +36,7 @@ usage:
 clean:
 	$(MAKE) -C src clean
 	rm -rf ${WEBDIR} ${API} ${EXAMPLES}
+	rm -rf .*.up2date
 
 distributions: src/dist/.up2date
 src/dist/.up2date: $(PY_SRC)
@@ -60,18 +61,18 @@ checkdocs:
 	cp -r ${EXAMPLES} ${WEBDIR}
 	cp -r src/dist/epydoc* ${WEBDIR}
 
-refdocs: .up2date.refdocs
-.up2date.refdocs: ${PY_SRC}
+refdocs: .refdocs.up2date
+.refdocs.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc ${PY_SRC} -o ${API} -n epydoc \
 	       -u http://epydoc.sourceforge.net --css blue
-	touch .up2date.refdocs
+	touch .refdocs.up2date
 
-examples: .up2date.examples
-.up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
+examples: .examples.up2date
+.examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
 	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
 	       -u http://epydoc.sourceforge.net --css blue
-	touch .up2date.examples
+	touch .examples.up2date
