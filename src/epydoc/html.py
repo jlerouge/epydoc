@@ -942,7 +942,7 @@ class HTML_Doc:
         str += I+'<th class="navbar">'
         if self._prj_name:
             if self._prj_url:
-                str += ('<a class="navbar" href="%s">%s</a>' %
+                str += ('<a class="navbar" target="_top" href="%s">%s</a>' %
                           (self._prj_url, self._prj_name))
             else:
                 str += self._prj_name
