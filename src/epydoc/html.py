@@ -1395,7 +1395,7 @@ class HTMLFormatter:
             #    fsum = '    <br /><i>(undocumented)</i>\n'
             str += '<tr><td align="right" valign="top" width="15%">'
             str += '<font size="-1">'+rtype+'</font></td>\n  <td><code>'
-            if fdoc.documented():
+            if fdoc.documented() or inherit:
                 str += self._func_signature(fname, fdoc, 1, 0, 'summary-sig')
             else:
                 str += '<a name="%s"></a>' % fname
