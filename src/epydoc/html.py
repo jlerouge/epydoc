@@ -254,10 +254,10 @@ class HTMLFormatter:
               is the default page shown main frame, when frames are
               enabled.  C{toppage} can be a URL, the name of a
               module, the name of a class, or one of the special
-              strings C{"trees"}, C{"indices"}, or C{"help"}.
-              By default, the top-level package or module is used, if
-              there is one; otherwise, C{"trees"} is used.
-              (type=C{string}) 
+              strings C{"trees.html"}, C{"indices.html"}, or
+              C{"help.html"}.  By default, the top-level package or
+              module is used, if there is one; otherwise, C{"trees"}
+              is used.  (type=C{string})
             - C{css}: The CSS stylesheet file.  If C{css} is a file
               name, then the specified file's conents will be used.
               Otherwise, if C{css} is the name of a CSS stylesheet in

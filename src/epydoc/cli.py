@@ -22,7 +22,7 @@ Usage::
     -u URL, --url URL         The documented project's url.
     -c SHEET, --css SHEET     CSS stylesheet for HTML files.
     -t PAGE, --toppage PAGE   The top page for the documentation.
-    --navlink LINK            HTML code for the navbar's homepage link.
+    --navlink HTML            HTML code for the navbar's homepage link.
     --private-css SHEET       CSS stylesheet for private objects.
     --help-file FILE          HTML body for the help page.
     --no-frames               Do not create frames-based table of contents.
