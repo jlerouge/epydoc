@@ -127,6 +127,7 @@ SPECIAL_METHODS ={
     '__radd__': 'Right-side addition operator',
     '__hash__': 'Hashing function',
     '__contains__': 'In operator',
+    '__nonzero__': 'Boolean test operator',
     '__str__': 'Informal representation operator',
     }
 
@@ -749,7 +750,7 @@ class HTMLFormatter:
         if doc.bases():
             str += '<pre class="base-tree">\n' 
             str += self._base_tree(uid) 
-            str += '</pre><br>\n\n'
+            str += '</pre><br />\n\n'
 
         # Write the class's known subclasses
         if doc.subclasses():
@@ -851,7 +852,7 @@ class HTMLFormatter:
         # Header and navigation bar.
         out.write(self._header('Index'))
         out.write(self._navbar('indices', 1))
-        out.write('<br>\n')
+        out.write('<br />\n')
 
         # Term index
         terms = self._extract_term_index().items()
@@ -867,7 +868,7 @@ class HTMLFormatter:
                             (self._uid_to_uri(link.target()),
                              self._term_index_to_anchor(term), link.name()))
                 out.write(str[:-2] + '</tr></td>\n')
-            out.write('</table>\n' +  '<br>\n')
+            out.write('</table>\n' +  '<br />\n')
 
         # Identifier index
         identifiers = self._extract_identifier_index()
@@ -898,7 +899,7 @@ class HTMLFormatter:
                 out.write('  <tr><td width="15%%">%s</td>\n' % href)
                 out.write('    <td>%s</td></tr>\n' % descr)
 
-            out.write('</table>\n' +  '<br>\n')
+            out.write('</table>\n' +  '<br />\n')
 
         # Navigation bar and footer.
         out.write(self._navbar('indices'))
@@ -920,27 +921,27 @@ class HTMLFormatter:
                  'Contents</b></font></center>\n<hr>\n')
 
         # Class table of contents (all classes/exceptions)
-        str += ('<a target="moduleFrame" href="%s">%s</a><br>\n' %
+        str += ('<a target="moduleFrame" href="%s">%s</a><br />\n' %
                 ('toc-everything.html', 'Everything'))
 
         # Package table of contents (individual packages)
         str += self._start_of('Packages')
-        str += '<br><font size="+1"><b>Packages</b></font><br>\n'
+        str += '<br /><font size="+1"><b>Packages</b></font><br />\n'
         for uid in uids:
             if uid.is_package():
                 str += ('<a target="moduleFrame" href="toc-%s">'+
-                        '%s</a><br>\n') % (self._uid_to_uri(uid), uid)
+                        '%s</a><br />\n') % (self._uid_to_uri(uid), uid)
 
         # Module table of contents (individual modules)
         str += self._start_of('Modules')
-        str += '<br><font size="+1"><b>Modules</b></font><br>\n'
+        str += '<br /><font size="+1"><b>Modules</b></font><br />\n'
         for uid in uids:
             if uid.is_module() and not uid.is_package():
                 str += ('<a target="moduleFrame" href="toc-%s">'+
-                        '%s</a><br>\n') % (self._uid_to_uri(uid), uid)
+                        '%s</a><br />\n') % (self._uid_to_uri(uid), uid)
                 
         # The private/public link.
-        str += '\n<br><hr>\n'
+        str += '\n<br /><hr>\n'
         str += self._public_private_link('toc')
         
         return str + '\n</body>\n</html>\n'
@@ -1012,8 +1013,7 @@ class HTMLFormatter:
                                  
         # The private/public link.
         str += '\n<hr>\n'
-        str += self._public_private_link('%s-mtoc' % uid)
-
+        str += self._public_private_link(uid, 1)
         return str + '\n</body>\n</html>\n'
     
     #////////////////////////////////////////////////////////////
@@ -1124,7 +1124,7 @@ class HTMLFormatter:
                 'target="_top">frames</a>&nbsp;|&nbsp;<a href="'+uri+
                 '" target="_top">no&nbsp;frames</a>]</font>')
     
-    def _public_private_link(self, where):
+    def _public_private_link(self, where, toc=0):
         """
         @return: The HTML code for a link between the public & private
             copies of the documentation.
@@ -1137,6 +1137,7 @@ class HTMLFormatter:
 
         if isinstance(where, UID): uri = self._uid_to_uri(where)
         else: uri = where+'.html'
+        if toc: uri = 'toc-'+uri
         
         if self._show_private:
             return ('<font size="-2">[show&nbsp;private&nbsp;|&nbsp;' +
@@ -1326,7 +1327,7 @@ class HTMLFormatter:
             str += '<tr><td width="15%">\n'
             str += '  <b>'+self._link_to_html(link)
             str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
-        return str + '</table><br>\n\n'
+        return str + '</table><br />\n\n'
 
     #////////////////////////////////////////////////////////////
     # Function tables
@@ -1375,9 +1376,9 @@ class HTMLFormatter:
 
             descrstr = self._summary(fdoc, container)
             if descrstr != '&nbsp;':
-                fsum = '<br>'+descrstr
+                fsum = '<br />'+descrstr
             else:
-                if inherit: fsum = '<br>\n'
+                if inherit: fsum = '<br />\n'
                 else: fsum = ''
             if inherit:
                 fsum += ('    <i>(inherited from %s)</i>\n' %
@@ -1386,7 +1387,7 @@ class HTMLFormatter:
             str += '<font size="-1">'+rtype+'</font></td>\n  <td>'
             str += self._func_signature(fname, fdoc, 1, 'summary-sig')
             str += fsum+'</td></tr>\n'
-        return str + '</table><br>\n\n'
+        return str + '</table><br />\n\n'
 
     def _func_details(self, functions, cls, heading='Function Details'):
         """
@@ -1425,13 +1426,18 @@ class HTMLFormatter:
             if not self._docmap.has_key(func): continue
             fdoc = self._docmap[func]
 
-            if SPECIAL_METHODS.has_key(fname):
-                str += '  <h3 class="func-details"><i>'
-                str += SPECIAL_METHODS[fname]+'</i></h3>\n'
-            else:
-                str += '  <h3 class="func-details">'+fname+'</h3>\n'
+            #if SPECIAL_METHODS.has_key(fname):
+            #    str += '  <h3 class="func-details"><i>'
+            #    str += SPECIAL_METHODS[fname]+'</i></h3>\n'
+            #else:
+            #    str += '  <h3 class="func-details">'+fname+'</h3>\n'
+            #str += '  <p>%s</p>\n' % self._func_signature(fname, fdoc)
 
-            str += '  <p>%s</p>\n' % self._func_signature(fname, fdoc)
+            str += '  <h3>%s\n' % self._func_signature(fname, fdoc)
+            if SPECIAL_METHODS.has_key(fname):
+                str += '    <br /><i>'
+                str += '(%s)</i>\n' % SPECIAL_METHODS[fname]
+            str += '  </h3>\n'           
 
             foverrides = fdoc.overrides()
 
@@ -1470,7 +1476,7 @@ class HTMLFormatter:
                     str += '\n'
                     if param.type():
                         ptype = self._dom_to_html(param.type(), container, 14)
-                        str += '        <br><i>'+('&nbsp;'*10)+'\n'
+                        str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
                     str += '      </dd>\n'
                 str += '    </dl>\n'
@@ -1482,7 +1488,7 @@ class HTMLFormatter:
                     str += self._dom_to_html(freturn.descr(), container, 8)
                     if freturn.type():
                         rtype = self._dom_to_html(freturn.type(),container,14)
-                        str += '        <br><i>'+('&nbsp;'*10)+'\n'
+                        str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % rtype.strip()
                 elif freturn.type():
                     str += self._dom_to_html(freturn.type(), container, 8)
@@ -1529,7 +1535,7 @@ class HTMLFormatter:
             str += '  </dd></dl>\n'
             str += '</td></tr></table>\n'
 
-        str += '<br>\n\n'
+        str += '<br />\n\n'
         return str
 
     def _func_signature(self, fname, fdoc, link=0, css_class="sig"):
@@ -1615,7 +1621,7 @@ class HTMLFormatter:
             str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
             str += '  <td><code><b><a href="#'+vname+'">'+vname
             str += '</a></b></code>\n  ' + vsum + '</td></tr>\n'
-        return str + '</table><br>\n\n'
+        return str + '</table><br />\n\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
         """
@@ -1676,7 +1682,7 @@ class HTMLFormatter:
 
         # If we didn't get any variables, don't print anything.
         if numvars == 0: return ''
-        return str+'<br>'
+        return str+'<br />'
 
     def _pprint_var_value(self, var):
         if not var.has_value(): return ''
@@ -1995,11 +2001,11 @@ class HTMLFormatter:
 
         if not links: return ''
         str = self._start_of(section)
-        str += '<font size="+1"><b>%s</b></font><br>\n' % section
+        str += '<font size="+1"><b>%s</b></font><br />\n' % section
         for link in links:
-            str += ('<a target="mainFrame" href="%s">%s</a><br>\n' %
+            str += ('<a target="mainFrame" href="%s">%s</a><br />\n' %
                     (self._uid_to_uri(link.target()), link.name()))
-        return str+'<br>\n'
+        return str+'<br />\n'
 
     def _toc_var_section(self, section, vars):
         # Sort & filter the vars.
@@ -2010,12 +2016,12 @@ class HTMLFormatter:
 
         if not vars: return ''
         str = self._start_of(section)
-        str += '<font size="+1"><b>%s</b></font><br>\n' % section
+        str += '<font size="+1"><b>%s</b></font><br />\n' % section
         for var in vars:
-            str += ('<a target="mainFrame" href="%s#%s">%s</a><br>\n' %
+            str += ('<a target="mainFrame" href="%s#%s">%s</a><br />\n' %
                     (self._uid_to_uri(var[1]), var[0].name(), 
                      var[0].name()))
-        return str+'<br>\n'
+        return str+'<br />\n'
 
     #////////////////////////////////////////////////////////////
     # Docstring -> HTML Conversion
@@ -2425,7 +2431,7 @@ class HTMLFormatter:
         if plural is None: plural = singular
         if len(items) == 0: return ''
         if len(items) == 1:
-            return '<p><b>%s:</b> %s<br></p>\n\n' % (singular, items[0])
+            return '<p><b>%s:</b> %s<br /></p>\n\n' % (singular, items[0])
         if short:
             str = '<dl><dt><b>%s:</b></dt>\n  <dd>\n    ' % plural
             return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
