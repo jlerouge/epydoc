@@ -15,6 +15,7 @@ one name.  UIDs should be always created using the L{make_uid}
 function; do not create UIDs directly.  The L{Link} class uses UIDs to
 implement crossreferencing between C{ObjDoc}s.
 
+@sort: make_uid, UID, Link
 @see: L{epydoc.objdoc}
 """
 __docformat__ = 'epytext en'
@@ -39,8 +40,6 @@ except:
     _WrapperDescriptorType = None
     _MethodDescriptorType = None
     _PropertyType = None
-
-__epydoc_sort__ = ['make_uid', 'UID', 'Link']
 
 ##################################################
 ## Table of Contents
