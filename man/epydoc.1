@@ -9,14 +9,11 @@ epydoc \- generate API documentation from Python docstrings
 .SH SYNOPSIS
 .HP 7
 .B epydoc
-.RB [ \-\-html " | "
-.BR \-\-latex " |"
-.BR \-\-dvi " |"
-.BR \-\-ps " |"
-.BR \-\-pdf " |"
-.BR \-\-check ]
+.RB [ \-\-html " | " \-\-latex " | " \-\-dvi " | " \-\-ps " | " \-\-pdf ]
 .RB [ \-o
 .IR dir ]
+.RB [ \-\-docformat
+.IR format ]
 .RB [ \-n
 .IR name ]
 .RB [ \-u
@@ -27,20 +24,31 @@ epydoc \- generate API documentation from Python docstrings
 .IR sheet ]
 .RB [ \-\-private\-css
 .IR sheet ]
-.RB [ \-\-docformat
-.IR format ]
-.RB [ \-p ]
 .RB [ \-\-navlink
 .IR html ]
-.RB [ \-\-show\-imports ]
-.RB [ \-\-no\-private ]
-.RB [ \-\-no\-frames ]
 .RB [ \-\-help\-file
 .IR file ]
+.RB [ \-\-private ]
+.RB [ \-\-no\-private ]
+.RB [ \-\-inheritance
+.IR style ]
+.RB [ \-\-show\-imports ]
 .RB [ \-\-builtins ]
+.RB [ \-\-ignore\-param\-mismatch ]
 .RB [ \-\-separate-classes ]
-.RB [ \-v ]
 .RB [ \-q ]
+.RB [ \-v ]
+.IB modules ...
+.HP 7
+.B epydoc
+.B \-\-check
+.RB [ \-\-tests
+.BR tests ]
+.RB [ \-\-private ]
+.RB [ \-\-builtins ]
+.RB [ \-\-ignore\-param\-mismatch ]
+.RB [ \-q ]
+.RB [ \-v ]
 .IB modules ...
 .PP
 .B epydoc \-h
@@ -54,10 +62,10 @@ generates API documentation for Python modules and packages, based on
 their docstrings.  A lightweight markup language called
 .B epytext
 can be used to format docstrings, and to add information about
-specific fields, such as parameters and instance variables.
-Currently, epydoc
-.B supports
-two output formats: HTML and LaTeX.
+specific fields, such as parameters and instance variables.  Epydoc
+also understands docstrings written in ReStructuredText, Javadoc, and
+plaintext.  Currently, epydoc supports two basic output formats: HTML
+and LaTeX.
 .PP
 The HTML API documentation produced by 
 .B epydoc
@@ -206,10 +214,10 @@ is "grouped," then inherited objects are gathered into groups, based
 on which class that they are inherited from.  If
 .I format
 is "listed," then inherited objects are listed in a short list at the
-end of their table.  If
+end of the summary table.  If
 .I format
 is "included," then inherited objects are mixed in with non-inherited
-objects.
+objects.  The default format for HTML output is "grouped."
 .TP
 .BI "\-n " name ", \-\-name " name
 The name of the project whose documentation is being generated.  This
@@ -334,6 +342,10 @@ for English).  For a list of the markup languages currently recognized
 by epydoc, run
 .BR "epydoc \-\-help docformat" .
 .TP
+.B \-\-ignore\-param\-mismatch
+Do not issue warnings when a method's parameters do not match the
+parameters of the base class method that it overrides.
+.TP
 .BI "\-\-inheritance " format
 The format that should be used to display inherited methods,
 variables, and properties.
@@ -346,7 +358,7 @@ is "listed," then inherited objects are listed in a short list at the
 end of their section.  If
 .I format
 is "included," then inherited objects are mixed in with non-inherited
-objects.
+objects.  The default format for LaTeX output is "listed."
 .TP
 .BI "\-n " name ", \-\-name " name
 The name of the project whose documentation is being generated.  This
@@ -404,6 +416,10 @@ or directory names (such as
 .BR epydoc/ ).
 Directory names specify packages, and are expanded to include
 all sub-modules and sub-packages.
+.TP
+.B \-\-ignore\-param\-mismatch
+Do not issue warnings when a method's parameters do not match the
+parameters of the base class method that it overrides.
 .TP
 .B \-\-private
 Perform checks on private objects
