@@ -1100,8 +1100,10 @@ class HTML_Doc:
                                                               default)
             str += PARAM_JOIN
         if fdoc.vararg():
-            str += ('<span class=%s-vararg>*%s</span>%s' %
-                    (cssclass, fdoc.vararg().name(), PARAM_JOIN))
+            vararg_name = fdoc.vararg().name()
+            if vararg_name != '...': vararg_name = '*%s' % vararg_name
+            str += ('<span class=%s-vararg>%s</span>%s' %
+                    (cssclass, vararg_name, PARAM_JOIN))
         if fdoc.kwarg():
             str += ('<span class=%s-kwarg>**%s</span>%s' %
                     (cssclass, fdoc.kwarg().name(), PARAM_JOIN))
@@ -1370,7 +1372,8 @@ class HTML_Doc:
                               'name', 'target'):
             return childstr
         else:
-            print 'Warning: unknown epytext DOM element %r' % tree.tagName
+            raise ValueError('Warning: unknown epytext DOM element %r' %
+                             tree.tagName)
     
     # Construct two regular expressions that are useful for colorizing
     # doctest blocks: _PROMPT_RE and _COLORIZE_RE.
@@ -1658,6 +1661,9 @@ class HTML_Doc:
             return '%s.html#%s' % (uid.module(), uid.shortname())
         elif uid.is_method():
             return '%s.html#%s' % (uid.cls(), uid.shortname())
+        elif uid.is_builtin_function():
+            # FIX THIS:
+            return '#%s' % uid.shortname()
         else:
             return '%s.html' % uid
     
