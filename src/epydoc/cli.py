@@ -401,6 +401,7 @@ def _latex(docmap, options, format):
                 _run(LATEX_COMMAND % filenames, options)
                 _run(MAKEINDEX_COMMAND % filenames, options)
                 _run(LATEX_COMMAND % filenames, options)
+                _run(LATEX_COMMAND % filenames, options)
                 
             # dvi -> postscript
             if format in ('ps', 'pdf'):
