@@ -56,7 +56,7 @@ __docformat__ = 'epytext en'
 # Use "%(tex)s" to include the latex filename, "%(ps)s" for the
 # postscript filename, etc.  (You must include the "s" after the close
 # parenthasis).
-LATEX_COMMAND = 'latex %(tex)s'
+LATEX_COMMAND = 'echo x | latex %(tex)s'
 MAKEINDEX_COMMAND = 'makeindex -q %(idx)s'
 DVIPS_COMMAND = 'dvips -q %(dvi)s -o %(ps)s -G0 -Ppdf'
 PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
@@ -344,7 +344,8 @@ def _make_docmap(modules, options):
 
 def _run(cmd, options):
     from epydoc.epytext import wordwrap
-    name = cmd.split(' ', 1)[0]
+    if '|' in cmd: name = cmd.split('|')[1].strip().split(' ', 1)[0]
+    else: name = cmd.strip().split(' ', 1)[0]
     if options['verbosity'] == 1:
         print >>sys.stderr, 'Running %s...' % name
     elif options['verbosity'] > 1:
@@ -355,7 +356,7 @@ def _run(cmd, options):
     exitcode = pipe.close()
     if exitcode is not None:
         print output
-        raise OSError('%s failed: %s' % name, exitcode)
+        raise OSError('%s failed: %s' % (name, exitcode))
 
 def _latex(docmap, options, format):
     """
@@ -536,4 +537,3 @@ if __name__ == '__main__':
         profiler.print_stats()
     else:
         cli()
-    
