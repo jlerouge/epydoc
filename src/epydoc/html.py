@@ -574,13 +574,25 @@ class HTML_Doc:
             str += self._start_of('Module Description')
             str += '<h2>Module '+uid.name()+'</h2>\n\n'
 
+        # Write the module's description.
+        if doc.descr():
+            str += self._dom_to_html(doc.descr(), uid) + '<hr/>\n'
+
+        # Add the version, if available
+        if doc.version():
+            str += self._version(doc.version(), uid)
+
         # Add any author links.
         if doc.authors():
             str += self._author(doc.authors(), uid)
 
-        # Write the module's description.
-        if doc.descr():
-            str += self._dom_to_html(doc.descr(), uid) + '<hr/>\n'
+        # Add any requirements
+        if doc.requires():
+            str += self._requires(doc.requires(), uid)
+
+        # Add any warnings
+        if doc.warnings():
+            str += self._warnings(doc.warnings(), uid)
 
         # Add any see-also links.
         if doc.seealsos():
@@ -626,10 +638,6 @@ class HTML_Doc:
         str = self._header(uid.name())
         str += self._navbar(uid, 1)
 
-        # Add any author links.
-        if doc.authors():
-            str += self._author(doc.authors(), uid)
-
         # Write the class's module and its name.
         str += self._start_of('Class Description')
         str += '<h2><font size="-1">\n'+uid.module().name()+'</font><br>\n' 
@@ -653,6 +661,22 @@ class HTML_Doc:
             str += '<hr/>\n' + self._dom_to_html(doc.descr(), uid)
             str += '\n\n'
         str += '<hr/>\n\n'
+
+        # Add the version, if available
+        if doc.version():
+            str += self._version(doc.version(), uid)
+
+        # Add any author links.
+        if doc.authors():
+            str += self._author(doc.authors(), uid)
+
+        # Add any requirements
+        if doc.requires():
+            str += self._requires(doc.requires(), uid)
+
+        # Add any warnings
+        if doc.warnings():
+            str += self._warnings(doc.warnings(), uid)
 
         # Add any see-also links
         if doc.seealsos():
@@ -716,29 +740,30 @@ class HTML_Doc:
         str += '<br>\n'
 
         # Term index
-        str += self._start_of('Term Index')
-        str += self._table_header('Term Index', 'index')
-        index = self._extract_term_index().items()
-        index.sort()
-        for (term, links) in index:
-            str += '  <tr><td width="15%">'+term+'</td>\n    <td>'
-            links.sort()
-            for link in links:
-                str += ('<i><a href="%s#%s">%s</a></i>, ' %
-                        (self._uid_to_uri(link.target()),
-                         self._term_index_to_anchor(term), link.name()))
-            str = str[:-2] + '</tr></td>\n'
-        str += '</table>\n' +  '<br>\n'
+        terms = self._extract_term_index().items()
+        if terms:
+            str += self._start_of('Term Index')
+            str += self._table_header('Term Index', 'index')
+            terms.sort()
+            for (term, links) in terms:
+                str += '  <tr><td width="15%">'+term+'</td>\n    <td>'
+                links.sort()
+                for link in links:
+                    str += ('<i><a href="%s#%s">%s</a></i>, ' %
+                            (self._uid_to_uri(link.target()),
+                             self._term_index_to_anchor(term), link.name()))
+                str = str[:-2] + '</tr></td>\n'
+            str += '</table>\n' +  '<br>\n'
 
         # Identifier index
-        str += self._start_of('Identifier Index')
-        str += self._table_header('Identifier Index', 'index')
         identifiers = self._extract_identifier_index()
-        for (href, descr) in identifiers:
-            str += '  <tr><td width="15%%">%s</td>\n' % href
-            str += '    <td>%s</td></tr>\n' % descr
-        str += '</table>\n' +  '<br>\n'
-            
+        if identifiers:
+            str += self._start_of('Identifier Index')
+            str += self._table_header('Identifier Index', 'index')
+            for (href, descr) in identifiers:
+                str += '  <tr><td width="15%%">%s</td>\n' % href
+                str += '    <td>%s</td></tr>\n' % descr
+            str += '</table>\n' +  '<br>\n'
 
         # Navigation bar and footer.
         str += self._navbar('epydoc-index')
@@ -1421,6 +1446,22 @@ class HTML_Doc:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
 
+            # Version
+            if fdoc.version():
+                str += self._version(fdoc.version(), func.parent())
+
+            # Author
+            if fdoc.authors():
+                str += self._author(fdoc.authors(), func.parent())
+
+            # Requirements
+            if fdoc.requires():
+                str += self._requires(fdoc.requires(), func.parent())
+                    
+            # Warnings
+            if fdoc.warnings():
+                str += self._warnings(fdoc.warnings(), func.parent())
+
             # See also
             if fdoc.seealsos():
                 str += self._seealso(fdoc.seealsos(), func.parent())
@@ -1738,6 +1779,10 @@ class HTML_Doc:
                 self._get_term_index_items(doc.version(), link, index)
             for author in doc.authors():
                 self._get_term_index_items(author, link, index)
+            for require in doc.requires():
+                self._get_term_index_items(require, link, index)
+            for warn in doc.warnings():
+                self._get_term_index_items(warn, link, index)
 
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
@@ -2196,31 +2241,61 @@ class HTML_Doc:
         """
         timestamp = time.asctime(time.localtime(time.time()))
         return FOOTER % (epydoc.__version__, timestamp)
+
+    def _descrlist(self, items, singular, plural=None, short=0):
+        """
+        @return: The HTML code for a list of description items.
+        @param items: The description items.
+        @type items: C{list} of C{string}
+        @param singular: The name of the list, if there is one
+            element. 
+        @param plural: The name of the list, if there are multiple
+            elements.  
+        """
+        if plural is None: plural = singular
+        if len(items) == 0: return ''
+        if len(items) == 1:
+            return '<p><b>%s:</b> %s<br></p>\n\n' % (singular, items[0])
+        if short:
+            str = '<dl><dt><b>%s:</b></dt>\n  <dd>\n    ' % plural
+            return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
+        else:
+            str = '<p><b>%s:</b>\n<ul>\n  <li>' % plural
+            return (str + '</li>\n  <li>'.join(items) +
+                    '\n  </li>\n</ul></p>\n\n')
     
     def _seealso(self, seealso, container):
         """
         @return: The HTML code for the see-also fields.
         """
         items = [self._dom_to_html(s, container) for s in seealso]
-        if len(items) == 0: return ''
-        if len(items) == 1:
-            return '<p><b>See also:</b> %s</p>\n\n' % items[0]
-        if len(items) > 1:
-            str = '<dl><dt><b>See also:</b></dt>\n  <dd>\n    '
-            return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
+        return self._descrlist(items, 'See also', short=1)
 
     def _author(self, authors, container):
         """
         @return: The HTML code for the author fields.
         """
         items = [self._dom_to_html(a, container) for a in authors]
-        if len(items) == 0: return ''
-        if len(items) == 1:
-            return '<p><b>Author:</b> %s</p>\n\n' % items[0]
-        if len(items) > 1:
-            str = '<dl><dt><b>Authors:</b></dt>\n  <dd>\n    '
-            return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
+        return self._descrlist(items, 'Author', 'Authors', short=1)
 
+    def _requires(self, requires, container):
+        """
+        @return: The HTML code for the requires field.
+        """
+        items = [self._dom_to_html(r, container) for r in requires]
+        return self._descrlist(items, 'Requires')
+         
+    def _warnings(self, warnings, container):
+        """
+        @return: The HTML code for the warnings field.
+        """
+        items = [self._dom_to_html(r, container) for r in warnings]
+        return self._descrlist(items, 'Warning', 'Warnings')
+
+    def _version(self, version, container):
+        return ('<p><b>Version:</b> %s</p>\n\n' %
+                self._dom_to_html(version, container))
+         
     def _imports(self, classes, excepts, functions, sortorder):
         if not self._show_imports: return ''
         class_items = [self._link_to_html(c)
