@@ -4,9 +4,6 @@
 ##  Edward Loper
 ############################################################
 
-# Python source files
-PY_SRC = $(wildcard epydoc/*.py)
-
 all: distributions
 
 # Clean.  
@@ -20,9 +17,7 @@ clean:
 
 # Distributions.
 # Build all from scratch; and create links for convenient access.
-distributions: dist/.up2date
-dist/.up2date: $(PY_SRC) clean sdist bdist
-	touch dist/.up2date
+distributions: clean sdist bdist
 
 # Source distributions
 sdist: gztardist zipdist

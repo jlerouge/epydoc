@@ -37,7 +37,8 @@ clean:
 	$(MAKE) -C src clean
 	rm -rf ${WEBDIR} ${API} ${EXAMPLES}
 
-distributions:
+distributions: src/dist/.up2date
+src/dist/.up2date: $(PY_SRC)
 	$(MAKE) -C src distributions
 
 web: xfer
