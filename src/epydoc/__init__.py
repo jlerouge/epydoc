@@ -80,6 +80,9 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 #   - add option: don't include vars and cvars that have no descr?
 #   - create a better default top_page than trees.html
 #   - render package's module sublists as some kind of table?
+#   - use <SPAN TITLE=""> for partially ellided var values?
+#   - put var values in the summary table?
+#   - options to --check (--check all, --check basic, etc)
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
