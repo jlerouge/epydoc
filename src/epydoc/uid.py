@@ -769,6 +769,14 @@ class Link:
         """
         return self._target
 
+    def is_private(self):
+        """
+        @return: True if this link points to a private object.  This
+            is equivalant to C{self.target().is_private()}.
+        @rtype: C{boolean}
+        """
+        return self._target.is_private()
+
     def __cmp__(self, other):
         if not isinstance(other, Link): return -1
         return cmp(self._target, other._target)
