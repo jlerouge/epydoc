@@ -9,12 +9,49 @@
 """
 Epydoc parser for ReStructuredText strings.  ReStructuredText is the
 standard markup language used by the Docutils project.
+L{parse_docstring()} provides the primary interface to this module; it
+returns a L{ParsedRstDocstring}, which supports all of the methods
+defined by L{ParsedDocstring}.
 
-@todo: Implement to_plaintext.  (It's required, as a fallback.)  How?
-@todo: Add to_latex??
-@warning: Epydoc only supports HTML output for ReStructuredText
-docstrings right now.
+L{ParsedRstDocstring} is basically just a L{ParsedDocstring} wrapper
+for the L{docutils.nodes.document} class.
 
+Creating C{ParsedRstDocstring}s
+===============================
+C{ParsedRstDocstring}s are created by the C{parse_document} function,
+using the L{docutils.core.publish_string()} method, with the following
+helpers:
+
+  - An L{_EpydocReader} is used to capture all error messages as it
+    parses the docstring.
+  - A L{_DocumentPseudoWriter} is used to extract the document itself,
+    without actually writing any output.  The document is saved for
+    further processing.  The settings for the writer are copied from
+    L{docutils.writers.html4css1.Writer}, since those settings will
+    be used when we actually write the docstring to html.
+
+Using C{ParsedRstDocstring}s
+============================
+
+C{ParsedRstDocstring}s support all of the methods defined by
+C{ParsedDocstring}; but only the following four methods have
+non-default behavior:
+
+  - L{to_html()<ParsedRstDocstring.to_html>} uses an
+    L{_EpydocHTMLTranslator} to translate the C{ParsedRstDocstring}'s
+    document into an HTML segment.
+  - L{split_fields()<ParsedRstDocstring.split_fields>} uses a
+    L{_SplitFieldsTranslator} to divide the C{ParsedRstDocstring}'s
+    document into its main body and its fields.  Special handling
+    is done to account for consolidated fields.
+  - L{summary()<ParsedRstDocstring.summary>} uses a
+    L{_SummaryExtractor} to extract the first sentence from
+    the C{ParsedRstDocstring}'s document.
+  - L{to_plaintext()<ParsedRstDocstring.to_plaintext>} uses
+    C{document.astext()} to convert the C{ParsedRstDocstring}'s
+    document to plaintext.
+
+@todo: Add ParsedRstDocstring.to_latex()
 @var CONSOLIDATED_FIELDS: A dictionary encoding the set of
 'consolidated fields' that can be used.  Each consolidated field is
 marked by a single tag, and contains a single bulleted list, where
@@ -56,17 +93,16 @@ CONSOLIDATED_FIELDS = {
 def parse_docstring(docstring, errors, **options):
     """
     Parse the given docstring, which is formatted using
-    ReStructuredText; and return an XML representation of its
-    contents.  The returned string is primarily composed of C{rawhtml}
-    elements, with C{link} elements embedded for ReStructuredText
-    interpreted text (C{`...`}), and with C{field} elements to encode
-    ReStructuredText fields.  See L{the module
-    documentation<epydoc.markup.restructuredtext>} for more information.
-
+    ReStructuredText; and return a L{ParsedDocstring} representation
+    of its contents.
+    @param docstring: The docstring to parse
     @type docstring: C{string}
-    @param docstring: The ReStructuredText docstring to parse.
-    @rtype: L{xml.dom.minidom.Document}
-    @return: An XML representation of C{docstring}'s contents.
+    @param errors: A list where any errors generated during parsing
+        will be stored.
+    @type errors: C{list} of L{ParseError}
+    @param options: Extra options.  Unknown options are ignored.
+        Currently, no extra options are defined.
+    @rtype: L{ParsedDocstring}
     """
     writer = _DocumentPseudoWriter()
     writer.settings_spec = HTMLWriter.settings_spec
@@ -75,20 +111,35 @@ def parse_docstring(docstring, errors, **options):
     return ParsedRstDocstring(writer.document)
     
 class ParsedRstDocstring(ParsedDocstring):
+    """
+    An encoded version of a ReStructuredText docstring.  The contents
+    of the docstring are encoded in the L{_document} instance
+    variable.
+
+    @ivar _document: A ReStructuredText document, encoding the
+        docstring.
+    @type _document: L{docutils.nodes.document}
+    """
     def __init__(self, document):
+        """
+        @type document: L{docutils.nodes.document}
+        """
         self._document = document
 
     def split_fields(self, errors=None):
+        # Inherit docs
         visitor = _SplitFieldsTranslator(self._document, errors)
         self._document.walk(visitor)
         return self, visitor.fields
 
     def summary(self):
+        # Inherit docs
         visitor = _SummaryExtractor(self._document)
         self._document.walk(visitor)
         return visitor.summary
 
     def to_html(self, docstring_linker, **options):
+        # Inherit docs
         visitor = _EpydocHTMLTranslator(self._document, docstring_linker)
         self._document.walkabout(visitor)
         return ''.join(visitor.body)
