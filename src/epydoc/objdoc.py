@@ -50,6 +50,14 @@ import xml.dom.minidom
 
 from epydoc.uid import UID, Link, make_uid
 
+# Python 2.2 types
+try:
+    _WrapperDescriptorType = type(list.__add__)
+    _MethodDescriptorType = type(list.append)
+except:
+    _WrapperDescriptorType = None
+    _MethodDescriptorType = None
+
 ##################################################
 ## Helper Functions
 ##################################################
@@ -997,8 +1005,11 @@ class ClassDoc(ObjDoc):
         self._cvariables = []
         self._ivariables = []
 
-        try: items = cls.__dict__.items()
-        except AttributeError: items = []
+        try:
+            items = [(f, getattr(cls, f)) for f in dir(cls)]
+        except:
+            try: items = cls.__dict__.items()
+            except AttributeError: items = []
         for (field, val) in items:
             # Convert functions to methods.  (Since we're getting
             # values via __dict__)
@@ -1128,7 +1139,9 @@ class ClassDoc(ObjDoc):
             # values via __dict__)
             if type(val) is types.FunctionType:
                 val = new.instancemethod(val, None, base)
-            if type(val) not in (types.MethodType, types.BuiltinMethodType):
+            if type(val) not in (types.MethodType, types.BuiltinMethodType,
+                                 _WrapperDescriptorType,
+                                 _MethodDescriptorType):
                 continue
             vuid = make_uid(val, self._uid, field)
             if vuid is None: continue
@@ -1452,7 +1465,9 @@ class FuncDoc(ObjDoc):
 
                 # Make sure it's a method.
                 if type(base_method) not in (types.MethodType,
-                                            types.BuiltinMethodType):
+                                            types.BuiltinMethodType,
+                                             _WrapperDescriptorType,
+                                             _MethodDescriptorType):
                     return 0
 
                 # Check that the parameters match.
@@ -1721,9 +1736,11 @@ class DocMap(UserDict.UserDict):
         # Check that it's a good object, and if not, issue a warning.
         if type(obj) not in (types.ModuleType, types.ClassType, types.TypeType,
                              types.BuiltinFunctionType, types.MethodType,
-                             types.BuiltinMethodType, types.FunctionType):
+                             types.BuiltinMethodType, types.FunctionType,
+                             _WrapperDescriptorType, _MethodDescriptorType):
             if sys.stderr.softspace: print >>sys.stderr
-            estr = 'Error: docmap cannot add a %s' % type(object).__name__
+            estr = 'Error: docmap cannot add an object with type '
+            estr += type(obj).__name__
             print >>sys.stderr, estr
             return
         
