@@ -9,21 +9,21 @@ generates C{ModuleDocs} that contain their API documentation.
 ######################################################################
 
 # Force reload of volatile modules:
-import astmatcher; reload(astmatcher); del astmatcher
-import apidoc; reload(apidoc); del apidoc
+import epydoc.astmatcher; reload(epydoc.astmatcher); del epydoc.astmatcher
+import epydoc.apidoc; reload(epydoc.apidoc); del epydoc.apidoc
     
 ######################################################################
 ## Imports
 ######################################################################
 
 # Python source code parsing:
-import parser, symbol, token
+import parser, symbol, token, tokenize
 # File services:
 import os, os.path
 # API documentation encoding:
-from apidoc import *
+from epydoc.apidoc import *
 # Syntax tree matching:
-from astmatcher import compile_ast_matcher
+from epydoc.astmatcher import compile_ast_matcher
 # Type comparisons:
 from types import StringType, ListType, TupleType, IntType
 
@@ -78,7 +78,7 @@ class DocParser:
     @group Parse Handler Methods: parse_import, parse_classdef,
         parse_funcdef, parse_simple_assignment,
         parse_complex_assignment, parse_multi_assignment, parse_try,
-        parse_if, parse_while, parse_for, parse_multistmt
+        parse_if, parse_while, parse_for, parse_multi_stmt
     @group Docstring Extraction: get_docstring, get_pseudo_docstring,
         get_comment_docstring
     @group Name Lookup: lookup_name, lookup_dotted_name
@@ -318,8 +318,8 @@ class DocParser:
                (testlist...) COLON (suite ...):forsuite
                NAME? COLON? (suite ...)?:elsesuite)))""")),
         # Semicolon-separated statements: "x=1; y=2"
-        ('process_multistmt', compile_ast_matcher("""
-            (stmt COMMENT*:comments
+        ('process_multi_stmt', compile_ast_matcher("""
+            (stmt COMMENT*
              (simple_stmt
               (small_stmt ...):stmt1
               SEMI
@@ -862,7 +862,7 @@ class DocParser:
     # Parse Handler: Semicolon-Separated Statements
     #////////////////////////////////////////////////////////////
 
-    def process_multistmt(self, vars, pseudo_docstring):
+    def process_multi_stmt(self, stmt1, rest, pseudo_docstring):
         """
         The statement handler for a set of semicolon-separated
         statements, such as:
@@ -873,8 +873,8 @@ class DocParser:
         delegates to C{process_suite}.
         """
         # Get a list of the small-statements.
-        small_stmts = ([vars['stmt1']] +
-                       [s for s in vars['rest'] if s[0] == symbol.small_stmt])
+        small_stmts = [stmt1] + [s for s in rest
+                                 if s[0] == symbol.small_stmt]
                         
         # Wrap them up to look like a suite.
         stmts = [[symbol.stmt, [symbol.simple_stmt, s, [token.NEWLINE, '']]]
@@ -1229,14 +1229,12 @@ def _add_comments_to_ast_helper(ast, reversed_tokens, stmt):
 ## Testing
 ######################################################################
 
-# Create a builtins moduledoc
-try: builtins_doc
-except:
-    import docinspector
-    builtins_doc = docinspector.DocInspector().inspect(__builtins__)
+if __name__ == '__main__':
+    # Create a builtins moduledoc
+    try: builtins_doc
+    except:
+        import docinspector
+        builtins_doc = docinspector.DocInspector().inspect(__builtins__)
     
-print DocParser(builtins_doc).parse('epydoc_test.py').pp(depth=4,
+    print DocParser(builtins_doc).parse('epydoc_test.py').pp(depth=4,
                        exclude=['subclasses'])
-#print DocParser(DocCollection()).parse('epydoc_test.py').pp(depth=-1,
-#                 exclude=['subclasses', 'value'])
-#print DocParser(DocCollection()).parse('docparser.py')
