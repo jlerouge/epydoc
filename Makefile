@@ -32,7 +32,7 @@ web: refdocs
 	(cd ${WEBDIR} && tar -cvzf webpage.tgz *)
 	scp ${WEBDIR}/webpage.tgz ${HOST}:${DIR}
 	ssh ${HOST} "cd ${DIR} && tar -xvzf webpage.tgz && rm webpage.tgz"
-	ssh ${HOST} "cd ${DIR} && ln -s epydoc.html index.html"
+	ssh ${HOST} "cd ${DIR} && ln -s epydoc.html index.html || true"
 
 refdocs: 
 	epydoc ${PY_SRC} -o ${WEBDIR}
