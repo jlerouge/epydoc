@@ -952,8 +952,8 @@ class ObjDoc:
             docstring = _getdoc(source_uid.value())
             if type(docstring) != types.StringType: return
             docstring = docstring.strip()
-            if not docstring: return
-            self.__include(docstring)
+            if docstring: self.__include(docstring)
+            return
                 
         for field in self._fieldtypes:
             if tag not in field.tags: continue
@@ -3103,6 +3103,191 @@ class DocMap(UserDict.UserDict):
 
     def __repr__(self):
         return '<Documentation: '+`len(self.data)`+' objects>'
+
+##################################################
+## Variable documentation extraction
+##################################################
+
+_vardef_cache = (None,None)
+def add_vardefs(uid):
+    if uid.is_module(): module = uid
+    else: module = uid.module()
+
+    # Get the vardef docstrings for this module.
+    if module[0] == _vardef_cache[0]:
+        vardefs = _vardef_cache[1]
+    else:
+        try: filename = module.value().__file__
+        except: return # E.g., a builtin module
+        if filename[-4:-1].lower() == '.py':
+            filename = filename[:-1]
+    
+        # Extract vardefs from the module.
+        try: vardefs = find_vardefs(open(filename).read(), module.name())
+        except: return # E.g., a .pyc with no corresponding .py
+
+    # X
+    for varname, varparent, vartype, vardoc in vardefs:
+        if varparent == uid.name():
+            vuid = make_uid(None, uid, varname)
+            var = Var(varname, vuid, vardoc, typ, 0)
+            if uid.is_module():
+                module._variables.append(Link(varname, vuid))
+            elif uid.is_class():
+                if vartype == 'instvar':
+                    module._ivariables.append(Link(varname, vuid))
+                else:
+                    module._cvariables.append(Link(varname, vuid))
+            else:
+                raise AssertionError, 'Broken'
+                
+
+    
+
+
+#: A regular expression describing a single Python string literal.
+#: Tripple-quoted, unicode, and raw strings are supported.
+_STRING_LITERAL = re.compile(r"""
+u?r?(?:            # Single-quote (') strings
+  '''(?:                 # Tripple-quoted can contain...
+      [^']               | # a non-quote
+      \\'                | # a backslashed quote
+      '{1,2}(?!')          # one or two quotes
+    )*''' |
+  '(?:                   # Non-tripple quoted can contain...
+     [^']                | # a non-quote
+     \\'                   # a backslashded quote
+   )*'(?!') | """+
+r'''
+                   # Double-quote (") strings
+  """(?:                 # Tripple-quoted can contain...
+      [^"]               | # a non-quote
+      \\"                | # a backslashed single
+      "{1,2}(?!")          # one or two quotes
+    )*""" |
+  "(?:                   # Non-tripple quoted can contain...
+     [^"]                | # a non-quote
+     \\"                   # a backslashded quote
+   )*"(?!")
+)''', re.VERBOSE)
+#: A regular expression for finding variable assignments.
+_ASSIGN = re.compile(r'\s*(?:(\w+)\.)?(\w+)\s*=')
+#: A regular expression for finding constructors.
+_INITDEF = re.compile(r'\s*def\s+__init__\((\w+)')
+#: A regular expression for finding class definitions.
+_CLASSDEF = re.compile(r'\s*class\s+(\w+)')
+#: A regular expression for finding indents.
+_INDENT = re.compile(r'(\s*)(.*)')
+#: A regular expression for finding strings/comments
+_STRING_LITERAL_OR_COMMENT = re.compile(r'%s|\#.*' %
+                                        _STRING_LITERAL.pattern,
+                                        re.VERBOSE)
+
+_vardefs_cache = (None, None)
+def find_vardefs(string, modulename='top', doc_comment_marker='#'):
+    # Remove all newlines from inside multiline strings.  (Note that
+    # non-tripple-quoted strings can also be multiline, via lines
+    # ending in backslash)
+    def newlinesub(match):
+        return match.group().replace('\n', '\0')
+    string = _STRING_LITERAL_OR_COMMENT.sub(newlinesub, string)
+
+    # The variable docstrings we've found
+    vardocs = []
+
+    # The comment we just encountered, or None if we didn't just
+    # encounter a comment.
+    comment = ''
+
+    # The string literal we just encountered, or None if we didn't just
+    # encounter a string literal.
+    stringlit = ''
+
+    # The name used for "self" in the constructor.  This is used to
+    # decide which assignments apply to instance vars.
+    selfname=''
+
+    # The name of the block that we're about to start.  This is set
+    # when we enounter a "def" or "class", and cleared otherwise.
+    blockname = None
+    
+    # The names of the blocks that we're nested in; and the indentation
+    # level for each block.  This is used to decide what long name to
+    # use; and when we enter/exit a block.
+    blocknames = [modulename]
+    indents = [0]
+
+    # The variable assignment we just encountered; or none if we didn't
+    # just encounter a variable assignment.
+    varname = None
+    varparent = None
+    vartype = None
+
+    lines = string.split('\n')
+    for line in lines:
+        indent, line = _INDENT.match(line).groups()
+        indentation = len(indent)
+
+        # Ignore blank lines
+        if line=='':
+            comments = stringlit = None
+            continue
+
+        # Update indentation & block names.
+        if line[0] != '#':
+            while indentation < indents[-1]:
+                blocknames.pop()
+                indents.pop()
+            if indentation > indents[-1]:
+                indents.append(indentation)
+                blocknames.append(blockname)
+
+        # If the top block name is 'None' then we're inside some non-
+        # class block, so we don't care about var docstrings.
+        if blocknames[-1] == None: continue
+        
+        # Update blockname.
+        if _CLASSDEF.match(line):
+            blockname=_CLASSDEF.match(line).group(1)
+        elif _INITDEF.match(line):
+            blockname, selfname = '__init__', _INITDEF.match(line).group(1)
+        elif line[0] != '#':
+            blockname = None
+
+        # If it's an assignment, then update varname.
+        m = _ASSIGN.match(line)
+        if m:
+            # Get the variable's name & type.
+            if blocknames[-1] == '__init__':
+                if m.group(1) == selfname:
+                    varname = m.group(2)
+                    varparent = '.'.join(blocknames[:-1])
+                    vartype = 'instvar'
+            else:
+                varname = [m.group(2)]
+                varparent = '.'.join(blocknames)
+                vartype = 'var'
+
+            # A comment/stringlit followed by an assignment:
+            if (comment or stringlit):
+                vardocstring = comment or stringlit
+                vardocs.append([varname, varparent, vartype, vardocstring])
+                varname = None
+
+        # Update "comments"
+        if line.startswith(doc_comment_marker):
+            comment += line #line.rstrip()[1:]+'\n'
+        else: comment = ''
+
+        # Update "stringlit"
+        if _STRING_LITERAL.match(line):
+            stringlit = line.replace('\0', '\n')
+            if varname:
+                # An assignment followed by a stringlit:
+                vardocs.append([varname, varparent, vartype, stringlit])
+                varname = None
+        else: stringlit = ''
+    return vardocs
 
 ##################################################
 ## Helper Functions
