@@ -2589,13 +2589,13 @@ class HTMLFormatter:
         else:
             parent = uid.parent()
             if parent is None:
-                raise ValueError("Cannot find URI for uid %s" % uid)
+                return '%s-unknown.html' % uid.name() # Error
             elif parent.is_module():
                 return '%s-module.html#%s' % (parent.name(), uid.shortname())
             elif parent.is_class():
                 return '%s-class.html#%s' % (parent.name(), uid.shortname())
             else:
-                raise ValueError("Cannot find URI for uid %s" % uid)
+                return '%s-unknown.html' % uid.name() # Error
             
     def _documented(self, uid):
         """
