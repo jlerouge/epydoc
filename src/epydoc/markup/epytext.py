@@ -1084,7 +1084,6 @@ def to_epytext(tree, indent=0, seclevel=0):
         return str
 
     if tree.tagName == 'epytext': indent -= 2
-    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     if tree.tagName == 'section': seclevel += 1
     children = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
@@ -1160,13 +1159,18 @@ def to_plaintext(tree, indent=0, seclevel=0):
     @rtype: C{string}
     """
     if isinstance(tree, Document):
-        return to_epytext(tree.childNodes[0], indent, seclevel)
+        return to_plaintext(tree.childNodes[0], indent, seclevel)
     if isinstance(tree, Text): return tree.data
 
-    if tree.tagName == 'epytext': indent -= 2
-    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     if tree.tagName == 'section': seclevel += 1
-    children = [to_plaintext(c, indent+2, seclevel) for c in tree.childNodes]
+
+    # Figure out the child indent level.
+    if tree.tagName == 'epytext': cindent = indent
+    elif tree.tagName == 'li' and tree.getAttributeNode('bullet'):
+        cindent = indent + 1 + len(tree.getAttributeNode('bullet').value)
+    else:
+        cindent = indent + 2
+    children = [to_plaintext(c, cindent, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
 
     if tree.tagName == 'para':
@@ -1188,14 +1192,20 @@ def to_plaintext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'literalblock':
         lines = [(indent+1)*' '+line for line in childstr.split('\n')]
         return '\n'.join(lines) + '\n\n'
-    elif tree.tagName in ('olist', 'ulist'):
-        return childstr
     elif tree.tagName == 'fieldlist':
         return indent*' '+'{omitted fieldlist}\n'
-    elif tree.tagName in ('uri', 'link'):
-        if len(children) != 2: return 'XX'+childstr+'XX'
+    elif tree.tagName == 'uri':
+        if len(children) != 2: raise ValueError('Bad URI ')
         elif children[0] == children[1]: return '<%s>' % children[1]
         else: return '%r<%s>' % (children[0], children[1])
+    elif tree.tagName == 'link':
+        if len(children) != 2: raise ValueError('Bad Link')
+        return '%s' % children[1]
+    elif tree.tagName in ('olist', 'ulist'):
+        # Use a condensed list if each list item is 1 line long.
+        for child in children:
+            if child.count('\n') > 2: return childstr
+        return childstr.replace('\n\n', '\n')+'\n'
     else:
         # Assume that anything else can be passed through.
         return childstr
@@ -1227,7 +1237,6 @@ def to_debug(tree, indent=4, seclevel=0):
         return str
 
     if tree.tagName == 'section': seclevel += 1
-    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     children = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
 
@@ -1319,7 +1328,7 @@ def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
     """
     words = str.split()
     out_str = ' '*(indent-startindex)
-    charindex = startindex
+    charindex = max(indent, startindex)
     for word in words:
         if charindex+len(word) > right and charindex > 0:
             out_str += '\n' + ' '*indent
