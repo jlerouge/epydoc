@@ -133,7 +133,7 @@ SPECIAL_METHODS ={
 
 SYMBOL_TO_HTML = {
     # Symbols
-    '<-': 'larr', '->': 'rarr', 
+    '<-': 'larr', '->': 'rarr', '^': 'uarr', 'v': 'darr',
 
     # Greek letters
     'alpha': 'alpha', 'beta': 'beta', 'gamma': 'gamma',
@@ -143,7 +143,37 @@ SYMBOL_TO_HTML = {
     'nu': 'nu', 'xi': 'xi', 'omicon': 'omicon',  
     'pi': 'pi', 'rho': 'rho', 'sigma': 'sigma',  
     'tau': 'tau', 'upsilon': 'upsilon', 'phi': 'phi',  
-    'chi': 'chi', 'psi': 'psi', 'omega': 'omega',  
+    'chi': 'chi', 'psi': 'psi', 'omega': 'omega',
+    'Alpha': 'Alpha', 'Beta': 'Beta', 'Gamma': 'Gamma',
+    'Delta': 'Delta', 'Epsilon': 'Epsilon', 'Zeta': 'Zeta',  
+    'Eta': 'Eta', 'Theta': 'Theta', 'Iota': 'Iota', 
+    'Kappa': 'Kappa', 'Lambda': 'Lambda', 'Mu': 'Mu',  
+    'Nu': 'Nu', 'Xi': 'Xi', 'Omicon': 'Omicon',  
+    'Pi': 'Pi', 'Rho': 'Rho', 'Sigma': 'Sigma',  
+    'Tau': 'Tau', 'Upsilon': 'Upsilon', 'Phi': 'Phi',  
+    'Chi': 'Chi', 'Psi': 'Psi', 'Omega': 'Omega',
+
+    # HTML character entities
+    'larr': 'larr', 'rarr': 'rarr', 'uarr': 'uarr',
+    'darr': 'darr', 'harr': 'harr', 'crarr': 'crarr',
+    'lArr': 'lArr', 'rArr': 'rArr', 'uArr': 'uArr',
+    'dArr': 'dArr', 'hArr': 'hArr', 
+    'copy': 'copy', 'times': 'times', 'forall': 'forall',
+    'exist': 'exist', 'part': 'part',
+    'empty': 'empty', 'isin': 'isin', 'notin': 'notin',
+    'ni': 'ni', 'prod': 'prod', 'sum': 'sum',
+    'prop': 'prop', 'infin': 'infin', 'ang': 'ang',
+    'and': 'and', 'or': 'or', 'cap': 'cap', 'cup': 'cup',
+    'int': 'int', 'there4': 'there4', 'sim': 'sim',
+    'cong': 'cong', 'asymp': 'asymp', 'ne': 'ne',
+    'equiv': 'equiv', 'le': 'le', 'ge': 'ge',
+    'sub': 'sub', 'sup': 'sup', 'nsub': 'nsub',
+    'sube': 'sube', 'supe': 'supe', 'oplus': 'oplus',
+    'otimes': 'otimes', 'perp': 'perp',
+
+    # Alternate (long) names
+    'infinity': 'infin', 'integral': 'int', 'product': 'prod',
+    '<=': 'le', '>=': 'ge',
     }
 
 ##################################################
@@ -708,7 +738,6 @@ class HTMLFormatter:
         # Show the summaries for classes, exceptions, functions, and
         # variables contained in the module.
         (classes,excepts) = self._split_classes(doc.classes())
-        (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
         str += self._class_summary(classes, doc.sortorder(),
                                    doc.groups(), 'Classes')
         str += self._class_summary(excepts, doc.sortorder(),
@@ -717,8 +746,11 @@ class HTMLFormatter:
                                   None, doc.groups(), 'Function Summary')
         str += self._var_summary(doc.variables(), doc.sortorder(),
                                  uid, doc.groups(), 'Variable Summary')
+
+        # Show a list of all imported objects.
+        (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
         str += self._imports(iclasses, iexcepts, doc.imported_functions(),
-                             doc.sortorder())
+                             doc.imported_variables(), doc.sortorder())
 
         # Show details for the functions and variables.
         str += self._func_details(doc.functions(), None)
@@ -971,8 +1003,24 @@ class HTMLFormatter:
         for (uid, doc) in self._docmap.items():
             if isinstance(doc, ModuleDoc):
                 funcs += doc.functions()
-                vars += [(var,uid) for var in doc.variables()]
+                vars += doc.variables()
         
+        # Only include objects that come from modules that we
+        # documented.  In particular, do not include base classes,
+        # inherited methods, and imported objects from other modules
+        # in the index.
+        documented_modules = [uid for uid in self._docmap.keys()
+                              if uid.is_module()]
+        documented_modules.append(None)
+        classes = [c for c in classes
+                   if c.target().module() in documented_modules]
+        excepts = [e for e in excepts
+                   if e.target().module() in documented_modules]
+        funcs = [f for f in funcs
+                 if f.target().module() in documented_modules]
+        vars = [v for v in vars
+                if v.uid().module() in documented_modules]
+
         # Class and excpetion lists.
         str += self._start_of('All Classes')
         str += self._toc_section('All&nbsp;Classes', classes)
@@ -997,7 +1045,6 @@ class HTMLFormatter:
         """
         doc = self._docmap[uid]
         (classes,excepts) = self._split_classes(doc.classes())
-        vars = [(var,uid) for var in doc.variables()]
 
         # Header and name.
         str = self._header(uid.name())
@@ -1011,7 +1058,7 @@ class HTMLFormatter:
         str += self._toc_section('Classes', classes)
         str += self._toc_section('Exceptions', excepts)
         str += self._toc_section('Functions', doc.functions())
-        str += self._toc_var_section('Variables', vars)
+        str += self._toc_var_section('Variables', doc.variables())
                                  
         # The private/public link.
         str += '\n<hr>\n'
@@ -2008,7 +2055,10 @@ class HTMLFormatter:
         # bother to word-wrap.
         if context == 'summary':
             val = re.sub(r'\n', '', val)
-            val = self._nosp_html(val)
+            if val.startswith('<span class='):
+                val = val[:12] + re.sub(' ', '&nbsp;', val[12:])
+            else:
+                val = re.sub(' ', '&nbsp;', val)
             val = self._linewrap_html(val, self._variable_summary_linelen, 1)
             return '<code>%s</code>\n' % val
 
@@ -2022,17 +2072,6 @@ class HTMLFormatter:
         str += '<pre class="variable">\n%s</pre>\n' % val
         str += '        </td></tr></table></dd>\n'
         return str
-
-    def _nosp_html(self, str):
-        in_elt = 0
-        out = ''
-        for c in str:
-            if c == '<': in_elt = 1
-            elif c == '>': in_elt = 0
-            
-            if c == ' ' and not in_elt: out += '&nbsp;'
-            else: out += c
-        return out
 
     def _linewrap_html(self, str, linelen, maxlines):
         """
@@ -2050,12 +2089,12 @@ class HTMLFormatter:
         while len(lines) <= maxlines and end < len(str):
             # Skip over HTML tags.
             if str[end] == '<':
-                while end<len(str) and str[end] != '>': end += 1
+                end = str.find('>', end)
                 cnum -= 1
 
             # HTML entities just count as 1 char.
             elif str[end] == '&':
-                while end<len(str) and str[end] != ';': end += 1
+                end = str.find(';', end)
 
             # Go on to the next character.
             cnum += 1
@@ -2298,17 +2337,16 @@ class HTMLFormatter:
     def _toc_var_section(self, section, vars):
         # Sort & filter the vars.
         if not self._show_private:
-            vars = [o for o in vars if not o[0].uid().is_private()]
-        vars.sort(lambda (v1,u1),(v2,u2): cmp(v1.name().lower(),
-                                              v2.name().lower()))
+            vars = [v for v in vars if not v.uid().is_private()]
+        vars.sort(lambda v1, v2: cmp(v1.name().lower(),
+                                     v2.name().lower()))
 
         if not vars: return ''
         str = self._start_of(section)
         str += '<font size="+1"><b>%s</b></font><br />\n' % section
         for var in vars:
-            str += ('<a target="mainFrame" href="%s#%s">%s</a><br />\n' %
-                    (self._uid_to_uri(var[1]), var[0].name(), 
-                     var[0].name()))
+            str += ('<a target="mainFrame" href="%s">%s</a><br />\n' %
+                    (self._uid_to_uri(var.uid()), var.name()))
         return str+'<br />\n'
 
     #////////////////////////////////////////////////////////////
@@ -2791,7 +2829,7 @@ class HTMLFormatter:
         else:
             return '&nbsp;'
 
-    def _imports(self, classes, excepts, functions, sortorder):
+    def _imports(self, classes, excepts, functions, variables, sortorder):
         if not self._show_imports: return ''
         class_items = [self._link_to_html(c)
                        for c in self._filtersort_links(classes, sortorder)]
@@ -2799,6 +2837,8 @@ class HTMLFormatter:
                         for e in self._filtersort_links(excepts, sortorder)]
         func_items = [self._link_to_html(f)
                       for f in self._filtersort_links(functions, sortorder)]
+        var_items = ['<code>%s</code>' % v.name()
+                     for v in self._filtersort_vars(variables, sortorder)]
         if not (class_items or except_items or func_items):
             return ''
         str = self._start_of('Imports')+'<dl>\n'
@@ -2811,6 +2851,9 @@ class HTMLFormatter:
         if len(func_items) > 0:
             str += '  <dt><b>Imported functions:</b></dt>\n  <dd>\n    '
             str += ',\n    '.join(func_items) + '\n  </dd>\n'
+        if len(var_items) > 0:
+            str += '  <dt><b>Imported variables:</b></dt>\n <dd>\n    '
+            str += ',\n    '.join(var_items) + '\n  </dd>\n'
         return str + '</dl>\n\n'
                                 
     def _link_to_html(self, link):
