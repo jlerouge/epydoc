@@ -1044,7 +1044,7 @@ def index_to_anchor(str):
     "Given a string, construct a name for an index anchor."
     return "_index_"+re.sub("[^a-zA-Z0-9]", "_", str)
 
-def to_html(tree, indent=0, seclevel=0):
+def to_html(tree, indent=0, seclevel=0, **kwargs):
     """
     Given the DOM tree for an epytext string (as
     returned by C{parse()}), return a string encoding it in HTML.  This
@@ -1056,61 +1056,61 @@ def to_html(tree, indent=0, seclevel=0):
 
     if tree.tagName == 'epytext': indent -= 2
     if tree.tagName == 'section': seclevel += 1
-    children = [to_html(c, indent+2, seclevel) for c in
+    children = [to_html(c, indent+2, seclevel, **kwargs) for c in
                 tree.childNodes]
 
     # Get rid of unnecessary <P>...</P> tags; they introduce extra
     # space on most browsers that we don't want.
-    for i in range(len(children)-1):
-        if (not isinstance(tree.childNodes[i], Text) and
-            tree.childNodes[i].tagName == 'para' and
-            (isinstance(tree.childNodes[i+1], Text) or
-             tree.childNodes[i+1].tagName != 'para')):
-            children[i] = children[i][5+indent:-5]
-    if (tree.hasChildNodes() and
-        not isinstance(tree.childNodes[-1], Text) and
-        tree.childNodes[-1].tagName == 'para'):
-        children[-1] = children[-1][5+indent:-5]
-    
+    if kwargs.get('para', 0) == 0:
+        for i in range(len(children)-1):
+            if (not isinstance(tree.childNodes[i], Text) and
+                tree.childNodes[i].tagName == 'para' and
+                (isinstance(tree.childNodes[i+1], Text) or
+                 tree.childNodes[i+1].tagName != 'para')):
+                children[i] = children[i][5+indent:-5]
+        if (tree.hasChildNodes() and
+            not isinstance(tree.childNodes[-1], Text) and
+            tree.childNodes[-1].tagName == 'para'):
+            children[-1] = children[-1][5+indent:-5]
             
     childstr = ''.join(children)
 
     if tree.tagName == 'para':
-        return _wordwrap('<P>' + childstr + '</P>', indent)
+        return _wordwrap('<p>' + childstr + '</p>', indent)
     elif tree.tagName in ('code', 'uri', 'link'):
-        return '<CODE>' + childstr + '</CODE>'
+        return '<code>' + childstr + '</code>'
     elif tree.tagName in ('italic', 'math'):
-        return '<I>' + childstr + '</I>'
+        return '<i>' + childstr + '</i>'
     elif tree.tagName == 'index':
-        return ('<A NAME="#'+index_to_anchor(childstr)+'"/>'+
-                '<I>' + childstr + '</I>')
+        return ('<a name="'+index_to_anchor(childstr)+'"></a>'+
+                '<i class="indexterm">' + childstr + '</i>')
     elif tree.tagName == 'bold':
-        return '<B>' + childstr + '</B>'
+        return '<b>' + childstr + '</b>'
     elif tree.tagName == 'ulist':
-        return indent*' '+'<UL>\n' + childstr + indent*' '+'</UL>\n'
+        return indent*' '+'<ul>\n' + childstr + indent*' '+'</ul>\n'
     elif tree.tagName == 'olist':
-        return indent*' '+'<OL>\n' + childstr + indent*' '+'</OL>\n'
+        return indent*' '+'<ol>\n' + childstr + indent*' '+'</ol>\n'
     elif tree.tagName == 'li':
-        return indent*' '+'<LI>\n' + childstr + indent*' '+'</LI>\n'
+        return indent*' '+'<li>\n' + childstr + indent*' '+'</li>\n'
     elif tree.tagName == 'heading':
-        return ((indent-2)*' '+'<H' + `seclevel` + '>' + childstr +
-                '</H' + `seclevel` + '>\n')
+        return ((indent-2)*' '+'<h' + `seclevel` + '>' + childstr +
+                '</h' + `seclevel` + '>\n')
     elif tree.tagName in ('literalblock', 'doctestblock'):
         # We could colorize doctest blocks someday.
-        return '<PRE>\n' + childstr + '\n</PRE>\n'
+        return '<pre>\n' + childstr + '\n</pre>\n'
     elif tree.tagName == 'fieldlist':
-        return indent*' '+'<DL>\n' + childstr + indent*' '+'</DL>\n'
+        return indent*' '+'<dl>\n' + childstr + indent*' '+'</dl>\n'
     elif tree.tagName == 'field':
         # Did I get this right?
         if (len(tree.childNodes) > 1 and
             tree.childNodes[1].tagName == 'arg'):
-            return (indent*' '+'<DT>'+children[0]+'('+children[1]+')\n'+
-                    indent*' '+'<DD>\n'+''.join(children[2:])+
-                    indent*' '+'</DD></DT>\n')
+            return (indent*' '+'<dt>'+children[0]+'('+children[1]+')</dt>\n'+
+                    indent*' '+'<dd>\n'+''.join(children[2:])+
+                    indent*' '+'</dd>\n')
         else:
-            return (indent*' '+'<DT>'+children[0]+'\n'+
-                    indent*' '+'<DD>\n'+''.join(children[1:])+
-                    indent*' '+'</DD></DT>\n')
+            return (indent*' '+'<dt>'+children[0]+'</dt>\n'+
+                    indent*' '+'<dd>\n'+''.join(children[1:])+
+                    indent*' '+'</dd>\n')
     elif tree.tagName in ('epytext', 'section', 'tag', 'arg'):
         return childstr
     else:
