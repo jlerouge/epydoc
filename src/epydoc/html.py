@@ -925,9 +925,7 @@ class HTMLFormatter:
                 for link in links:
                     str = ('<i><a href="%s#%s">%s</a></i>, ' %
                             (self._uid_to_uri(link.target()),
-                             term, link.name()))
-                    private.write(str)
-                    if link.is_public(): public.write(str)
+                             key, link.target().name()))
                 str = str[:-2] + '</tr></td>\n'
                 _write_if_nonempty(public, private, links, str)
             footer = '</table>\n<br />\n'
@@ -2732,7 +2730,8 @@ class HTMLFormatter:
         # Combine terms & links into one list
         keys = terms.keys()
         keys.sort()
-        return  [(k, terms[k], links[k]) for k in keys]
+        print [(k, terms[k], links[k]) for k in keys]
+        return [(k, terms[k], links[k]) for k in keys]
 
     #////////////////////////////////////////////////////////////
     # Identifier index generation
