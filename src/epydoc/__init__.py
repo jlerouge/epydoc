@@ -24,12 +24,20 @@ produce API documentation using the following steps:
      - L{epydoc.uid} is used to create unique identifiers for each
        object.
      - L{epydoc.epytext} is used to parse the objects' documentation
-       strings.
+       strings, if they are written using the U{epytext markup
+       language<http://epydoc.sourceforge.net/epytext.html>}.
   3. Produce HTML output, using L{epydoc.html}.
      - L{epydoc.css} is used to generate the CSS stylehseet.
      - L{epydoc.help} is used to generate the help page.
      - L{epydoc.colorize} is used to colorize doctest blocks and
        regular expressions variable values.
+
+@group Interface Modules: cli, gui
+@group Inspection Modules: uid, objdoc, imports
+@group Docstring Parsing Modules: epytext
+@group Documentation Output Modules: html, css, help, colorize,
+       latex, man
+@group Testing Modules: checker, test
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
@@ -76,27 +84,41 @@ __epydoc_sort__ = [
     # Documentation completeness checker
     'checker']
 
-# To do:
+# Done todo:
+#   - add @group (e.g. "@group accessors:")
+#   - Add other field tags?
 #   - add escape characters to epytext? (e.g. E{->})
+#   - adding fields dynamically: __extra_epydoc_fields__
+
+# To do:
+#   - Change html to write directly to files, instead of building up strings
+#      and then writing them.
 #   - switch to turn on/off inherited methods in the method summary
 #     list. (like the [frames/noframes] and [show/hide private] 
 #     switches?)
-#   - add @group (e.g. "@group accessors:")
-#   - Add other field tags?
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - option to turn off function doc inheritance?
 #     - add --check for doc inheritance?
-#   - Change html to write directly to files, instead of building up strings
-#      and then writing them.
 #   - add option: don't include vars and cvars that have no descr?
 #   - create a better default top_page than trees.html
 #   - render package's module sublists as some kind of table?
 #   - use <SPAN TITLE=""> for partially ellided var values?
 #   - put var values in the summary table?
 #   - options to --check (--check all, --check basic, etc)
+#   - Improve error message "Unknown field tag 'ivar'" when they
+#     try to use an ivar in the wrong context (etc.)
+#   - document the method for deciding what's public/private
+#   - Add support for properties
+#   - Add support for getting docs from parsing?
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
 #     distinguish them?  Of course, we can't even *access* the module,
 #     since "import curses.wrapper" gives us a function. :-/
+
+# Changes for docs:
+#   - fields are defined slightly differently (@group)
+#   - new fields (@group: order is significant)
+#   - staticmethod/classmethod
+#   - document __extra_epydoc_fields__
