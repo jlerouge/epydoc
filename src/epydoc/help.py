@@ -7,19 +7,20 @@
 #
 
 """
-Predefined help file for the HTML outputter (L{epydoc.html}).
+Default help file for the HTML outputter (L{epydoc.html}).
 
 @type HTML_HELP: C{string}
 @var HTML_HELP: The contents of the HTML body for the default
-   help page.
+help page.
 """
 
-HTML_HELP = """
+# Expects: {'this_project': name}
+HTML_HELP = '''
 <center><h2> API Documentation </h2></center>
 
 <p> This document contains the API (Application Programming Interface)
-documentation for this project.  Documentation for the Python objects
-defined by the project is divided into separate pages for each
+documentation for %(this_project)s.  Documentation for the Python
+objects defined by the project is divided into separate pages for each
 package, module, and class.  The API documentation also includes two
 pages containing information about the project as a whole: a trees
 page, and an index page.  </p>
@@ -34,7 +35,7 @@ page, and an index page.  </p>
     <li> A summary of the classes defined by the package. </li>
     <li> A summary of the functions defined by the package. </li>
     <li> A summary of the variables defined by the package. </li>
-    <li> A detailed description of each funciton defined by the
+    <li> A detailed description of each function defined by the
     package. </li>
     <li> A detailed description of each variable defined by the
     package. </li>
@@ -46,7 +47,7 @@ page, and an index page.  </p>
     <li> A summary of the classes defined by the module. </li>
     <li> A summary of the functions defined by the module. </li>
     <li> A summary of the variables defined by the module. </li>
-    <li> A detailed description of each funciton defined by the
+    <li> A detailed description of each function defined by the
     module. </li>
     <li> A detailed description of each variable defined by the
     module. </li>
@@ -54,7 +55,7 @@ page, and an index page.  </p>
   
   <p>Each <b>Class Documentation</b> page contains:
   <ul>
-    <li> A class inheritence diagram. </li>
+    <li> A class inheritance diagram. </li>
     <li> A list of known subclasses. </li>
     <li> A description of the class. </li>
     <li> A summary of the methods defined by the class. </li>
@@ -85,15 +86,52 @@ page, and an index page.  </p>
   <p> The <b>Index</b> page contains indices of terms and
   identifiers: 
   <ul>
-    <li> The <i>term index</i> lists every term indexed by any object's
-    documentaiton.  For each term, the index provides links to each
+    <li> The <i>term index</i> lists every term indexed by any object\'s
+    documentation.  For each term, the index provides links to each
     place where the term is indexed. </li>
     <li> The <i>identifier index</i> lists the (short) name of every package,
     module, class, method, function, variable, and parameter.  For each
     identifier, the index provides a short description, and a link to
-    its documentation.  (<b>The identifier index is not implemented
-    yet.</b>) </li>
+    its documentation. </li>
   </ul></p>
+
+<h2> The Table of Contents </h2>
+
+<p> The table of contents occupies the two frames on the left side of
+the window.  The upper-left frame displays the <i>project
+contents</i>, and the lower-left frame displays the <i>module
+contents</i>: </p>
+
+<center>
+<table class="summary" border="1" cellspacing="0" cellpadding="3">
+  <tr heigh="30%">
+    <td align="center"> Project<br>Contents<hr>...</td>
+    <td align="center" rowspan="2" width="70%">
+      API<br>Documentation<br>Frame
+    </td>
+  </tr>
+  <tr>
+    <td align="center"> Module<br>Contents<hr>&nbsp;<br>...<br>&nbsp;</td>
+  </tr>
+</table><br>
+</center>
+
+<p> The <b>project contents frame</b> contains a list of all packages
+and modules that are defined by the project.  Clicking on an entry
+will display its contents in the module contents frame.  Clicking on a
+special entry, labeled "Everything," will display the contents of
+the entire project. </p>
+
+<p> The <b>module contents frame</b> contains a list of every
+submodule, class, type, exception, function, and variable defined by a
+module or package.  Clicking on an entry will display its
+documentation in the API documentation frame.  Clicking on the name of
+the module, at the top of the frame, will display the documentation
+for the module itself. </p>
+
+<p> The "<b>frames</b>" and "<b>no frames</b>" buttons below the top
+navigation bar can be used to control whether the table of contents is
+displayed or not. </p>
 
 <h2> The Navigation Bar </h2>
 
@@ -134,15 +172,17 @@ on the navigation bar.  Note that not some labels (such as
       <td valign="top"> the help page </td></tr>
 </table>
 
-<p> The "<b>show private</b>" and "<b>hide private</b>" buttons 
-below the top navigation bar can be used to control whether
-documentation for private objects is displayed.  Private objects are
-defined as objects whose (short) names begin with a single underscore,
-but do not end with an underscore.  For example, "<code>_x</code>",
+<p> The "<b>show private</b>" and "<b>hide private</b>" buttons below
+the top navigation bar can be used to control whether documentation
+for private objects is displayed.  Private objects are usually defined
+as objects whose (short) names begin with a single underscore, but do
+not end with an underscore.  For example, "<code>_x</code>",
 "<code>__pprint</code>", and "<code>epydoc.epytext._tokenize</code>"
 are private objects; but "<code>re.sub</code>",
-"<code>__init__</code>", and "<code>type_</code>" are not. </p>
+"<code>__init__</code>", and "<code>type_</code>" are not.  However,
+if a module defines the "<code>__all__</code>" variable, then its
+contents are used to decide which objects are private. </p>
 
 <p> A timestamp below the bottom navigation bar indicates when each
 page was last updated. </p>
-"""
+'''
