@@ -136,6 +136,20 @@ def _usage(exit_code=1):
     print >>stream, '\nUsage:', usage.strip()+'\n'
     sys.exit(exit_code)
 
+def _usage_error(estr, exit_code=1):
+    """
+    Issue an error message, and exit.
+    """
+    progname = os.path.basename(sys.argv[0])
+    if '\n' in estr:
+        estr = '\n%s\nRun "%s -h" for usage.\n' % (estr.strip(), progname)
+    else:
+        estr = '%s; run "%s -h" for usage.' % (estr.strip(), progname)
+        from epydoc.markup import wordwrap
+        estr = '\n'+wordwrap(estr)
+    print >>sys.stderr, estr
+    sys.exit(exit_code)
+
 def _help(arg):
     """
     Display a speficied help message, and exit.
@@ -199,6 +213,19 @@ def _version():
     import epydoc
     print "Epydoc version %s" % epydoc.__version__
     sys.exit(0)
+
+def _check_css(cssname):
+    """
+    If C{cssname} is not valid, then issue an error and exit.
+    """
+    if cssname is None: return
+    if os.path.isfile(cssname): return
+    from epydoc.css import STYLESHEETS
+    if STYLESHEETS.has_key(cssname): return
+
+    # We couldn't find it.
+    print >>sys.stderr, '\nError: CSS file %s not found\n' % cssname
+    sys.exit(1)
 
 def _parse_args():
     """
@@ -322,34 +349,29 @@ def _parse_args():
     if options['inheritance'] not in ('grouped', 'listed', 'included'):
         estr = 'Bad inheritance style.  Valid options are '
         estr += 'grouped, listed, included'
-        print >>sys.stderr, ('%s;\nrun "%s -h" for usage.' %
-                             (estr,os.path.basename(sys.argv[0])))
-        sys.exit(1)
+        _usage_error(estr)
 
     # Make sure tests has a valid value.
-    for test in options['tests']:
+    for test in options['tests'].keys():
         if test not in TESTS:
-            estr = 'Bad epydoc test %r.  Valid options are:' % test
-            for t in TESTS: estr += '\n  - %r' % t
-            print >>sys.stderr, ('%s\nrun "%s -h" for usage.' %
-                                 (estr,os.path.basename(sys.argv[0])))
-            sys.exit(1)
+            estr = 'Bad epydoc test %r.  Valid tests are:' % test
+            for t in TESTS: estr += '\n  - %s' % t
+            _usage_error(estr)
 
     # Check that the options all preceed the filenames.
     for m in modules:
         if m == '-': break
         elif m[0:1] == '-':
-            estr = 'options must preceed modules'
-            print >>sys.stderr, ('%s; run "%s -h" for usage.' %
-                                 (estr,os.path.basename(sys.argv[0])))
-            sys.exit(1)
+            _usage_error('options must preceed modules')
+
+    # Check the CSS file(s)
+    _check_css(options.get('css'))
+    _check_css(options.get('private_css'))
         
     # Make sure we got some modules.
     modules = [m for m in modules if m != '-']
     if len(modules) == 0:
-        print >>sys.stderr, ('no modules specified; run "%s -h" for usage.' %
-                             os.path.basename(sys.argv[0]))
-        sys.exit(1)
+        _usage_error('no modules specified')
     options['modules'] = modules
 
     return options
