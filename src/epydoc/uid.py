@@ -50,7 +50,7 @@ def _import_module(name):
     """
     try:
         return import_module(name)
-    except ImportError:
+    except ImportError, e:
         if sys.stderr.softspace: print >>sys.stderr
         print  >>sys.stderr, '\n  Warning: %s' % e
         return None
