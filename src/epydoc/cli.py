@@ -196,7 +196,8 @@ def _parse_args():
                'prj_name':'', 'action':'html', 'check_private':0,
                'show_imports':0, 'frames':1, 'private':1,
                'list_classes_separately': 0, 'debug':0,
-               'docformat':None, 'top':None}
+               'docformat':None, 'top':None, 'inheritance': 'grouped',
+               'autogen_vars': 1}
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:t:u:Vvpq?:'
@@ -207,7 +208,9 @@ def _parse_args():
                 'builtins no-frames no_frames noframes debug '+
                 'docformat= doc-format= doc_format= top=  navlink= '+
                 'nav_link= nav-link= latex html dvi ps pdf '+
-                'separate-classes separate_classes').split()
+                'separate-classes separate_classes '+
+                'inheritance= inheritence= '+
+                'no-autogen-vars no_autogen_vars').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -234,10 +237,14 @@ def _parse_args():
         elif opt in ('--helpfile', '--help-file', '--help_file'):
             options['help'] = val
         elif opt in ('--html',): options['action'] = 'html'
+        elif opt in ('--inheritance', '--inheritence'):
+            options['inheritance']=val.lower()
         elif opt in ('--latex',): options['action']='latex'
         elif opt in ('--name', '-n'): options['prj_name']=val
         elif opt in ('--navlink', '--nav-link', '--nav_link'):
             options['prj_link'] = val
+        elif opt in ('--no-autogen-vars', '--no_autogen_vars'):
+            options['autogen_vars'] = 0
         elif opt in ('--no-private', '--no_private'): options['private']=0
         elif opt in ('--output', '--target', '-o'): options['target']=val
         elif opt in ('-p',): options['check_private'] = 1
@@ -259,6 +266,14 @@ def _parse_args():
             modules.remove('__main__')
         else:
             _usage()
+
+    # Make sure inheritance has a valid value
+    if options['inheritance'] not in ('grouped', 'short', 'long'):
+        estr = 'Bad inheritance style.  Valid options are '
+        estr += 'grouped, short, and long'
+        print >>sys.stderr, ('%s; run "%s -h" for usage' %
+                             (estr,os.path.basename(sys.argv[0])))
+        sys.exit(1)
 
     # Pick a default target directory, if none was specified.
     if options['target'] is None:
@@ -345,7 +360,11 @@ def _make_docmap(modules, options):
 
     verbosity = options['verbosity']
     document_bases = (options['action'] != 'check')
-    d = DocMap(verbosity, document_bases)
+    document_autogen_vars = options['autogen_vars']
+    inheritance_groups = (options['inheritance'] == 'grouped')
+    inherit_groups = (options['inheritance'] != 'grouped')
+    d = DocMap(verbosity, document_bases, document_autogen_vars,
+               inheritance_groups, inherit_groups)
     if options['verbosity'] > 0:
         print  >>sys.stderr, ('Building API documentation for %d modules.'
                               % len(modules))
