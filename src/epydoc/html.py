@@ -305,6 +305,13 @@ class HTMLFormatter:
               used for tooltips for the values of variables.  If a
               line is longer than this length, then it will be
               truncated.  The default is 600 characters.  (type=C{int})
+            - C{inheritance}: How inherited objects should be displayed.
+              If C{inheritance='grouped'}, then inherited objects are
+              gathered into groups; if C{inheritance='short'}, then
+              inherited objects are listed in a short list at the
+              end of their group; if C{inheritance='long'}, then
+              inherited objects are mixed in with non-inherited
+              objects.  The default is 'grouped'.  (type=C{string})
         """
         self._docmap = docmap
 
@@ -326,6 +333,7 @@ class HTMLFormatter:
                          kwargs.get('variable_summary_linelength', 40)
         self._variable_tooltip_linelen = \
                          kwargs.get('variable_tooltip_linelength', 600)
+        self._inheritance = kwargs.get('inheritance', 'grouped')
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
@@ -1170,7 +1178,7 @@ class HTMLFormatter:
         """
         @return: The HTML code for a class's base tree.  The tree is
             drawn 'upside-down' and right justified, to allow for
-            multiple inheritence.
+            multiple inheritance.
         @rtype: C{string}
         """
         if not self._docmap.has_key(uid): return ''
@@ -1405,10 +1413,14 @@ class HTMLFormatter:
             # Add the lines for each func
             for link in group:
                 groupstr += self._func_summary_line(link, cls)
+            if self._inheritance == 'short' and cls is not None:
+                groupstr += self._inheritance_list(group, cls.uid())
 
         str = self._table_header(heading, 'summary')
         for link in functions:
             str += self._func_summary_line(link, cls)
+        if self._inheritance == 'short' and cls is not None:
+            str += self._inheritance_list(functions, cls.uid())
         return str + groupstr + '</table><br />\n\n'
 
     def _func_summary_line(self, link, cls):
@@ -1421,6 +1433,8 @@ class HTMLFormatter:
             inherit = 0
             try: container = func.module()
             except TypeError: container = None
+
+        if inherit and self._inheritance == 'short': return ''
 
         # If we don't have documentation for the function, then we
         # can't say anything about it.
@@ -1444,9 +1458,19 @@ class HTMLFormatter:
         else:
             if inherit: fsum = '<br />\n'
             else: fsum = ''
-        if inherit:
-            fsum += ('    <i>(inherited from %s)</i>\n' %
-                     self._uid_to_href(container, container.shortname()))
+
+        # Display any notable attributes.
+        attribs = []
+        if func.is_classmethod():
+            attribs.append('Class method')
+        if func.is_staticmethod():
+            attribs.append('Static method')
+        if inherit and self._inheritance != 'grouped':
+            href = self._uid_to_href(container, container.shortname())
+            attribs.append('Inherited from %s' % href)
+        if attribs:
+            fsum += '    <i>(' + '; '.join(attribs) + ')</i>\n'
+            
         #if not fdoc.documented():
         #    fsum = '    <br /><i>(undocumented)</i>\n'
         str = '<tr><td align="right" valign="top" width="15%">'
@@ -1678,16 +1702,22 @@ class HTMLFormatter:
             # Add the lines for each func
             for property in group:
                 groupstr += self._property_summary_line(property, container)
+                if self._inheritance == 'short':
+                    groupstr += self._inheritance_list(group, container)
 
         str = self._table_header(heading, 'summary')
         for property in properties:
             str += self._property_summary_line(property, container)
-        str += groupstr
-        return str + '</table><br />\n\n'
+        if self._inheritance == 'short':
+            str += self._inheritance_list(properties, container)
+        return str + groupstr + '</table><br />\n\n'
 
     def _property_summary_line(self, link, container):
         prop = link.target()
         pname = link.name()
+        
+        inherit = (container.is_class() and container != prop.cls())
+        if inherit and self._inheritance == 'short': return ''
         
         # If we don't have documentation for the properties, then we
         # can't say anything about it.
@@ -1706,9 +1736,12 @@ class HTMLFormatter:
         
         str = '<tr><td align="right" valign="top" '
         str += 'width="15%"><font size="-1">'+ptype+'</font></td>\n'
-        str += '  <td><code><b><a href="#%s">' % pname
-
-        str += '%s</a></b></code>%s</td></tr>' % (pname, psum)
+        str += '  <td><b>%s</b>%s' % (self._link_to_html(link), psum)
+        if (self._inheritance != 'grouped' and inherit):
+            cls = prop.cls()
+            str += ('    <i>(Inherited from %s)</i>\n' %
+                    self._uid_to_href(cls, cls.shortname()))
+        str += '</td></tr>'
         return str
 
     def _property_details(self, properties, container,
@@ -1719,8 +1752,14 @@ class HTMLFormatter:
 
         numprops = 0
         for link in properties:
+
             prop = link.target()
             pname = link.name()
+
+            # Don't document inherited properties; instead, the
+            # property summary points to the details description in
+            # the parent class's file.
+            if container != prop.cls(): continue
             
             if not self._docmap.has_key(prop): continue
             pdoc = self._docmap[prop]
@@ -1790,14 +1829,20 @@ class HTMLFormatter:
             # Add the lines for each func
             for var in group:
                 groupstr += self._var_summary_line(var, container)
+            if self._inheritance == 'short' and container.is_class():
+                groupstr += self._inheritance_list(group, container)
 
         str = self._table_header(heading, 'summary')
         for var in variables:
             str += self._var_summary_line(var, container)
-        str += groupstr
-        return str + '</table><br />\n\n'
+        if self._inheritance == 'short' and container.is_class():
+            str += self._inheritance_list(variables, container)
+        return str + groupstr + '</table><br />\n\n'
 
     def _var_summary_line(self, var, container):
+        inherit = (container.is_class() and container != var.uid().cls())
+        if inherit and self._inheritance == 'short': return ''
+            
         vname = var.name()
         if var.type():
             vtype = self._dom_to_html(var.type(), container, 10).strip()
@@ -1810,16 +1855,21 @@ class HTMLFormatter:
             vsum = ' = <span title="%s">%s</span>' % (title, val)
         str = '<tr><td align="right" valign="top" '
         str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
-        str += '  <td><code><b>'
+        str += '  <td><b>'
 
         # If we don't have any info about it, then just list it in
         # the summary (not the details).
         if (var.descr() is None and var.type() is None and
-            not var.has_value()): 
-            str += '<a name="%s">%s</a>' % (vname, vname)
+            not var.has_value()):
+            str += '<code><a name="%s">%s</a></code>' % (vname, vname)
         else:
-            str += '<a href="#%s">%s</a>' % (vname, vname)
-        return str + '</b></code>\n  ' + vsum + '</td></tr>\n'
+            str += self._uid_to_href(var.uid(), vname)
+        str += '</b>\n  ' + vsum 
+        if (self._inheritance != 'grouped' and inherit):
+            cls = var.uid().cls()
+            str += ('    <i>(Inherited from %s)</i>\n' %
+                    self._uid_to_href(cls, cls.shortname()))
+        return str + '</td></tr>\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
         """
@@ -1838,6 +1888,12 @@ class HTMLFormatter:
             vname = var.name()
             vtyp = var.type()
             hasval = var.has_value()
+
+            # Don't document inherited variables; instead, the
+            # property summary points to the details description in
+            # the parent class's file.
+            if container.is_class() and container != var.uid().cls():
+                continue
 
             # Don't bother if we don't know anything about it.
             if (var.descr() is None and vtyp is None and not hasval):
@@ -2384,7 +2440,7 @@ class HTMLFormatter:
         """
         field_values = []
         for field in doc.fields():
-            field_values += doc.field_value(field)
+            field_values += doc.field_values(field)
         return field_values
 
     def _standard_fields(self, doc):
@@ -2400,7 +2456,7 @@ class HTMLFormatter:
         str = ''
 
         for field in doc.fields():
-            values = doc.field_value(field)
+            values = doc.field_values(field)
             if not values: continue
             items = [self._dom_to_html(v, container) for v in values]
             str += self._descrlist(items, field.singular,
@@ -2899,3 +2955,41 @@ class HTMLFormatter:
                 classes.append(link)
         return (classes, excepts)
         
+    def _inheritance_list(self, links, cls):
+        """
+        @return: A string containing HTML that lists all objects from
+            that were inherited from a base ancestor of C{cls}.
+            Only the objects linked to from one of the links in
+            C{links} are considered.  The HTML lists the objects in
+            one row of a table, grouped by ancestor.
+        @type C{links}: C{list} of L{Link}
+        @param C{links}: The set of member objects of C{cls}
+            that should be listed by ancestor.
+        @type C{cls}: L{UID}
+        @param C{cls}: The UID of the class whose inherited objects
+            should be listed.
+        """
+        # Group the objects by defining class
+        inh_dict = {}
+        for link in links:
+            if isinstance(link, Link): key = link.target().cls()
+            else: key = link.uid().cls()
+            if key == cls: continue
+            if not inh_dict.has_key(key): inh_dict[key] = []
+            inh_dict[key].append(link)
+
+        if not inh_dict: return ''
+        
+        str = '  <tr><td colspan="2">\n'
+        inh_items = inh_dict.items()
+        inh_items.sort(lambda a,b: cmp(a[0], b[0]))
+        for (base, obj_links) in inh_items:
+            str += '    <b>Inherited from %s:</b>\n' % base.shortname()
+            for link in obj_links:
+                str += '      '
+                if isinstance(link, Link): str += self._link_to_html(link)
+                else: str += self._uid_to_href(link.uid(), link.name())
+                str += ',\n'
+            str = str[:-2] + '\n      <br />\n'
+        return str[:-13] + '\n    </td></tr>\n'
+
