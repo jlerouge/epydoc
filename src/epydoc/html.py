@@ -1338,7 +1338,7 @@ class HTMLFormatter:
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
-            while (not fdoc.documented() and fdoc.overrides() and
+            while (not fdoc.documented() and fdoc.matches_override() and
                    self._docmap.has_key(fdoc.overrides())):
                 fdoc = self._docmap[fdoc.overrides()]
 
@@ -1411,7 +1411,7 @@ class HTMLFormatter:
             # Try to find a documented ancestor.
             inhdoc = fdoc
             inherit_docs = 0
-            while (not inhdoc.documented() and inhdoc.overrides() and
+            while (not inhdoc.documented() and inhdoc.matches_override() and
                    self._docmap.has_key(inhdoc.overrides())):
                 inherit_docs = 1
                 inhdoc = self._docmap[inhdoc.overrides()]
@@ -2477,7 +2477,7 @@ class HTMLFormatter:
 
         # Try to find a documented ancestor.
         if isinstance(doc, FuncDoc):
-            while (not doc.documented() and doc.overrides() and
+            while (not doc.documented() and doc.matches_override() and
                    self._docmap.has_key(doc.overrides())):
                 doc = self._docmap[doc.overrides()]
 
