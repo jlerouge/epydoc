@@ -542,6 +542,8 @@ def _html(docmap, options):
     try: html_doc.write(options['target'], progress.report)
     except OSError, e:
         print >>sys.stderr, '\nError writing docs:\n%s\n' % e
+    except IOError, e:
+        print >>sys.stderr, '\nError writing docs:\n%s\n' % e
 
 def _check(docmap, modules, options):
     """
