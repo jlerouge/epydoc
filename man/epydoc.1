@@ -165,7 +165,7 @@ Supress the generation of epytext warnings and errors.
 Include a list of the classes and functions that each module imports
 on the module documentation pages.
 .TP
-.BI "\-t " page ", \-\-toppage " page
+.BI "\-t " page ", \-\-top " page
 The top page for the documentation. 
 .I page
 can be the name of a documented module or a class; the name of a file
@@ -347,10 +347,10 @@ documentation is written directly to the output directory.
 .\" ================== DIAGNOSTICS ====================
 .SH DIAGNOSTICS
 Errors are divided into five categories: import errors; epytext
-errors; epytext warnings; field warnings; and documentation generation
-errors.  Whenver epydoc encounters an error, it issues a warning
-message that describes the error, and attempts to continue generating
-documentation. 
+errors; epytext warnings; field warnings; and inspection errors.
+Whenver epydoc encounters an error, it issues a warning message that
+describes the error, and attempts to continue generating
+documentation.
 .PP
 Import errors indicate that epydoc was unable to import a module.
 Import errors typically prevent epydoc from generating documentation
@@ -366,7 +366,10 @@ but
 is not a valid name for a Python module.
 .TP
 .BI "Could not find a UID for " link-target
- ...
+Epydoc was unable to find the object referred to by an inline link
+construction
+.RB ( "L{...}" ).
+This is usually caused by a typo in the link.
 .TP
 .BI "Could not import " module
 Epydoc attempted to import
@@ -523,8 +526,10 @@ in the same docstring, but
 can only take a single value.
 .RE
 .PP
-Documentation generation errors are caused by..
-
+Inspection errors are generated if epydoc encounters problems while
+attempting to inspect the properties of a documented object.  Most of
+inspection errors do not prevent epydoc from documenting the object in
+question.  Epydoc can generate the following inspection errors:
 .RS 4
 .TP
 .BI "The parameters of " inhmethod " do not match " basemethod .
