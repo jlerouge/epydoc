@@ -55,7 +55,7 @@ clean:
 ##//////////////////////////////////////////////////////////////////////
 
 distributions: .distributions.up2date
-.distributions.up2date: $(PY_SRC) .html.up2date
+.distributions.up2date: $(PY_SRC) .html.up2date $(DOCS)
 	$(MAKE) -C src distributions
 	touch .distributions.up2date
 
@@ -67,7 +67,7 @@ web: xfer
 webpage: xfer
 xfer: .html.up2date stdlib
 	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
-	rsync -arzv -e ssh ${STDLIB} $(HOST):$(DIR)/stdlib
+	rsync -arzv -e ssh ${STDLIB}/ $(HOST):$(DIR)/stdlib
 
 local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
@@ -76,7 +76,7 @@ checkdocs:
 	epydoc --check ${PY_SRC}
 
 .html.up2date: .refdocs.up2date .examples.up2date \
-		doc/epydoc-man.html doc/epydocgui-man.html
+		doc/epydoc-man.html doc/epydocgui-man.html ${DOCS}
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
@@ -148,3 +148,4 @@ stdlib: .stdlib.up2date
 	python2.2 src/epydoc/cli.py -o ${STDLIB} -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
+	touch .stdlib.up2date
