@@ -37,7 +37,7 @@ regular expressions.
 @var QMRK_TAG: The CSS class for colorizing C{"?"} and C{"??"} in
 regular expressions.
     
-@var RANGE_TAG: The CSS class for colorizing repeat ranges (such as
+@var RNG_TAG: The CSS class for colorizing repeat ranges (such as
 C{"a{3,8}"}) in regular expressions.
     
 @var PAREN_TAG: The CSS class for colorizing parenthases in regular
