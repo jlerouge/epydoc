@@ -17,6 +17,7 @@ DIR = /home/groups/e/ep/epydoc/htdocs
 WEBDIR = html
 API = doc/api
 EXAMPLES = doc/examples
+STDLIB = stdlib
 
 ############################################################
 
@@ -32,10 +33,11 @@ usage:
 	@echo "  make checkdoc -- check the documentation completeness"
 	@echo "  make distributions -- build the distributions"
 	@echo "  make clean -- remove all built files"
+	@echo "  make stdlib -- build docs for the Python Standard Library"
 
 clean:
 	$(MAKE) -C src clean
-	rm -rf ${WEBDIR} ${API} ${EXAMPLES}
+	rm -rf ${WEBDIR} ${API} ${EXAMPLES} ${STDLIB}
 	rm -rf .*.up2date
 
 distributions: src/dist/.up2date
@@ -84,8 +86,9 @@ LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/lib-old/' \
 	      |grep -v '/site-packages/')
 stdlib:
-	mkdir -p stdlib
-	epydoc -o stdlib -f -vvvv -q -c white --show-imports \
+	rm -rf ${STDLIB}
+	mkdir -p ${STDLIB}
+	epydoc -o ${STDLIB} -f -vvvv -q -c white --show-imports \
 	       -n ${LNAME} -u http://www.python.org \
 	       --builtins ${LIBS}
 
