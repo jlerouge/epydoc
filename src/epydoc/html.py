@@ -285,12 +285,12 @@ class HTML_Doc:
         for uid in self._docmap.keys():
             # Module and class API files
             if not (uid.is_module() or uid.is_class()): continue
-            if not self._is_private(uid.name()): n += 1
+            if not uid.is_private(): n += 1
             if self._create_private_docs: n += 1
 
             # Module TOC files.
             if not (uid.is_module() and self._create_frames): continue
-            if not self._is_private(uid.name()): n += 1
+            if not uid.is_private(): n += 1
             if self._create_private_docs: n += 1
         return n
 
@@ -398,7 +398,7 @@ class HTML_Doc:
 
         @rtype: C{None}
         """
-        for uid in self._sort(self._docmap.keys()):
+        for uid in self._filtersort_uids(self._docmap.keys()):
             doc = self._docmap[uid]
             filename = os.path.join(directory, '%s.html' % uid)
             if isinstance(doc, ModuleDoc):
@@ -449,7 +449,7 @@ class HTML_Doc:
         open(filename, 'w').write(str)
 
         # Write the table of contents for each module.
-        for uid in self._sort(self._docmap.keys()):
+        for uid in self._filtersort_uids(self._docmap.keys()):
             if uid.is_module():
                 doc = self._docmap[uid]
                 filename = os.path.join(directory, '%s-mtoc.html' % uid)
@@ -725,7 +725,7 @@ class HTML_Doc:
             page. 
         @rtype: C{string}
         """
-        uids = self._sort(self._docmap.keys()) # Used for filtering
+        uids = self._filtersort_uids(self._docmap.keys())
 
         # Header
         str = self._header('Table of Contents')
@@ -872,7 +872,7 @@ class HTML_Doc:
             pkg = where.package()
             if pkg is not None:
                 str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += self._uid_to_href(pkg, 'Parent', 'navbar')
+                str += self._uid_to_href(pkg, 'Parent', 'navbar', 0)
                 str += '&nbsp;&nbsp;&nbsp;</th>\n'
             else:
                 str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
@@ -881,14 +881,14 @@ class HTML_Doc:
             pkg = where.package()
             if pkg is not None:
                 str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += self._uid_to_href(pkg, 'Package', 'navbar')
+                str += self._uid_to_href(pkg, 'Package', 'navbar', 0)
                 str += '&nbsp;&nbsp;&nbsp;</th>\n'
             else:
                 str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
                 str += '&nbsp;Package&nbsp;&nbsp;&nbsp;</th>\n'
         elif isinstance(self._package, UID):
             str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(self._package, 'Package', 'navbar')
+            str += self._uid_to_href(self._package, 'Package', 'navbar', 0)
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
         else:
             str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
@@ -904,11 +904,11 @@ class HTML_Doc:
             str += '&nbsp;&nbsp;&nbsp;Module&nbsp;&nbsp;&nbsp;</th>\n'
         elif isinstance(where, UID) and where.is_class():
             str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(where.module(), 'Module', 'navbar')
+            str += self._uid_to_href(where.module(), 'Module', 'navbar', 0)
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
         elif isinstance(self._module, UID):
             str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(self._module, 'Module', 'navbar')
+            str += self._uid_to_href(self._module, 'Module', 'navbar', 0)
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
         else:
             str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
@@ -986,7 +986,7 @@ class HTML_Doc:
         @rtype: C{string}
         """
         # For private pages, there's no corresponding public page..
-        if isinstance(where, UID) and self._is_private(where.name()):
+        if isinstance(where, UID) and where.is_private():
             return ('<font size="-2">[<b>show&nbsp;private</b>' +
                     '&nbsp;|&nbsp;hide&nbsp;private]</font>')
 
@@ -1069,7 +1069,7 @@ class HTML_Doc:
             if doc and doc.subclasses():
                 str += ' '*depth + '  <ul>\n'
                 children = [l.target() for l
-                            in self._sort(doc.subclasses())]
+                            in self._filtersort_links(doc.subclasses())]
                 for child in children:
                     str += self._class_tree_item(child, depth+4)
                 str += ' '*depth + '  </ul>\n'
@@ -1082,7 +1082,7 @@ class HTML_Doc:
         @rtype: C{string}
         """
         str = '<ul>\n'
-        uids = self._sort(self._docmap.keys())
+        uids = self._filtersort_uids(self._docmap.keys())
         #docs.sort(lambda a,b: cmp(a[0], b[0]))
         for uid in uids:
             doc = self._docmap[uid]
@@ -1116,8 +1116,8 @@ class HTML_Doc:
         str += '\n'
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  <ul>\n'
-            modules = [l.target() for l
-                       in self._sort(doc.modules(), doc.sortorder())]
+            modules = [l.target() for l in 
+                       self._filtersort_links(doc.modules(), doc.sortorder())]
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  </ul>\n'
@@ -1131,7 +1131,7 @@ class HTML_Doc:
         @rtype: C{string}
         """
         str = '<ul>\n'
-        uids = self._sort(self._docmap.keys())
+        uids = self._filtersort_uids(self._docmap.keys())
         #docs.sort(lambda a,b: cmp(a[0], b[0]))
         # Find all top-level packages. (what about top-level
         # modules?)
@@ -1151,7 +1151,7 @@ class HTML_Doc:
         """
         if len(modules) == 0: return ''
         str = '<h3>Modules</h3>\n<ul>\n'
-        modules = self._sort(modules, sortorder)
+        modules = self._filtersort_links(modules, sortorder)
         
         for link in modules:
             str += self._module_tree_item(link.target())
@@ -1168,7 +1168,7 @@ class HTML_Doc:
             module.
         @rtype: C{string}
         """
-        classes = self._sort(classes, sortorder)
+        classes = self._filtersort_links(classes, sortorder)
         if len(classes) == 0: return ''
         str = self._table_header(heading, 'summary')
 
@@ -1196,7 +1196,7 @@ class HTML_Doc:
             functions. 
         @rtype: C{string}
         """
-        functions = self._sort(functions, sortorder)
+        functions = self._filtersort_links(functions, sortorder)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'summary')
 
@@ -1211,9 +1211,10 @@ class HTML_Doc:
                 try: container = func.module()
                 except TypeError: container = None
 
-            if not self._docmap.has_key(func):
-                print 'SKIPPING:', func
-                continue
+            # If we don't have documentation for the function, then we
+            # can't say anything about it.
+            if not self._docmap.has_key(func): continue
+                
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
@@ -1251,7 +1252,7 @@ class HTML_Doc:
             functions.
         @rtype: C{string}
         """
-        functions = self._sort(functions)
+        functions = self._filtersort_links(functions)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
 
@@ -1312,11 +1313,12 @@ class HTML_Doc:
                     kwarg_name != ikwarg_name or
                     vararg_name != ivararg_name):
                     if fname != '__init__':
-                        estr =(('Warning: The parameters of %s do not '+
+                        estr =(('\nWarning: The parameters of %s do not '+
                                 'match the parameters of the base class '+
                                 'method %s; not inheriting documentation.')
                                % (fdoc.uid(), inh_fdoc.uid()))
-                        print epytext.wordwrap(estr, 9, 75-9).strip()
+                        estr = epytext.wordwrap(estr, 9, 75-9).strip()
+                        print >>sys.stderr, estr
                     break
 
                 # Inherit the documentation.
@@ -1463,13 +1465,12 @@ class HTML_Doc:
             variables and class variables.
         @rtype: C{string}
         """
-        # DEBUGGING
-        #variables = self._sort(variables, sortorder)
+        variables = self._filtersort_vars(variables, sortorder)
         if len(variables) == 0: return ''
         str = self._table_header(heading, 'summary')
 
         for var in variables:
-            vname = var.uid().shortname()
+            vname = var.name()
             if var.type():
                 vtype = self._dom_to_html(var.type(), container, 10).strip()
             else: vtype = '&nbsp;'
@@ -1490,8 +1491,7 @@ class HTML_Doc:
             variables and class variables.
         @rtype: C{string}
         """
-        # DEBUGGING
-        #variables = self._sort(variables)
+        variables = self._filtersort_vars(variables)
         if len(variables) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>'
 
@@ -1506,7 +1506,7 @@ class HTML_Doc:
                     ' bgcolor="#e0e0e0">'+
                     '<tr><td>\n')
             
-            vname = var.uid().shortname()
+            vname = var.name()
             vtyp = var.type()
             hasval = var.has_value()
 
@@ -1549,14 +1549,15 @@ class HTML_Doc:
         # These should be defined somewhere higher, and maybe
         # customizable.
         MAXLINES = 8 # Max total lines
-        MAXCHARS = 400 # Max total characters
-        LINELEN = 80 # Length of lines (for wrapping), in chars.
-        LINEWRAP_ENTITY = '&rArr;' # Use crarr?
+        LINELEN = 60 # Length of lines (for wrapping), in chars.
+        LINEWRAP_MARKER = r'<span class="variable-linewrap">\</span>'
+        ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
 
         # For regexps, display the regexp pattern.
         if type(val).__name__ == 'SRE_Pattern':
             try:
-                if len(`val.pattern`) < MAXCHARS: val = `val.pattern`
+                pat = `val.pattern`
+                if len(pat) < (MAXLINES*LINELEN): val = pat
             except: pass
 
         # For lists, tuples, and dicts, use pprint??
@@ -1568,15 +1569,13 @@ class HTML_Doc:
             try: val = `val`
             except: val = '...'
 
-        # Truncate to MAXCHARS characters.
-        if len(val) > MAXCHARS:
-            val = val[:297]+'...'
-        if val.count('\n') > MAXLINES:
-            val = '\n'.join(val.split('\n')[:MAXLINES]) + '\n...'
+        # Get rid of any null characters.
+        val = val.replace('\0', '')
 
-        # Add line wrapping.  The "\r" will be turned into "&rarr;" later.
-        if len(val) > LINELEN and '\n' not in val:
-            val = re.sub('(%s)' % ('.'*LINELEN), r'\1\r\n', val)
+        # Add line wrapping.  The "\0" will be turned into
+        # LINEWRAP_MARK below.
+        if len(val) > LINELEN:
+            val = re.sub('(%s)(?=.)' % ('.'*LINELEN), '\\1\0\n', val)
 
         # Pad the last line, so all value regions will have equal width.
         val += ' '*(LINELEN-len(val)+val.rfind('\n')+1)
@@ -1585,12 +1584,17 @@ class HTML_Doc:
         val = re.sub('&', '&amp;', val)
         val = re.sub('<', '&lt;', val)
         val = re.sub('>', '&gt;', val)
-        val = re.sub('\r', LINEWRAP_ENTITY, val)
+        val = re.sub('\0', LINEWRAP_MARKER, val)
 
+        # Truncate at MAXLINES.
+        if val.count('\n') >= MAXLINES:
+            val = ('\n'.join(val.split('\n')[:MAXLINES]) + '\n' +
+                   ELLIPSIS_MARKER+ ' '*(LINELEN-3))
+        
         # Construct the value box.
         str = '      <dt><b>Value:</b></dt>\n' 
         str += '      <dd><table><tr><td>\n'
-        str += '<pre class="variable">%s</pre>\n' % val
+        str += '<pre class="variable">\n%s</pre>\n' % val
         str += '        </td></tr></table></dd>\n'
         return str
 
@@ -1630,7 +1634,7 @@ class HTML_Doc:
         """
         index = {}
         for (uid, doc) in self._docmap.items():
-            if (not self._show_private) and self._is_private(uid.name()):
+            if (not self._show_private) and uid.is_private():
                 continue
             
             if uid.is_function():
@@ -1652,22 +1656,20 @@ class HTML_Doc:
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
                 for var in doc.variables():
-                    if ((not self._show_private) and
-                        self._is_private(var.uid().shortname())): continue
+                    if ((not self._show_private) and var.uid().is_private()):
+                        continue
                     self._get_term_index_items(var.descr(), link, index)
                     self._get_term_index_items(var.type(), link, index)
             elif isinstance(doc, ClassDoc):
                 for var in doc.ivariables() + doc.cvariables():
-                    if ((not self._show_private) and
-                        self._is_private(var.uid().shortname())): continue
+                    if ((not self._show_private) and var.uid().is_private()):
+                        continue
                     self._get_term_index_items(var.descr(), link, index)
                     self._get_term_index_items(var.type(), link, index)
             elif isinstance(doc, FuncDoc):
                 extra_p = [v for v in [doc.vararg(), doc.kwarg(),
                                        doc.returns()] if v is not None]
                 for param in doc.parameter_list()+extra_p:
-                    if ((not self._show_private) and
-                        self._is_private(param.name())): continue
                     self._get_term_index_items(param.descr(), link, index)
                     self._get_term_index_items(param.type(), link, index)
                 for fraise in doc.raises():
@@ -1687,7 +1689,7 @@ class HTML_Doc:
         identifiers = []
         
         for (uid, doc) in self._docmap.items():
-            if (not self._show_private) and self._is_private(uid.name()):
+            if (not self._show_private) and uid.is_private():
                 continue
             if uid.is_module():
                 # Add the module to the index.
@@ -1704,12 +1706,11 @@ class HTML_Doc:
                 # Add all of the module's variables to the index.
                 descr = ' Variable in module %s' % self._uid_to_href(uid)
                 for var in doc.variables():
-                    if ((not self._show_private) and
-                        self._is_private(var.uid().shortname())): continue
+                    if ((not self._show_private) and var.uid().is_private()):
+                        continue
                     href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.uid().shortname(),
-                             var.uid().shortname()))
-                    identifiers.append( (var.uid().shortname(), href, descr) )
+                            (self._uid_to_uri(uid), var.name(), var.name()))
+                    identifiers.append( (var.name(), href, descr) )
                     
             elif uid.is_class():
                 # Add the class to the index.
@@ -1722,23 +1723,21 @@ class HTML_Doc:
                 descr = ('Class variable in class %s' %
                          self._uid_to_href(uid))
                 for var in doc.cvariables():
-                    if ((not self._show_private) and
-                        self._is_private(var.uid().shortname())): continue
+                    if ((not self._show_private) and var.uid().is_private()):
+                        continue
                     href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.uid().shortname(),
-                             var.uid().shortname()))
-                    identifiers.append( (var.uid().shortname(), href, descr) )
+                            (self._uid_to_uri(uid), var.name(), var.name()))
+                    identifiers.append( (var.name(), href, descr) )
 
                 # Add all the instance variables to the index.
                 descr = ('Instance variable in class %s' %
                          self._uid_to_href(uid))
                 for var in doc.ivariables():
-                    if ((not self._show_private) and
-                        self._is_private(var.uid().shortname())): continue
+                    if ((not self._show_private) and var.uid().is_private()):
+                        continue
                     href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.uid().shortname(),
-                             var.uid().shortname()))
-                    identifiers.append( (var.uid().shortname(), href, descr) )
+                            (self._uid_to_uri(uid), var.name(), var.name()))
+                    identifiers.append( (var.name(), href, descr) )
 
             elif uid.is_routine():
                 # Add the function/method to the index.
@@ -1762,11 +1761,8 @@ class HTML_Doc:
                     extra_p = [v for v in [doc.vararg(), doc.kwarg()]
                                if v is not None]
                     for var in doc.parameter_list()+extra_p:
-                        if ((not self._show_private) and
-                            self._is_private(var.uid().shortname())): continue
-                        href = self._uid_to_href(uid, var.uid().shortname())
-                        identifiers.append( (var.uid().shortname(),
-                                             href, descr) )
+                        href = self._uid_to_href(uid, var.name())
+                        identifiers.append( (var.name(), href, descr) )
             else:
                 raise AssertionError, 'fix me'
 
@@ -1780,7 +1776,7 @@ class HTML_Doc:
     def _toc_section(self, section, links):
         # Sort & filter the links
         if not self._show_private:
-            links = [o for o in links if not self._is_private(o.name())]
+            links = [o for o in links if not o.target().is_private()]
         links.sort(lambda x,y: cmp(x.name().lower(), y.name().lower()))
 
         if not links: return ''
@@ -1794,18 +1790,17 @@ class HTML_Doc:
     def _toc_var_section(self, section, vars):
         # Sort & filter the vars.
         if not self._show_private:
-            vars = [o for o in vars
-                    if not self._is_private(o[0].uid().name())]
-        vars.sort(lambda (v1,u1),(v2,u2): cmp(v1.uid().shortname().lower(),
-                                              v2.uid().shortname().lower()))
+            vars = [o for o in vars if not o[0].uid().is_private()]
+        vars.sort(lambda (v1,u1),(v2,u2): cmp(v1.name().lower(),
+                                              v2.name().lower()))
 
         if not vars: return ''
         str = self._start_of(section)
         str += '<font size="+1"><b>%s</b></font><br>\n' % section
         for var in vars:
             str += ('<a target="mainFrame" href="%s#%s">%s</a><br>\n' %
-                    (self._uid_to_uri(var[1]), var[0].uid().shortname(), 
-                     var[0].uid().shortname()))
+                    (self._uid_to_uri(var[1]), var[0].name(), 
+                     var[0].name()))
         return str+'<br>\n'
 
     #////////////////////////////////////////////////////////////
@@ -1926,8 +1921,7 @@ class HTML_Doc:
                               'name', 'target'):
             return childstr
         else:
-            raise ValueError('Warning: unknown epytext DOM element %r' %
-                             tree.tagName)
+            raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
     
     # Construct two regular expressions that are useful for colorizing
     # doctest blocks: _PROMPT_RE and _COLORIZE_RE.
@@ -2008,8 +2002,8 @@ class HTML_Doc:
     def _dom_link_to_html(self, target, name, container):
         uid = findUID(target, container, self._docmap)
         if uid is None:
-            print ('Warning: could not find UID for L{%s} in %s' %
-                   (target, container))
+            print >>sys.stderr, ('\nWarning: could not find UID for '+
+                                 'L{%s} in %s' % (target, container))
         return self._uid_to_href(uid, name, 'link')
     
     #////////////////////////////////////////////////////////////
@@ -2057,7 +2051,7 @@ class HTML_Doc:
                 if toplevel:
                     self._package = pkg
 
-    def _cmp_name(self, uid1, uid2):
+    def _cmp_name(self, name1, name2):
         """
         Compare uid1 and uid2 by their names, using the following rules: 
           - C{'__init__'} < anything.
@@ -2068,67 +2062,114 @@ class HTML_Doc:
             C{uid1>uid2}.
         @rtype: C{int}
         """
-        x = uid1.name()
-        y = uid2.name()
-        if (y == '__init__'): return 1
-        if (x == '__init__'): return -1
-        if x == y: return 0
-        if self._is_private(x) and not self._is_private(y): return 1
-        if self._is_private(y) and not self._is_private(x): return -1
-        return cmp(x.lower(), y.lower())
+        if (name2 == '__init__'): return 1
+        if (name1 == '__init__'): return -1
+        if name1 == name2: return 0
+        if self._is_private(name1) and not self._is_private(name2): return 1
+        if self._is_private(name2) and not self._is_private(name1): return -1
+        return cmp(name1.lower(), name2.lower())
 
-    # Define these:
-    def _filtersort_links(self, links): pass
-    def _filtersort_vars(self, vars): pass
-    def _filtersort_uids(self, uids): pass
-
-    # Things that get sorted:
-    #   - UIDs: _write_docs, _write_frames, _toc_to_html, _class_tree,
-    #      _module_tree
-    #   - Links: _class_tree_item, _module_tree_item, _module_list,
-    #      _class_summary, _func_summary, _func_details, _imports
-    #   - Vars: _var_summary, _var_details
-    #   - Both Links and Vars make use of sortorder.
-    #   - Filter based on __all__, as well as __epydoc_sort__?
-    #   - Links & vars have object poiters; access __all__ etc directly?
-    def _sort(self, docs, sortorder=None):
+    def _filtersort_links(self, links, sortorder=None):
         """
-        Sort and filter a list of C{ObjDoc}s.  In particular, if
-        C{sortorder} is not C{None}, then sort according to its
-        contents; otherwise, sort using L{_cmp_name}.  If
-        L{_show_private} is true, then filter out all private objects;
-        otherwise, perform no filtering.
+        Sort and filter a list of C{Link}s.  If L{_show_private} is
+        false, then filter out all private objects; otherwise, perform
+        no filtering.
 
-        @param docs: The list of C{ObjDoc}s to be sorted and filtered.
-        @type docs: C{list} of (L{UID} or L{Link} or C{Var})
-        @param sortorder: A list of object names, typically generated
-            from __epydoc__sort__, and returned by {doc.sortorder()},
-            where C{doc} is the object that contains the objects
-            documented by C{docs}.
+        @param links: The list of C{Link}s to be sorted and filtered.
+        @type links: C{list} of L{Link}
+        @param sortorder: A list of link names, typically generated
+            from C{__epydoc__sort__}, and returned by
+            L{ObjDoc.sortorder}.  Links whose name are in C{sortorder}
+            are placed at the beginning of the sorted list, in the
+            order that they appear in C{sortorder}.
         @type sortorder: C{list} of C{string}
+        @return: The sorted list of links.
+        @rtype: C{list} of L{Link}
         """
-        docs = list(docs)
-
-        # First, sort by __epydoc_sort__
-        if sortorder is None:
-            sortdocs = []
-        else:
-            sortorder = list(sortorder)
-            sortdocs = sortorder[:]
-            for doc in docs:
-                try: index = sortorder.index(doc.name())
-                except ValueError: continue
-                sortdocs[index] = doc
-            sortdocs = [d for d in sortdocs if type(d) != type('')]
-            for doc in sortdocs: docs.remove(doc)
-        
-        # Then, sort by _cmp_name.
-        docs.sort(lambda x,y,s=self: s._cmp_name(x, y))
+        # Filter out private objects.
         if not self._show_private:
-            docs = [d for d in docs if not self._is_private(d.name())]
+            links = [l for l in links if not l.target().is_private()]
+        else:
+            links = list(links)
 
-        return sortdocs + docs
+        # Check the sortorder.  If available, then use it to sort the
+        # objects.
+        if (type(sortorder) not in (type(()), type([]))):
+            so_links = []
+        else:
+            if type(sortorder) == type(()): sortorder = list(sortorder)
+            so_links = sortorder[:]
+            for link in links:
+                try: so_links[sortorder.index(link.name())] = link 
+                except ValueError: continue
+            so_links = [l for l in so_links if type(l) != type('')]
+            for link in so_links: links.remove(link)
 
+        # Sort any links not contained in sortorder.
+        links.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
+        
+        return so_links + links
+
+    def _filtersort_uids(self, uids):
+        """
+        Sort and filter a list of C{UID}s.  If L{_show_private} is
+        false, then filter out all private objects; otherwise, perform
+        no filtering.
+
+        @param uids: The list of C{UID}s to be sorted and filtered.
+        @type uids: C{list} of L{UID}
+        @return: The sorted list of UIDs.
+        @rtype: C{list} of L{UID}
+        """
+        # Filter out private objects
+        if not self._show_private:
+            uids = [u for u in uids if not u.is_private()]
+
+        # Sort and return the UIDs.
+        uids.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
+        return uids
+
+    def _filtersort_vars(self, vars, sortorder=None):
+        """
+        Sort and filter a list of C{Var}s.  If L{_show_private} is
+        false, then filter out all private objects; otherwise, perform
+        no filtering.
+
+        @param vars: The list of C{Var}s to be sorted and filtered.
+        @type vars: C{list} of L{Var}
+        @param sortorder: A list of variable names, typically generated
+            from C{__epydoc__sort__}, and returned by
+            L{ObjDoc.sortorder}.  Vars whose name are in C{sortorder}
+            are placed at the beginning of the sorted list, in the
+            order that they appear in C{sortorder}.
+        @type sortorder: C{list} of C{string}
+        @return: The sorted list of variables.
+        @rtype: C{list} of L{Var}
+        """
+        # Filter out private objects.
+        if not self._show_private:
+            vars = [v for v in vars if not v.uid().is_private()]
+        else:
+            vars = list(vars)
+
+        # Check the sortorder.  If available, then use it to sort the
+        # objects.
+        if (type(sortorder) not in (type(()), type([]))):
+            so_vars = []
+        else:
+            if type(sortorder) == type(()): sortorder = list(sortorder)
+            so_vars = sortorder[:]
+            for var in vars:
+                try: so_vars[sortorder.index(var.name())] = var
+                except ValueError: continue
+            so_vars = [v for v in so_vars if type(v) != type('')]
+            for var in so_vars: vars.remove(var)
+
+        # Sort any variables not contained in sortorder.
+        vars.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
+        
+        return so_vars + vars
+        
     def _header(self, name):
         """
         @return: The HTML code for the header of a page with the given
@@ -2172,11 +2213,11 @@ class HTML_Doc:
     def _imports(self, classes, excepts, functions, sortorder):
         if not self._show_imports: return ''
         class_items = [self._link_to_html(c)
-                       for c in self._sort(classes, sortorder)]
+                       for c in self._filtersort_links(classes, sortorder)]
         except_items = [self._link_to_html(e)
-                        for e in self._sort(excepts, sortorder)]
+                        for e in self._filtersort_links(excepts, sortorder)]
         func_items = [self._link_to_html(f)
-                      for f in self._sort(functions, sortorder)]
+                      for f in self._filtersort_links(functions, sortorder)]
         if not (class_items or except_items or func_items):
             return ''
         str = self._start_of('Imports')+'<dl>\n'
@@ -2257,7 +2298,7 @@ class HTML_Doc:
         else:
             return '%s.html' % name
     
-    def _uid_to_href(self, uid, label=None, css_class=None):
+    def _uid_to_href(self, uid, label=None, css_class=None, code=1):
         """
         @return: The HTML code to link to the given UID.  This code
             consists of an anchor with an href to the page for C{uid}.
@@ -2268,6 +2309,8 @@ class HTML_Doc:
         @rtype: C{string}
         @type uid: L{uid.UID}
         @type label: C{string}
+        @param code: Whether or not to include C{<code>...</code>}
+            tags around the label.
         """
         # Find a default value for the label.
         if label is None: label = uid.name()
@@ -2276,15 +2319,23 @@ class HTML_Doc:
         # private and we're not showing private, then don't link to
         # it; just show the label.
         if (uid is None or (not self._docmap.has_key(uid)) or
-            (not self._show_private) and self._is_private(uid.name())):
-            return '<code>%s</code>' % label
+            (not self._show_private) and uid.is_private()):
+            if code: return '<code>%s</code>' % label
+            else: return '%s' % label
+                
 
         # Construct an href, using uid_to_uri.
-        if css_class:
+        if css_class and code:
             return ('<a href="%s" class="%s"><code>%s</code></a>' %
                     (self._uid_to_uri(uid), css_class, label))
-        else: 
+        elif css_class:
+            return ('<a href="%s" class="%s">%s</a>' %
+                    (self._uid_to_uri(uid), css_class, label))
+        elif code:
             return ('<a href="%s"><code>%s</code></a>' %
+                    (self._uid_to_uri(uid), label))
+        else:
+            return ('<a href="%s">%s</a>' %
                     (self._uid_to_uri(uid), label))
 
     def _start_of(self, heading):
