@@ -63,7 +63,7 @@ PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
 ## This is a more verbose version of LATEX_COMMAND.
 DEBUG_LATEX_COMMAND = r"echo x | latex %(tex)s"
 
-PROFILE=1
+PROFILE=0
 
 # What tests can we run?
 TESTS=('basic', 'types', 'vars', 'private', 'authors', 'versions', 'all')
@@ -539,7 +539,9 @@ def _html(docmap, options):
         print  >>sys.stderr, ('Writing HTML docs (%d files) to %r.' %
                               (num_files, options['target']))
     progress = _Progress('Writing', options['verbosity'], num_files, 1)
-    html_doc.write(options['target'], progress.report)
+    try: html_doc.write(options['target'], progress.report)
+    except OSError, e:
+        print >>sys.stderr, '\nError writing docs:\n%s\n' % e
 
 def _check(docmap, modules, options):
     """
@@ -668,5 +670,6 @@ if __name__ == '__main__':
         import pstats
         p = pstats.Stats('/tmp/profile.out')
         p.strip_dirs().sort_stats('time', 'cum').print_stats(60)
+        p.strip_dirs().sort_stats('cum', 'time').print_stats(60)
     else:
         cli()
