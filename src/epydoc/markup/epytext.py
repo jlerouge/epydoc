@@ -1,8 +1,9 @@
 #
-# epytext.py
+# epytext.py: epydoc formatted docstring parsing
+# Edward Loper
 #
-# Parser for the Epydoc formatted docstring markup language
 # Created [04/10/01 12:00 AM]
+# $Id$
 #
 
 """
