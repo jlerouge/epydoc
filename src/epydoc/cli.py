@@ -90,7 +90,7 @@ def cli():
 
     # Perform the requested action.
     if options['action'] == 'html': _html(docmap, options)
-    elif options['action'] == 'check': _check(docmap, modules, options)
+    elif options['action'] == 'check': _check(docmap, options)
     elif options['action'] == 'latex': _latex(docmap, options, 'latex')
     elif options['action'] == 'dvi': _latex(docmap, options, 'dvi')
     elif options['action'] == 'ps': _latex(docmap, options, 'ps')
@@ -545,7 +545,7 @@ def _html(docmap, options):
     except IOError, e:
         print >>sys.stderr, '\nError writing docs:\n%s\n' % e
 
-def _check(docmap, modules, options):
+def _check(docmap, options):
     """
     Run completeness checks on the objects in the given documentation
     map.  By default, C{_check} checks for docstrings in all public
@@ -565,7 +565,7 @@ def _check(docmap, modules, options):
     # Run completeness checks.
     if options['verbosity'] > 0:
         print  >>sys.stderr, 'Performing completeness checks...'
-    checker = DocChecker(docmap, modules)
+    checker = DocChecker(docmap)
 
     if options['tests'].get('all'):
         for test in TESTS: options['tests'][test] = 1
