@@ -246,8 +246,14 @@ class HTMLFormatter:
         displaying the values of variables in the variable
         details sections.
     @ivar _variable_maxlines: The maximum number of lines that
-         should be displayed for the value of a variable in the
-         variable details section.
+        should be displayed for the value of a variable in the
+        variable details section.
+    @ivar _create_private_docs: Whether or not to create documentation
+        pages that include information about private objects.
+    @ivar _frames_index: Whether or not to create a frames-based
+        table of contents for the documentation.
+    @ivar _variable_tooltip_linelen: The maximum line length for
+        variable value tooltips.
     """
 
     #////////////////////////////////////////////////////////////
@@ -498,21 +504,20 @@ class HTMLFormatter:
 
         # Report any failed crossreferences
         if self._failed_xrefs:
-            if sys.stderr.softspace: print >>sys.stderr
-            print >>sys.stderr, ('Warning: Failed identifier '+
-                                  'crossreference targets:')
+            estr = 'Warning: Failed identifier crossreference targets:\n'
             failed_identifiers = self._failed_xrefs.keys()
-            failed_identifiers.sort()
+            failed_identifiers.sort(lambda a,b: cmp(a[1],b[1]))
             for identifier in failed_identifiers:
                 uids = self._failed_xrefs[identifier].keys()
                 uids.sort()
-                estr = '    - %s' % identifier
+                estr += '    - %s' % identifier
                 if len(uids)==1 and len(identifier)+len(uid.name())+14 < 70:
-                    estr += ' (from %s)' % uid.name()
+                    estr += ' (from %s)\n' % uids[0].name()
                 else:
                     for uid in uids:
-                        estr += '\n      (from %s)' % uid.name()
-                print >>sys.stderr, estr
+                        estr += '\n      (from %s)\n' % uid.name()
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, estr
 
     def _write(self, write_func, directory, filename,
                progress_callback, is_public, *args):
@@ -1395,7 +1400,7 @@ class HTMLFormatter:
         the top-level list is a class with no (documented) bases; and
         under each class is listed all of its subclasses.  Note that
         in the case of multiple inheritance, a class may appear
-        multiple times.  This is used by L{_trees_to_html} to write
+        multiple times.  This is used by L{_write_trees} to write
         the class hierarchy.
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
@@ -1486,7 +1491,7 @@ class HTMLFormatter:
         """
         Write HTML code for a nested list showing the submodule
         relationships between all documented packages and modules.
-        This is used by L{_trees_to_html} to write the module
+        This is used by L{_write_trees} to write the module
         hierarchy.
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
@@ -1552,7 +1557,7 @@ class HTMLFormatter:
         """
         Write HTML for a list item describing a package/module and all
         of its submodules.  This is used by both L{_write_module_tree}
-        and L{write_module_list} to write package hierarchies.
+        and L{_write_module_list} to write package hierarchies.
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
         @param uid: The C{UID} of the module to describe
@@ -1695,7 +1700,7 @@ class HTMLFormatter:
             if (self._inheritance == 'listed' and
                 isinstance(container, ClassDoc)):
                 self._write_inheritance_list(public, private, group,
-                                             container.uid())
+                                             container)
 
         # Write the table footer
         _write_if_nonempty(public, private, functions, '</table><br />\n\n')
@@ -2079,7 +2084,7 @@ class HTMLFormatter:
             # Add an inheritance list, if appropriate
             if self._inheritance == 'listed':
                 self._write_inheritance_list(public, private, group,
-                                             container.uid())
+                                             container)
 
         # Write the table footer
         _write_if_nonempty(public, private, properties, '</table><br />\n\n')
@@ -2265,7 +2270,7 @@ class HTMLFormatter:
             if (self._inheritance == 'listed' and
                 isinstance(container, ClassDoc)):
                 self._write_inheritance_list(public, private,
-                                             group, container.uid())
+                                             group, container)
                                              
         # Write the table footer
         _write_if_nonempty(public, private, variables, '</table><br />\n\n')
@@ -2444,7 +2449,7 @@ class HTMLFormatter:
         @return: A string representation of the value of the variable
             C{var}, suitable for use in a C{<pre>...</pre>} HTML
             block.
-        @type var: L{Lar}
+        @type var: L{Var}
         """
         if not var.has_value(): return ''
         val = var.uid().value()
@@ -2603,7 +2608,7 @@ class HTMLFormatter:
         list of tuples of the form C{(key, term, [links])}.
         This list is used by L{_write_indices} to construct the
         term index.
-        @rtype: C{list} of C{(string, L{ParsedDocstring},
+        @rtype: C{list} of C{(string, L{markup.ParsedDocstring},
                               list of Link)}
         """
         terms = {}
@@ -3150,7 +3155,7 @@ class HTMLFormatter:
     def _split_classes(self, classes_and_excepts):
         """
         Divide the classes fromt the given module into exceptions and
-        non-exceptions.  This is used by L{_module_to_html} to list
+        non-exceptions.  This is used by L{_write_module} to list
         exceptions and non-exceptions separately.
 
         @param classes_and_excepts: The list of classes to split up.
@@ -3187,12 +3192,13 @@ class HTMLFormatter:
         @param cls: The UID of the class whose inherited objects
             should be listed.
         """
+        cuid = cls.uid()
         # Group the objects by defining class
         inh_dict = {}
         for link in links:
             if isinstance(link, Link): key = link.target().cls()
             else: key = link.uid().cls()
-            if key == cls: continue
+            if key == cuid: continue
             if key is None: continue
             if not inh_dict.has_key(key): inh_dict[key] = []
             inh_dict[key].append(link)
@@ -3203,9 +3209,14 @@ class HTMLFormatter:
         header = '  <tr><td colspan="2">\n'
         _write_if_nonempty(public, private, links, header)
 
-        # Get the inheritance items, and sort them by base
-        inh_items = inh_dict.items()
-        inh_items.sort()
+        # Get the inheritance items, and sort them in the container
+        # class's base order.
+        inh_items = []
+        for base in cls.base_order():
+            if inh_dict.has_key(base):
+                inh_items.append((base, inh_dict[base]))
+                del inh_dict[base]
+        inh_items += inh_dict.items() # Should be unnecessary
 
         for j in range(len(inh_items)):
             (base, obj_links) = inh_items[j]
