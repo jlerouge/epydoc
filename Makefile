@@ -22,13 +22,15 @@ WEBDIR = html
 API = api
 EXAMPLES = examples
 STDLIB = stdlib
+LATEX = latex/api
+STDLIB_LATEX = latex/stdlib
 
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
 ##//////////////////////////////////////////////////////////////////////
 
 .PHONY: all usage clean distributions web webpage xfer local
-.PHONY: checkdocs refdocs examples stdlib
+.PHONY: checkdocs refdocs examples stdlib latex
 
 all: usage
 usage:
@@ -96,6 +98,13 @@ refdocs: .refdocs.up2date
 	       --docformat plaintext ${PY_SRC} xml.dom.minidom
 	touch .refdocs.up2date
 
+pdf: .pdf.up2date
+.pdf.up2date: ${PY_SRC}
+	rm -rf ${LATEX}
+	mkdir -p ${LATEX}
+	epydoc --pdf -o ${LATEX} -n Epydoc --no-private ${PY_SRC}
+	touch .pdf.up2date
+
 examples: .examples.up2date
 .examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
 	rm -rf ${EXAMPLES}
@@ -149,3 +158,11 @@ stdlib: .stdlib.up2date
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext --debug \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
 	touch .stdlib.up2date
+
+stdlib-pdf: .stdlib-pdf.up2date
+.stdlib-pdf.up2date: ${PY_SRC}
+	rm -rf ${STDLIB_LATEX}
+	mkdir -p ${STDLIB_LATEX}
+	python2.2 src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
+		--no-private -n ${SLNAME} --docformat plaintext \
+		--debug --builtins ${SLFILES}
