@@ -190,7 +190,7 @@ class DocChecker:
 
         @param docmap: A documentation map containing the
             documentation for the objects to be checked.
-        @type docmap: C{DocMap<objdoc.DocMap>}
+        @type docmap: L{DocMap<objdoc.DocMap>}
         """
         docs = []
         self._docs = docmap.values()
@@ -246,10 +246,10 @@ class DocChecker:
         Print a warning about the object named C{name}.
 
         @param error: The error message to print.
-        @type error: C{String}
+        @type error: C{string}
         @param name: The name of the object that generated the
             warning.
-        @type name: C{String}
+        @type name: C{string}
         @rtype: C{None}
         """
         name = str(name)
@@ -281,7 +281,7 @@ class DocChecker:
         L{_check_class}, and L{_check_func}.
 
         @param doc: The documentation that should be checked.
-        @type doc: C{ObjDoc}
+        @type doc: L{ObjDoc}
         @rtype: C{None}
         """
         if (self._checks & DocChecker.DESCR) and (not doc.descr()):
@@ -303,7 +303,7 @@ class DocChecker:
         Run checks on the module whose UID is C{doc}.
         
         @param doc: The UID of the module to check.
-        @type doc: C{UID}
+        @type doc: L{UID}
         @rtype: C{None}
         """
         if not self._check_name_publicity(`doc.uid()`): return
@@ -318,7 +318,7 @@ class DocChecker:
         Run checks on the class whose UID is C{doc}.
         
         @param doc: The UID of the class to check.
-        @type doc: C{UID}
+        @type doc: L{UID}
         @rtype: C{None}
         """
         if not self._check_name_publicity(`doc.uid()`): return
@@ -337,7 +337,7 @@ class DocChecker:
         whose name is C{name}.
         
         @param var: The documentation for the variable to check.
-        @type var: C{Var}
+        @type var: L{Var}
         @param name: The name of the variable to check.
         @type name: C{string}
         @param check_type: Whether or not the variable's type should
@@ -362,10 +362,10 @@ class DocChecker:
         """
         @return: The closest documented ancestor of C{doc} (including
             C{doc}).
-        @rtype: C{ObjDoc}
+        @rtype: L{ObjDoc}
         @param doc: The UID of the object whose documented ancestor
             should be returned.
-        @type doc: C{UID}
+        @type doc: L{UID}
         """
         if isinstance(doc, FuncDoc):
             while (not doc.documented() and
@@ -379,7 +379,7 @@ class DocChecker:
         Run checks on the function whose UID is C{doc}.
         
         @param doc: The UID of the function to check.
-        @type doc: C{UID}
+        @type doc: L{UID}
         @rtype: C{None}
         """
         if not self._check_name_publicity(`doc.uid()`): return

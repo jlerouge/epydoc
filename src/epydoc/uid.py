@@ -42,7 +42,7 @@ class UID:
     @ivar _name: The dotted name for the object
     @type _name: C{string}
     @ivar _obj: The object
-    @type _obj: (any)
+    @type _obj: any
     """
     def __init__(self, obj):
         """
@@ -50,7 +50,7 @@ class UID:
 
         @param obj: The object for which a unique identifier should be
             created.
-        @type obj: (any)
+        @type obj: any
         """
         
         # Special case: create a UID from just a name.
@@ -110,7 +110,7 @@ class UID:
         """
         @return: The object identified by this C{UID}; or C{None} if
             that object is not available.
-        @rtype: (any)
+        @rtype: any
         """
         return self._obj
     
@@ -128,7 +128,7 @@ class UID:
             contained by M{a}.
         @rtype: C{boolean}
         @param ancestor: The UID of the potential ancestor.
-        @type ancestor: C{UID}
+        @type ancestor: L{UID}
         """
         descendant = self
         
@@ -156,7 +156,7 @@ class UID:
         """
         @return: The UID of the class that contains the object
             identified by this UID.
-        @rtype: C{UID}
+        @rtype: L{UID}
         """
         if type(self._obj) == _MethodType: 
             return UID(self._obj.im_class)
@@ -167,7 +167,7 @@ class UID:
         """
         @return: The UID of the module that contains the object
             identified by this UID.
-        @rtype: C{UID}
+        @rtype: L{UID}
         """
         if type(self._obj) == _MethodType:
             return UID(sys.modules[self._obj.im_class.__module__])
@@ -182,7 +182,7 @@ class UID:
         """
         @return: The UID of the package that contains the object
             identified by this UID.
-        @rtype: C{UID}
+        @rtype: L{UID}
         """
         if type(self._obj) == _ModuleType:
             dot = self._name.rfind('.')
@@ -338,7 +338,7 @@ def _makeuid(obj):
         class, function, or method.  Otherwise, return C{None}.
     @rtype: L{UID} or C{None}
     @param obj: The object whose UID should be returned.
-    @type obj: (any)
+    @type obj: any
     """
     if type(obj) in (_FunctionType, _BuiltinFunctionType,
                      _MethodType, _BuiltinMethodType,
@@ -364,7 +364,7 @@ def findUID(name, container, docmap=None):
     @return: The UID for the object that can be accessed with the name
         C{name} from the module C{module}; or C{None} if no object was
         found.
-    @rtype: C{UID} or C{None}
+    @rtype: L{UID} or C{None}
     """
     if container is None: return None
     if not (container.is_module() or container.is_class()):

@@ -595,7 +595,7 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
     @type start: C{int}
     @type block_indent: C{int}
     @type tokens: C{list} of L{Token}
-    @type warnings: C{list} of C{ParseError}
+    @type warnings: C{list} of L{ParseError}
     @rtype: C{int}
     """
     # If they dedent past block_indent, keep track of the minimum
@@ -650,7 +650,7 @@ def _tokenize_literal(lines, start, block_indent, tokens, warnings):
     @type start: C{int}
     @type block_indent: C{int}
     @type tokens: C{list} of L{Token}
-    @type warnings: C{list} of C{ParseError}
+    @type warnings: C{list} of L{ParseError}
     @rtype: C{int}
     """
     linenum = start + 1
@@ -697,7 +697,7 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
     @type start: C{int}
     @type bullet_indent: C{int}
     @type tokens: C{list} of L{Token}
-    @type warnings: C{list} of C{ParseError}
+    @type warnings: C{list} of L{ParseError}
     @rtype: C{int}
     """
     linenum = start + 1
@@ -785,7 +785,7 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
     @type start: C{int}
     @type para_indent: C{int}
     @type tokens: C{list} of L{Token}
-    @type warnings: C{list} of C{ParseError}
+    @type warnings: C{list} of L{ParseError}
     @rtype: C{int}
     """
     linenum = start + 1
@@ -1541,7 +1541,7 @@ class StructuringError(ParseError):
     documentation string.
 
     @ivar token: The C{Token} where the C{StructuringError} occured.
-    @type token: C{Token}
+    @type token: L{Token}
     """
     def __init__(self, descr, token):
         """
@@ -1568,7 +1568,7 @@ class ColorizingError(ParseError):
     A warning or error generated while colorizing a paragraph.
 
     @ivar token: The C{Token} where the C{ColorizingError} occured.
-    @type token: C{Token}
+    @type token: L{Token}
     @ivar charnum: The index into the paragraph's contents of the
         character where the C{ColorizingError} occured.
     @type charnum: C{int}
