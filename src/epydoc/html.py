@@ -2730,7 +2730,6 @@ class HTMLFormatter:
         # Combine terms & links into one list
         keys = terms.keys()
         keys.sort()
-        print [(k, terms[k], links[k]) for k in keys]
         return [(k, terms[k], links[k]) for k in keys]
 
     #////////////////////////////////////////////////////////////
