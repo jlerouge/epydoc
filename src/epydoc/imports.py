@@ -15,6 +15,31 @@ its module name or its file name.
 
 import sys, re, types, os.path
 
+class _DevNull:
+    """
+    A "file-like" object that discards anything that is written and
+    always reports end-of-file when read.  C{_DevNull} is used by
+    L{import_module} to discard output when importing modules; and to
+    ensure that stdin appears closed.
+    """
+    def __init__(self):
+        self.closed = 1
+        self.mode = 'r+'
+        self.softspace = 0
+        self.name='</dev/null>'
+    def close(self): pass
+    def flush(self): pass
+    def read(self, size=0): return ''
+    def readline(self, size=0): return ''
+    def readlines(self, sizehint=0): return []
+    def seek(self, offset, whence=0): pass
+    def tell(self): return 0L
+    def truncate(self, size=0): pass
+    def write(self, str): pass
+    def writelines(self, sequence): pass
+    xreadlines = readlines
+_dev_null = _DevNull()
+
 def _find_module_from_filename(filename):
     """
     Break a module/package filename into a base directory and a module
@@ -84,14 +109,21 @@ def import_module(name):
 
     # Save some important values.  This helps prevent the module that
     # we import from breaking things *too* badly.  Also, save sys.path, 
-    # because we will modify if we're importing from a filename.
+    # because we will modify if we're importing from a filename.  Note
+    # that we do *not* save sys.modules.
     old_sys = sys.__dict__.copy()
     old_sys_path = sys.path[:]
     if type(__builtins__) == types.DictionaryType:
         old_builtins = __builtins__.copy()
     else:
         old_builtins = __builtins__.__dict__.copy()
-    #old_sys_modules = sys.modules.copy()
+
+    # Supress input and output.  (These get restored when we restore
+    # sys to old_sys).  
+    sys.stdin = sys.stdout = sys.stderr = _dev_null
+
+    # Remove any "command-line arguments"
+    sys.argv = ['(imported)']
 
     try:
         # If they gave us a file name, then convert it to a module
@@ -101,7 +133,15 @@ def import_module(name):
                 raise ImportError('%r does not exist' % name)
                 return None
             (basedir, name) = _find_module_from_filename(name)
+
+            # Make sure that the package is on the path.
             sys.path = [basedir] + sys.path
+            
+            ## Just in case, make sure that the interediate package
+            ## directories are all on the path too.
+            #for pkg in name.split('.')[:-1]:
+            #    basedir = os.path.join(basedir, pkg)
+            #    sys.path.insert(1, basedir)
 
         # Make sure that we have a valid name
         if not re.match(r'^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$', name):
@@ -111,10 +151,12 @@ def import_module(name):
         # component, then this just gives us the top-level object.
         try:
             topLevel = __import__(name)
+        except KeyboardInterrupt:
+            raise
         except Exception, e:
-            raise ImportError('Could not import %r -- %r' % (name, e))
+            raise ImportError('Could not import %r -- %s' % (name, e))
         except SystemExit, e:
-            raise ImportError('Could not import %r -- %r' % (name, e))
+            raise ImportError('Could not import %r -- %s' % (name, e))
         except:
             raise ImportError('Could not import %r')
         
@@ -123,8 +165,10 @@ def import_module(name):
         pieces = name.split(".")[1:]
         m = topLevel
         for p in pieces:
-            m = getattr(m, p)
-            
+            try: m = getattr(m, p)
+            except AttributeError:
+                estr = 'Could not import %r -- getattr failed' % name
+                raise ImportError(estr)
         return m
     finally:
         # Restore the important values that we saved.
@@ -134,7 +178,6 @@ def import_module(name):
             __builtins__.__dict__.update(old_builtins)
         sys.__dict__.update(old_sys)
         sys.path = old_sys_path
-        #sys.modules = old_sys_modules
 
 if __name__ == '__main__':
     # A few quick tests.
