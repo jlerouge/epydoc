@@ -52,7 +52,7 @@ class UID:
     A globally unique identifier.
 
     UID is an abstract base class.  The base class defines
-    X{shortname}, X{is_private}, X{__str__}, and X{__repr__}; all
+    C{shortname}, C{is_private}, C{__str__}, and C{__repr__}; all
     other methods must be defined by derived classes.
 
     @ivar __name: This UID's globally unique name.
@@ -545,7 +545,7 @@ class VariableUID(UID):
         return hash( (self._base, self._shortname) )
 
     def __eq__(self, other):
-        return (isinstance(other, ValueUID) and
+        return (isinstance(other, VariableUID) and
                 self._shortname == other._shortname and
                 self._base == other._base)
 
@@ -604,6 +604,16 @@ def make_uid(object, base_uid=None, shortname=None):
         raise TypeError('Cannot create a UID for a '+
                         type(object).__name__+
                         ' without a base UID.')
+
+def reset_uid_cache():
+    """
+    Reset the internal cache of UIDs for objects.
+    @rtype: C{None}
+    """
+    global _object_uids, _variable_uids, _name_to_uid
+    _object_uids = {}
+    _variable_uids = {}
+    _name_to_uid = {}
 
 ##################################################
 ## Links
