@@ -67,3 +67,8 @@ __epydoc_sort__ = ['cli',
 #   - add --check for doc inheritance?
 #   - add option: list vars that have no descr?
 #   - use __all__ when determining whether a name is private???
+
+# Other issues
+#   - curses.wrapper names both a function and a module; how to
+#     distinguish them?  Use html names like module-curses.wrapper
+#     vs. function-curses.wrapper?  Ick.  Or just ignore it... :)
