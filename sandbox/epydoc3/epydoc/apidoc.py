@@ -9,6 +9,38 @@ Terminiology:
 
 .. inheritancegraph:: APIDoc, VariableDoc, ValueDoc, etc..
 
+ Architecture graph::
+
+            +-----------+       
+ python --> | Inspector |
+ object     +-----------+
+                  |
+                  V
+             +---------+      +--------+
+  source --> | Shallow |      |  Full  | <-- source
+   code      | Parser  |      | Parser |      code
+             +---------+      +--------+
+                      |        |
+                      |        |
+                      V        V
+                   +---------------+
+                   |  Name Finder  |
+                   +---------------+
+                           |
+                           V
+                  +------------------+
+                  | Docstring Parser |
+                  +------------------+
+                           |
+                           V
+                      +---------+
+                      | Writers |
+                      +---------+
+
+Blocks:
+  - Inspector: creates a ValueDoc from a Python object
+  - Shallow Parser: finds variable docstrings & imports
+
 Stages:
   1. Create DocMap
   2. Run Inspector
@@ -32,22 +64,70 @@ But.. param can have a descr..  So why not just say that all APIDoc
 objects *can* have a docstring, but some are unlikely to (eg function
 arguments).
 
-[XX] Better name for VariableOrValueDoc??
+.. [XX] Better name for VariableOrValueDoc??
 
 """
 
 # A sentinel is a unique value.
 try: sentinel = object
 except: sentinel = lambda:[]
+sentinel = lambda:[]
 
 import types, re
 
+######################################################################
+# Top level??
+######################################################################
+
+def pydoc(name):
+    try:
+        self.help(get_object(name))
+    except:
+        filename = find_filename(name)
+        objdoc = DocInspector().parse(filename)
+        
+def help(object):
+    # X
+    objdoc = DocInspector().inspect(object)
+
+    # Y
+    ShallowParser().parse(objdoc)
+
+    
+    filename = find_filename(object)
+    if filname is not None:
+        ShallowParser.parse(filename)
+
+def help(modules):
+    for module in modules:
+        inspected = []
+        parsed = []
+        try: inspected.append(inspector.inspect(module))
+        except: parsed.append(parser.parse(module))
+
+    #for valuedoc in inspected:
+    #    parser.
+        
+    
 ######################################################################
 # Documentation Graph
 ######################################################################
 
 class DocCollection:
-    def __init__(self):
+    """
+
+    A set of objects that should be documented.
+    
+    """
+    def __init__(self, *objects):
+        """
+
+        @param objects: The objects to document.  Can be actual
+        objects or names. ??
+          
+        """
+        
+        
         self._docs = {}
         """Map from DottedName to apidoc"""
 
@@ -67,7 +147,7 @@ class DocCollection:
 
     def __setitem__(self, dotted_name, apidoc):
         self._docs[dotted_name] = apidoc
-
+        
 ######################################################################
 # Dotted Names
 ######################################################################
@@ -83,9 +163,11 @@ class DottedName:
         for identifier in identifiers:
             if isinstance(identifier, DottedName):
                 self._identifiers += identifier._identifiers
-            else:
+            elif isinstance(identifier, types.StringType):
                 assert _IDENTIFIER_RE.match(identifier), 'Bad identifier'
                 self._identifiers += identifier.split('.')
+            else:
+                assert 0, 'bad identifier: %r' % identifier
         self._identifiers = tuple(self._identifiers)
 
     def __repr__(self):
@@ -109,7 +191,7 @@ class DottedName:
 
     def __contains__(self, other):
         return self._identifiers[len(other)] == other._identifiers
-
+    
     def parent(self):
         if len(self._identifiers) == 1:
             return None
@@ -127,8 +209,8 @@ class APIDoc:
     documented.  Currently, this includes variables, values, and
     function parameters.
     """
-    def __init__(self):
-        self.docstring = None
+    def __init__(self, docstring=None):
+        self.docstring = docstring
         """The item's docstring.
         @type: C{string}"""
 
@@ -143,13 +225,11 @@ class APIDoc:
         self.metadata = {}
         """Metadata about the item, extracted from its docstring."""
 
-    def children(self):
+    def referenced_apidocs(self): # [XX] ???
         """
-        @return: A list of all C{APIDoc}s that are (directly)
-        contained by this C{APIDoc}.
-        @rtype: C{list} of L{APIDoc}
+        @return: A list of all APIDocs that are directly referenced by
+        this APIDoc.  (E.g., children, base classes, etc.)
         """
-        raise ValueError
 
     #////////////////////////////////////////////////////////////
     # String Representation (for debugging)
@@ -158,6 +238,9 @@ class APIDoc:
     _STR_FIELDS = ['docstring', 'descr', 'summary', 'metadata']
     """A list of the fields that should be printed by L{pp()}."""
 
+    def __str__(self):
+        return self.pp()
+    
     def pp(self, doublespace=0, depth=2, exclude=[]):
         """
         @return: A string representation for this C{APIDoc}.
@@ -242,9 +325,6 @@ class APIDoc:
             if len(valrepr) < 40: return valrepr
             else: return valrepr[:37]+'...'
 
-    def __str__(self):
-        return self.pp()
-    
 ######################################################################
 # Variable Documentation Objects
 ######################################################################
@@ -255,11 +335,12 @@ class VariableDoc(APIDoc):
     Each variable is uniquely identified by its dotted name.
     """
     _STR_FIELDS = (['name'] + APIDoc._STR_FIELDS +
-                   ['valuedoc', 'is_imported', 'is_alias'])
+                   ['valuedoc', 'is_imported', 'is_alias', 'is_instvar'])
 
-    def __init__(self, name, valuedoc=None):
+    def __init__(self, name, valuedoc, is_imported='unknown',
+                 is_alias='unknown', is_instvar=0, docstring=None):
         """Create a new C{VariableDoc}."""
-        APIDoc.__init__(self)
+        APIDoc.__init__(self, docstring=docstring)
         
         self.name = name
         """The variable's dotted name."""
@@ -267,10 +348,13 @@ class VariableDoc(APIDoc):
         self.valuedoc = valuedoc
         """API documentation about the variable's value."""
 
-        self.is_imported = 0#'unknown'
+        self.is_imported = is_imported
         """Is this variable's value defined in another module?"""
 
-        self.is_alias = 'unknown'
+        self.is_instvar = is_instvar
+        """Is this an instance variable?"""
+
+        self.is_alias = is_alias
         """Is this an 'alias' variable?"""
 
         self.type = None
@@ -278,9 +362,6 @@ class VariableDoc(APIDoc):
 
         self.public = True # [XX] set based on name.
         """Should the variable be considered 'public'?"""
-
-    def children(self):
-        return [self.valuedoc]
 
 ######################################################################
 # Value Documentation Objects
@@ -290,11 +371,12 @@ class ValueDoc(APIDoc):
     """
     API documentation information about a single Python value.
     """
-    _STR_FIELDS = ['dotted_name']+APIDoc._STR_FIELDS+['value', 'type'] 
+    _STR_FIELDS = (['dotted_name']+APIDoc._STR_FIELDS+
+                   ['value', 'repr', 'type'])
     
     NO_VALUE = sentinel()
     """A unique object that is used as the value of L{ValueDoc._value}
-    when the value is unknown. """
+    when the value is unknown."""
     
     def __init__(self, dotted_name=None, value=NO_VALUE, repr=None,
                  type=None):
@@ -313,54 +395,72 @@ class ValueDoc(APIDoc):
         self.type = type
         """A description of the value's type."""
 
-    def children(self):
-        return []
+class NamespaceDoc(ValueDoc):
+    """
+    API documentation information about a singe Python namespace
+    value.  (I.e., a module or a class).
+    """
+    _STR_FIELDS = ValueDoc._STR_FIELDS + ['children']
 
-class ModuleDoc(ValueDoc):
+    def __init__(self):
+        ValueDoc.__init__(self)
+
+        self.children = {}
+        """The contents of the namespace, encoded as a dictionary
+        mapping from (short) names to C{VariableDoc}s.  This
+        dictionary contains all names defined by the namespace,
+        including imported and aliased variables.
+        @type: C{dict} from C{string} to L{VariableDoc}"""
+
+        self.groupnames = []
+        """A list of the names of the groups, in sorted order."""
+
+        self.groups = {}
+        """The groups defined by the namespace's docstring, encoded as
+        a dictionary mapping from group names to lists of
+        C{VariableDoc}s.  The lists of C{VariableDoc}s are pre-sorted.
+        @type: C{dict} from C{string} to (C{list} of L{VariableDoc})
+        """
+
+    def add_child(self, variabledoc):
+        """
+        Add the given C{VariableDoc} as a child of this namepsace.  If
+        the namespace already defines a child with the same name, it
+        will be replaced.
+        """
+        assert isinstance(variabledoc, VariableDoc)
+        self.children[variabledoc.name] = variabledoc
+
+    def get_children(self, group=None, doctype=None):
+        # [XX] ignores groups right now.
+        variabledocs = self.children.keys()
+        if doctype is None:
+            return variabledocs
+        elif doctype is ValueDoc:
+            # Group None's with ValueDoc's.
+            return [variabledoc for variabledoc in variabledocs if
+                    variabledoc.valuedoc is None or
+                    variabledoc.valuedoc.__class__ is doctype]
+        else:
+            return [variabledoc for variabledoc in variabledocs if
+                    variabledoc.valuedoc is not None and
+                    variabledoc.valuedoc.__class__ is doctype]
+    
+
+class ModuleDoc(NamespaceDoc):
     """
     API documentation information about a single module.
     """
-    _STR_FIELDS = (ValueDoc._STR_FIELDS +
-                   ['submodules', 'modules', 'classes', 'functions',
-                    'variables'])
+    _STR_FIELDS = (NamespaceDoc._STR_FIELDS +
+                   ['package', 'docformat', 'public_names'])
     
     def __init__(self):
         """Create a new C{ModuleDoc}."""
-        ValueDoc.__init__(self)
+        NamespaceDoc.__init__(self)
 
         self.package = None
         """API documentation for the module's containing package.
-        @type: L{ValueDoc}"""
-
-        self.submodules = []
-        """API documentation for the module's submodules.
-        @type: C{list} of L{ValueDoc}"""
-
-        self.modules = []
-        """API documentation for the modules directly contained by the
-        module.  Since modules cannot be defined locally, this list
-        includes only imported modules.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.classes = []
-        """API documentation for the classes directly contained by the
-        module.  This list includes both imported and locally defined
-        classes.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.functions = []
-        """API documentation for the functions directly contained by
-        the module.  This list includes both imported and locally
-        defined functions.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.variables = []
-        """API documentaiton for the variables directly contained by
-        this module.  This list includes only variables that are not
-        listed elsewhere; i.e., modules, classes, and functions are
-        not included in this list.  This list includes both imported
-        and locally defined variables.
-        @type: C{list} of L{VariableDoc}"""
+        @type: L{ModuleDoc}"""
 
         self.docformat = None
         """The markup language used by docstrings in this module.
@@ -370,23 +470,15 @@ class ModuleDoc(ValueDoc):
         """A list of the names of ..., extracted from __all__
         @type: C{string}"""
 
-    def children(self):
-        return (self.submodules + self.modules + self.classes +
-               self.functions + self.variables)
-
-class ClassDoc(ValueDoc):
+class ClassDoc(NamespaceDoc):
     """
     API documentation information about a single class.
     """
-    _STR_FIELDS = (ValueDoc._STR_FIELDS +
-                   ['bases', 'subclasses', 'nested_classes',
-                    'instance_methods', 'static_methods',
-                    'class_methods', 'properties',
-                    'instance_variables', 'class_variables'])
+    _STR_FIELDS = NamespaceDoc._STR_FIELDS + ['bases', 'subclasses']
     
     def __init__(self):
         """Create a new C{ClassDoc}."""
-        ValueDoc.__init__(self)
+        NamespaceDoc.__init__(self)
 
         self.bases = []
         """API documentation for the class's base classes.
@@ -396,35 +488,6 @@ class ClassDoc(ValueDoc):
         """API documentation for the class's known subclasses.
         @type: C{list} of L{ClassDoc}"""
 
-        self.nested_classes = []
-        """API documentation for the class's nested classes.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.instance_methods = []
-        """API documentation for the class's instance methods.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.static_methods = []
-        """API documentation for the class's static methods.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.class_methods = []
-        """API documentation for the class's class methods.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.properties = []
-        """API documentation for the class's properties.
-        @type: C{list} of L{VariableDoc}"""
-
-        self.instance_variables = []
-        """API documentation for the class's instance variables.
-        @type: C{list} of L{VariableDoc}"""
-        
-        self.class_variables = []
-        """API documentation for the class's class variables.
-        @type: C{list} of L{VariableDoc}"""
-
-
 class RoutineDoc(ValueDoc):
     """
     API documentation information about a single routine.
@@ -432,32 +495,50 @@ class RoutineDoc(ValueDoc):
     _STR_FIELDS = (ValueDoc._STR_FIELDS +
                    ['args', 'vararg', 'kwarg', 'returns', 'overrides'])
                    
-    def __init__(self):
+    def __init__(self, args=None, vararg=None, kwarg=None, returns=None,
+                 overrides=None):
         """Create a new C{FuncDoc}."""
         ValueDoc.__init__(self)
 
-        self.args = None
+        self.args = args
         """API documentation for the routine's positional arguments.
         @type: C{list} of L{ArgDoc}"""
 
-        self.vararg = None
+        self.vararg = vararg
         """API documentation for the routine's vararg argument, or
         C{None} if it has no vararg argument.
         @type: L{ArgDoc}"""
 
-        self.kwarg = None
+        self.kwarg = kwarg
         """API documentation for the routine's keyword argument, or
         C{None} if it has no keyword argument.
         @type: L{ArgDoc}"""
 
-        self.returns = None
+        self.returns = returns
         """A description of the value returned by this routine.
         @type: L{ArgDoc}? or C{string}?"""
-
-        self.overrides = None
+        
+        self.overrides = overrides
         """API documentation for the routine overriden by this
         routine.
-        @type: L{VariableDoc}"""
+        @type: L{RoutineDoc}"""
+
+class FunctionDoc(RoutineDoc): pass
+class InstanceMethodDoc(RoutineDoc): pass
+class ClassMethodDoc(RoutineDoc): pass
+class StaticMethodDoc(RoutineDoc): pass
+
+def cm_doc_from_routine_doc(routine_doc):
+    import copy
+    cm_doc = copy.copy(routine_doc)
+    cm_doc.__class__ = ClassMethodDoc
+    return cm_doc
+
+def sm_doc_from_routine_doc(routine_doc):
+    import copy
+    sm_doc = copy.copy(routine_doc)
+    sm_doc.__class__ = StaticMethodDoc
+    return sm_doc
 
 class PropertyDoc(ValueDoc):
     """
@@ -507,4 +588,5 @@ class ArgDoc(APIDoc):
         self.type = type
         """A description of the argument's expected type.
         @type: L{ParsedDocstring}"""
-
+        
+    
