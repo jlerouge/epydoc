@@ -39,23 +39,50 @@ produce API documentation using the following steps:
        latex, man
 @group Testing Modules: checker, test
 
+@order: cli, gui, uid, objdoc, imports, epytext, html, css, help,
+       colorize, latex, man
+
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
-@version: 1.2
+@version: 1.2 alpha
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
+
+@todo 1.2: Add support for Docutils/ReST?
+@todo 1.2: Add support for escape characters & groups to the latex
+    outputter.
+@todo 1.2: Finish the man-page style outputter.
+@todo 1.2: Create a better default top_page than trees.html
+@todo 1.2: More options for --check (--check all, --check basic)
+@todo 1.2: Add more symbols (like E{E}{->}).
+@todo 1.2: Add --no-inheritance?
+@todo 1.2: Add --check for doc inheritance? (??)
+
+@todo 1.3: Modify L{epydoc.html} to write directly to streams,
+    rather than building up strings.
+    
+@todo 2.0: Refactor L{epydoc.objdoc.ObjDoc}: ObjDoc will just
+    contain info about objects, but not gather it.  An 'inspection' 
+    module will be responsible for gathering the info.
+@todo 2.0: Add an alternative 'parsing' module that can gather
+    info by parsing python files, instead of using inspection.
+
+@var __license__: The license governing the use and distribution of
+    epydoc.
+@var __contributors__: Contributors to epydoc, in alphabetical
+    order by last name.
 """
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '1.2 prerelease'
+__version__ = '1.2 alpha'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 
 # Copyright/license info
-__copyright__ = '(C) 2002 Edward Loper'
+__copyright__ = '(C) 2003 Edward Loper'
 __license__ = 'IBM Open Source License'
 
 # Contributors to epydoc (in alpha order by last name)
@@ -64,49 +91,11 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
                     'Bruce Mitchener <bruce@cubik.org>',
                     'Christian Reis <kiko@async.com.br>']
 
-# Sort order
-__epydoc_sort__ = [
-    # interfaces
-    'cli', 'gui',
-
-    # Inspection
-    'imports', 'objdoc', 'epytext', 'uid',
-
-    # HTML Formatter
-    'html', 'css', 'help', 'colorize',
-
-    # LaTeX Formatter
-    'latex',
-
-    # Manpage Formatter
-    'man',
-
-    # Documentation completeness checker
-    'checker']
-
 # To do:
-#   - Add more escape characters?
-#   - Add escape character & group support to latex
-#   - finish man-page output
 #   - Change html to write directly to files, instead of building up strings
 #      and then writing them?
-#   - add option: don't include vars and cvars that have no descr?
-#   - create a better default top_page than trees.html
-#   - options to --check (--check all, --check basic, etc)
-#   - Improve error message "Unknown field tag 'ivar'" when they
-#     try to use an ivar in the wrong context (etc.)
-#   - Add support for properties
 
-# To do: medium-term
-#   - better doc inheritence?
-#     - refactor inheritance
-#     - option to turn off function doc inheritance?
-#     - add --check for doc inheritance?
-
-# To do: long-term
-#   - Add support for getting docs from parsing?
-
-# Other issues
+# Issues
 #   - curses.wrapper names both a function and a module; how to
 #     distinguish them?  Of course, we can't even *access* the module,
 #     since "import curses.wrapper" gives us a function. :-/
@@ -114,6 +103,8 @@ __epydoc_sort__ = [
 # Changes needed for docs:
 #   - document the method for deciding what's public/private
 #   - fields are defined slightly differently (@group)
-#   - new fields (@group: order is significant)
+#   - new fields (@group: order is significant; @sort)
+#   - depreciated __epydoc_sort__
 #   - staticmethod/classmethod
-#   - document __extra_epydoc_fields__
+#   - document __extra_epydoc_fields__ and @newfield
+#   - Add a faq?
