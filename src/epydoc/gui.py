@@ -12,7 +12,7 @@ Graphical interface to epydoc.  This interface might be useful for
 systems where it's inconvenient to use the command-line interface
 (such as Windows).  It supports all of the features that are supported
 by the command-line interface.  It also supports loading and saving of
-X{project files}, which store a set of related options, and the
+X{project files}, which store a set of related modules, and the
 options that should be used to generate the documentation for those
 modules.
 
@@ -212,18 +212,18 @@ class EpydocGUI:
         filemenu.add_command(label='Save Project', underline=0,
                              command=self._save,
                              accelerator='Ctrl-s')
-        filemenu.add_command(label='Save As..', underline=0,
+        filemenu.add_command(label='Save As..', underline=5,
                              command=self._saveas,
-                             accelerator='Ctrl-s')
+                             accelerator='Ctrl-a')
         filemenu.add_separator()
-        filemenu.add_command(label='Exit', underline=0,
+        filemenu.add_command(label='Exit', underline=1,
                              command=self.destroy,
                              accelerator='Ctrl-x')
         menubar.add_cascade(label='File', underline=0, menu=filemenu)
         gomenu = Menu(menubar, tearoff=0)
         gomenu.add_command(label='Run Epydoc',  command=self._open,
-                           underline=0, accelerator='Ctrl-g')
-        menubar.add_cascade(label='Run', menu=gomenu)
+                           underline=0, accelerator='Alt-g')
+        menubar.add_cascade(label='Run', menu=gomenu, underline=0)
         self._top.config(menu=menubar)
         
     def _init_module_list(self, mainframe):
@@ -305,9 +305,9 @@ class EpydocGUI:
         oframe2 = Frame(self._topframe, relief='groove', border=2,
                         background=BG_COLOR)
         self._option_frame = oframe2
-        l2 = Label(oframe2, text="Package Name:", **COLOR_CONFIG)
+        l2 = Label(oframe2, text="Project Name:", **COLOR_CONFIG)
         l2.grid(row=2, col=0, columnspan=2, sticky='e')
-        l3 = Label(oframe2, text="Package URL:", **COLOR_CONFIG)
+        l3 = Label(oframe2, text="Project URL:", **COLOR_CONFIG)
         l3.grid(row=3, col=0, columnspan=2, sticky='e')
         l4 = Label(oframe2, text="Output Directory:", **COLOR_CONFIG)
         l4.grid(row=4, col=0, columnspan=2, sticky='e')
@@ -360,6 +360,7 @@ class EpydocGUI:
         self._top.bind('<Alt-o>', self._options_toggle)
         self._top.bind('<Alt-g>', self._go)
         self._top.bind('<Alt-s>', self._go)
+        self._top.bind('<Control-g>', self._go)
 
         self._top.bind('<Control-o>', self._open)
         self._top.bind('<Control-s>', self._save)
@@ -433,8 +434,8 @@ class EpydocGUI:
 
     def _getopts(self):
         options = {}
-        options['pkg_name'] = self._name_entry.get() or None
-        options['pkg_url'] = self._url_entry.get() or None
+        options['prj_name'] = self._name_entry.get() or None
+        options['prj_url'] = self._url_entry.get() or None
         options['outdir'] = self._out_entry.get() or 'html'
         if self._css_var.get() == '-other-':
             options['css'] = self._css_entry.get() or 'default'
@@ -496,11 +497,11 @@ class EpydocGUI:
         if 1:#try:
             opts = load(open(prjfile, 'r'))
             self._name_entry.delete(0, 'end')
-            if opts.get('pkg_name'):
-                self._name_entry.insert(0, opts['pkg_name'])
+            if opts.get('prj_name'):
+                self._name_entry.insert(0, opts['prj_name'])
             self._url_entry.delete(0, 'end')
-            if opts.get('pkg_url'):
-                self._url_entry.insert(0, opts['pkg_url'])
+            if opts.get('prj_url'):
+                self._url_entry.insert(0, opts['prj_url'])
             self._out_entry.delete(0, 'end')
             self._out_entry.insert(0, opts.get('outdir', 'html'))
             self._css_entry.delete(0, 'end')
