@@ -23,11 +23,12 @@ documentation for a set of modules and packages: </p>
 <dl>
   <dt><code><code class="user">MODULES...</code></code></dt>
   <dd>
-    A list of the modules that should be documented.  Modules may be
-    specified using either filenames (such as
-    "<code>epydoc/epytext.py</code>") or module names (such as
-    "<code>os.path</code>").  The filename for a package is its
-    "<code>__init__.py</code>" file.
+    A list of the modules that should be documented.  Modules can be
+    specified using module names (such as
+    "<code>os.path</code>"), filenames (such as
+    "<code>epydoc/epytext.py</code>"), or directory names (such as
+    "<code>epydoc/</code>").  Directory names specify packages,
+    and are expanded to include all sub-modules and sub-packages.
   </dd>
   
   <dt><code><b>--html</b></code></dt>
@@ -285,7 +286,7 @@ page</a>. </p>
     </tr>
 </table>
 <font size="-1">
-<!-- hhmts start --> Last modified: Wed Nov  6 07:22:50 EST 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Thu Nov  7 04:39:41 EST 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>

@@ -42,14 +42,15 @@ Project files record a list of related modules, and the options that
 should be used to generate the documentation for those modules.
 .TP
 .IR modules ...
-The list of the modules that should be documented.  Modules may be
-specified using either filenames (such as
-.BR epydoc/epytext.py )
-or module names (such as
-.BR os.path ).
-The filename for a package is its
-.B __init__.py
-file.
+The list of the modules that should be documented.  Modules can be
+specified using module names (such as
+.BR os.path ),
+filenames (such as
+.BR epydoc/epytext.py ),
+or directory names (such as
+.BR epydoc/ ).
+Directory names specify packages, and are expanded to include
+all sub-modules and sub-packages.
 .TP
 .B \-h, \-\-help, \-\-usage, \-?
 Display a usage message.

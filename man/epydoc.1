@@ -144,15 +144,16 @@ file.
 .B HTML DOCUMENTATION GENERATION OPTIONS 
 .RS 4
 .TP
-.B modules...
-The list of the modules that should be documented.  Modules may be
-specified using either filenames (such as
-.BR epydoc/epytext.py )
-or module names (such as
-.BR os.path ).
-The filename for a package is its
-.B __init__.py
-file.
+.IR modules ...
+The list of the modules that should be documented.  Modules can be
+specified using module names (such as
+.BR os.path ),
+filenames (such as
+.BR epydoc/epytext.py ),
+or directory names (such as
+.BR epydoc/ ).
+Directory names specify packages, and are expanded to include
+all sub-modules and sub-packages.
 .TP
 .B \-\-builtins
 Add the builtin modules (as defined by sys.builtin_module_names) to
@@ -275,15 +276,16 @@ is used multiple times, it produces successively more verbose output.
 .B LATEX DOCUMENTATION GENERATION OPTIONS
 .RS 4
 .TP
-.B modules...
-The list of the modules that should be documented.  Modules may be
-specified using either filenames (such as
-.BR epydoc/epytext.py )
-or module names (such as
-.BR os.path ).
-The filename for a package is its
-.B __init__.py
-file.
+.IR modules ...
+The list of the modules that should be documented.  Modules can be
+specified using module names (such as
+.BR os.path ),
+filenames (such as
+.BR epydoc/epytext.py ),
+or directory names (such as
+.BR epydoc/ ).
+Directory names specify packages, and are expanded to include
+all sub-modules and sub-packages.
 .TP
 .B \-\-builtins
 Add the builtin modules (as defined by sys.builtin_module_names) to
@@ -347,15 +349,16 @@ is used multiple times, it produces successively more verbose output.
 .B DOCUMENTATION COMPLETENESS CHECKING OPTIONS
 .RS 4
 .TP
-.B modules...
+.IR modules ...
 The list of the modules whose documentation should be checked.
-Modules may be specified using either filenames (such as
-.BR epydoc/epytext.py )
-or module names (such as
-.BR os.path ).
-The filename for a package is its
-.B __init__.py
-file.
+Modules can  be specified using module names (such as
+.BR os.path ),
+filenames (such as
+.BR epydoc/epytext.py ),
+or directory names (such as
+.BR epydoc/ ).
+Directory names specify packages, and are expanded to include
+all sub-modules and sub-packages.
 .TP
 .B \-\-check
 Perform completeness checks on the documentation.
