@@ -79,7 +79,7 @@ from epydoc.imports import import_module
 ## Dispatcher
 ##################################################
 
-def parse(docstring, markup='plaintext', errors=None):
+def parse(docstring, markup='plaintext', errors=None, **options):
     """
     Parse the given docstring, and use it to construct a
     C{ParsedDocstring}.  If any fatal C{ParseError}s are encountered
@@ -114,26 +114,26 @@ def parse(docstring, markup='plaintext', errors=None):
     # Is the markup language valid?
     if not re.match(r'\w+', markup):
         _parse_warn('Warning: Bad markup language name: %s' % markup)
-        return plaintext.parse_docstring(docstring, errors)
+        return plaintext.parse_docstring(docstring, errors, **options)
 
     # Is the markup language supported?
     try: exec('from epydoc.markup.%s import parse_docstring' % markup)
     except:
         _parse_warn('Warning: Unsupported markup language: %s' % markup)
-        return plaintext.parse_docstring(docstring, errors)
+        return plaintext.parse_docstring(docstring, errors, **options)
 
     # Parse the docstring.
-    try: parsed_docstring = parse_docstring(docstring, errors)
-    except KeyboardError: raise
+    try: parsed_docstring = parse_docstring(docstring, errors, **options)
+    except KeyboardInterrupt: raise
     except Exception, e:
         errors.append(ParseError('Internal error: %s' % e))
-        return plaintext.parse_docstring(docstring, errors)
+        return plaintext.parse_docstring(docstring, errors, **options)
 
     # Check for fatal errors.
     fatal_errors = [e for e in errors if e.is_fatal()]
     if fatal_errors and raise_on_error: raise fatal_errors[0]
     if fatal_errors:
-        return plaintext.parse_docstring(docstring, errors)
+        return plaintext.parse_docstring(docstring, errors, **options)
 
     return parsed_docstring
 
@@ -185,7 +185,7 @@ class ParsedDocstring:
     methods will be added to this base class; but they will always
     be given a default implementation.
     """
-    def split_fields(self):
+    def split_fields(self, errors=None):
         """
         Split this docstring into its body and its fields.
         
@@ -193,6 +193,10 @@ class ParsedDocstring:
             the main body of this docstring, and C{M{fields}} is a list
             of its fields.
         @rtype: C{(L{ParsedDocstring}, list of L{Field})}
+        @param errors: A list where any errors generated during
+            splitting will be stored.  If no list is specified, then
+            errors will be ignored.
+        @type errors: C{list} of L{ParseError}
         """
         # Default behavior:
         return self, []
@@ -434,7 +438,10 @@ class ParseError(Exception):
         @return: the formal representation of this C{ParseError}.
         @rtype: C{string}
         """
-        return '<ParseError on line %d>' % self._linenum+self._offset
+        if self._linenum is None:
+            return '<ParseError on line %d' % self._offset
+        else:
+            return '<ParseError on line %d>' % (self._linenum+self._offset)
 
     def __cmp__(self, other):
         """
