@@ -2425,6 +2425,7 @@ class HTMLFormatter:
             #return '<p><b>%s:</b> %s<br /></p>\n\n' % (singular, items[0])
         if short:
             str = '<dl><dt><b>%s:</b></dt>\n  <dd>\n    ' % plural
+            items = [item.strip() for item in items]
             return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
         else:
             str = '<p><b>%s:</b>\n<ul>\n  <li>' % plural
