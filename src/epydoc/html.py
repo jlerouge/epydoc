@@ -16,7 +16,6 @@ overwrite the one produced by epydoc.
 # Improvements I'd like to make:
 #    - Better CSS support
 #    - List exceptions separately from other classes
-#    - 
 
 
 ##################################################
@@ -86,7 +85,7 @@ table.summary, table.details, table.index
 tr.summary        { background: #c0e0e0; color: #000000;
                     text-align: left; font-size: 120%; } 
 tr.details, tr.index
-                  { background: #d0f0f0; color: #000000;
+                  { background: #c0e0e0; color: #000000;
                     text-align: center; font-size: 120%; }
 
 /* Base tree */
@@ -310,6 +309,10 @@ class HTML_Doc:
         str = self._index_to_html()
         open(directory+'epydoc-index.html', 'w').write(str)
 
+        self._show_private = 0
+        self._write_css(directory)
+        self._write_help(directory)
+        
         # This is getting very hack-ish.  Oh well. :)
         self._show_private = 'both'        
         if self._show_private == 'both':
@@ -322,10 +325,6 @@ class HTML_Doc:
         else:
             self._write_docs(directory, verbose)
 
-        self._show_private = 0
-        self._write_css(directory)
-        self._write_help(directory)
-        
     def _write_docs(self, directory, verbose):
         if directory[-1] != '/': directory = directory + '/'
         # Create dest directory, if necessary
@@ -394,15 +393,31 @@ class HTML_Doc:
                         '__str__': 'Informal representation operator'
                         }
 
-    def _sort(self, docs):
+    def _sort(self, docs, sort_order=None):
         """
         Sort a list of C{ObjDoc}s.
         """
         docs = list(docs)
+
+        # First, sort by __epydoc_sort__
+        if sort_order is None:
+            sortdocs = []
+        else:
+            sort_order = list(sort_order)
+            sortdocs = sort_order[:]
+            for doc in docs:
+                try: index = sort_order.index(doc.name())
+                except ValueError: continue
+                sortdocs[index] = doc
+            sortdocs = [d for d in sortdocs if type(d) != type('')]
+            for doc in sortdocs: docs.remove(doc)
+        
+        # Then, sort by _cmp_name.
         docs.sort(lambda x,y: _cmp_name(x, y))
         if not self._show_private:
             docs = filter(lambda x:not _is_private(x.name()), docs)
-        return docs
+
+        return sortdocs + docs
 
     def _header(self, name):
         'Return an HTML header with the given name.'
@@ -443,7 +458,9 @@ class HTML_Doc:
         elif (isinstance(doc, FuncDoc) and
               doc.returns().descr() is not None):
             summary = epytext.summary(doc.returns().descr())
-            return ('Return '+epytext.to_html(summary).strip())
+            summary = epytext.to_html(summary).strip()
+            summary = summary[:1].lower() + summary[1:]
+            return ('Return '+ summary)
         else:
             return '&nbsp;'
 
@@ -508,7 +525,7 @@ class HTML_Doc:
         bases = self._docmap[uid].bases()
         
         if postfix == '':
-            str = ' '*(width-2) + '<b>'+`uid`+'</b>\n'
+            str = ' '*(width-2) + '<b>'+uid.shortname()+'</b>\n'
         else: str = ''
         for i in range(len(bases)-1, -1, -1):
             base = bases[i]
@@ -554,17 +571,17 @@ class HTML_Doc:
             str += '\n'
             if doc and doc.children():
                 str += ' '*depth + '  <ul>\n'
-                children = [l.target() for l in doc.children()]
-                children.sort()
+                children = [l.target() for l
+                            in self._sort(doc.children())]
                 for child in children:
                     str += self._class_tree_item(child, depth+4)
                 str += ' '*depth + '  </ul>\n'
         return str
 
-    def _class_tree(self):
+    def _class_tree(self, sort_order=None):
         str = '<ul>\n'
         docs = self._docmap.items()
-        docs.sort()
+        docs.sort(lambda a,b: cmp(a[0], b[0]))
         for (uid, doc) in docs:
             if not isinstance(doc, ClassDoc): continue
             hasbase = 0
@@ -587,18 +604,18 @@ class HTML_Doc:
         str += '\n'
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  <ul>\n'
-            modules = [l.target() for l in doc.modules()]
-            modules.sort()
+            modules = [l.target() for l
+                       in self._sort(doc.modules(), doc.sort_order())]
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  </ul>\n'
         str += ' '*depth+'</li>'
         return str
 
-    def _module_tree(self):
+    def _module_tree(self, sort_order=None):
         str = '<ul>\n'
         docs = self._docmap.items()
-        docs.sort()
+        docs.sort(lambda a,b: cmp(a[0], b[0]))
         # Find all top-level packages. (what about top-level
         # modules?)
         for (uid, doc) in docs:
@@ -620,9 +637,9 @@ class HTML_Doc:
                '<th colspan="2">\n' + heading +\
                '</th></tr>\n'
     
-    def _class_summary(self, classes, heading='Class Summary'):
+    def _class_summary(self, classes, sort_order, heading='Class Summary'):
         'Return a summary of the classes in a module'
-        classes = self._sort(classes)
+        classes = self._sort(classes, sort_order)
         if len(classes) == 0: return ''
         str = self._table_header(heading, 'summary')
 
@@ -672,15 +689,16 @@ class HTML_Doc:
         str = self._table_header(heading, 'details')+'</table>'
 
         for link in functions:
-            str += ('<table width="100%" class="func-details"'+
-                    ' bgcolor="#e0e0e0">'+
-                    '<tr><td>\n')
             fname = link.name()
             func = link.target()
             if not self._docmap.has_key(func):
                 if WARN_MISSING:
                     print 'WARNING: MISSING', func
                 continue
+            
+            str += ('<table width="100%" class="func-details"'+
+                    ' bgcolor="#e0e0e0">'+
+                    '<tr><td>\n')
             
             fdoc = self._docmap[func]
 
@@ -716,8 +734,8 @@ class HTML_Doc:
 
             # Description
             if fdescr:
-                str += '  <dd>'+epytext.to_html(fdescr, para=1)+'</dd>\n'
-            str += '  <dt></dt><dd>\n'
+                str += '\n'+epytext.to_html(fdescr, para=1)+'\n'
+            str += '<dl><dt></dt><dd>\n'
 
             # Parameters
             if fparam:
@@ -772,10 +790,10 @@ class HTML_Doc:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
                 
-            str += '  </dd>\n</dl>\n\n'
+            str += '</dd></dl>\n'
             str += '</td></tr></table>\n'
 
-        str += '<br>\n'
+        str += '<br>\n\n'
         return str
 
     def _var_details(self, variables, heading='Variable Details'):
@@ -823,9 +841,9 @@ class HTML_Doc:
         if numvars == 0: return ''
         return str+'<br>'
 
-    def _func_summary(self, functions, heading='Function Summary'):
+    def _func_summary(self, functions, sort_order, heading='Function Summary'):
         'Return a summary of the functions in a class or module'
-        functions = self._sort(functions)
+        functions = self._sort(functions, sort_order)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'summary')
         
@@ -875,9 +893,9 @@ class HTML_Doc:
             str += fsum+'</td></tr>\n'
         return str + '</table><br>\n\n'
     
-    def _var_summary(self, variables, heading='Variable Summary'):
+    def _var_summary(self, variables, sort_order, heading='Variable Summary'):
         'Return a summary of the variables in a class or module'
-        variables = self._sort(variables)
+        variables = self._sort(variables, sort_order)
         if len(variables) == 0: return ''
         str = self._table_header(heading, 'summary')
 
@@ -894,10 +912,11 @@ class HTML_Doc:
             str += '</a>'+'</b></code>\n  ' + vsum+'</td></tr>\n'
         return str + '</table><br>\n\n'
 
-    def _module_list(self, modules):
+    def _module_list(self, modules, sort_order):
         if len(modules) == 0: return ''
         str = '<h3>Modules</h3>\n<ul>\n'
-        modules.sort(lambda l1,l2:cmp(l1.target(),l2.target()))
+        modules = self._sort(modules, sort_order)
+        
         for link in modules:
             str += self._module_tree_item(link.target())
         return str + '</ul>\n'
@@ -1073,13 +1092,13 @@ class HTML_Doc:
             str += self._seealso(doc.seealsos())
 
         if doc.ispackage():
-            str += self._module_list(doc.modules())
+            str += self._module_list(doc.modules(), doc.sort_order())
 
         (classes,excepts) = self._split_classes_and_excepts(doc)
-        str += self._class_summary(classes, 'Classes')
-        str += self._class_summary(excepts, 'Exceptions')
-        str += self._func_summary(doc.functions())
-        str += self._var_summary(doc.variables())
+        str += self._class_summary(classes, doc.sort_order(), 'Classes')
+        str += self._class_summary(excepts, doc.sort_order(), 'Exceptions')
+        str += self._func_summary(doc.functions(), doc.sort_order())
+        str += self._var_summary(doc.variables(), doc.sort_order())
 
         str += self._func_details(doc.functions(), None)
         str += self._var_details(doc.variables())
@@ -1119,11 +1138,11 @@ class HTML_Doc:
 
         str += self._seealso(doc.seealsos())
 
-        str += self._func_summary(doc.methods(),
+        str += self._func_summary(doc.methods(), doc.sort_order(),
                                   'Method Summary')
-        str += self._var_summary(doc.ivariables(),
+        str += self._var_summary(doc.ivariables(), doc.sort_order(),
                                  'Instance Variable Summary')
-        str += self._var_summary(doc.cvariables(),
+        str += self._var_summary(doc.cvariables(), doc.sort_order(),
                                  'Class Variable Summary')
         
         str += self._func_details(doc.methods(), doc, 
