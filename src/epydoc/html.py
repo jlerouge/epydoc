@@ -914,16 +914,6 @@ class HTML_Doc:
             else:
                 rtype = '&nbsp;'
 
-            pstr = '('
-            for param in fdoc.parameters():
-                pstr += param.name()+', '
-            if fdoc.vararg():
-                pstr += '*'+fdoc.vararg().name()+', '
-            if fdoc.kwarg():
-                pstr += '**'+fdoc.kwarg().name()+', '
-            if pstr == '(': pstr = '()'
-            else: pstr = pstr[:-2]+')'
-
             descrstr = self._summary(fdoc, container)
             if descrstr != '&nbsp;':
                 fsum = '<br>'+descrstr
@@ -936,11 +926,9 @@ class HTML_Doc:
             str += '<tr><td align="right" valign="top" width="15%">'
             str += '<font size="-1">'+rtype+'</font></td>\n  <td>'
             str += self._func_signature(fname, fdoc, 1, 'summary-sig')
-            #str += self._uid_to_href(func, fname)
-            #str += '</b>'+pstr+'</code>\n  '
             str += fsum+'</td></tr>\n'
         return str + '</table><br>\n\n'
-    
+
     def _func_details(self, functions, cls, heading='Function Details'):
         """
         @return: The HTML code for a function details table.  This
@@ -997,7 +985,7 @@ class HTML_Doc:
                 inheritdoc = 1
                 
             fdescr=fdoc.descr()
-            fparam = fdoc.parameters()[:]
+            fparam = fdoc.parameter_list()[:]
             if fdoc.vararg(): fparam.append(fdoc.vararg())
             if fdoc.kwarg(): fparam.append(fdoc.kwarg())
             freturn = fdoc.returns()
@@ -1088,17 +1076,9 @@ class HTML_Doc:
         str += '<span class=%s-name>%s</span>' % (cssclass, fname)
         if link: str += '</a>'
         
-        str += '('
         PARAM_JOIN = ',\n'+' '*15
-        for param in fdoc.parameters():
-            str += '<span class=%s-arg>%s</span>' % (cssclass, param.name())
-            if param.default() and not link:
-                default = param.default()
-                if len(default) > 60:
-                    default = default[:57]+'...'
-                str += '=<span class=%s-default>%s</span>' % (cssclass,
-                                                              default)
-            str += PARAM_JOIN
+        str += '('
+        str += self._params_to_html(fdoc.parameters(), cssclass, not link)
         if fdoc.vararg():
             vararg_name = fdoc.vararg().name()
             if vararg_name != '...': vararg_name = '*%s' % vararg_name
@@ -1111,6 +1091,26 @@ class HTML_Doc:
 
         return str + ')</code>'
 
+    def _params_to_html(self, parameters, cssclass, show_defaults):
+        PARAM_JOIN = ',\n'+' '*15
+        str = ''
+        for param in parameters:
+            if type(param) in (type([]), type(())):
+                sublist = self._params_to_html(param, cssclass,
+                                               show_defaults)
+                str += '(%s), ' % sublist[:-len(PARAM_JOIN)]
+            else:
+                str += ('<span class=%s-arg>%s</span>' %
+                        (cssclass, param.name()))
+                if param.default() and show_defaults:
+                    default = param.default()
+                    if len(default) > 60:
+                        default = default[:57]+'...'
+                    str += ('=<span class=%s-default>%s</span>' %
+                            (cssclass, default))
+                str += PARAM_JOIN
+        return str
+    
     #////////////////////////////////////////////////////////////
     # Variable tables
     #////////////////////////////////////////////////////////////
@@ -1248,7 +1248,7 @@ class HTML_Doc:
             elif isinstance(doc, FuncDoc):
                 extra_p = [v for v in [doc.vararg(), doc.kwarg(),
                                        doc.returns()] if v is not None]
-                for param in doc.parameters()+extra_p:
+                for param in doc.parameter_list()+extra_p:
                     self._get_index_items(param.descr(), link, index)
                     self._get_index_items(param.type(), link, index)
                 for fraise in doc.raises():
