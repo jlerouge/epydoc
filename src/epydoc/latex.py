@@ -48,13 +48,13 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
-\usepackage{makeidx, multirow}
-\addtolength{\parskip}{0.5ex}
+\usepackage{makeidx, multirow, longtable}
+\makeindex
+\begin{document}
+
 \setlength{\parindent}{0ex}
 \setlength{\fboxrule}{2\fboxrule}
 \newlength{\BCL} % base class length, for base trees.
-\makeindex
-\begin{document}
 
 \pagestyle{fancy}
 \renewcommand{\sectionmark}[1]{\markboth{#1}{}}
@@ -83,6 +83,10 @@ _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
 ##################################################
 
 class LatexFormatter:
+    """
+    @ivar _show_private: Whether to include show private objects in
+    the documentation.
+    """
     def __init__(self, docmap, **kwargs):
         self._docmap = docmap
 
@@ -90,7 +94,7 @@ class LatexFormatter:
         self._show_private = kwargs.get('private', 0)
         self._prj_name = kwargs.get('prj_name', 0)
         self._top_section = 2
-        self._list_classes_separately = 1
+        self._list_classes_separately = 0
         self._index_functions = 1
         
     def dvi(self, directory):
@@ -101,8 +105,8 @@ class LatexFormatter:
         #return
         print 'RUNNING LaTeX'
         os.system('latex api.tex')
-        #os.system('makeindex api.idx')
-        #os.system('latex api.tex')
+        os.system('makeindex api.idx')
+        os.system('latex api.tex')
         os.chdir(oldpath)
 
     def write(self, directory):
@@ -137,12 +141,28 @@ class LatexFormatter:
         str += self._start_of('Header')
         str += _LATEX_HEADER + '\n'
 
+        str += self._start_of('Title')
+        str += '\\title{%s}\n' % self._text_to_latex(self._prj_name)
+        str += '\\author{API Documentation}\n'
+        str += '\\maketitle\n'
+        
+        str += self._start_of('Table of Contents')
+        str += '\\addtolength{\\parskip}{-1ex}'
+        str += '\\tableofcontents\n'
+        str += '\\addtolength{\\parskip}{1ex}'
+
         str += self._start_of('Includes')
-        for uid in self._filtersort_uids(self._docmap.keys()):
+        uids = self._filtersort_uids(self._docmap.keys())
+        for uid in uids:
             if uid.is_module():
                 str += '\\include{%s-module}\n' % uid.name()
-            elif uid.is_class() and self._list_classes_separately:
-                str += '\\include{%s-class}\n' % uid.name()
+
+        # If we're listing classes separately, put them after all the
+        # modules.
+        if self._list_classes_separately:
+            for uid in uids:
+                if uid.is_class():
+                    str += '\\include{%s-class}\n' % uid.name()
 
         str += self._start_of('Index')
         str += '\\printindex\n\n'
@@ -305,64 +325,54 @@ class LatexFormatter:
         str = self._start_of(heading)
         str += '  '+self._section(heading, seclevel)
 
-        str += '\\begin{tabular}{|p{.15\\textwidth}|p{.25\\textwidth}|'
-        str += 'p{.5\\textwidth}|l}\n'
-        str += '\\cline{1-3}\n'
-        str += '\\centering \\textbf{Type}& '
+        str += '\\begin{longtable}'
+        str += '{|p{.30\\textwidth}|'
+        str += 'p{.62\\textwidth}|l}\n'
+        str += '\\cline{1-2}\n'
+
+        # Set up the headers & footer (this makes the table span
+        # multiple pages in a happy way).
+        str += '\\cline{1-2} '
         str += '\\centering \\textbf{Name} & '
         str += '\\centering \\textbf{Description/Value}& \\\\\n'
-        str += '\\cline{1-3}\n'
+        str += '\\cline{1-2}\n'
+        str += '\\endhead'
+        str += '\\cline{1-2}'
+        str += '\\multicolumn{3}{r}{\\small\\textit{'
+        str += 'continued on next page}}\\\\'
+        str += '\\endfoot'
+        str += '\\cline{1-2}\n'
+        str += '\\endlastfoot'
 
         for var in variables:
-            if var.type():
-                typ = self._dom_to_latex(var.type(), 10).strip()
-                str += '\\raggedleft ' + typ.replace('.', '.\-')
-            str += ' & \\centering '
-
-            str += self._text_to_latex(var.name()) + ' & '
+            str += '\\raggedright '
+            name = re.sub('(.)', r'\1\-', var.name())
+            str += name.replace('_', r'\_') + ' & '
 
             if var.descr():
+                str += '\\raggedright '
                 str += self._dom_to_latex(var.descr(), 10).strip()
             elif var.has_value():
-                val = self._pprint_var_value(var)
-                str += '%s' % val
-            str += '\\\\\n'
-            str += '\\cline{1-3}\n'
+                str += '\\raggedright '
+                str += self._pprint_var_value(var)
+            str += '&\\\\\n'
+            str += '\\cline{1-2}\n'
 
-        str += '\\end{tabular}\n\n'
+        str += '\\end{longtable}\n\n'
         return str
     
     def _pprint_var_value(self, var):
+        MAXWIDTH = 100 # Roughly 2 lines.
         val = var.uid().value()
-        
-        #if type(val) == type(''):
-        #    val = self._text_to_latex(`val`)
-        #    latex_nl = self._text_to_latex(r'\n')
-        #    if val.find(latex_nl) >= 0:
-        #        val = val[1:-1].replace(latex_nl, '\n')
-        #elif type(val) in (type(()), type([]), type({})):
-        #    pp = pprint.PrettyPrinter(width=50)
-        #    val = self._text_to_latex(pp.pformat(val)) 
-        #else:
-        #    try: val = self._text_to_latex(`val`)
-        #    except: val = '...'
-        
         try:
             val = `val`
-            if len(val) > 40: val = val[:37] + '...'
+            if len(val) > MAXWIDTH: val = val[:MAXWIDTH-3] + '...'
+            val = re.sub('(.)', '\\1\1', val)
             val = self._text_to_latex(val)
+            val = val.replace('\1', r'\-')
+            val = val.replace(' ', '~')
         except: val = '...'
-
-        if val.count('\n') > 6:
-            val = '\n'.join(val.split('\n')[:6])+'\n\\textbf{...}\n'
-
-        # Add an alltt around it.
-        if val.count('\n') > 0:
-            val = '\\begin{alltt}\n%s\\end{alltt}\n' % val
-        else:
-            val = '\\texttt{%s}' % val
-            
-        return val
+        return '\\texttt{%s}' % val
     
     #////////////////////////////////////////////////////////////
     # Function List
@@ -555,21 +565,30 @@ class LatexFormatter:
     # Docstring -> LaTeX Conversion
     #////////////////////////////////////////////////////////////
     
-    def _dom_to_latex(self, tree, indent=0):
+    def _dom_to_latex(self, tree, indent=0, breakany=0):
+        """
+        @param breakany: Insert hyphenation marks, so that LaTeX can
+        break the resulting string at any point.  This is useful for
+        small boxes (e.g., the type box in the variable list table).
+        """
         if isinstance(tree, xml.dom.minidom.Document):
             tree = tree.childNodes[0]
-        return self._dom_to_latex_helper(tree, indent, 0)
+        return self._dom_to_latex_helper(tree, indent, 0, breakany)
 
-    def _dom_to_latex_helper(self, tree, indent, seclevel):
+    def _dom_to_latex_helper(self, tree, indent, seclevel, breakany):
         if isinstance(tree, xml.dom.minidom.Text):
-            return self._text_to_latex(tree.data)
+            if breakany: 
+                data = re.sub('([^ ])', '\\1\1', tree.data)
+                return self._text_to_latex(data).replace('\1', r'\-')
+            else:
+                return self._text_to_latex(tree.data)
 
         if tree.tagName == 'section': seclevel += 1
     
         # Figure out the child indent level.
         if tree.tagName == 'epytext': cindent = indent
         cindent = indent + 2
-        children = [self._dom_to_latex_helper(c, cindent, seclevel)
+        children = [self._dom_to_latex_helper(c, cindent, seclevel, breakany)
                     for c in tree.childNodes]
         childstr = ''.join(children)
     
@@ -670,10 +689,6 @@ class LatexFormatter:
         str += ('\\multicolumn{%s}{r}{' % labelwidth)
         str += '\\settowidth{\\BCL}{%s}' % shortname
         str += '\\multirow{2}{\\BCL}{%s}}\n' % shortname
-        #str += '\\hline\n'
-        #shortname = `labelwidth`
-        #str += ('\\multicolumn{%s}{|r|}{\\multirow{2}{%sex}{%s}}\n' %
-        #        (labelwidth, len(uid.shortname()), shortname))
 
         # The vertical bars for other base classes (top half)
         for vbar in linespec:
@@ -726,7 +741,7 @@ class LatexFormatter:
     def _module_tree(self, sortorder=None):
         """
         @return: The HTML code for the module hierarchy tree.  This is
-            used by L{_trees_to_html} to construct the hiearchy page.
+            used by L{_trees_to_latex} to construct the hiearchy page.
         @rtype: C{string}
         """
         str = '\\begin{itemize}\n'
@@ -746,7 +761,7 @@ class LatexFormatter:
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
-            L{_module_to_html} to list the submodules of a package.
+            L{_module_to_latex} to list the submodules of a package.
         @rtype: C{string}
         """
         if len(modules) == 0: return ''
@@ -790,9 +805,12 @@ class LatexFormatter:
         str = re.sub(r'([#$&%_\${}])', r'\\\1', str)
 
         # These elements need to be in math mode.
-        str = re.sub('([<>|])', r'\\(\1\\)', str)
+        #str = re.sub('([<>|])', r'\\(\1\\)', str)
 
         # These elements have special names.
+        str = str.replace('|', '{\\textbar}')
+        str = str.replace('<', '{\\textless}')
+        str = str.replace('>', '{\\textgreater}')
         str = str.replace('^', '{\\textasciicircum}')
         str = str.replace('~', '{\\textasciitilde}')
         str = str.replace('\0', r'{\textbackslash}')
