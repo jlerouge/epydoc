@@ -17,8 +17,15 @@ options that should be used to generate the documentation for those
 modules.
 
 Usage::
-    epydocgui FILE.prj | MODULES... | -V | -h
+    epydocgui [OPTIONS] [FILE.prj | MODULES...]
+
+    FILE.prj                  An epydoc GUI project file.
+    MODULES...                A list of Python modules to document.
+    -V, --version             Print the version of epydoc.
+    -h, -?, --help, --usage   Display this usage message
+    --debug                   Do not suppress error messages
 """
+__docformat__ = 'epytext en'
 
 import sys, os.path, re, glob
 from Tkinter import *
@@ -981,6 +988,9 @@ def _version():
     print "Epydoc version %s" % epydoc.__version__
     sys.exit(0)
 
+# At some point I could add:
+#   --show-messages, --hide-messages
+#   --show-options, --hide-options
 def _usage():
     print
     print 'Usage: epydocgui [OPTIONS] [FILE.prj | MODULES...]'
