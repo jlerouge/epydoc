@@ -209,7 +209,9 @@ class LatexFormatter:
             os.mkdir(directory)
 
         # Write the module & class files.
-        for uid in self._filtersort_uids(self._docmap.keys()):
+        objects = self._filter(self._docmap.keys())
+        objects.sort()
+        for uid in objects:
             if uid.is_module():
                 filename = os.path.join(directory, ('%s-module.tex' %
                                                     uid.name()))
@@ -314,7 +316,8 @@ class LatexFormatter:
         str += '\\addtolength{\\parskip}{1ex}\n'
 
         str += self._start_of('Includes')
-        uids = self._filtersort_uids(self._docmap.keys())
+        uids = self._filter(self._docmap.keys())
+        uids.sort()
         for uid in uids:
             if uid.is_module():
                 str += '\\include{%s-module}\n' % uid.name()
@@ -360,24 +363,22 @@ class LatexFormatter:
 
         # If it's a package, list the sub-modules.
         if doc.ispackage() and doc.modules():
-            str += self._module_list(doc.modules(), doc.sortorder(),
-                                     doc.groups())
+            str += self._module_list(doc, doc.modules())
 
         # Class list. !! add summaries !!
         if self._list_classes_separately and doc.classes():
-            str += self._class_list(doc.classes(), doc.sortorder(),
-                                    doc.groups())
+            str += self._class_list(doc, doc.classes())
                 
         # Function List
-        str += self._func_list(doc.functions(), None, doc.groups())
+        str += self._func_list(doc, doc.functions())
 
         # Variable list.
         if doc.variables():
-            str += self._var_list(doc.variables(), uid, doc.groups())
+            str += self._var_list(doc, doc.variables())
 
         # Class list.
         if not self._list_classes_separately:
-            classes = self._filtersort_links(doc.classes(), doc.sortorder())
+            classes = self._filter(doc.classes())
             for cls in classes:
                 str += self._class_to_latex(cls.target())
         
@@ -417,21 +418,21 @@ class LatexFormatter:
         str += self._standard_fields(doc)
 
         # Methods.
-        str += self._func_list(doc.methods(), doc, doc.groups(),
+        str += self._func_list(doc, doc.methods(),
                                'Methods', seclevel+1)
-        str += self._func_list(doc.staticmethods(), doc, doc.groups(),
+        str += self._func_list(doc, doc.staticmethods(),
                                'Static Methods', seclevel+1)
-        str += self._func_list(doc.classmethods(), doc, doc.groups(),
+        str += self._func_list(doc, doc.classmethods(),
                                'Class Methods', seclevel+1)
 
         if doc.properties():
-            str += self._property_list(doc.properties(), uid, doc.groups(),
+            str += self._property_list(doc, doc.properties(), 
                                        'Properties', seclevel+1)
         if doc.ivariables():
-            str += self._var_list(doc.ivariables(), uid, doc.groups(),
+            str += self._var_list(doc, doc.ivariables(), 
                                   'Instance Variables', seclevel+1)
         if doc.cvariables():
-            str += self._var_list(doc.cvariables(), uid, doc.groups(),
+            str += self._var_list(doc, doc.cvariables(), 
                                   'Class Variables', seclevel+1)
 
         # End mark for the class's index entry.
@@ -442,35 +443,32 @@ class LatexFormatter:
     #////////////////////////////////////////////////////////////
     # Class List
     #////////////////////////////////////////////////////////////
-    def _class_list(self, classes, sortorder, groups):
-        classes = self._filtersort_links(classes, sortorder)
+    def _class_list(self, container, classes):
+        classes = self._filter(classes)
         if len(classes) == 0: return ''
-
-        # Create the portion of the table containing the group
-        # entries.  Do this first, so we can see what's not in any
-        # group; but add it to the string last, so the groupless
-        # properties are at the top.
-        groupstr = ''
-        for groupname, groupmembers in groups:
-            # Extract the group
-            group = [c for c in classes if c.target() in groupmembers]
-            if not group: continue
-            classes = [c for c in classes if c not in group]
-            # Print a header within the table
-            groupstr += '  \\item \\textbf{%s}\n' % groupname
-            groupstr += '  \\begin{itemize}\n'
-            # Add the lines for each func
-            for cls in group:
-                groupstr += self._class_list_line(cls)
-            groupstr += '  \end{itemize}\n'
         
+        groups = container.by_group(classes)
+
         str = self._start_of('Classes')
         str += self._section('Classes', 1)
         str += '\\begin{itemize}'
         str += '  \\setlength{\\parskip}{0ex}\n'
-        for link in classes:
-            str += self._class_list_line(link)
-        return str+groupstr+'\\end{itemize}'
+        
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # properties are at the top.
+        for name, group in groups:
+            if name is not None:
+                str += '  \\item \\textbf{%s}\n' % name
+                str += '  \\begin{itemize}\n'
+            # Add the lines for each class
+            for cls in group:
+                str += self._class_list_line(cls)
+            if name is not None:
+                str += '  \end{itemize}\n'
+        
+        return str + '\\end{itemize}'
 
     def _class_list_line(self, link):
         cname = link.name()
@@ -491,11 +489,12 @@ class LatexFormatter:
     #////////////////////////////////////////////////////////////
     # Property List
     #////////////////////////////////////////////////////////////
-    def _property_list(self, properties, container, groups,
+    def _property_list(self, container, properties, 
                        heading='Properties', seclevel=1):
-        properties = self._filtersort_links(properties)
+        properties = self._filter(properties)
         if len(properties) == 0: return ''
 
+        groups = container.by_group(properties)
         str = self._start_of(heading)
         str += '  '+self._section(heading, seclevel)
 
@@ -522,28 +521,18 @@ class LatexFormatter:
         # entries.  Do this first, so we can see what's not in any
         # group; but add it to the string last, so the groupless
         # properties are at the top.
-        groupstr = ''
-        for groupname, groupmembers in groups:
-            # Extract the group
-            group = [p for p in properties if p.target() in groupmembers]
-            if not group: continue
-            properties = [p for p in properties if p not in group]
+        for name, group in groups:
             # Print a header within the table
-            groupstr += '\\multicolumn{2}{|l|}{'
-            groupstr += '\\textbf{%s}}\\\\\n' % groupname
-            groupstr += '\\cline{1-2}\n'
-            # Add the lines for each func
+            if name is not None:
+                str += '\\multicolumn{2}{|l|}{'
+                str += '\\textbf{%s}}\\\\\n' % name
+                str += '\\cline{1-2}\n'
+            # Add the lines for each property
             for property in group:
-                groupstr += self._property_list_line(property, container)
-                if self._inheritance == 'listed':
-                    groupstr += self._inheritance_list_line(group, container)
-                    
-        for link in properties:
-            str += self._property_list_line(link, container)
-        if self._inheritance == 'listed' and container.is_class():
-            str += self._inheritance_list_line(properties, container)
-        str += groupstr + '\\end{longtable}\n\n'
-        return str
+                str += self._property_list_line(property, container.uid())
+            if self._inheritance == 'listed':
+                str += self._inheritance_list_line(group, container.uid())
+        return str + '\\end{longtable}\n\n'
 
     def _property_list_line(self, link, container):
         inherit = (container.is_class() and container != link.target().cls())
@@ -567,11 +556,13 @@ class LatexFormatter:
     # Variable List
     #////////////////////////////////////////////////////////////
 
-    def _var_list(self, variables, container, groups,
+    def _var_list(self, container, variables, 
                   heading='Variables', seclevel=1):
-        variables = self._filtersort_vars(variables)
+        variables = self._filter(variables)
         if len(variables) == 0: return ''
         
+        groups = container.by_group(variables)
+
         str = self._start_of(heading)
         str += '  '+self._section(heading, seclevel)
 
@@ -598,29 +589,19 @@ class LatexFormatter:
         # entries.  Do this first, so we can see what's not in any
         # group; but add it to the string last, so the groupless
         # functions are at the top.
-        groupstr = ''
-        for groupname, groupmembers in groups:
-            # Extract the group
-            group = [v for v in variables if v.uid() in groupmembers]
-            if not group: continue
-            variables = [v for v in variables if v not in group]
+        for name, group in groups:
             # Print a header within the table
-            groupstr += '\\multicolumn{2}{|l|}{'
-            groupstr += '\\textbf{%s}}\\\\\n' % groupname
-            groupstr += '\\cline{1-2}\n'
-            # Add the lines for each func
+            if name is not None:
+                str += '\\multicolumn{2}{|l|}{'
+                str += '\\textbf{%s}}\\\\\n' % name
+                str += '\\cline{1-2}\n'
+            # Add the lines for each variable
             for var in group:
-                groupstr += self._var_list_line(var, container)
-            if self._inheritance == 'listed' and container.is_class():
-                groupstr += self._inheritance_list_line(group, container)
-
-        for var in variables:
-            str += self._var_list_line(var, container)
-        if self._inheritance == 'listed' and container.is_class():
-            str += self._inheritance_list_line(variables, container)
-        str += groupstr
-        str += '\\end{longtable}\n\n'
-        return str
+                str += self._var_list_line(var, container.uid())
+            if (self._inheritance == 'listed' and
+                isinstance(container, ClassDoc)):
+                str += self._inheritance_list_line(group, container.uid())
+        return str + '\\end{longtable}\n\n'
     
     def _var_list_line(self, var, container):
         inherit = (container.is_class() and container != var.uid().cls())
@@ -659,54 +640,45 @@ class LatexFormatter:
     # Function List
     #////////////////////////////////////////////////////////////
     
-    def _func_list(self, functions, cls, groups,
+    def _func_list(self, container, functions, 
                    heading='Functions', seclevel=1):
-        
-        functions = self._filtersort_links(functions)
+        functions = self._filter(functions)
         if len(functions) == 0: return ''
+
+        groups = container.by_group(functions)
+
+        str = self._start_of(heading)
+        str += '  '+self._section(heading, seclevel)
 
         # Create the portion of the table containing the group
         # entries.  Do this first, so we can see what's not in any
         # group; but add it to the string last, so the groupless
         # functions are at the top.
-        groupstr = ''
-        for groupname, groupmembers in groups:
-            # Extract the group
-            group = [f for f in functions if f.target() in groupmembers]
-            if not group: continue
-            functions = [f for f in functions if f not in group]
+        for name, group in groups:
             # Print a header within the table
-            groupstr += '\n%s\\large{%s}\n' % (_HRULE, groupname)
-            # Add the lines for each func
+            if name is not None:
+                str += '\n%s\\large{%s}\n' % (_HRULE, name)
+            # Add the lines for each function
             for link in group:
-                groupstr += self._func_list_box(link, cls)
-            if self._inheritance == 'listed' and cls is not None:
-                groupstr += self._inheritance_list(group, cls.uid())
+                str += self._func_list_box(link, container.uid())
+            if (self._inheritance == 'listed' and
+                isinstance(container, ClassDoc)):
+                str += self._inheritance_list(group, container.uid())
 
-        str = self._start_of(heading)
-        str += '  '+self._section(heading, seclevel)
-
-        funcstr = ''
-        for link in functions:
-            funcstr += self._func_list_box(link, cls)
-        if self._inheritance == 'listed' and cls is not None:
-            funcstr += self._inheritance_list(functions, cls.uid())
-        funcstr += groupstr
-        if funcstr == '': return ''
-        else: return str+funcstr
-
+        return str
+            
     def _func_list_box(self, link, cls):
         str = ''
         fname = link.name()
-        func = link.target()
-        if func.is_method() or func.is_builtin_method():
-            container = func.cls()
+        fuid = link.target()
+        if fuid.is_method() or fuid.is_builtin_method():
+            container = fuid.cls()
             # (If container==ClassType, it's (probably) a class method.)
-            inherit = (container != cls.uid() and
+            inherit = (container != cls and
                        container.value() is not types.ClassType)
         else:
             inherit = 0
-            try: container = func.module()
+            try: container = fuid.module()
             except TypeError: container = None
 
         # Don't include inherited functions, if inheritance=listed.
@@ -714,24 +686,27 @@ class LatexFormatter:
 
         # If we don't have documentation for the function, then we
         # can't say anything about it.
-        if not self._docmap.has_key(func): return ''
-        fdoc = self._docmap[func]
+        if not self._docmap.has_key(fuid): return ''
+        fdoc = self._docmap[fuid]
 
         # What does this method override?
         foverrides = fdoc.overrides()
 
         # Try to find a documented ancestor.
-        inhdoc = self._docmap.documented_ancestor(func) or fdoc
+        if fuid.is_any_method() and not fdoc.has_docstring():
+            inhdoc = self._docmap.documented_ancestor(fuid) or fdoc
+        else:
+            inhdoc = fdoc
         inherit_docs = (inhdoc is not fdoc)
 
         # nb: this gives the containing section, not a reference
         # directly to the function.
         if not inherit:
-            str += '    \\label{%s}\n' % self._uid_to_label(func)
+            str += '    \\label{%s}\n' % self._uid_to_label(fuid)
         
         fsig = self._func_signature(fname, fdoc)
         if not inherit:
-            str += '    ' + self._indexterm(func)
+            str += '    ' + self._indexterm(fuid)
         str += '    \\vspace{0.5ex}\n\n'
         str += '    \\begin{boxedminipage}{\\textwidth}\n\n'
         str += '    %s\n\n' % fsig
@@ -804,7 +779,8 @@ class LatexFormatter:
 
         ## Overrides
         if foverrides:
-            str += '      Overrides: %s' % foverrides
+            str += ('      Overrides: %s' %
+                    self._text_to_latex(foverrides.name()))
             if inherit_docs:
                 str += ' \textit{(inherited documentation)}'
             str += '\n\n'
@@ -1014,8 +990,7 @@ class LatexFormatter:
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  \\begin{itemize}\n'
             str += ' '*depth + '\\setlength{\\parskip}{0ex}\n'
-            modules = [l.target() for l in 
-                       self._filtersort_links(doc.modules(), doc.sortorder())]
+            modules = [l.target() for l in self._filter(doc.modules())]
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  \\end{itemize}\n'
@@ -1030,7 +1005,8 @@ class LatexFormatter:
         """
         str = '\\begin{itemize}\n'
         str += '\\setlength{\\parskip}{0ex}\n'
-        uids = self._filtersort_uids(self._docmap.keys())
+        uids = self._filter(self._docmap.keys())
+        uids.sort()
         #docs.sort(lambda a,b: cmp(a[0], b[0]))
         # Find all top-level packages. (what about top-level
         # modules?)
@@ -1041,41 +1017,38 @@ class LatexFormatter:
                 str += self._module_tree_item(uid)
         return str +'\\end{itemize}\n'
 
-    def _module_list(self, modules, sortorder, groups):
+    def _module_list(self, container, modules):
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
             L{_module_to_latex} to list the submodules of a package.
         @rtype: C{string}
         """
+        modules = self._filter(modules)
         if len(modules) == 0: return ''
         str = self._start_of('Modules')
         str += self._section('Modules', 1)
         str += '\\begin{itemize}\n'
         str += '\\setlength{\\parskip}{0ex}\n'
-        modules = self._filtersort_links(modules, sortorder)
+
+        groups = container.by_group(modules)
         
         # Create the portion of the table containing the group
         # entries.  Do this first, so we can see what's not in any
         # group; but add it to the string last, so the groupless
         # properties are at the top.
-        groupstr = ''
-        for groupname, groupmembers in groups:
-            # Extract the group
-            group = [m for m in modules if m.target() in groupmembers]
-            if not group: continue
-            modules = [m for m in modules if m not in group]
+        for name, group in groups:
             # Print a header within the table
-            groupstr += '  \\item \\textbf{%s}\n' % groupname
-            groupstr += '  \\begin{itemize}\n'
-            # Add the lines for each func
+            if name is not None:
+                str += '  \\item \\textbf{%s}\n' % name
+                str += '  \\begin{itemize}\n'
+            # Add the lines for each module
             for link in group:
-                groupstr += self._module_tree_item(link.target())
-            groupstr += '  \end{itemize}\n'
+                str += self._module_tree_item(link.target())
+            if name is not None:
+                str += '  \end{itemize}\n'
         
-        for link in modules:
-            str += self._module_tree_item(link.target())
-        return str + groupstr + '\\end{itemize}\n\n'
+        return str + '\\end{itemize}\n\n'
 
     #////////////////////////////////////////////////////////////
     # Helpers
@@ -1202,106 +1175,22 @@ class LatexFormatter:
             if piece[:1] == '_' and piece[-1:] != '_': return 1
         return 0
 
-    def _filtersort_links(self, links, sortorder=None):
+    def _filter(self, links):
         """
-        Sort and filter a list of C{Link}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
+        Filter a list of C{Link}s.  If L{_show_private} is false, then
+        filter out all private objects; otherwise, perform no
+        filtering.
 
-        @param links: The list of C{Link}s to be sorted and filtered.
+        @param links: The list of C{Link}s to be filtered.
         @type links: C{list} of L{Link}
-        @param sortorder: A list of link names, typically generated
-            from C{__epydoc__sort__}, and returned by
-            L{ObjDoc.sortorder}.  Links whose name are in C{sortorder}
-            are placed at the beginning of the sorted list, in the
-            order that they appear in C{sortorder}.
-        @type sortorder: C{list} of C{string}
-        @return: The sorted list of links.
+        @return: The filtered list of links.
         @rtype: C{list} of L{Link}
         """
         # Filter out private objects.
         if not self._show_private:
-            links = [l for l in links if not l.target().is_private()]
+            return [l for l in links if l.is_public()]
         else:
-            links = list(links)
-
-        # Check the sortorder.  If available, then use it to sort the
-        # objects.
-        if (type(sortorder) not in (type(()), type([]))):
-            so_links = []
-        else:
-            if type(sortorder) == type(()): sortorder = list(sortorder)
-            so_links = sortorder[:]
-            for link in links:
-                try: so_links[sortorder.index(link.name())] = link 
-                except ValueError: continue
-            so_links = [l for l in so_links if type(l) != type('')]
-            for link in so_links: links.remove(link)
-
-        # Sort any links not contained in sortorder.
-        links.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        
-        return so_links + links
-
-    def _filtersort_uids(self, uids):
-        """
-        Sort and filter a list of C{UID}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
-
-        @param uids: The list of C{UID}s to be sorted and filtered.
-        @type uids: C{list} of L{UID}
-        @return: The sorted list of UIDs.
-        @rtype: C{list} of L{UID}
-        """
-        # Filter out private objects
-        if not self._show_private:
-            uids = [u for u in uids if not u.is_private()]
-
-        # Sort and return the UIDs.
-        uids.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        return uids
-
-    def _filtersort_vars(self, vars, sortorder=None):
-        """
-        Sort and filter a list of C{Var}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
-
-        @param vars: The list of C{Var}s to be sorted and filtered.
-        @type vars: C{list} of L{Var}
-        @param sortorder: A list of variable names, typically generated
-            from C{__epydoc__sort__}, and returned by
-            L{ObjDoc.sortorder}.  Vars whose name are in C{sortorder}
-            are placed at the beginning of the sorted list, in the
-            order that they appear in C{sortorder}.
-        @type sortorder: C{list} of C{string}
-        @return: The sorted list of variables.
-        @rtype: C{list} of L{Var}
-        """
-        # Filter out private objects.
-        if not self._show_private:
-            vars = [v for v in vars if not v.uid().is_private()]
-        else:
-            vars = list(vars)
-
-        # Check the sortorder.  If available, then use it to sort the
-        # objects.
-        if (type(sortorder) not in (type(()), type([]))):
-            so_vars = []
-        else:
-            if type(sortorder) == type(()): sortorder = list(sortorder)
-            so_vars = sortorder[:]
-            for var in vars:
-                try: so_vars[sortorder.index(var.name())] = var
-                except ValueError: continue
-            so_vars = [v for v in so_vars if type(v) != type('')]
-            for var in so_vars: vars.remove(var)
-
-        # Sort any variables not contained in sortorder.
-        vars.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        
-        return so_vars + vars
+            return links
 
     def _standard_fields(self, doc):
         """
