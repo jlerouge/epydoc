@@ -15,30 +15,26 @@
 Command-line interface for epydoc.
 
 Usage::
+
  epydoc [OPTIONS] MODULES...
-    MODULES...                The Python modules to document.
-    -o DIR, --output DIR      The output directory for HTML files.
-    -n NAME, --name NAME      The documented project's name.
-    -u URL, --url URL         The documented project's url.
-    -c SHEET, --css SHEET     CSS stylesheet for HTML files.
-    -t PAGE, --top PAGE       The top page for the documentation.
-    --navlink HTML            HTML code for the navbar's homepage link.
-    --private-css SHEET       CSS stylesheet for private objects.
-    --help-file FILE          HTML body for the help page.
-    --no-frames               Do not use frames, by default.
-    --no-private              Do not document private objects.
-    --show-imports            Include lists of importes.
-    --docformat FORMAT        Set the default value for __docformat__.
-    --builtins                Add all builtin modules to MODULES.
-    -v, --verbose             Display a progress bar.
-    -vv, -vvv, -vvvv          Produce sucessively more verbose output.
-    -q, --quiet               Supress epytext warnings and errors.
-    --check                   Run documentation completeness checks.
-    -p                        Run checks on private objects.
-    -V, --version             Print the version of epydoc.
-    -h, -?, --help, --usage   Display this usage message.
-    -h TOPIC, --help TOPIC    Display information about TOPIC
-                              (css, usage, docformat, or version).
+ 
+     MODULES...                The Python modules to document.
+     --html                    Generate HTML output (default).
+     --latex                   Generate LaTeX output.
+     --pdf                     Generate pdf output, via LaTeX.
+     --check                   Run documentation completeness checks.
+     -o DIR, --output DIR      The output directory.
+     -n NAME, --name NAME      The documented project's name.
+     -u URL, --url URL         The documented project's url.
+     -t PAGE, --top PAGE       The top page for the HTML documentation.
+     -c SHEET, --css SHEET     CSS stylesheet for HTML files.
+     --private-css SHEET       CSS stylesheet for private objects.
+     -V, --version             Print the version of epydoc.
+     -h, -?, --help, --usage   Display this usage message.
+     -h TOPIC, --help TOPIC    Display information about TOPIC
+                               (css, usage, docformat, or version).
+
+ See the epytext(1) man page for a complete list of options.
 
 @var PROFILE: Whether or not to run the profiler.
 
@@ -131,7 +127,8 @@ def _usage(exit_code=1):
     if NAME == '(imported)': NAME = 'epydoc'
     usage = __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
     usage = re.sub(r'\n\s*@[\s\S]*', '', usage)
-    print >>stream, 'Usage:', usage.strip()
+    usage = re.sub(r'\n ', '\n', usage)
+    print >>stream, '\nUsage:', usage.strip()+'\n'
     sys.exit(exit_code)
 
 def _help(arg):
@@ -191,14 +188,15 @@ def _parse_args():
         Currently, the following configuration parameters are set:
         C{target}, C{modules}, C{verbosity}, C{prj_name}, C{output},
         C{check_private}, C{show_imports}, C{frames}, C{private},
-        C{debug}, C{top}, and C{docformat}.
+        C{debug}, C{top}, C{list_classes_separately}, and C{docformat}.
     @rtype: C{None}
     """
     # Default values.
-    options = {'target':'html', 'modules':[], 'verbosity':1,
+    options = {'target':None, 'modules':[], 'verbosity':1,
                'prj_name':'', 'action':'html', 'check_private':0,
                'show_imports':0, 'frames':1, 'private':1,
-               'debug':0, 'docformat':None, 'top':None}
+               'list_classes_separately': 0, 'debug':0,
+               'docformat':None, 'top':None}
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:t:u:Vvpq?:'
@@ -208,7 +206,8 @@ def _parse_args():
                 'show_imports css= no_private no-private name= '+
                 'builtins no-frames no_frames noframes debug '+
                 'docformat= doc-format= doc_format= top=  navlink= '+
-                'nav_link= nav-link= latex html dvi ps pdf').split()
+                'nav_link= nav-link= latex html dvi ps pdf '+
+                'separate-classes separate_classes').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -247,6 +246,8 @@ def _parse_args():
             options['private_css'] = val
         elif opt in ('--ps',): options['action'] = 'ps'
         elif opt in ('--quiet', '-q'): options['verbosity'] -= 1
+        elif opt in ('--separate-classes', '--separate_classes'):
+            options['list_classes_separately'] = 1
         elif opt in ('--show-imports', '--show_imports'):
             options['show_imports'] = 1
         elif opt in ('-t', '--top'): options['top'] = val
@@ -258,6 +259,13 @@ def _parse_args():
             modules.remove('__main__')
         else:
             _usage()
+
+    # Pick a default target directory, if none was specified.
+    if options['target'] is None:
+        if options['action'] == 'html':
+            options['target'] = 'html'
+        elif options['action'] in ('latex', 'dvi', 'ps', 'pdf'):
+            options['target'] = 'latex'
 
     # Check that the options all preceed the filenames.
     for m in modules:
