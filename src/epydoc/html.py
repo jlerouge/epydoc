@@ -10,10 +10,12 @@
 Documentation to HTML converter.
 """
 
-# Improvements I'd like to make:
-#    - Better CSS support
-#    - List exceptions separately from other classes
-
+# To do:
+#   - Support U{name|uri} and U{name|mailto} and U{mailto}
+#   - Support L{name|target}
+#   - Control over whether you link to non-documented objects
+#   - Control over whether L{...} links to non-documented objs
+#   - Better help
 
 ##################################################
 ## Constants
@@ -314,8 +316,6 @@ def _colorize_doctestblock(str):
 #   - Index generation
 #   - Helper functions
 
-
-
 class HTML_Doc:
     """
     Documentation to HTML converter.
@@ -423,7 +423,7 @@ class HTML_Doc:
             written to the current directory.  If the directory does
             not exist, it will be created.
         @type verbose: C{int}
-        @param verbose: The level of verbosity output when writing the
+        @param verbose: The level of verbosity for output when writing the
             documentation.  A verbosity of zero will only generate
             output on errors.  A verbosity of one will output a single
             period for each file written.  Higher values give more
@@ -433,9 +433,15 @@ class HTML_Doc:
         if directory[-1] != '/': directory = directory + '/'
         self._show_private = 0
         
-        # Write the CSS file.
+        # Write the private version of the docs.
+        self._show_private = 1
+        self._cssfile = '../epydoc.css'
+        self._write_docs(os.path.join(directory, 'private/'), verbose)
+
+        # Write the public version of the docs.
+        self._show_private = 0
         self._cssfile = 'epydoc.css'
-        self._write_css(directory)
+        self._write_docs(directory, verbose)
         
         # Write the tree file (package & class hierarchies)
         str = self._tree_to_html()
@@ -448,13 +454,52 @@ class HTML_Doc:
         # Write the help file.
         self._write_help(directory)
 
-        # Write the private & public versions of the docs.
-        self._show_private = 0
-        self._write_docs(directory, verbose)
-        self._show_private = 1
-        self._cssfile = '../epydoc.css'
-        self._write_docs(os.path.join(directory, 'private/'), verbose)
+        # Write the CSS file.
+        self._write_css(directory)
 
+    def _write_docs(self, directory, verbose):
+        """
+        A helper for L{write} that does the work of writing the
+        documentation to the given directory.
+        
+        @param directory: Testing L{_find_toplevel}.
+        """
+        # Create dest directory, if necessary
+        if not os.path.isdir(directory):
+            if os.path.exists(directory):
+                raise ValueError('%r is not a directory' % directory)
+            os.mkdir(directory)
+
+        for (n, d) in self._docmap.items():
+            if isinstance(d, ModuleDoc):
+                if verbose==1:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                elif verbose>1: print 'Writing docs for module: ', n
+                str = self._module_to_html(n)
+                open(directory+`n`+'.html', 'w').write(str)
+            elif isinstance(d, ClassDoc):
+                if verbose==1:
+                    sys.stdout.write('.')
+                    sys.stdout.flush()
+                elif verbose>1: print 'Writing docs for class:  ', n
+                str = self._class_to_html(n)
+                open(directory+`n`+'.html', 'w').write(str)
+
+    def _write_help(self, directory):
+        """
+        Write a default help file for the documentation, unless a
+        help file is already present.
+
+        @rtype: C{None}
+        """
+        filename = os.path.join(directory, 'epydoc-help.html')
+        if os.path.exists(filename): return
+        helpfile = open(filename, 'w')
+        navbar = self._navbar('help')
+        helpfile.write(self._header('Help')+navbar+HELP+navbar+self._footer())
+        helpfile.close()
+        
     def _write_css(self, directory):
         """
         Write the CSS stylesheet for the documentation.  If a
@@ -486,49 +531,6 @@ class HTML_Doc:
         cssfile = open(filename, 'w')
         cssfile.write(css)
         cssfile.close()
-
-    def _write_help(self, directory):
-        """
-        Write a default help file for the documentation, unless a
-        help file is already present.
-
-        @rtype: C{None}
-        """
-        filename = os.path.join(directory, 'epydoc-help.html')
-        if os.path.exists(filename): return
-        helpfile = open(filename, 'w')
-        navbar = self._navbar('help')
-        helpfile.write(self._header('Help')+navbar+HELP+navbar+self._footer())
-        helpfile.close()
-        
-    def _write_docs(self, directory, verbose):
-        """
-        A helper for L{write} that does the work of writing the
-        documentation to the given directory.
-        
-        @param directory: Testing L{_find_toplevel}.
-        """
-        # Create dest directory, if necessary
-        if not os.path.isdir(directory):
-            if os.path.exists(directory):
-                raise ValueError('%r is not a directory' % directory)
-            os.mkdir(directory)
-
-        for (n, d) in self._docmap.items():
-            if isinstance(d, ModuleDoc):
-                if verbose==1:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                elif verbose>1: print 'Writing docs for module: ', n
-                str = self._module_to_html(n)
-                open(directory+`n`+'.html', 'w').write(str)
-            elif isinstance(d, ClassDoc):
-                if verbose==1:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                elif verbose>1: print 'Writing docs for class:  ', n
-                str = self._class_to_html(n)
-                open(directory+`n`+'.html', 'w').write(str)
 
     #////////////////////////////////////////////////////////////
     # HTML page generation
@@ -958,6 +960,7 @@ class HTML_Doc:
     def _module_tree_item(self, uid=None, depth=0):
         """
         Helper function for L{_module_tree} and L{_module_list}.
+        
         @rtype: C{string}
         """
         if uid is None: return ''
