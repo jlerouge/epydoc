@@ -2262,7 +2262,7 @@ class FuncDoc(ObjDoc):
         # Check for a signatue in the docstring.
         if self._init_signature_from_docstring(docstring or '', func.__name__):
             # Remove the signature from the docstring.
-            return re.sub(r'^\s*[^\n]*\n', '', docstring, 1)
+            return self._SIGNATURE_RE.sub('', docstring, 1)
         
         # Otherwise, use the argspec if it's a function.
         elif type(func) is types.FunctionType:
@@ -2327,7 +2327,7 @@ class FuncDoc(ObjDoc):
         docstring was taken from.
         """
         # Check if the docstring begins w/ a signature line.
-        m = FuncDoc._SIGNATURE_RE.match(docstring)
+        m = self._SIGNATURE_RE.match(docstring)
         if (not m) or (m.group('func') != func_name):
             return False
 
