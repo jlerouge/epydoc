@@ -1066,25 +1066,10 @@ def findUID(name, container=None, docmap=None):
         if child is not None: return child
         else: container = container.module()
 
+    # Is it an object in the containing module?
     if container:
-        components = name.split('.')
-        module = container.value()
-    
-        # Is it a variable in the containing module?
-        var = _find_variable_in(name, container, docmap)
-        if var is not None: return var
-
-        # Is it an object in the containing module?
-        try:
-            obj = module
-            for component in components:
-                obj_parent = obj
-                obj_name = component
-                try: obj = obj.__dict__[component]
-                except: raise KeyError()
-            try: return make_uid(obj, make_uid(obj_parent), obj_name)
-            except: pass
-        except KeyError: pass
+        uid = _find_object_in_module(name, container.value(), docmap)
+        if uid: return uid
 
     if container: container_name = container.name()
     else: container_name = ''
@@ -1093,6 +1078,7 @@ def findUID(name, container=None, docmap=None):
     # containing module, or any of its ancestors.
     modcomponents = container_name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
+        # [XX] Add check: does components[:i] match our own ancestors?
         try:
             modname = '.'.join(modcomponents[:i]+[name])
             return(make_uid(import_module(modname)))
@@ -1108,30 +1094,29 @@ def findUID(name, container=None, docmap=None):
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
                 mod = import_module(modname)
-                var = _find_variable_in(name, container, docmap)
-                if var is not None: return var
-                obj = getattr(import_module(modname), objname)
-                return make_uid(obj, make_uid(mod), objname)
+                uid = _find_object_in_module(objname, mod, docmap)
+                if uid: return uid
             except: pass
 
-    # Is it an field of a class in a module?  The module part of the
-    # name may be relative to the containing module, or any of its
-    # ancestors.
-    modcomponents = container_name.split('.')
-    components = name.split('.')
-    for i in range(len(modcomponents)-1, -1, -1):
-        for j in range(len(components)-1, -1, -1):
-            try:
-                modname = '.'.join(modcomponents[:i]+components[:j])
-                objname = '.'.join(components[j:-1])
-                fieldname = components[-1]
-                mod = import_module(modname)
-                var = _find_variable_in(name, container, docmap)
-                if var is not None: return var
-                obj = getattr(import_module(modname), objname)
-                field = getattr(obj, fieldname)
-                return make_uid(field, make_uid(obj), fieldname)
-            except: pass
+#     # Is it an field of a class in a module?  The module part of the
+#     # name may be relative to the containing module, or any of its
+#     # ancestors.
+#     modcomponents = container_name.split('.')
+#     components = name.split('.')
+#     for i in range(len(modcomponents)-1, -1, -1):
+#         for j in range(len(components)-1, -1, -1):
+#             try:
+#                 modname = '.'.join(modcomponents[:i]+components[:j])
+#                 objname = '.'.join(components[j:-1])
+#                 obj = getattr(import_module(modname), objname)
+#                 obj_uid = make_uid(obj)
+#                 fieldname = components[-1]
+#                 mod = import_module(modname)
+#                 var = _find_variable_in(fieldname, obj_uid, docmap)
+#                 if var is not None: return var
+#                 field = getattr(obj, fieldname)
+#                 return make_uid(field, obj_uid, fieldname)
+#             except: pass
 
     # If the name starts with 'self.', then try leaving that off.
     if name.startswith('self.'):
@@ -1146,6 +1131,34 @@ def findUID(name, container=None, docmap=None):
     # We couldn't find it; return None.
     return None
 
+def _find_object_in_module(name, module, docmap):
+    """
+    Search for an object or variable named C{name} in the given
+    module, given the DocMap C{docmap}.
+    """
+    # Is it an object in the containing module?
+    try:
+        components = name.split('.')
+        
+        # Use getattr to follow all components but the last one.
+        obj = module
+        for component in components[:-1]:
+            obj_parent = obj
+            obj_name = component
+            try: obj = getattr(obj, component)
+            except: raise KeyError()
+        obj_uid = make_uid(obj)
+                
+        # Is it a variable in obj?
+        var = _find_variable_in(components[-1], obj_uid, docmap)
+        if var is not None: return var
+
+        # Is it an object in obj?
+        try: return make_uid(getattr(obj, components[-1]),
+                             obj_uid, components[-1])
+        except: return None
+    except KeyError: return None
+
 def _find_variable_in(name, container, docmap):
     """
     Search for a variable named C{name} in the module or class whose
@@ -1156,6 +1169,7 @@ def _find_variable_in(name, container, docmap):
         C{None} if it doesn't.
     """
     if docmap is None or not docmap.has_key(container): return None
+    if '.' in name: return None
     container_doc = docmap.get(container)
     if container.is_module():
         for var in container_doc.variables():
