@@ -43,18 +43,6 @@ __epydoc_sort__ = ['make_uid', 'UID', 'Link']
 ## - Inspection Helpers
 ## - UID Lookup (findUID)
 
-def _import_module(name):
-    """
-    A wrapper for L{import_module} that catches any import errors, and
-    displays a warning to stderr.
-    """
-    try:
-        return import_module(name)
-    except ImportError, e:
-        if sys.stderr.softspace: print >>sys.stderr
-        print  >>sys.stderr, '\n  Warning: %s' % e
-        return None
-
 ##################################################
 ## Unique Identifier Base Class
 ##################################################
@@ -404,37 +392,42 @@ class ObjectUID(UID):
             obj = self._obj
             typ = type(obj)
 
-            if typ is _ModuleType:
-                return None
-            if typ is _ClassType:
-                self._module = ObjectUID(_import_module(obj.__module__))
-            elif typ is _FunctionType:
-                self._module = ObjectUID(_find_function_module(obj))
-            elif typ is _MethodType:
-                module = _import_module(obj.im_class.__module__)
-                self._module = ObjectUID(module)
-            elif typ is _BuiltinFunctionType and obj.__self__ is None:
-                module = _find_builtin_obj_module(obj)
-                if module is None: self._module = None
-                else: self._module = ObjectUID(module)
-            elif typ is _BuiltinMethodType and obj.__self__ is not None:
-                cls = type(obj.__self__)
-                module = _find_builtin_obj_module(cls)
-                if module is None: self._module = None
-                else: self._module = ObjectUID(module)
-            elif typ is _TypeType and hasattr(obj, '__module__'):
-                self._module = ObjectUID(_import_module(obj.__module__))
-                if (self._module is not None and
-                    obj not in self._module.value().__dict__.values()):
-                    # The __module__ attribute lied; try finding it ourselves.
+            try:
+                if typ is _ModuleType:
+                    return None
+                if typ is _ClassType:
+                    self._module = ObjectUID(import_module(obj.__module__))
+                elif typ is _FunctionType:
+                    self._module = ObjectUID(_find_function_module(obj))
+                elif typ is _MethodType:
+                    module = import_module(obj.im_class.__module__)
+                    self._module = ObjectUID(module)
+                elif typ is _BuiltinFunctionType and obj.__self__ is None:
                     module = _find_builtin_obj_module(obj)
-                    if module is not None: self._module = ObjectUID(module)
-            elif typ is _TypeType:
-                module = _find_builtin_obj_module(obj)
-                if module is None: self._module = None
-                else: self._module = ObjectUID(module)
-            else:
-                raise ValueError("Cant find module for %r" % self._obj)
+                    if module is None: self._module = None
+                    else: self._module = ObjectUID(module)
+                elif typ is _BuiltinMethodType and obj.__self__ is not None:
+                    cls = type(obj.__self__)
+                    module = _find_builtin_obj_module(cls)
+                    if module is None: self._module = None
+                    else: self._module = ObjectUID(module)
+                elif typ is _TypeType and hasattr(obj, '__module__'):
+                    self._module = ObjectUID(import_module(obj.__module__))
+                    if (self._module is not None and
+                        obj not in self._module.value().__dict__.values()):
+                        # The __module__ attribute lied; try finding it ourselves.
+                        module = _find_builtin_obj_module(obj)
+                        if module is not None: self._module = ObjectUID(module)
+                elif typ is _TypeType:
+                    module = _find_builtin_obj_module(obj)
+                    if module is None: self._module = None
+                    else: self._module = ObjectUID(module)
+                else:
+                    raise ValueError("Cant find module for %r" % self._obj)
+            except ImportError, e:
+                if sys.stderr.softspace: print >>sys.stderr
+                print  >>sys.stderr, '\n  Warning: %s' % e
+                self._module = None
         return self._module
 
     def package(self):
@@ -450,7 +443,13 @@ class ObjectUID(UID):
             # Look up the package.
             dot = mname.rfind('.')
             if dot < 0: self._pkg = None
-            else: self._pkg = ObjectUID(_import_module(mname[:dot]))
+            else:
+                try:
+                    self._pkg = ObjectUID(import_module(mname[:dot]))
+                except ImportError, e:
+                    if sys.stderr.softspace: print >>sys.stderr
+                    print  >>sys.stderr, '\n  Warning: %s' % e
+                    self._pkg = None
                                   
         return self._pkg
 
@@ -855,7 +854,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            return(make_uid(_import_module(modname)))
+            return(make_uid(import_module(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -866,11 +865,11 @@ def findUID(name, container, docmap=None):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                mod = _import_module(modname)
+                mod = import_module(modname)
                 if _is_variable_in(name, make_uid(mod), docmap):
                     val = None # it may not be a real object
                     return make_uid(val, container, name)
-                obj = getattr(_import_module(modname), objname)
+                obj = getattr(import_module(modname), objname)
                 return make_uid(obj)
             except: pass
 
