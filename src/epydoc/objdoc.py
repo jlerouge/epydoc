@@ -1654,7 +1654,7 @@ class DocMap(UserDict.UserDict):
                              types.BuiltinFunctionType, types.MethodType,
                              types.BuiltinMethodType, types.FunctionType):
             if sys.stderr.softspace: print >>sys.stderr
-            estr = 'Error: docmap cannot add a %s' % type(object)
+            estr = 'Error: docmap cannot add a %s' % type(object).__name__
             print >>sys.stderr, estr
             return
         
