@@ -48,12 +48,6 @@ Documentation to HTML converter.
 ## Constants
 ##################################################
 
-HELP = '''
-    <h2> Help </h2>
-
-    <p> (No help available) </p>
-'''
-
 # Expects: (name, css)
 HEADER = '''
 <?xml version="1.0" encoding="iso-8859-1"?>
@@ -123,7 +117,8 @@ import epydoc.epytext as epytext
 from epydoc.uid import UID, Link, findUID
 from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
-import epydoc.css
+from epydoc.css import STYLESHEETS
+from epydoc.help import HTML_HELP
 
 ##################################################
 ## Documentation -> HTML Conversion
@@ -215,9 +210,18 @@ class HTML_Doc:
         self._docmap = docmap
 
         # Process keyword arguments.
-        self._prj_name = kwargs.get('prj_name', '')
-        self._prj_url = kwargs.get('prj_url', None)
         self._css = kwargs.get('css')
+        self._show_imports = kwargs.get('show_imports', 0)
+        self._prj_url = kwargs.get('prj_url', None)
+        self._prj_name = kwargs.get('prj_name', '')
+
+        # If the name doesn't include any html tags, then assume it's
+        # plaintext, and munge it appropriately.
+        if not re.match('^([^<>]*<[^<>]+>)+$', self._prj_name):
+            self._prj_name = re.sub('&', '&amp;', self._prj_name)
+            self._prj_name = re.sub('<', '&lt;', self._prj_name)
+            self._prj_name = re.sub('>', '&gt;', self._prj_name)
+            self._prj_name = re.sub(' ', '&nbsp;', self._prj_name)
 
         # Find the top-level object (if any)
         self._find_toplevel()
@@ -315,10 +319,11 @@ class HTML_Doc:
         @rtype: C{None}
         """
         filename = os.path.join(directory, 'epydoc-help.html')
-        if os.path.exists(filename): return
+        #if os.path.exists(filename): return
         helpfile = open(filename, 'w')
         navbar = self._navbar('help')
-        helpfile.write(self._header('Help')+navbar+HELP+navbar+self._footer())
+        helpfile.write(self._header('Help')+navbar+HTML_HELP+
+                       navbar+self._footer())
         helpfile.close()
         
     def _write_css(self, directory):
@@ -339,12 +344,12 @@ class HTML_Doc:
         if self._css is None:
             if os.path.exists(filename):
                 return
-            else: css = epydoc.css.STYLESHEETS['default'][0]
+            else: css = STYLESHEETS['default'][0]
         else:
             if os.path.exists(self._css):
                 css = open(self._css).read()
-            elif epydoc.css.STYLESHEETS.has_key(self._css):
-                css = epydoc.css.STYLESHEETS[self._css][0]
+            elif STYLESHEETS.has_key(self._css):
+                css = STYLESHEETS[self._css][0]
             else:
                 raise IOError("Can't find CSS file: %r" % self._css)
 
@@ -406,11 +411,14 @@ class HTML_Doc:
 
         # Show the summaries for classes, exceptions, functions, and
         # variables contained in the module.
-        (classes,excepts) = self._split_classes_and_excepts(doc)
+        (classes,excepts) = self._split_classes(doc.classes())
+        (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
         str += self._class_summary(classes, doc.sortorder(), 'Classes')
         str += self._class_summary(excepts, doc.sortorder(), 'Exceptions')
         str += self._func_summary(doc.functions(), doc.sortorder(), None)
         str += self._var_summary(doc.variables(), doc.sortorder(), uid)
+        str += self._imports(iclasses, iexcepts, doc.imported_functions(),
+                             doc.sortorder())
 
         # Show details for the functions and variables.
         str += self._func_details(doc.functions(), None)
@@ -550,12 +558,16 @@ class HTML_Doc:
     # Navigation bar
     #////////////////////////////////////////////////////////////
     # The navigation bar is placed at the top & bottom of every HTML
-    # page. 
+    # page.
+    #
     
     def _navbar(self, where, uid=None):
         """
         @return: The HTML code for a navigation bar on the given type
-            of page.
+            of page.  The navigation bar typically looks like::
+            
+                [ Package Module Class Tree Index Help ]
+                
         @rtype: C{string}
         @param where: The type of page for which a navigation bar
             should be generated.  Possible values are C{'class'},
@@ -572,45 +584,59 @@ class HTML_Doc:
         str += '        <tr valign="top">\n'
 
         I = '          ' # indentation
+
+        # Make sure that "package" and "parent" take up the same
+        # amount of room, so the navbar looks the same on different
+        # pages..
+        if self._package is None: WIDTH=''
+        else: WIDTH='width="20%"'
         
         # The "Go to Package" link
         if self._package is None: pass
         elif where in ('class', 'module'):
             pkg = uid.package()
             if pkg is not None:
-                str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += '<a class="navbar" href="'+`pkg`+'.html">'
+                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
+                str += '&nbsp;<a class="navbar" href="'+`pkg`+'.html">'
                 str += 'Package</a>&nbsp;&nbsp;&nbsp;</th>\n'
             else:
-                str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += 'Package&nbsp;&nbsp;&nbsp;</th>\n'
+                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
+                str += '&nbsp;Package&nbsp;&nbsp;&nbsp;</th>\n'
         elif where=='package':
-            str += I+'<th bgcolor="#70b0f0" class="navselect">'
-            str += '&nbsp;&nbsp;&nbsp;'
-            str += 'Package&nbsp;&nbsp;&nbsp;</th>\n'
+            pkg = uid.package()
+            if pkg is not None:
+                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
+                str += '&nbsp;<a class="navbar" href="'+`pkg`+'.html">'
+                str += 'Parent</a>&nbsp;&nbsp;&nbsp;</th>\n'
+            else:
+                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
+                str += '&nbsp;Parent&nbsp;&nbsp;&nbsp;</th>\n'
         elif isinstance(self._package, UID):
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
             str += '<a class="navbar" href="'+`self._package`+'.html">'
             str += 'Package</a>&nbsp;&nbsp;&nbsp;</th>\n'
-        elif 'multiple' == self._package:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
+        else:
+            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
             str += 'Package&nbsp;&nbsp;&nbsp;</th></b>\n'
         
         # The "Go to Module" link
         if self._module is None: pass
         elif where=='class':
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
             str += '<a class="navbar" href="'+`uid.module()`+'.html">'
             str += 'Module</a>&nbsp;&nbsp;&nbsp;</th>\n'
         elif where=='module':
-            str += I+'<th bgcolor="#70b0f0" class="navselect">&nbsp;' 
-            str += '&nbsp;&nbsp;Module&nbsp;&nbsp;&nbsp;</th>\n'
+            str += I+'<th '+WIDTH+' bgcolor="#70b0f0" class="navselect">' 
+            str += '&nbsp;&nbsp;&nbsp;Module&nbsp;&nbsp;&nbsp;</th>\n'
+        elif where=='package':
+            str += I+'<th '+WIDTH+' bgcolor="#70b0f0" class="navselect">' 
+            str += '&nbsp;&nbsp;&nbsp;Package&nbsp;&nbsp;&nbsp;</th>\n'
         elif isinstance(self._module, UID):
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
             str += '<a class="navbar" href="'+`self._module`+'.html">'
             str += 'Module</a>&nbsp;&nbsp;&nbsp;</th>\n'
-        elif 'multiple' == self._module:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
+        else:
+            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
             str += 'Module&nbsp;&nbsp;&nbsp;</th>\n'
         
         # The "Go to Class" link
@@ -976,12 +1002,37 @@ class HTML_Doc:
 
             foverrides = fdoc.overrides()
 
+            # If we inherit docs, then make sure that the parameter
+            # names match the function that we're inheriting docs from.
+            fparam_names = [p.name() for p in fdoc.parameter_list()]
+            kwarg_name = fdoc.kwarg() and fdoc.kwarg().name()
+            vararg_name = fdoc.vararg() and fdoc.vararg().name()
+
             # Try to find a documented ancestor.
             inheritdoc = 0
             while (not fdoc.documented() and
                    fdoc.overrides() and
                    self._docmap.has_key(fdoc.overrides())):
-                fdoc = self._docmap[fdoc.overrides()]
+                # Get the inherited documentation.
+                inh_fdoc = self._docmap[fdoc.overrides()]
+                
+                # Require that the names of parameters match.
+                ifparam_names = [p.name() for p in inh_fdoc.parameter_list()]
+                ikwarg_name = inh_fdoc.kwarg() and inh_fdoc.kwarg().name()
+                ivararg_name = inh_fdoc.vararg() and inh_fdoc.vararg().name()
+                if (fparam_names != ifparam_names[:len(fparam_names)] or
+                    kwarg_name != ikwarg_name or
+                    vararg_name != ivararg_name):
+                    if fname != '__init__':
+                        estr =(('Warning: The parameters of %s do not '+
+                                'match the parameters of the base class '+
+                                'method %s; not inheriting documentation.')
+                               % (fdoc.uid(), inh_fdoc.uid()))
+                        print epytext.wordwrap(estr, 9, 75-9).lstrip()
+                    break
+
+                # Inherit the documentation.
+                fdoc = inh_fdoc
                 inheritdoc = 1
                 
             fdescr=fdoc.descr()
@@ -1110,7 +1161,7 @@ class HTML_Doc:
                             (cssclass, default))
                 str += PARAM_JOIN
         return str
-    
+
     #////////////////////////////////////////////////////////////
     # Variable tables
     #////////////////////////////////////////////////////////////
@@ -1454,7 +1505,7 @@ class HTML_Doc:
     def _dom_link_to_html(self, target, name, container):
         uid = findUID(target, container, self._docmap)
         if uid is None:
-            print ('Warning: could not find UID for %r in %r' %
+            print ('Warning: could not find UID for L{%s} in %r' %
                    (target, container))
         return self._uid_to_href(uid, name, 'link')
     
@@ -1578,26 +1629,44 @@ class HTML_Doc:
         """
         @return: The HTML code for the see-also fields.
         """
-        if not seealso: return ''
-        str = '<dl><dt><b>See also:</b>\n  </dt><dd>'
-        for see in seealso:
-            str += self._dom_to_html(see, container) + ', '
-        return str[:-2] + '</dd>\n</dl>\n\n'
+        items = [self._dom_to_html(s, container) for s in seealso]
+        if len(items) > 0:
+            str = '<dl><dt><b>See also:</b></dt>\n  <dd>\n    '
+            return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
+        else: return ''
 
     def _author(self, authors, container):
         """
         @return: The HTML code for the author fields.
         """
-        if not authors: return ''
-        if len(authors) == 1:
-            return ('<p class="author"><b>Author:</b> %s</p>\n\n' %
-                    self._dom_to_html(authors[0], container))
-        else:
-            str = '<p class="author"><b>Authors:</b>\n'
-            for author in authors:
-                str += '  %s,\n' % self._dom_to_html(author, container)
-            return str[:-2] + '\n</p>\n\n'
+        items = [self._dom_to_html(a, container) for a in authors]
+        if len(items) > 0:
+            str = '<dl><dt><b>Authors:</b></dt>\n  <dd>\n    '
+            return str + ',\n    '.join(items) + '\n  </dd>\n</dl>\n\n'
+        else: return ''
 
+    def _imports(self, classes, excepts, functions, sortorder):
+        if not self._show_imports: return ''
+        class_items = [self._link_to_html(c)
+                       for c in self._sort(classes, sortorder)]
+        except_items = [self._link_to_html(e)
+                        for e in self._sort(excepts, sortorder)]
+        func_items = [self._link_to_html(f)
+                      for f in self._sort(functions, sortorder)]
+        if not (class_items or except_items or func_items):
+            return ''
+        str = self._start_of('Imports')+'<dl>\n'
+        if len(class_items) > 0:
+            str += '  <dt><b>Imported classes:</b></dt>\n  <dd>\n    '
+            str += ',\n    '.join(class_items) + '\n  </dd>\n'
+        if len(except_items) > 0:
+            str += '  <dt><b>Imported exceptions:</b></dt>\n  <dd>\n    '
+            str += ',\n    '.join(except_items) + '\n  </dd>\n'
+        if len(func_items) > 0:
+            str += '  <dt><b>Imported functions:</b></dt>\n  <dd>\n    '
+            str += ',\n    '.join(func_items) + '\n  </dd>\n'
+        return str + '</dl>\n\n'
+                                
     def _summary(self, doc, container):
         """
         @return: The HTML code for the summary description of the
@@ -1732,23 +1801,22 @@ class HTML_Doc:
                '<tr bgcolor="#70b0f0" class="'+css_class+'">\n'+\
                '  <th colspan="2">' + heading + '</th></tr>\n'
     
-    def _split_classes_and_excepts(self, doc):
+    def _split_classes(self, classes_and_excepts):
         """
         Divide the classes fromt the given module into exceptions and
         non-exceptions.  This is used by L{_module_to_html} to list
         exceptions and non-exceptions separately.
 
-        @param doc: The documentation for the module whose classes
-            should be split up.
-        @type doc: L{objdoc.ModuleDoc}
+        @param classes_and_excepts: The list of classes to split up.
+        @type classes_and_excepts: C{list} of L{uid.Link}
         @return: A list C{(I{classes}, I{excepts})}, where
             C{I{classes}} is the list of non-exception classes, and
             C{I{excepts}} is the list of exception classes.
-        @rtype: C{pair} of C{list} of C{objdoc.ClassDoc}
+        @rtype: C{pair} of C{list} of L{uid.Link}
         """
         classes = []
         excepts = []
-        for link in doc.classes():
+        for link in classes_and_excepts:
             try:
                 if (self._docmap.has_key(link.target()) and
                     self._docmap[link.target()].is_exception()):
