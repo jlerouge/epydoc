@@ -8,20 +8,48 @@
 
 """
 Documentation to HTML converter.
+
+Testing L{re} and L{objdoc} and L{re.compile} and L{objdoc.DocMap}.
 """
 
 # To do:
-#   - Support U{name|uri} and U{name|mailto} and U{mailto}
-#   - Support L{name|target}
 #   - Control over whether you link to non-documented objects
 #   - Control over whether L{...} links to non-documented objs
 #   - Better help
 
 ##################################################
-## Constants
+## Implementation Notes
 ##################################################
 
-WARN_MISSING = 0
+# Index:
+#     1. Constants
+#     2. Imports
+#     3. HTML Formatter
+#       - Constructor
+#       - Write
+#       - HTML page generation
+#       - Navigation bar
+#       - Base class trees
+#       - Class hierarchy trees
+#       - Module hierarchy trees
+#       - Class tables
+#       - Function tables
+#       - Variable tables
+#       - Index generation
+#       - Docstring->HTML Conversion
+#       - Helper functions
+#
+
+# I chose to implement the formatter as a class (rather than as a
+# group of functions) because it lets me use instance variables to
+# remember all the configuration variables, that might have
+# far-reaching consequences.  Passing these around manually would be a
+# pain.  Also, I don't have to explicitly pass around the docmap,
+# which is used almost everywhere.
+
+##################################################
+## Constants
+##################################################
 
 HELP = '''
     <h2> Help </h2>
@@ -96,224 +124,13 @@ from xml.dom.minidom import Text as _Text
 # epydoc imports
 import epydoc.epytext as epytext
 from epydoc.uid import UID, Link, findUID
-from epydoc.objdoc import Documentation, ModuleDoc, FuncDoc
+from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 import epydoc.css
 
 ##################################################
-## Helper functions.
-##################################################
-
-def _is_private(str):
-    """
-    @return: true if C{str} is the name of a private Python object.
-    @rtype: C{boolean}
-    """
-    str = string.split(str, '.')[-1]
-    return (str and str[0]=='_' and str[-1]!='_')
-
-def _cmp_name(uid1, uid2):
-    """
-    Compare uid1 and uid2 by their names, using the following rules: 
-      - C{'__init__'} < anything.
-      - public < private.
-      - otherwise, sort alphabetically by name.
-
-    @return: -1 if C{uid1<uid2}; 0 if C{uid1==uid2}; and 1 if
-        C{uid1>uid2}.
-    @rtype: C{int}
-    """
-    x = uid1.name()
-    y = uid2.name()
-    if (y == '__init__'): return 1
-    if (x == '__init__'): return -1
-    if x == y: return 0
-    if _is_private(x) and not _is_private(y): return 1
-    if _is_private(y) and not _is_private(x): return -1
-    return cmp(x, y)
-
-def _uid_to_uri(uid):
-    """
-    @return: a URI that points to the description of the object
-        identified by C{uid}.
-    @rtype: C{string}
-    @param uid: A unique identifier for the object.
-    @type uid: L{UID}
-    """
-    if uid.is_function():
-        return '%s.html#%s' % (uid.module(), uid.shortname())
-    elif uid.is_method():
-        return '%s.html#%s' % (uid.cls(), uid.shortname())
-    else:
-        return '%s.html' % uid
-
-##################################################
-## Docstring -> HTML Conversion
-##################################################
-
-def index_to_anchor(str):
-    """
-    Given the name of an inline index item, construct a URI anchor.
-    These anchors are used to create links from the index page to each
-    index item.
-    """
-    return "_index_"+re.sub("[^a-zA-Z0-9]", "_", str)
-
-# Use a cache to avoid converting epytext->HTML repeatedly (e.g., when
-# creating the versions of pages that do and don't include private
-# objects).  
-_dom_to_html_cache = {}
-
-def dom_to_html(tree, container=None, **kwargs):
-    """
-    Given the DOM tree for an epytext string (as returned by
-    L{epytext.parse}), return a string encoding it in HTML.  This
-    string does not include C{<html>} or C{<body>} tags.
-
-    To do:
-      - honor ordered list bullets
-      - implement more advanced uri links
-
-    @param tree: The DOM tree for an epytext string.
-    @type tree: C{xml.dom.minidom.Element}
-    @param container: The container in which to look up objects by name
-        (e.g., for link directives).
-    @type container: Python module
-    @param kwargs: Keyword arguments.
-        - para = whether to keep 'extra' para tags.  These 'extra' 
-          para tags can cause extra unwanted space on some browsers
-          (e.g., between list items).
-          Default: C{false} (i.e., don't keep them).
-    """
-    global _dom_to_html_cache
-    if not _dom_to_html_cache.has_key( (tree,container) ):
-        html = _dom_to_html(tree, container, 0, 0, **kwargs)
-        _dom_to_html_cache[tree, container] = html
-    return _dom_to_html_cache[tree,container]
-
-def _dom_to_html(tree, container, indent, seclevel, **kwargs):
-    """
-    Helper function for L{dom_to_html}, that does the real work of
-    converting a DOM tree for an epytext string to HTML.
-
-    @param tree: The DOM tree for an epytext string.
-    @type tree: C{xml.dom.minidom.Element}
-    @param container: The container in which to look up objects by name
-        (e.g., for link directives).
-    @type container: Python module
-    @param indent: The number of characters indentation that should be
-        used for HTML tags.
-    @type indent: C{int}
-    @param seclevel: The current section level.
-    @type seclevel: int
-    @param kwargs: Keyword arguments (see L{dom_to_html} for
-        details). 
-    """
-    # This takes care of converting > to &gt;, etc.:
-    if isinstance(tree, _Text): return tree.toxml()
-
-    if tree.tagName == 'epytext': indent -= 2
-    if tree.tagName == 'section': seclevel += 1
-
-    # Process the children first.
-    children = [_dom_to_html(c, container, indent+2, seclevel, **kwargs) 
-                for c in tree.childNodes]
-
-    # Get rid of unnecessary <P>...</P> tags; they introduce extra
-    # space on most browsers that we don't want.
-    if kwargs.get('para', 0) == 0:
-        for i in range(len(children)-1):
-            if (not isinstance(tree.childNodes[i], _Text) and
-                tree.childNodes[i].tagName == 'para' and
-                (isinstance(tree.childNodes[i+1], _Text) or
-                 tree.childNodes[i+1].tagName != 'para')):
-                children[i] = children[i][5+indent:-5]
-        if (tree.hasChildNodes() and
-            not isinstance(tree.childNodes[-1], _Text) and
-            tree.childNodes[-1].tagName == 'para'):
-            children[-1] = children[-1][5+indent:-5]
-
-    # Construct the HTML string for the children.
-    childstr = ''.join(children)
-
-    # Perform the approriate action for the DOM tree type.
-    if tree.tagName == 'para':
-        return epytext.wordwrap('<p>%s</p>' % childstr, indent)
-    elif tree.tagName == 'code':
-        return '<code>%s</code>' % childstr
-    elif tree.tagName == 'uri':
-        return '<a href="%s">%s</a>' % (children[1], children[0])
-    elif tree.tagName == 'link':
-        target = re.sub('[^a-zA-Z0-9.]', '_', children[1])
-        uid = findUID(target, container)
-        if uid is not None:
-            return ('<a href="%s">' % _uid_to_uri(uid) +
-                    '<code class="link">%s</code></a>' % children[0])
-        else:
-            print ('Warning: could not find UID for %r in %r' %
-                   (childstr, container))
-            return '<code class="link">%s</code>' % childstr
-    elif tree.tagName == 'italic':
-        return '<i>%s</i>' % childstr
-    elif tree.tagName == 'math':
-        return '<i class="math">%s</i>' % childstr
-    elif tree.tagName == 'index':
-        return ('<a name="%s"></a>' % index_to_anchor(childstr) +
-                '<i class="indexterm">%s</i>' % childstr)
-    elif tree.tagName == 'bold':
-        return '<b>%s</b>' % childstr
-    elif tree.tagName == 'ulist':
-        return indent*' '+'<ul>\n%s%s</ul>\n' % (childstr, indent*' ')
-    elif tree.tagName == 'olist':
-        return indent*' '+'<ol>\n%s%s</ol>\n' % (childstr, indent*' ')
-    elif tree.tagName == 'li':
-        return indent*' '+'<li>\n%s%s</li>\n' % (childstr, indent*' ')
-    elif tree.tagName == 'heading':
-        return ('%s<h%s class="heading">%s</h%s>\n' %
-                ((indent-2)*' ', seclevel, childstr, seclevel))
-    elif tree.tagName == 'literalblock':
-        return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
-    elif tree.tagName == 'doctestblock':
-        childstr = _colorize_doctestblock(childstr)
-        return '<pre class="doctestblock">\n%s\n</pre>\n' % childstr
-    elif tree.tagName == 'fieldlist':
-        raise AssertionError("There should not be any field lists left")
-    elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
-                          'name', 'target'):
-        return childstr
-    else:
-        raise ValueError('Unknown DOM element %r' % tree.tagName)
-
-def _colorize_doctestblock(str):
-    """
-    Do some colorization for a doctest block (minor for now).
-
-    @type str: C{string}
-    @param str: The contents of the doctest block to be colorized.
-    @rtype: C{string}
-    @return: The colorized doctest block.
-    """
-    regexp = re.compile(r'^(\s*)(&gt;&gt;&gt;|\.\.\.)(\s*)(.*)$',
-                        re.MULTILINE)
-    return regexp.sub(r'\1<span class="pyprompt">\2</span>\3'+
-                      r'<span class="pycode">\4</span>', str)
-
-##################################################
 ## Documentation -> HTML Conversion
 ##################################################
-# Index of HTML_Doc:
-#   - Constructor
-#   - Write
-#   - HTML page generation
-#   - Navigation bar
-#   - Base class trees
-#   - Class hierarchy trees
-#   - Module hierarchy trees
-#   - Class tables
-#   - Function tables
-#   - Variable tables
-#   - Index generation
-#   - Helper functions
 
 class HTML_Doc:
     """
@@ -350,7 +167,7 @@ class HTML_Doc:
 
     Also, generate an index file, a help file, and a tree file.
 
-    @type docmap: L{Documentation}
+    @type docmap: L{DocMap}
     @ivar docmap: The documentation object, encoding the objects that
         should be documented.
     @type _pkg_name: C{string}
@@ -382,10 +199,10 @@ class HTML_Doc:
     def __init__(self, docmap, **kwargs):
         """
         Construct a new HTML outputter, using the given
-        L{Documentation} object.
+        L{DocMap} object.
         
         @param docmap: The documentation to output.
-        @type docmap: L{objdoc.Documentation}
+        @type docmap: L{DocMap}
         @param kwargs: Keyword arguments:
             - C{pkg_name}: A name for the documentation (for the
               navbar).  This name can contain arbitrary HTML code
@@ -407,6 +224,9 @@ class HTML_Doc:
 
         # Find the top-level object (if any)
         self._find_toplevel()
+
+        # Cache the HTML that we generate for each docstring.
+        self._dom_to_html_cache = {}
 
     #////////////////////////////////////////////////////////////
     # Write (and its helpers)
@@ -517,12 +337,12 @@ class HTML_Doc:
         if self._css is None:
             if os.path.exists(filename):
                 return
-            else: css = epydoc.css.STYLESHEETS['default']
+            else: css = epydoc.css.STYLESHEETS['default'][0]
         else:
             if os.path.exists(self._css):
                 css = open(self._css).read()
             elif epydoc.css.STYLESHEETS.has_key(self._css):
-                css = epydoc.css.STYLESHEETS[self._css]
+                css = epydoc.css.STYLESHEETS[self._css][0]
             else:
                 raise IOError("Can't find CSS file: %r" % self._css)
 
@@ -572,7 +392,7 @@ class HTML_Doc:
 
         # Write the module's description.
         if doc.descr():
-            str += dom_to_html(doc.descr(), uid) + '<hr/>\n'
+            str += self._dom_to_html(doc.descr(), uid) + '<hr/>\n'
 
         # Add any see-also links.
         if doc.seealsos():
@@ -580,15 +400,15 @@ class HTML_Doc:
 
         # If it's a package, add a list of sub-modules.
         if doc.ispackage():
-            str += self._module_list(doc.modules(), doc.sort_order())
+            str += self._module_list(doc.modules(), doc.sortorder())
 
         # Show the summaries for classes, exceptions, functions, and
         # variables contained in the module.
         (classes,excepts) = self._split_classes_and_excepts(doc)
-        str += self._class_summary(classes, doc.sort_order(), 'Classes')
-        str += self._class_summary(excepts, doc.sort_order(), 'Exceptions')
-        str += self._func_summary(doc.functions(), doc.sort_order())
-        str += self._var_summary(doc.variables(), doc.sort_order(), uid)
+        str += self._class_summary(classes, doc.sortorder(), 'Classes')
+        str += self._class_summary(excepts, doc.sortorder(), 'Exceptions')
+        str += self._func_summary(doc.functions(), doc.sortorder(), None)
+        str += self._var_summary(doc.variables(), doc.sortorder(), uid)
 
         # Show details for the functions and variables.
         str += self._func_details(doc.functions(), None)
@@ -640,7 +460,7 @@ class HTML_Doc:
 
         # Write the class's description
         if doc.descr():
-            str += '<hr/>\n' + dom_to_html(doc.descr(), uid)
+            str += '<hr/>\n' + self._dom_to_html(doc.descr(), uid)
             str += '\n\n'
         str += '<hr/>\n\n'
 
@@ -650,11 +470,11 @@ class HTML_Doc:
 
         # Show the summaries for methods, instance variables, and
         # class variables contained in the class.
-        str += self._func_summary(doc.methods(), doc.sort_order(),
-                                  'Method Summary')
-        str += self._var_summary(doc.ivariables(), doc.sort_order(),
+        str += self._func_summary(doc.methods(), doc.sortorder(),
+                                  doc, 'Method Summary')
+        str += self._var_summary(doc.ivariables(), doc.sortorder(),
                                  uid, 'Instance Variable Summary')
-        str += self._var_summary(doc.cvariables(), doc.sort_order(),
+        str += self._var_summary(doc.cvariables(), doc.sortorder(),
                                  uid, 'Class Variable Summary')
 
         # Show details for methods and variables
@@ -713,7 +533,7 @@ class HTML_Doc:
             str += '  <tr><td width="10%">'+term+'</td>\n    <td>'
             sources.sort()
             for source in sources:
-                target = source+'.html#'+epytext.index_to_anchor(term)
+                target = source+'.html#'+self._index_to_anchor(term)
                 str += '<i><a href="' + target + '">'
                 str += source + '</a></i>, '
             str = str[:-2] + '</tr></td>\n'
@@ -854,17 +674,17 @@ class HTML_Doc:
             copies of the documentation.
         @rtype: C{string}
         """
-        if self._show_private and _is_private(uid.name()):
+        if self._show_private and self._is_private(uid.name()):
             return ''
 
         str = '<table width="100%"><tr>\n  <td width="100%"></td>\n'
         if self._show_private:
             str += '  <td><font size="-2">[show&nbsp;private&nbsp;|'
-            str += '&nbsp;<a href="../' + _uid_to_uri(uid)
+            str += '&nbsp;<a href="../' + self._uid_to_uri(uid)
             str += '">hide&nbsp;private</a>]</font></td>\n'
         else:
             str += '  <td><font size="-2">[<a href="private/'
-            str += _uid_to_uri(uid) + '">show&nbsp;private</a>'
+            str += self._uid_to_uri(uid) + '">show&nbsp;private</a>'
             str += '&nbsp;|&nbsp;hide&nbsp;private]</font></td>\n'
         return str + '</tr></table>\n'
     
@@ -941,7 +761,7 @@ class HTML_Doc:
                 str += ' '*depth + '  </ul>\n'
         return str
 
-    def _class_tree(self, sort_order=None):
+    def _class_tree(self, sortorder=None):
         """
         @return: The HTML code for the class hierarchy tree.  This is
             used by L{_tree_to_html} to construct the hierarchy page.
@@ -982,14 +802,14 @@ class HTML_Doc:
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  <ul>\n'
             modules = [l.target() for l
-                       in self._sort(doc.modules(), doc.sort_order())]
+                       in self._sort(doc.modules(), doc.sortorder())]
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  </ul>\n'
         str += ' '*depth+'</li>'
         return str
 
-    def _module_tree(self, sort_order=None):
+    def _module_tree(self, sortorder=None):
         """
         @return: The HTML code for the module hierarchy tree.  This is
             used by L{_tree_to_html} to construct the hiearchy page.
@@ -1006,7 +826,7 @@ class HTML_Doc:
                 str += self._module_tree_item(uid)
         return str +'</ul>\n'
 
-    def _module_list(self, modules, sort_order):
+    def _module_list(self, modules, sortorder):
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
@@ -1015,7 +835,7 @@ class HTML_Doc:
         """
         if len(modules) == 0: return ''
         str = '<h3>Modules</h3>\n<ul>\n'
-        modules = self._sort(modules, sort_order)
+        modules = self._sort(modules, sortorder)
         
         for link in modules:
             str += self._module_tree_item(link.target())
@@ -1025,14 +845,14 @@ class HTML_Doc:
     # Class tables
     #////////////////////////////////////////////////////////////
     
-    def _class_summary(self, classes, sort_order, heading='Class Summary'):
+    def _class_summary(self, classes, sortorder, heading='Class Summary'):
         """
         @return: The HTML code for the class summary table.  This is
             used by L{_module_to_html} to list the classes in a
             module.
         @rtype: C{string}
         """
-        classes = self._sort(classes, sort_order)
+        classes = self._sort(classes, sortorder)
         if len(classes) == 0: return ''
         str = self._table_header(heading, 'summary')
 
@@ -1051,7 +871,8 @@ class HTML_Doc:
     # Function tables
     #////////////////////////////////////////////////////////////
     
-    def _func_summary(self, functions, sort_order, heading='Function Summary'):
+    def _func_summary(self, functions, sortorder, cls,
+                      heading='Function Summary'):
         """
         @return: The HTML code for a function summary table.  This
             is used by L{_module_to_html} to list the functions in a
@@ -1059,36 +880,36 @@ class HTML_Doc:
             functions. 
         @rtype: C{string}
         """
-        functions = self._sort(functions, sort_order)
+        functions = self._sort(functions, sortorder)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'summary')
         
         for link in functions:
             func = link.target()
             fname = link.name()
-            if func.is_method(): container = func.cls()
+            if func.is_method():
+                container = func.cls()
+                inherit = (container != cls.uid())
             else:
+                inherit = 0
                 try: container = func.module()
                 except TypeError: container = None
-            if not self._docmap.has_key(func):
-                if WARN_MISSING:
-                    print 'WARNING: MISSING', func
-                continue
             
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
-            inheritdoc = 0
             while (not fdoc.documented() and
                    fdoc.overrides() and
                    self._docmap.has_key(fdoc.overrides())):
                 fdoc = self._docmap[fdoc.overrides()]
-                inheritdoc = 1
                 
             rval = fdoc.returns()
             if rval.type():
-                rtype = dom_to_html(rval.type(), container)
-            else: rtype = '&nbsp;'
+                rtype = ('\n<font size="-1">'+
+                         self._dom_to_html(rval.type(), container, 8)+
+                         "</font>")
+            else:
+                rtype = '&nbsp;'
 
             pstr = '('
             for param in fdoc.parameters():
@@ -1103,13 +924,14 @@ class HTML_Doc:
             descrstr = self._summary(fdoc, container)
             if descrstr != '&nbsp;':
                 fsum = '<br>'+descrstr
-            else: fsum = ''
-            str += '<tr><td align="right" valign="top" '
-            str += 'width="15%"><font size="-1">'
-            str += rtype+'</font></td>\n'
-            str += '  <td><code><b><a href="#'+fname+'">'
-            str += fname+'</a>'
-            str += '</b>'+pstr+'</code>\n  '
+            else:
+                fsum = ''
+            if inherit: fsum += '    <i>(inherited)</i>\n'
+            str += '<tr><td align="right" valign="top" width="15%">'
+            str += rtype+'</td>\n  <td>'
+            str += self._func_signature(fname, fdoc, 1, 'summary-sig')
+            #str += self._uid_to_href(func, fname)
+            #str += '</b>'+pstr+'</code>\n  '
             str += fsum+'</td></tr>\n'
         return str + '</table><br>\n\n'
     
@@ -1123,34 +945,40 @@ class HTML_Doc:
         """
         functions = self._sort(functions)
         if len(functions) == 0: return ''
-        str = self._table_header(heading, 'details')+'</table>'
+        str = self._table_header(heading, 'details')+'</table>\n'
 
         for link in functions:
             fname = link.name()
             func = link.target()
-            if func.is_method(): container = func.cls()
+            if func.is_method():
+                container = func.cls()
+                inherit = (container != cls.uid())
             else:
+                inherit = 0
                 try: container = func.module()
                 except TypeError: container = None
             if not self._docmap.has_key(func):
-                if WARN_MISSING:
-                    print 'WARNING: MISSING', func
                 continue
+
+            # Don't document inherited methods; instead, the method
+            # summary points to the details description in the parent
+            # class's file.
+            if inherit: continue
             
-            str += ('<table width="100%" class="func-details"'+
+            str += ('\n<table width="100%" class="func-details"'+
                     ' bgcolor="#e0e0e0">'+
                     '<tr><td>\n')
             
             fdoc = self._docmap[func]
 
-            str += '<a name="'+fname+'"></a>\n'
+            str += '  <a name="'+fname+'"></a>\n'
             if SPECIAL_METHODS.has_key(fname):
-                str += '<h3 class="func-details"><i>'
+                str += '  <h3 class="func-details"><i>'
                 str += SPECIAL_METHODS[fname]+'</i></h3>\n'
             else:
-                str += '<h3 class="func-details">'+fname+'</h3>\n'
+                str += '  <h3 class="func-details">'+fname+'</h3>\n'
 
-            str += self._func_signature(fname, fdoc)
+            str += '  <p>%s</p>\n' % self._func_signature(fname, fdoc)
 
             foverrides = fdoc.overrides()
 
@@ -1175,8 +1003,8 @@ class HTML_Doc:
 
             # Description
             if fdescr:
-                str += '\n'+dom_to_html(fdescr, container, para=1)+'\n'
-            str += '<dl><dt></dt><dd>\n'
+                str += self._dom_to_html(fdescr, container, 2)
+            str += '  <dl><dt></dt><dd>\n'
 
             # Parameters
             if fparam:
@@ -1185,46 +1013,45 @@ class HTML_Doc:
                     pname = param.name()
                     str += '      <dd><code><b>' + pname +'</b></code>'
                     if param.descr():
-                        str += ' - ' + dom_to_html(param.descr(),
-                                                   container)
+                        pdescr = self._dom_to_html(param.descr(), container, 8)
+                        str += ' -\n %s' % pdescr.rstrip()
+                    str += '\n'
                     if param.type():
-                        str += ' <br>\n        <i>'+('&nbsp;'*10)
-                        str += '(type=' + dom_to_html(param.type(),
-                                                      container)
-                        str += ')</i>'
-                    str += '</dd>\n'
+                        ptype = self._dom_to_html(param.type(), container, 14)
+                        str += '        <br><i>'+('&nbsp;'*10)+'\n'
+                        str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
+                    str += '      </dd>\n'
                 str += '    </dl>\n'
 
             # Returns
             if freturn.descr() or freturn.type():
-                str += '    <dl><dt><b>Returns:</b></dt>\n      <dd>'
+                str += '    <dl><dt><b>Returns:</b></dt>\n      <dd>\n'
                 if freturn.descr():
-                    str += dom_to_html(freturn.descr(), container)
+                    str += self._dom_to_html(freturn.descr(), container, 8)
                     if freturn.type():
-                        str += ' <br>' + '<i>'+('&nbsp;'*10)
-                        str += '(type=' 
-                        str += dom_to_html(freturn.type(), container) 
-                        str += ')</i>'
+                        rtype = self._dom_to_html(freturn.type(),container,14)
+                        str += '        <br><i>'+('&nbsp;'*10)+'\n'
+                        str += ' '*8+'(type=%s)</i>\n' % rtype.strip()
                 elif freturn.type():
-                    str += dom_to_html(freturn.type(), container)
-                str += '</dd>\n    </dl>\n'
+                    str += self._dom_to_html(freturn.type(), container, 8)
+                str += '      </dd>\n    </dl>\n'
 
             # Raises
             if fraises:
                 str += '    <dl><dt><b>Raises:</b></dt>\n'
                 for fraise in fraises:
                     str += '      '
-                    str += '<dd><code><b>'+fraise.name()+'</b></code> - '
-                    str += dom_to_html(fraise.descr(), container)+'</dd>\n'
+                    str += '<dd><code><b>'+fraise.name()+'</b></code> -\n'
+                    str += self._dom_to_html(fraise.descr(), container, 8)
+                    str +'      </dd>\n'
                 str += '    </dl>\n'
 
             # Overrides
             if foverrides:
-                cls = foverrides.cls()
                 str += '    <dl><dt><b>Overrides:</b></dt>\n'
-                if self._docmap.has_key(cls):
+                if self._docmap.has_key(foverrides.cls()):
                     str += ('      <dd><code><a href="' +
-                            _uid_to_uri(cls) + '#' +
+                            self._uid_to_uri(foverrides.cls()) + '#' +
                             foverrides.shortname() +
                             '">' + `foverrides` + '</a></code>')
                 else:
@@ -1232,14 +1059,14 @@ class HTML_Doc:
                 if inheritdoc:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
-                
-            str += '</dd></dl>\n'
+
+            str += '  </dd></dl>\n'
             str += '</td></tr></table>\n'
 
         str += '<br>\n\n'
         return str
 
-    def _func_signature(self, fname, fdoc, cssclass="sig"):
+    def _func_signature(self, fname, fdoc, link=0, cssclass="sig"):
         """
         @return: The HTML code for the function signature of the
             function with the given name and documentation.
@@ -1247,10 +1074,16 @@ class HTML_Doc:
         @type fname: C{string}
         @param fdoc: The documentation for the function.
         @type fdoc: L{objdoc.FuncDoc}
+        @param link: Whether to create a link from the function's name
+            to its details description.
         """
-        str = '<b><code class=%s>' % cssclass
-        str += '<span class=%s-name>%s</span>(' % (cssclass, fname)
+        str = '<code class=%s>' % cssclass
+        if link: str += '<a href="%s">' % self._uid_to_uri(fdoc.uid())
+        str += '<span class=%s-name>%s</span>' % (cssclass, fname)
+        if link: str += '</a>'
         
+        str += '('
+        PARAM_JOIN = ',\n'+' '*15
         for param in fdoc.parameters():
             str += '<span class=%s-arg>%s</span>' % (cssclass, param.name())
             if param.default():
@@ -1259,22 +1092,22 @@ class HTML_Doc:
                     default = default[:57]+'...'
                 str += '=<span class=%s-default>%s</span>' % (cssclass,
                                                               default)
-            str += ', '
+            str += PARAM_JOIN
         if fdoc.vararg():
-            str += '<span class=%s-vararg>*%s</span>, ' % (cssclass,
-                                                   fdoc.vararg().name())
+            str += ('<span class=%s-vararg>*%s</span>%s' %
+                    (cssclass, fdoc.vararg().name(), PARAM_JOIN))
         if fdoc.kwarg():
-            str += '<span class=%s-kwarg>**%s</span>, ' % (cssclass,
-                                                   fdoc.kwarg().name())
-        if str[-1] != '(': str = str[:-2]
+            str += ('<span class=%s-kwarg>**%s</span>%s' %
+                    (cssclass, fdoc.kwarg().name(), PARAM_JOIN))
+        if str[-1] != '(': str = str[:-len(PARAM_JOIN)]
 
-        return str + ')</code></b>'
+        return str + ')</code>'
 
     #////////////////////////////////////////////////////////////
     # Variable tables
     #////////////////////////////////////////////////////////////
     
-    def _var_summary(self, variables, sort_order, container,
+    def _var_summary(self, variables, sortorder, container,
                      heading='Variable Summary'):
         """
         @return: The HTML code for a variable summary table.  This
@@ -1283,13 +1116,14 @@ class HTML_Doc:
             variables and class variables.
         @rtype: C{string}
         """
-        variables = self._sort(variables, sort_order)
+        variables = self._sort(variables, sortorder)
         if len(variables) == 0: return ''
         str = self._table_header(heading, 'summary')
 
         for var in variables:
             vname = var.name()
-            if var.type(): vtype = dom_to_html(var.type(), container)
+            if var.type():
+                vtype = self._dom_to_html(var.type(), container, 10).strip()
             else: vtype = '&nbsp;'
             if var.descr():
                 vsum = '<br>'+self._summary(var, container)
@@ -1330,11 +1164,11 @@ class HTML_Doc:
 
             if var.descr():
                 str += '  <dd>'
-                str += dom_to_html(var.descr(), container)+'<br>\n'
+                str += self._dom_to_html(var.descr(), container)+'<br>\n'
                 
             if var.type():
                 str += '  <dl><dt><b>Type:</b>\n' 
-                str += '<code>'+dom_to_html(var.type(), container)
+                str += '<code>'+self._dom_to_html(var.type(), container)
                 str += '</code>'+'</dt></dl>\n'
 
             #if var.overrides():
@@ -1362,7 +1196,7 @@ class HTML_Doc:
             for child in tree.childNodes:
                 self.get_index_items(child, base, dict)
         else:
-            children = [dom_to_html(c) for c in tree.childNodes]
+            children = [self._dom_to_html(c) for c in tree.childNodes]
             key = ''.join(children).lower().strip()
             if dict.has_key(key):
                 dict[key].append(base)
@@ -1386,23 +1220,153 @@ class HTML_Doc:
         return index
 
     #////////////////////////////////////////////////////////////
+    # Docstring -> HTML Conversion
+    #////////////////////////////////////////////////////////////
+
+    def _index_to_anchor(self, str):
+        """
+        Given the name of an inline index item, construct a URI anchor.
+        These anchors are used to create links from the index page to each
+        index item.
+        """
+        return "_index_"+re.sub("[^a-zA-Z0-9]", "_", str)
+    
+    def _dom_to_html(self, tree, container=None, indent=0):
+        """
+        Given the DOM tree for an epytext string (as returned by
+        L{epytext.parse}), return a string encoding it in HTML.  This
+        string does not include C{<html>} or C{<body>} tags.
+    
+        To do:
+          - honor ordered list bullets
+          - implement more advanced uri links
+    
+        @param tree: The DOM tree for an epytext string.
+        @type tree: C{xml.dom.minidom.Element}
+        @param container: The container in which to look up objects by name
+            (e.g., for link directives).
+        @type container: Python module
+        """
+        if not self._dom_to_html_cache.has_key( (tree,container) ):
+            html = self._dom_to_html_helper(tree, container, indent, 0)
+            self._dom_to_html_cache[tree, container] = html
+        return self._dom_to_html_cache[tree,container]
+    
+    def _dom_to_html_helper(self, tree, container, indent, seclevel):
+        """
+        Helper function for L{_dom_to_html}, that does the real work of
+        converting a DOM tree for an epytext string to HTML.
+    
+        @param tree: The DOM tree for an epytext string.
+        @type tree: C{xml.dom.minidom.Element}
+        @param container: The container in which to look up objects by name
+            (e.g., for link directives).
+        @type container: Python module
+        @param indent: The number of characters indentation that should be
+            used for HTML tags.
+        @type indent: C{int}
+        @param seclevel: The current section level.
+        @type seclevel: int
+        """
+        # This takes care of converting > to &gt;, etc.:
+        if isinstance(tree, _Text): return tree.toxml()
+    
+        if tree.tagName == 'epytext': indent -= 2
+        if tree.tagName == 'section': seclevel += 1
+    
+        # Process the children first.
+        children = [self._dom_to_html_helper(c, container, indent+2, seclevel)
+                    for c in tree.childNodes]
+    
+        # Get rid of unnecessary <P>...</P> tags; they introduce extra
+        # space on most browsers that we don't want.
+        for i in range(len(children)-1):
+            if (not isinstance(tree.childNodes[i], _Text) and
+                tree.childNodes[i].tagName == 'para' and
+                (isinstance(tree.childNodes[i+1], _Text) or
+                 tree.childNodes[i+1].tagName != 'para')):
+                children[i] = ' '*(indent+2)+children[i][5+indent:-5]+'\n'
+        if (tree.hasChildNodes() and
+            not isinstance(tree.childNodes[-1], _Text) and
+            tree.childNodes[-1].tagName == 'para'):
+            children[-1] = ' '*(indent+2)+children[-1][5+indent:-5]+'\n'
+    
+        # Construct the HTML string for the children.
+        childstr = ''.join(children)
+    
+        # Perform the approriate action for the DOM tree type.
+        if tree.tagName == 'para':
+            return epytext.wordwrap('<p>%s</p>' % childstr, indent)
+        elif tree.tagName == 'code':
+            return '<code>%s</code>' % childstr
+        elif tree.tagName == 'uri':
+            return '<a href="%s">%s</a>' % (children[1], children[0])
+        elif tree.tagName == 'link':
+            target = re.sub('[^a-zA-Z0-9.]', '_', children[1])
+            return self._dom_link_to_html(target, children[0], container)
+        elif tree.tagName == 'italic':
+            return '<i>%s</i>' % childstr
+        elif tree.tagName == 'math':
+            return '<i class="math">%s</i>' % childstr
+        elif tree.tagName == 'index':
+            return ('<a name="%s"></a>' % self._index_to_anchor(childstr) +
+                    '<i class="indexterm">%s</i>' % childstr)
+        elif tree.tagName == 'bold':
+            return '<b>%s</b>' % childstr
+        elif tree.tagName == 'ulist':
+            return indent*' '+'<ul>\n%s%s</ul>\n' % (childstr, indent*' ')
+        elif tree.tagName == 'olist':
+            return indent*' '+'<ol>\n%s%s</ol>\n' % (childstr, indent*' ')
+        elif tree.tagName == 'li':
+            return indent*' '+'<li>\n%s%s</li>\n' % (childstr, indent*' ')
+        elif tree.tagName == 'heading':
+            return ('%s<h%s class="heading">%s</h%s>\n' %
+                    ((indent-2)*' ', seclevel, childstr, seclevel))
+        elif tree.tagName == 'literalblock':
+            return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
+        elif tree.tagName == 'doctestblock':
+            childstr = self._colorize_doctestblock(childstr)
+            return '<pre class="doctestblock">\n%s\n</pre>\n' % childstr
+        elif tree.tagName == 'fieldlist':
+            raise AssertionError("There should not be any field lists left")
+        elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
+                              'name', 'target'):
+            return childstr
+        else:
+            raise ValueError('Unknown DOM element %r' % tree.tagName)
+    
+    def _colorize_doctestblock(self, str):
+        """
+        Do some colorization for a doctest block (minor for now).
+    
+        @type str: C{string}
+        @param str: The contents of the doctest block to be colorized.
+        @rtype: C{string}
+        @return: The colorized doctest block.
+        """
+        regexp = re.compile(r'^(\s*)(&gt;&gt;&gt;|\.\.\.)(\s*)(.*)$',
+                            re.MULTILINE)
+        return regexp.sub(r'\1<span class="pyprompt">\2</span>\3'+
+                          r'<span class="pycode">\4</span>', str)
+
+    def _dom_link_to_html(self, target, name, container):
+        uid = findUID(target, container, self._docmap)
+        if uid is None:
+            print ('Warning: could not find UID for %r in %r' %
+                   (target, container))
+        return self._uid_to_href(uid, name, 'link')
+    
+    #////////////////////////////////////////////////////////////
     # Helper functions
     #////////////////////////////////////////////////////////////
     
-    def _header(self, name):
+    def _is_private(self, str):
         """
-        @return: The HTML code for the header of a page with the given
-            name.
-        @rtype: C{string}
+        @return: true if C{str} is the name of a private Python object.
+        @rtype: C{boolean}
         """
-        return HEADER % (name, self._cssfile)
-               
-    def _footer(self):
-        """
-        @return: The HTML code for the footer of a page.
-        @rtype: C{string}
-        """
-        return FOOTER % time.asctime(time.localtime(time.time()))
+        str = string.split(str, '.')[-1]
+        return (str and str[0]=='_' and str[-1]!='_')
     
     def _find_toplevel(self):
         """
@@ -1435,44 +1399,79 @@ class HTML_Doc:
                 if toplevel:
                     self._package = pkg
 
-    def _sort(self, docs, sort_order=None):
+    def _cmp_name(self, uid1, uid2):
+        """
+        Compare uid1 and uid2 by their names, using the following rules: 
+          - C{'__init__'} < anything.
+          - public < private.
+          - otherwise, sort alphabetically by name.
+    
+        @return: -1 if C{uid1<uid2}; 0 if C{uid1==uid2}; and 1 if
+            C{uid1>uid2}.
+        @rtype: C{int}
+        """
+        x = uid1.name()
+        y = uid2.name()
+        if (y == '__init__'): return 1
+        if (x == '__init__'): return -1
+        if x == y: return 0
+        if self._is_private(x) and not self._is_private(y): return 1
+        if self._is_private(y) and not self._is_private(x): return -1
+        return cmp(x, y)
+    
+    def _sort(self, docs, sortorder=None):
         """
         Sort and filter a list of C{ObjDoc}s.  In particular, if
-        C{sort_order} is not C{None}, then sort according to its
+        C{sortorder} is not C{None}, then sort according to its
         contents; otherwise, sort using L{_cmp_name}.  If
         L{_show_private} is true, then filter out all private objects;
         otherwise, perform no filtering.
 
         @param docs: The list of C{ObjDoc}s to be sorted and filtered.
         @type docs: C{list} of L{ObjDoc}
-        @param sort_order: A list of object names, typically generated
-            from __epydoc__sort__, and returned by {doc.sort_order()},
+        @param sortorder: A list of object names, typically generated
+            from __epydoc__sort__, and returned by {doc.sortorder()},
             where C{doc} is the object that contains the objects
             documented by C{docs}.
-        @type sort_order: C{list} of C{string}
+        @type sortorder: C{list} of C{string}
         """
         docs = list(docs)
 
         # First, sort by __epydoc_sort__
-        if sort_order is None:
+        if sortorder is None:
             sortdocs = []
         else:
-            sort_order = list(sort_order)
-            sortdocs = sort_order[:]
+            sortorder = list(sortorder)
+            sortdocs = sortorder[:]
             for doc in docs:
-                try: index = sort_order.index(doc.name())
+                try: index = sortorder.index(doc.name())
                 except ValueError: continue
                 sortdocs[index] = doc
             sortdocs = [d for d in sortdocs if type(d) != type('')]
             for doc in sortdocs: docs.remove(doc)
         
         # Then, sort by _cmp_name.
-        docs.sort(lambda x,y: _cmp_name(x, y))
+        docs.sort(lambda x,y,s=self: s._cmp_name(x, y))
         if not self._show_private:
-            docs = filter(lambda x:not _is_private(x.name()), docs)
+            docs = [d for d in docs if not self._is_private(d.name())]
 
         return sortdocs + docs
 
+    def _header(self, name):
+        """
+        @return: The HTML code for the header of a page with the given
+            name.
+        @rtype: C{string}
+        """
+        return HEADER % (name, self._cssfile)
+               
+    def _footer(self):
+        """
+        @return: The HTML code for the footer of a page.
+        @rtype: C{string}
+        """
+        return FOOTER % time.asctime(time.localtime(time.time()))
+    
     def _seealso(self, seealso, container):
         """
         @return: The HTML code for the see-also fields.
@@ -1480,7 +1479,7 @@ class HTML_Doc:
         if not seealso: return ''
         str = '<dl><dt><b>See also:</b>\n  </dt><dd>'
         for see in seealso:
-            str += dom_to_html(see, container) + ', '
+            str += self._dom_to_html(see, container) + ', '
         return str[:-2] + '</dd>\n</dl>\n\n'
 
     def _author(self, authors, container):
@@ -1490,11 +1489,11 @@ class HTML_Doc:
         if not authors: return ''
         if len(authors) == 1:
             return ('<p class="author"><b>Author:</b> %s</p>\n\n' %
-                    dom_to_html(authors[0], container))
+                    self._dom_to_html(authors[0], container))
         else:
             str = '<p class="author"><b>Authors:</b>\n'
             for author in authors:
-                str += '  %s,\n' % dom_to_html(author, container)
+                str += '  %s,\n' % self._dom_to_html(author, container)
             return str[:-2] + '\n</p>\n\n'
 
     def _summary(self, doc, container):
@@ -1524,13 +1523,13 @@ class HTML_Doc:
                 doc = self._docmap[doc.overrides()]
 
         if descr != None:
-            str = dom_to_html(epytext.summary(descr), container).strip()
+            str = self._dom_to_html(epytext.summary(descr), container).strip()
             if str == '': str = '&nbsp;'
             return str
         elif (isinstance(doc, FuncDoc) and
               doc.returns().descr() is not None):
             summary = epytext.summary(doc.returns().descr())
-            summary = dom_to_html(summary, container).strip()
+            summary = self._dom_to_html(summary, container).strip()
             summary = summary[:1].lower() + summary[1:]
             return ('Return '+ summary)
         else:
@@ -1548,7 +1547,22 @@ class HTML_Doc:
         """
         return self._uid_to_href(link.target(), link.name())
 
-    def _uid_to_href(self, uid, label=None):
+    def _uid_to_uri(self, uid):
+        """
+        @return: a URI that points to the description of the object
+            identified by C{uid}.
+        @rtype: C{string}
+        @param uid: A unique identifier for the object.
+        @type uid: L{UID}
+        """
+        if uid.is_function():
+            return '%s.html#%s' % (uid.module(), uid.shortname())
+        elif uid.is_method():
+            return '%s.html#%s' % (uid.cls(), uid.shortname())
+        else:
+            return '%s.html' % uid
+    
+    def _uid_to_href(self, uid, label=None, cls=None):
         """
         @return: The HTML code to link to the given UID.  This code
             consists of an anchor with an href to the page for C{uid}.
@@ -1561,14 +1575,27 @@ class HTML_Doc:
         @type label: C{string}
         """
         if label==None: label = `uid`
+        parent = '.'.join(`uid`.split('.')[:-1])
         if self._docmap.has_key(uid):
-            str = ('<a href="' + _uid_to_uri(uid) +
-                   '">' + label + '</a>')
-            if not isinstance(self._docmap[uid], ModuleDoc):
-                str = '<code>'+str+'</code>'
+            if cls is None:
+                return ('<a href="%s"><code>%s</code></a>' %
+                        (self._uid_to_uri(uid), label))
+            else:
+                return ('<a href="%s" class="%s"><code>%s</code></a>' %
+                        (self._uid_to_uri(uid), cls, label))
+        elif (uid is not None and uid.object() is None and
+              self._docmap.has_key(UID(parent))):
+            if cls is None:
+                return ('<a href="%s#%s"><code>%s</code></a>' %
+                        (self._uid_to_uri(UID(parent)),
+                         uid.shortname(), label))
+            else:
+                return ('<a href="%s#%s" class="%s"><code>%s</code></a>' %
+                        (self._uid_to_uri(UID(parent)),
+                         uid.shortname(), cls, label))
+                         
         else:
-            str = label
-        return str
+            return '<code>%s</code>' % label
 
     def _start_of(self, heading):
         """
@@ -1598,8 +1625,7 @@ class HTML_Doc:
                '<table class="'+css_class+'" border="1" cellpadding="3"' +\
                ' cellspacing="0" width="100%" bgcolor="white">\n' +\
                '<tr bgcolor="#70b0f0" class="'+css_class+'">\n'+\
-               '<th colspan="2">\n' + heading +\
-               '</th></tr>\n'
+               '  <th colspan="2">' + heading + '</th></tr>\n'
     
     def _split_classes_and_excepts(self, doc):
         """
