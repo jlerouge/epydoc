@@ -504,8 +504,9 @@ class ObjDoc:
     """
     # Note: order is significant.
     STANDARD_FIELDS = [
-        # If it's depreciated, put that first.
-        DocField(['depreciated'], 'Depreciated', multivalue=0),
+        # If it's deprecated, put that first.
+        DocField(['deprecated', 'depreciated'],
+                 'Deprecated', multivalue=0),
 
         # Status info
         DocField(['version'], 'Version', multivalue=0),
