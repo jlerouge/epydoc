@@ -54,9 +54,11 @@ from epydoc.uid import UID, Link, make_uid
 try:
     _WrapperDescriptorType = type(list.__add__)
     _MethodDescriptorType = type(list.append)
+    _PropertyType = property
 except:
     _WrapperDescriptorType = None
     _MethodDescriptorType = None
+    _PropertyType = None
 
 # This is used when we get a bad field tag, to distinguish between
 # unknown field tags, and field tags that were just used in a bad
@@ -215,7 +217,7 @@ def set_default_docformat(new_format):
 ##################################################
 
 #////////////////////////////////////////////////////////
-#// Var and Param
+#// Var, Param, and Raise
 #////////////////////////////////////////////////////////
 
 class Var:
@@ -522,7 +524,7 @@ class ObjDoc:
         DocField(['attention'], 'Attention'),
         DocField(['invariant'], 'Invariant'),
         ]
-    def __init__(self, obj, verbosity=0):
+    def __init__(self, uid, verbosity=0):
         """
         Create the documentation for the given object.
         
@@ -534,7 +536,8 @@ class ObjDoc:
             supress warnings and errors.
         @type verbosity: C{int}
         """
-        self._uid = make_uid(obj)
+        obj = uid.value()
+        self._uid = uid
 
         # Default: no description
         self._descr = None
@@ -664,6 +667,7 @@ class ObjDoc:
             if tag in field.tags:
                 if arg is not None:
                     warnings.append(tag+' did not expect an argument')
+                    return
                 if not field.multivalue and len(values) > 0:
                     warnings.append(tag+ ' redefined')
                     del values[:]
@@ -811,12 +815,13 @@ class ModuleDoc(ObjDoc):
     @ivar _modules: A list of all modules conained in the package
         (package only).
     """
-    def __init__(self, mod, verbosity=0):
+    def __init__(self, uid, verbosity=0):
+        mod = uid.value()
         self._tmp_var = {}
         self._tmp_type = {}
         self._tmp_groups = {}
         self._tmp_group_order = []
-        ObjDoc.__init__(self, mod, verbosity)
+        ObjDoc.__init__(self, uid, verbosity)
 
         # If mod is a package, then it will contain a __path__
         if mod.__dict__.has_key('__path__'): self._modules = []
@@ -834,7 +839,7 @@ class ModuleDoc(ObjDoc):
             # Don't do anything for these special variables:
             if field in ('__builtins__', '__doc__', '__all__', '__file__',
                          '__path__', '__name__', '__epydoc_sort__',
-                         '__docformat__'):
+                         '__extra_epydoc_fields__', '__docformat__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
@@ -1102,13 +1107,15 @@ class ClassDoc(ObjDoc):
     @type _bases: C{list} of L{Link}
     @ivar _bases: A list of the identifiers of this class's bases.
     """
-    def __init__(self, cls, verbosity=0):
+    def __init__(self, uid, verbosity=0):
+        cls = uid.value()
         self._tmp_ivar = {}
         self._tmp_cvar = {}
         self._tmp_type = {}
         self._tmp_groups = {}
         self._tmp_group_order = []
-        ObjDoc.__init__(self, cls, verbosity)
+        self._property_type = {}
+        ObjDoc.__init__(self, uid, verbosity)
 
         # Handle methods & class variables
         self._methods = []
@@ -1126,7 +1133,7 @@ class ClassDoc(ObjDoc):
             if type(val) is types.FunctionType:
                 val = getattr(cls, field)
 
-            # Deal with static/class methods. (Python 2.2)
+            # Deal with static/class methods and properties. (Python 2.2)
             try:
                 if isinstance(val, staticmethod):
                     val = new.instancemethod(getattr(cls, field), None, cls)
@@ -1137,8 +1144,10 @@ class ClassDoc(ObjDoc):
                     val = new.instancemethod(val, None, cls)
                     self._classmethods.append(Link(field, make_uid(val)))
                     continue
-                #elif isinstance(val, property):
-                #    self._properties.append(val)
+                elif isinstance(val, property):
+                    uid = make_uid(val, self._uid, field)
+                    self._properties.append(Link(field, uid))
+                    continue
             except NameError: pass
                 
             vuid = make_uid(val, self._uid, field)
@@ -1173,6 +1182,14 @@ class ClassDoc(ObjDoc):
                 if typ is not None: del self._tmp_type[field]
                 else: typ = epytext.parse_type_of(val)
                 self._cvariables.append(Var(vuid, descr, typ, 1))
+
+        # Keep track of types for properties.
+        for prop in self._properties:
+            name = prop.name()
+            typ = self._tmp_type.get(name)
+            if typ is not None:
+                self._property_type[prop.target()] = typ
+                del self._tmp_type[name]
 
         # Add the remaining class variables
         for (name, descr) in self._tmp_cvar.items():
@@ -1330,7 +1347,9 @@ class ClassDoc(ObjDoc):
         
         if self._tmp_groups:
             elts = {}
+            processed = {} # For error messages.
             for m in self.allmethods(): elts[m.name()] = m.target()
+            for p in self.properties(): elts[p.name()] = p.target()
             for v in self.ivariables(): elts[v.name()] = v.uid()
             for v in self.cvariables(): elts[v.name()] = v.uid()
             for c in self.subclasses(): elts[c.name()] = c.uid()
@@ -1340,9 +1359,15 @@ class ClassDoc(ObjDoc):
                 for member in members:
                     try:
                         group.append(elts[member])
+                        processed[member] = name
+                        del elts[member]
                     except KeyError:
-                        estr = ('Group member not found: %s.%s' %
-                                (self.uid(), member))
+                        if processed.has_key(member):
+                            estr = ('%s.%s is already in group %s.' %
+                                    (self.uid(), member, processed[member]))
+                        else:
+                            estr = ('Group member not found: %s.%s' %
+                                    (self.uid(), member))
                         self._field_warnings.append(estr)
                 if group:
                     self._groups.append((name, group))
@@ -1410,6 +1435,14 @@ class ClassDoc(ObjDoc):
         """
         return self._staticmethods
 
+    def properties(self):
+        """
+        @return: A list of all properties defined by the class
+            documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._properties
+
     def allmethods(self):
         """
         @return: A list of all instance, class, and static methods
@@ -1468,12 +1501,15 @@ class ClassDoc(ObjDoc):
         cuid = make_uid(cls, self._uid, cls.__name__)
         self._subclasses.append(Link(cls.__name__, cuid))
 
+    def property_type(self, uid): 
+        return self._property_type.get(uid, None)
+
 #////////////////////////////////////////////////////////
 #// FuncDoc
 #////////////////////////////////////////////////////////
 class FuncDoc(ObjDoc):
     """
-    The documentation for a function of method.  This documentation
+    The documentation for a function or method.  This documentation
     consists of the standard documentation fields (descr, author,
     etc.) and the following class-specific fields:
 
@@ -1505,13 +1541,14 @@ class FuncDoc(ObjDoc):
         whether a builtin function or method has a signature in its
         docstring.
     """
-    def __init__(self, func, verbosity=0):
+    def __init__(self, uid, verbosity=0):
+        func = uid.value()
         self._tmp_param = {}
         self._tmp_type = {}
         self._raises = []
         self._overrides = None
         self._matches_override = 0
-        ObjDoc.__init__(self, func, verbosity)
+        ObjDoc.__init__(self, uid, verbosity)
 
         if self._uid.is_method(): func = func.im_func
         if type(func) is types.FunctionType:
@@ -1792,16 +1829,17 @@ class FuncDoc(ObjDoc):
         return 1
 
     def _process_field(self, tag, arg, descr, warnings):
-        # return, rtype, arg, type, raise
         if tag in ('return', 'returns'):
             if arg is not None:
                 warnings.append(tag+' did not expect an argument')
+                return
             if self._tmp_param.has_key('return'):
                 warnings.append('Redefinition of @%s' % tag)
             self._tmp_param['return'] = descr
         elif tag in ('returntype', 'rtype'):
             if arg is not None:
                 warnings.append(tag+' did not expect an argument')
+                return
             if self._tmp_type.has_key('return'):
                 warnings.append('Redefinition of @%s' % tag)
             self._tmp_type['return'] = descr
@@ -1931,6 +1969,77 @@ class FuncDoc(ObjDoc):
         """
         return self._matches_override
 
+#////////////////////////////////////////////////////////
+#// PropertyDoc
+#////////////////////////////////////////////////////////
+class PropertyDoc(ObjDoc):
+    """
+    The documentation for a class property.  This documentation
+    consists of the standard documentation fields (descr, author,
+    etc.) and the following class-specific fields:
+
+      - X{fget}: The property's get function
+      - X{fset}: The property's set function
+      - X{fdel}: The property's delete function
+      - X{type}: The property's type
+
+    For more information on the standard documentation fields, see
+    L{ObjDoc}.
+    """
+    def __init__(self, uid, typ=None, verbosity=0):
+        property = uid.value()
+        self._fget = make_uid(property.fget)
+        self._fset = make_uid(property.fset)
+        self._fdel = make_uid(property.fdel)
+        self._type = typ
+        ObjDoc.__init__(self, uid, verbosity)
+
+        # Print out any errors/warnings that we encountered.
+        self._print_errors()
+
+    def _process_field(self, tag, arg, descr, warnings):
+        if tag == 'type':
+            if arg is not None:
+                warnings.append(tag+' did not expect an argument')
+                return
+            if self._type is not None:
+                warnings.append('Redefinition of %s' % tag)
+            self._type = descr
+        else:
+            ObjDoc._process_field(self, tag, arg, descr, warnings)
+
+    def __repr__(self):
+        return '<PropertyDoc: %s>' % self._uid
+
+    def type(self):
+        """
+        @return: The DOM representation of an epytext description of
+            this variable's type.
+        @rtype: L{xml.dom.minidom.Element}
+        """
+        return self._type
+
+    def fget(self):
+        """
+        @return: The UID of this property's get function.
+        @rtype: L{UID}
+        """
+        return self._fget
+
+    def fset(self):
+        """
+        @return: The UID of this property's set function.
+        @rtype: L{UID}
+        """
+        return self._fset
+
+    def fdel(self):
+        """
+        @return: The UID of this property's delete function.
+        @rtype: L{UID}
+        """
+        return self._fdel
+
 ##################################################
 ## Documentation Management
 ##################################################
@@ -1972,7 +2081,7 @@ class DocMap(UserDict.UserDict):
         self._top = None
         self._inherited = 0
 
-    def add_one(self, obj):
+    def add_one(self, obj, objID):
         """
         Add an object's documentation to this documentation map.  If
         you also want to include the objects contained by C{obj}, then
@@ -1985,7 +2094,6 @@ class DocMap(UserDict.UserDict):
         """
         self._inherited = 0
         self._top = None
-        objID = make_uid(obj)
             
         # If we've already documented it, don't do anything.
         if self.data.has_key(objID): return
@@ -1994,7 +2102,7 @@ class DocMap(UserDict.UserDict):
         if objID is None: return
         
         if objID.is_module():
-            self.data[objID] = ModuleDoc(obj, self._verbosity)
+            self.data[objID] = ModuleDoc(objID, self._verbosity)
             for module in self._package_children.get(objID, []):
                 self.data[objID].add_module(module)
             packageID = objID.package()
@@ -2007,7 +2115,7 @@ class DocMap(UserDict.UserDict):
                     self._package_children[packageID] = [obj]
 
         elif objID.is_class():
-            self.data[objID] = ClassDoc(obj, self._verbosity)
+            self.data[objID] = ClassDoc(objID, self._verbosity)
             for child in self._class_children.get(objID, []):
                 self.data[objID].add_subclass(child)
             try: bases = obj.__bases__
@@ -2025,9 +2133,15 @@ class DocMap(UserDict.UserDict):
                     self._class_children[baseID] = [obj]
 
         elif objID.is_function() or objID.is_method():
-            self.data[objID] = FuncDoc(obj, self._verbosity)
+            self.data[objID] = FuncDoc(objID, self._verbosity)
         elif objID.is_routine():
-            self.data[objID] = FuncDoc(obj, self._verbosity)
+            self.data[objID] = FuncDoc(objID, self._verbosity)
+        elif objID.is_property():
+            # Does the class specify a type for the property?
+            clsdoc = self.data[objID.parent()]
+            typ = clsdoc.property_type(objID)
+
+            self.data[objID] = PropertyDoc(objID, typ, self._verbosity)
 
     def add(self, obj):
         """
@@ -2055,7 +2169,7 @@ class DocMap(UserDict.UserDict):
         if self.data.has_key(objID): return
 
         # Add ourselves.
-        self.add_one(obj)
+        self.add_one(obj, objID)
         doc = self.get(objID)
         if not doc: return
 
@@ -2069,6 +2183,8 @@ class DocMap(UserDict.UserDict):
             for var in doc.cvariables():
                 if var.uid().is_class():
                     self.add(var.uid().value())
+            for link in doc.properties():
+                self.add_one(link.target().value(), link.target())
                     
             # Make sure all bases are added.
             if self._document_bases:
