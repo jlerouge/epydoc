@@ -89,9 +89,10 @@ option to produce a separate LaTeX file for each class.
 .PP
 .B epydoc
 can also be used to check the completeness of the API documentation.
-In particular, it will check that every package, module, class,
-method, and function has a description; and that every variable and
-parameter has a description and a type.
+By default, it checks that every public package, module, class,
+method, and function has a docstring description.  The
+.B \-\-tests
+option can be used to specify additional tests to perform.
 .\" ================== OPTIONS ====================
 .SH OPTIONS
 Options are divided into five categories: action selection options;
@@ -127,7 +128,7 @@ and
 .BR dvips
 to convert the LaTeX files into a single postscript file.
 .TP
-.B \-\-ps
+.B \-\-pdf
 Generate Adobe Acrobat
 .RB ( pdf )
 output.  This option first creates LaTeX output, and then uses
@@ -139,6 +140,9 @@ and
 to convert the LaTeX files into a single
 .B pdf
 file.
+.TP
+.B \-\-check
+Perform completeness checks on the documentation.
 .RE
 .PP
 .B HTML DOCUMENTATION GENERATION OPTIONS 
@@ -189,6 +193,20 @@ A file containing the body of the help page for the HTML output.
 Navigation bars will be added at the top and bottom of this help file.
 If no file is specified, then a default help file is used.
 .TP
+.BI "\-\-inheritance " format
+The format that should be used to display inherited methods,
+variables, and properties in the "summary" tables.
+If
+.I format
+is "grouped," then inherited objects are gathered into groups, based
+on which class that they are inherited from.  If
+.I format
+is "listed," then inherited objects are listed in a short list at the
+end of their table.  If
+.I format
+is "included," then inherited objects are mixed in with non-inherited
+objects.
+.TP
 .BI "\-n " name ", \-\-name " name
 The name of the project whose documentation is being generated.  This
 is used in the index page's title, and in the help page.  It is also
@@ -215,18 +233,23 @@ the frames-based table of contents by clicking on
 .B frames
 in the navigation bar.
 .TP
-.B \-\-no\-private
-Do not generate any documentation for private objects.  This option
-can be useful if you want to discourage users from directly accessing
-private objects.  This option is also useful if you want to generate
-documentation more quickly, since epydoc will only need to produce
-half as many HTML pages.
-.TP
 .BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
 The output directory for HTML files.  By default, HTML files are
 written to the
 .B html
 directory.
+.TP
+.B \-\-private, \-\-no\-private
+These options control whether documentation is generated for private
+objects.  By default, HTML documentation includes private objects, and
+users can choose whether to view private objects or not, by clicking
+on "show private" and "hide private" links.  But if you want to
+discourage users from directly accessing private objects, then you may
+prefer not to generate documentation for private objects.  The
+.B \-\-no\-private
+option is also useful if you want to generate documentation more
+quickly, since epydoc will only need to produce half as many HTML
+pages.
 .TP
 .BI "\-\-private\-css " sheet
 CSS stylesheet for HTML files containing private API documentation.
@@ -249,8 +272,8 @@ is used multiple times, it produces successively more quiet output (by
 suppressing warning messages).
 .TP
 .B \-\-show\-imports
-Include a list of the classes and functions that each module imports
-on the module documentation pages.
+Include a list of the classes, functions, and variables that each
+module imports on the module documentation pages.
 .TP
 .BI "\-t " page ", \-\-top " page
 The top page for the documentation. 
@@ -275,6 +298,8 @@ is used multiple times, it produces successively more verbose output.
 .PP
 .B LATEX DOCUMENTATION GENERATION OPTIONS
 .RS 4
+LaTeX documentation generation options are used when producing LaTeX,
+postscript (ps), or pdf output.
 .TP
 .IR modules ...
 The list of the modules that should be documented.  Modules can be
@@ -305,19 +330,23 @@ for English).  For a list of the markup languages currently recognized
 by epydoc, run
 .BR "epydoc \-\-help docformat" .
 .TP
+.BI "\-\-inheritance " format
+The format that should be used to display inherited methods,
+variables, and properties.
+If
+.I format
+is "grouped," then inherited objects are gathered into groups, based
+on which class that they are inherited from.  If
+.I format
+is "listed," then inherited objects are listed in a short list at the
+end of their section.  If
+.I format
+is "included," then inherited objects are mixed in with non-inherited
+objects.
+.TP
 .BI "\-n " name ", \-\-name " name
 The name of the project whose documentation is being generated.  This
-is used in the index page's title, and in the help page.  It is also
-used to create the homepage link on the navigation bar, if the
-.B \-\-navlink
-option is not used.
-.TP
-.B \-\-no\-private
-Do not generate any documentation for private objects.  This option
-can be useful if you want to discourage users from directly accessing
-private objects.  This option is also useful if you want to generate
-documentation more quickly, since epydoc will only need to produce
-half as many HTML pages.
+is used on the title page, in the page header, and in the pdf metadata.
 .TP
 .BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
 The output directory.  By default, HTML files are
@@ -326,6 +355,11 @@ written to the
 directory, and LaTeX files are written to the
 .B latex
 directory.
+.TP
+.B \-\-private, \-\-no\-private
+These options control whether documentation is generated for private
+objects.  By default, LaTeX output only includes documentation for
+public objects.
 .TP
 .B \-q, \-\-quiet
 Produce quiet output.  If
@@ -348,6 +382,13 @@ is used multiple times, it produces successively more verbose output.
 .PP
 .B DOCUMENTATION COMPLETENESS CHECKING OPTIONS
 .RS 4
+The
+.B \-\-check
+option is used to perform completeness checks on the documentation of
+your project.  By default, epydoc checks to make sure that all public
+objects have docstrings.  Additional checks can be added with the
+.B \-\-tests
+option.
 .TP
 .IR modules ...
 The list of the modules whose documentation should be checked.
@@ -360,17 +401,19 @@ or directory names (such as
 Directory names specify packages, and are expanded to include
 all sub-modules and sub-packages.
 .TP
-.B \-\-check
-Perform completeness checks on the documentation.
-.TP
-.B \-p
-Perform checks on private objects.
+.B \-\-private
+Perform checks on private objects
 .TP
 .B \-q, \-\-quiet
 Produce quiet output.  If
 .B \-q
 is used multiple times, it produces successively more quiet output (by
 suppressing warning messages).
+.TP
+.BI "\-\-tests " tests  ", \-\-checks " tests
+Perform additional tests on the documentation.  For a list of the
+additional tests that are available, run
+.BR "epydoc --help tests" .
 .TP
 .B \-v, \-\-verbose
 Produce verbose output.  If
@@ -395,7 +438,7 @@ Print the version of Epydoc.
 .\" ================== EXAMPLES ====================
 .SH EXAMPLES
 .TP
-.BR "epydoc \-n " epydoc " \-u " "http://epydoc.sf.net epydoc/*.py"
+.BR "epydoc \-n " epydoc " \-u " "http://epydoc.sf.net epydoc/"
 Generate the HTML API documentation for the epydoc package and all of
 its submodules, and write the output to the
 .B html
@@ -405,11 +448,11 @@ as the project name, and
 .B http://epydoc.sf.net
 as the project URL.
 .TP
-.BR "epydoc \-\-pdf \-n " epydoc " --no-private epydoc/*.py"
+.BR "epydoc \-\-pdf \-n " epydoc " epydoc/"
 Generate the LaTeX API documentation for the epydoc package and all of
 its submodules, and write the output to the
 .B latex
-directory.  Do not include private objects in the documentation.
+directory.
 .TP
 .BR "epydoc \-o "api " \-\-css " blue " \-\-private\-css " "green sys"
 Generate API documentation for the
