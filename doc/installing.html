@@ -38,8 +38,6 @@ Password:
 <code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-1.0.noarch.rpm</code>
 </pre></li>
 
-<li> Scripts? </li>
-
 <li> Once epydoc is installed, you can delete the RPM file.
 
 <pre class="screen">
@@ -51,8 +49,16 @@ Password:
 
 <ol>
   <li> Download and run <code>epydoc-1.0.win32.exe</code>. </li>
-  <li> Follow the on-screen instructions. </li>
-  <li> Adding shortcuts? </li>
+  <li> Follow the on-screen instructions.  Epydoc will be installed in
+  the <code>epydoc</code> subdirectory of your Python installation
+  directory (typically <code>C:\Python22\</code>). </li>
+  <li> The windows installer creates two scripts in the
+  <code>Scripts</code> subdirectory of your Python installation
+  directory: <code>epydoc.pyw</code> opens the graphical user
+  interface, and <code>epydoc.py</code> calls the command line
+  interface.  If you'd like, you can create shortcuts from these
+  scripts to more convenient locations (such as your desktop or start
+  menu). </li>
   <li> Once epydoc is installed, you can delete
   <code>epydoc-1.0.win32.exe</code>. </li>
 </ol>
@@ -70,19 +76,19 @@ Password:
 </pre></li>
 
   <li> Use the <code>setup.py</code> script in the
-  <code>eydoc-1.0/src/</code> directory to install epydoc. 
+  <code>eydoc-1.0/</code> directory to install epydoc. 
 
 <pre class="screen">
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-1.0/src/</code>
-<code class="prompt">[/tmp/epydoc-1.0/src]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-1.0/</code>
+<code class="prompt">[/tmp/epydoc-1.0]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-1.0/src]#</code> <code class="user">python setup.py install</code>
+<code class="prompt">[/tmp/epydoc-1.0]#</code> <code class="user">python setup.py install</code>
 running install
 running build
 <i>[...]</i>
 copying build/scripts/epydoc -> /usr/bin
 changing mode of /usr/bin/epydoc to 100775
-<code class="prompt">[/tmp/epydoc-1.0/src]#</code> <code class="user">cd ../..</code>
+<code class="prompt">[/tmp/epydoc-1.0]#</code> <code class="user">cd ..</code>
 <code class="prompt">[/tmp]#</code>
 </pre></li>
 
@@ -123,7 +129,7 @@ directory and the source distribution file.
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Wed Sep 25 03:44:22 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Sep 25 15:06:06 EDT 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
