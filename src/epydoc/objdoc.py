@@ -16,14 +16,16 @@
 Support for C{ObjDoc}s, which encode the information about a Python
 object that is necessary to create its documentation.  C{ObjDoc}s are
 created and managed by the C{DocMap} class, which acts like a
-dictionary from Python objects to C{ObjDoc}s.
+dictionary from L{UID}s to C{ObjDoc}s.
 
 Textual documentation entries (e.g., module descriptions, method
 descriptions, variable types, see-also entries) are encoded as DOM
-C{Elements}, using the DTD described in the C{epytext} module.
+L{Documents<xml.dom.minidom.Document>} and
+L{Elements<xml.dom.minidom.Document>}, using the DTD described in the
+L{epytext} module.
 
 Each Python object is identified by a globally unique identifier,
-implemented with the C{UID} class.  These identifiers are also used by
+implemented with the L{UID} class.  These identifiers are also used by
 the C{Link} class to implement crossreferencing between C{ObjDoc}s.
 """
 
@@ -35,10 +37,10 @@ import inspect, UserDict, epytext, string, new, re
 import xml.dom.minidom
 import types
 
-from epydoc.uid import UID, Link
+from epydoc.uid import UID, Link, make_uid
 
 ##################################################
-## Helper
+## Helper Functions
 ##################################################
 def _flatten(tree):
     """
@@ -79,32 +81,6 @@ def _getdoc(obj):
     else:
         return inspect.getdoc(obj)
 
-def _type(obj):
-    """
-    @return: an epytext representation of the type of C{obj}.  If
-        C{obj} is an instance of a class, then the epytext
-        representation contains a link to the instance's class.
-        Otherwise, it contains the name of C{obj}'s type.
-    @rtype: L{xml.dom.minidom.Element}
-    """
-    text = xml.dom.minidom.Element('epytext')
-    para = xml.dom.minidom.Element('para')
-    text.appendChild(para)
-    if type(obj) is types.InstanceType:
-        link = xml.dom.minidom.Element('link')
-        name = xml.dom.minidom.Element('name')
-        target = xml.dom.minidom.Element('target')
-        para.appendChild(link)
-        link.appendChild(name)
-        link.appendChild(target)
-        name.appendChild(xml.dom.minidom.Text(str(obj.__class__)))
-        target.appendChild(xml.dom.minidom.Text(str(obj.__class__)))
-    else:
-        code = xml.dom.minidom.Element('code')
-        para.appendChild(code)
-        code.appendChild(xml.dom.minidom.Text(type(obj).__name__))
-    return text
-
 def _find_docstring(uid):
     """
     @return: The file name and line number of the docstring for the
@@ -118,11 +94,11 @@ def _find_docstring(uid):
     # finding modules for objects (esp. functions).
 
     # Get the filename of the source file.
-    object = uid.object()
+    object = uid.value()
     try:
         if uid.is_module(): muid = uid
         else: muid = uid.module()
-        filename = muid.object().__file__
+        filename = muid.value().__file__
     except: return (None, None)
     if filename[-4:-1].lower() == '.py':
         filename = filename[:-1]
@@ -169,46 +145,50 @@ def _find_docstring(uid):
 
 class Var:
     """
-    The documentation for an individual variable.  This consists of
-    the variable's name, its description, and its type.  C{Var}s are 
-    used by L{ModuleDoc} (variables) and L{ClassDoc} (ivariables and
-    cvariables); and L{FuncDoc} (params, vararg, kwarg, retval).
-    """
-    def __init__(self, name, descr=None, type=None, value=None):
-        """
-        Construct the documentation for a variable or parameter.
+    The documentation for a variable.  This documentation consists of
+    the following fields:
 
-        @param name: The name of the variable.
-        @type name: C{string}
+        - X{uid}: The variable's UID
+        - X{descr}: A description of the variable
+        - X{type}: A description of the variable's type
+        - X{has_value}: A flag indicating whether a variable has a
+          value.  If this flag is true, then the value can be accessed
+          via the C{Var}'s UID.
+        
+    C{Var}s are used by L{ModuleDoc} to document variables; and by
+    L{ClassDoc} to document instance and class variables.
+    """
+    def __init__(self, uid, descr=None, type=None, has_value=1):
+        """
+        Construct the documentation for a variable.
+
+        @param uid: A unique identifier for the variable.
+        @type uid: C{string}
         @param descr: The DOM representation of an epytext description
             of the variable (as produced by C{epytext.parse}).
-        @type descr: C{xml.dom.minidom.Element}
+        @type descr: L{xml.dom.minidom.Element}
         @param type: The DOM representation of an epytext description
             of the variable's type (as produced by C{epytext.parse}).
-        @type type: C{xml.dom.minidom.Element}
-        @param value:
-          For variables:
-            - C{None} if the variable's value is unknown
-            - The UID of the variable's value, if it is a module,
-              class, function, method, or type.
-            - A string representation of the variable's value,
-              otherwise.
-          For parameters:
-            - C{None} if the parameter has no default value.
-            - A string representation of the parameter's default
-              value, otherwise.
-        @type value: C{string} or L{UID} or C{None}
+        @type type: L{xml.dom.minidom.Element}
+        @param has_value: Whether the documented variable has a value.
         """
-        self._name = name
+        self._uid = uid
         self._descr = descr
         self._type = type
-        self._value = value
+        self._has_value = has_value
         
+    def uid(self):
+        """
+        @return: The UID of the variable documented by this C{Var}.
+        @rtype: L{UID}
+        """
+        return self._uid
+    
     def type(self):
         """
         @return: The DOM representation of an epytext description of
             this variable's type.
-        @rtype: C{xml.dom.minidom.Element}
+        @rtype: L{xml.dom.minidom.Element}
         """
         return self._type
     
@@ -216,66 +196,118 @@ class Var:
         """
         @return: The DOM representation of an epytext description of
             this variable.
-        @rtype: C{xml.dom.minidom.Element}
+        @rtype: L{xml.dom.minidom.Element}
         """
         return self._descr
-    
+
+    def has_value(self):
+        """
+        @return: True if the variable documented by this C{Var} has a
+            value.  If this function returns true, then the value can
+            be accessed via the C{Var}'s UID.
+        @rtype: C{boolean}
+        """
+        return self._has_value
+
+    def __repr__(self):
+        return '<Variable '+self._name+'>'
+
+class Param:
+    """
+    The documentation for a function parameter.  This documentation
+    consists of the following fields:
+
+        - X{name}: The name of the parameter
+        - X{descr}: A description of the parameter
+        - X{type}: A description of the parameter's type
+        - X{default}: The parameter's default value
+
+    C{Param}s are used by L{FuncDoc} to document parameters.
+    """
+    def __init__(self, name, descr=None, type=None, default=None):
+        """
+        Construct the documentation for a parameter.
+
+        @param name: The name of the parameter.
+        @type name: C{string}
+        @param descr: The DOM representation of an epytext description
+            of the parameter (as produced by C{epytext.parse}).
+        @type descr: L{xml.dom.minidom.Element}
+        @param type: The DOM representation of an epytext description
+            of the parameter's type (as produced by C{epytext.parse}).
+        @type type: L{xml.dom.minidom.Element}
+        @param default: A string representation of the parameter's
+            default value; or C{None} if it has no default value.
+        @type default: C{string} or C{None}
+        """
+        self._name = name
+        self._descr = descr
+        self._type = type
+        self._default = default
+        
     def name(self):
         """
-        @return: The name of this variable.
+        @return: The name of this parameter.
         @rtype: C{string}
         """
         return self._name
     
-    def value(self):
+    def type(self):
         """
-        @return: The value of this variable.
-        
-          For variables:
-            - C{None} if the variable's value is unknown
-            - The UID of the variable's value, if it is a module,
-              class, function, method, or type.
-            - A string representation of the variable's value,
-              otherwise.
-          For parameters:
-            - C{None} if the parameter has no default value.
-            - A string representation of the parameter's default
-              value, otherwise.
+        @return: The DOM representation of an epytext description of
+            this parameter's type.
+        @rtype: L{xml.dom.minidom.Element}
+        """
+        return self._type
+    
+    def descr(self):
+        """
+        @return: The DOM representation of an epytext description of
+            this parameter.
+        @rtype: L{xml.dom.minidom.Element}
+        """
+        return self._descr
+    
+    def default(self):
+        """
+        @return:  A string representation of the parameter's
+            default value; or C{None} if it has no default value.
         @rtype: C{string} or C{None}
         """
-        return self._value
+        return self._default
 
     def set_type(self, type):
         """
-        Set this variable's type.
+        Set this parameter's type.
         
         @param type: The DOM representation of an epytext description
-            of the variable's type (as produced by C{epytext.parse}).
-        @type type: C{xml.dom.minidom.Element}
+            of the parameter's type (as produced by C{epytext.parse}).
+        @type type: L{xml.dom.minidom.Element}
         @rtype: C{None}
         """
         self._type = type
         
     def set_descr(self, descr):
         """
-        Set this variable's description.
+        Set this parameter's description.
         
-        @type descr: C{xml.dom.minidom.Element}
+        @type descr: L{xml.dom.minidom.Element}
         @param descr: The DOM representation of an epytext description
-            of the variable's type (as produced by C{epytext.parse}).
+            of the parameter's type (as produced by C{epytext.parse}).
         @rtype: C{None}
         """
         self._descr = descr
         
-    def set_value(self, value):
+    def set_default(self, default):
         """
-        Set this variable's value.
+        Set this parameter's default value.
         
-        @param value: The new value.
-        @type value: C{string} or C{None}
+        @param default: A string representation of the parameter's
+            default value; or C{None} if it has no default value.
+        @type default: C{string} or C{None}
         @rtype: C{None}
         """
-        self._value = value
+        self._default = default
         
     def __repr__(self):
         return '<Variable '+self._name+'>'
@@ -295,7 +327,7 @@ class Raise:
         @param descr: The DOM representation of an epytext description
             of when the exception is raised (as produced by
             C{epytext.parse}). 
-        @type descr: C{xml.dom.minidom.Element}
+        @type descr: L{xml.dom.minidom.Element}
         """
         self._name = name
         self._descr = descr
@@ -312,7 +344,7 @@ class Raise:
         @return: The DOM representation of an epytext description
             of when the exception is raised (as produced by
             C{epytext.parse}).
-        @rtype: C{xml.dom.minidom.Element}
+        @rtype: L{xml.dom.minidom.Element}
         """
         return self._descr
         
@@ -325,6 +357,7 @@ class ObjDoc:
     that is necessary to create its documentation.  This base class
     defines the following documentation fields:
 
+        - X{uid}: The object's unique identifier
         - X{descr}: A description of the object
         - X{authors}: A list of the object's authors
         - X{version}: The object's version
@@ -336,14 +369,14 @@ class ObjDoc:
     @type _uid: L{UID}
     
     @ivar _descr: The object's description, encoded as epytext.
-    @type _descr: C{Element}
+    @type _descr: L{xml.dom.minidom.Document}
 
     @ivar _authors: Author(s) of the object
-    @type _authors: C{list} of C{Element}
+    @type _authors: C{list} of L{xml.dom.minidom.Element}
     @ivar _version: Version of the object
-    @type _version: C{Element}
+    @type _version: L{xml.dom.minidom.Element}
     @ivar _seealsos: See also entries
-    @type _seealsos: C{list} of C{Element}
+    @type _seealsos: C{list} of L{xml.dom.minidom.Element}
     """
     def __init__(self, obj, verbosity=0):
         """
@@ -357,7 +390,7 @@ class ObjDoc:
             supress warnings and errors.
         @type verbosity: C{int}
         """
-        self._uid = UID(obj)
+        self._uid = make_uid(obj)
 
         # Initialize fields.
         self._authors = []
@@ -404,7 +437,7 @@ class ObjDoc:
         """
         @return: A description of the object documented by this
             C{ObjDoc}.
-        @returntype: C{Element}
+        @returntype: L{xml.dom.minidom.Document}
         """
         return self._descr
     
@@ -412,7 +445,7 @@ class ObjDoc:
         """
         @return: A list of the authors of the object documented by
             this C{ObjDoc}.
-        @returntype: C{list} of C{Element}
+        @returntype: C{list} of L{xml.dom.minidom.Element}
         """
         return self._authors
     
@@ -420,7 +453,7 @@ class ObjDoc:
         """
         @return: The version of the object documented by this
             C{ObjDoc}.
-        @returntype: C{Element}
+        @returntype: L{xml.dom.minidom.Element}
         """
         return self._version
     
@@ -428,7 +461,7 @@ class ObjDoc:
         """
         @return: A list of objects related to the object documented by 
             this C{ObjDoc}.
-        @returntype: C{list} of C{Element}
+        @returntype: C{list} of L{xml.dom.minidom.Element}
         """
         return self._seealsos
 
@@ -482,9 +515,10 @@ class ObjDoc:
             pdoc = epytext.parse_as_literal(docstring)
 
         # Extract and process any fields
-        if pdoc.childNodes and pdoc.childNodes[-1].tagName == 'fieldlist':
-            fields = pdoc.childNodes[-1].childNodes
-            pdoc.removeChild(pdoc.childNodes[-1])
+        if (pdoc.hasChildNodes() and pdoc.childNodes[0].hasChildNodes() and
+            pdoc.childNodes[0].childNodes[-1].tagName == 'fieldlist'):
+            fields = pdoc.childNodes[0].childNodes[-1].childNodes
+            pdoc.childNodes[0].removeChild(pdoc.childNodes[0].childNodes[-1])
             for field in fields:
                 # Get the tag
                 tag = field.childNodes[0].childNodes[0].data.lower()
@@ -502,7 +536,7 @@ class ObjDoc:
                 self._process_field(tag, arg, field, field_warnings)
 
         # Save the remaining docstring as the description..
-        if pdoc.hasChildNodes():
+        if pdoc.hasChildNodes() and pdoc.childNodes[0].hasChildNodes():
             self._descr = pdoc
         else:
             self._descr = None
@@ -518,7 +552,6 @@ class ObjDoc:
             (filename, startline) = _find_docstring(self._uid)
             if startline is None: startline = 0
             
-            print
             print '='*75
             if filename is not None:
                 print filename
@@ -537,6 +570,7 @@ class ObjDoc:
                     print '       '+warning
                 else:
                     print '%5s: Warning: %s' % ('L'+`startline+1`, warning)
+            print
         
 #////////////////////////////////////////////////////////
 #// ModuleDoc
@@ -587,54 +621,50 @@ class ModuleDoc(ObjDoc):
         # Handle functions, classes, and variables.
         self._classes = []
         self._functions = []
-        variables = {}
         self._imported_classes = []
         self._imported_functions = []
+        self._variables = []
         for (field, val) in mod.__dict__.items():
-            vuid = UID(val)
+            vuid = make_uid(val, self._uid, field)
+                
             # Don't do anything for introspection specials.
             if field in ('__builtins__', '__doc__',
                          '__file__', '__path__', '__name__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
-            if not vuid.found_fullname(): continue
+            if vuid is None: continue
             # Don't do anything for modules.
             if vuid.is_module(): continue
 
-            # Add the field to the appropriate place.
+            # Is it a function?
             if vuid.is_function() or vuid.is_builtin_function():
                 if vuid.module() == self._uid:
                     self._functions.append(Link(field, vuid))
                 else:
                     self._imported_functions.append(Link(field, vuid))
+
+            # Is it a class?
             elif vuid.is_class():
                 if vuid.module() == self._uid:
                     self._classes.append(Link(field, vuid))
                 else:
                     self._imported_classes.append(Link(field, vuid))
-            else:
-                if type(val) is types.StringType:
-                    value = `val`
-                else:
-                    value = UID(val)
-                    if not value.found_fullname():
-                        try: value = `val`
-                        except: value = None
-                if self._tmp_type.has_key(field):
-                    typ = self._tmp_type[field]
-                    variables[field] = Var(field, None, typ, value)
-                    del self._tmp_type[field]
-                else:
-                    variables[field] = Var(field, None, _type(val), value)
 
-        # Add descriptions and types to variables
+            # Is it a variable?
+            else:
+                descr = self._tmp_var.get(field)
+                if descr is not None: del self._tmp_var[field]
+                typ = self._tmp_type.get(field)
+                if typ is not None: del self._tmp_type[field]
+                else: typ = epytext.parse_type_of(val)
+                self._variables.append(Var(vuid, descr, typ, 1))
+
+        # Add the remaining variables
         for (name, descr) in self._tmp_var.items():
-            var = variables.setdefault(name, Var(name))
-            var.set_descr(descr)
-            if self._tmp_type.has_key(name):
-                var.set_type(self._tmp_type[name])
-                del self._tmp_type[name]
-        self._variables = variables.values()
+            typ = self._tmp_type.get(name)
+            if typ is not None: del self._tmp_type[name]
+            vuid = make_uid(None, self._uid, name)
+            self._variables.append(Var(vuid, descr, typ, 0))
 
         # Make sure we used all the type fields.
         if self._tmp_type != {}:
@@ -778,7 +808,7 @@ class ModuleDoc(ObjDoc):
             raise TypeError('This ModuleDoc does not '+
                             'document a package.')
         name = (module.__name__.split('.'))[-1]
-        self._modules.append(Link(name, UID(module)))
+        self._modules.append(Link(name, make_uid(module)))
 
 #////////////////////////////////////////////////////////
 #// ClassDoc
@@ -822,61 +852,53 @@ class ClassDoc(ObjDoc):
         ObjDoc.__init__(self, cls, verbosity)
 
         # Handle methods & class variables
-        cvariables = {}
         self._methods = []
+        self._cvariables = []
+        self._ivariables = []
 
         try: items = cls.__dict__.items()
         except AttributeError: items = []
         for (field, val) in items:
-            vuid = UID(val)
+            vuid = make_uid(val, self._uid, field)
+            
             # Don't do anything for introspection specials.
             if field in ('__doc__', '__module__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
-            if not vuid.found_fullname(): continue
+            if vuid is None: continue
             # Don't do anything for modules.
             if vuid.is_module(): continue
 
-            # Add the field to the appropriate place.
-            # Note that, since we got it via __dict__, it'll be a
-            # Function, not a Method.
+            # Is it a method?  (Since we got it via __dict__, it will
+            # be a function instead of a method.)
             if vuid.is_function():
                 method = new.instancemethod(val, None, cls)
-                self._methods.append(Link(field, UID(method)))
+                self._methods.append(Link(field, make_uid(method)))
             elif vuid.is_routine():
                 self._methods.append(Link(field, vuid))
-            else:
-                if type(val) is types.StringType:
-                    value = `val`
-                else:
-                    value = UID(val)
-                    if not value.found_fullname():
-                        try: value = `val`
-                        except: value = None
-                if self._tmp_type.has_key(field):
-                    typ = self._tmp_type[field]
-                    cvariables[field] = Var(field, None, typ, value)
-                    del self._tmp_type[field]
-                else:
-                    cvariables[field] = Var(field, None, _type(val), value)
 
-        # Add descriptions and types to class variables
+            # Is it a class variable?
+            else:
+                descr = self._tmp_cvar.get(field)
+                if descr is not None: del self._tmp_cvar[field]
+                typ = self._tmp_type.get(field)
+                if typ is not None: del self._tmp_type[field]
+                else: typ = epytext.parse_type_of(val)
+                self._cvariables.append(Var(vuid, descr, typ, 1))
+
+        # Add the remaining class variables
         for (name, descr) in self._tmp_cvar.items():
-            var = cvariables.setdefault(name, Var(name))
-            var.set_descr(descr)
-            if self._tmp_type.has_key(name):
-                var.set_type(self._tmp_type[name])
-                del self._tmp_type[name]
-        self._cvariables = cvariables.values()
+            typ = self._tmp_type.get(name)
+            if typ is not None: del self._tmp_type[name]
+            vuid = make_uid(None, self._uid, name)
+            self._cvariables.append(Var(vuid, descr, typ, 0))
 
-        # Construct instance variables.
-        self._ivariables = []
+        # Add the instance variables.
         for (name, descr) in self._tmp_ivar.items():
-            if self._tmp_type.has_key(name):
-                self._ivariables.append(Var(name, descr, self._tmp_type[name]))
-                del self._tmp_type[name]
-            else:
-                self._ivariables.append(Var(name, descr))
+            typ = self._tmp_type.get(name)
+            if typ is not None: del self._tmp_type[name]
+            vuid = make_uid(None, self._uid, name)
+            self._ivariables.append(Var(vuid, descr, typ, 0))
 
         # Make sure we used all the type fields.
         if self._tmp_type:
@@ -889,7 +911,7 @@ class ClassDoc(ObjDoc):
         # Add links to base classes.
         try: bases = cls.__bases__
         except AttributeError: bases = []
-        self._bases = [Link(base.__name__, UID(base)) for base in bases]
+        self._bases = [Link(base.__name__, make_uid(base)) for base in bases]
 
         # Initialize subclass list.  (Subclasses get added
         # externally with add_subclass())
@@ -956,16 +978,16 @@ class ClassDoc(ObjDoc):
 
     def _inherit_methods(self, base):
         for (field, val) in base.__dict__.items():
-            vuid = UID(val)
+            vuid = make_uid(val, self._uid, field)
             if vuid is None: continue
             if not vuid.is_routine(): continue
             if self._methodbyname.has_key(field): continue
             self._methodbyname[field] = 1
             if vuid.is_function():
                 method = new.instancemethod(val, None, base)
-                self._methods.append(Link(field, UID(method)))
+                self._methods.append(Link(field, make_uid(method)))
             else:
-                self._methods.append(Link(field, UID(val)))
+                self._methods.append(Link(field, make_uid(val)))
 
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
@@ -975,7 +997,7 @@ class ClassDoc(ObjDoc):
                          '__file__', '__path__', '__name__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
-            if not vuid.found_fullname(): continue
+            if vuid is None: continue
             # Don't do anything for modules.
             if vuid.is_module(): continue
 
@@ -1068,7 +1090,7 @@ class ClassDoc(ObjDoc):
         @type cls: L{UID}
         @rtype: C{None}
         """
-        self._subclasses.append(Link(cls.__name__, UID(cls)))
+        self._subclasses.append(Link(cls.__name__, make_uid(cls)))
 
 #////////////////////////////////////////////////////////
 #// FuncDoc
@@ -1159,7 +1181,7 @@ class FuncDoc(ObjDoc):
         self._params = []
         self._kwarg_param = None
         self._vararg_param = None
-        self._return = Var('return')
+        self._return = Param('return')
 
         m = FuncDoc._SIGNATURE_RE.match(_getdoc(func) or '')
         if m and m.group('func') == func.__name__:
@@ -1172,7 +1194,7 @@ class FuncDoc(ObjDoc):
                 while '[' in params or ']' in params:
                     m2 = re.match(r'(.*)\[([^\[\]]+)\](.*)', params)
                     if not m2:
-                        self._vararg_param = Var('...')
+                        self._vararg_param = Param('...')
                         return
                     (start, mid, end) = m2.groups()
                     mid = re.sub(r'((,|^)\s*[\w\-\.]+)', r'\1=...', mid)
@@ -1180,26 +1202,26 @@ class FuncDoc(ObjDoc):
 
                 params = re.sub(r'=...=' , r'=', params)
                 for name in params.split(','):
-                    name = name.strip()
                     if '=' in name: (name, default) = name.split('=',1)
                     else: default = None
+                    name = name.strip()
                     if name == '...':
-                        self._vararg_param = Var('...', value=default)
+                        self._vararg_param = Param('...', default=default)
                     elif name.startswith('**'):
-                        self._kwarg_param = Var(name[1:], value=default)
+                        self._kwarg_param = Param(name[1:], default=default)
                     elif name.startswith('*'):
-                        self._vararg_param = Var(name[1:], value=default)
+                        self._vararg_param = Param(name[1:], default=default)
                     else:
-                        self._params.append(Var(name.strip(), value=default))
+                        self._params.append(Param(name, default=default))
             # Extract the return type from the signature
             if rtype:
                 self._return.set_type(epytext.parse_as_para(rtype))
 
             # Remove the signature from the description.
-            text = self._descr.childNodes[0].childNodes[0]
+            text = self._descr.childNodes[0].childNodes[0].childNodes[0]
             text.data = FuncDoc._SIGNATURE_RE.sub('', text.data, 1)
         else:
-            self._vararg_param = Var('...')
+            self._vararg_param = Param('...')
 
         # What do we do with documented parameters?
         ## If they specified parameters, use them. ??
@@ -1207,9 +1229,9 @@ class FuncDoc(ObjDoc):
         #if self._tmp_param or self._tmp_type:
         #    vars = {}
         #    for (name, descr) in self._tmp_param.items():
-        #        vars[name] = Var(name, descr)
+        #        vars[name] = Param(name, descr)
         #    for (name, type_descr) in self._tmp_type.items():
-        #        if not vars.has_key(name): vars[name] = Var(name)
+        #        if not vars.has_key(name): vars[name] = Param(name)
         #        vars[name].set_type(type_descr)
         #    self._params = 
 
@@ -1219,11 +1241,11 @@ class FuncDoc(ObjDoc):
 
         # Construct argument/return Variables.
         self._params = self._params_to_vars(args, defaults)
-        if vararg: self._vararg_param = Var(vararg)
+        if vararg: self._vararg_param = Param(vararg)
         else: self._vararg_param = None
-        if kwarg: self._kwarg_param = Var(kwarg)
+        if kwarg: self._kwarg_param = Param(kwarg)
         else: self._kwarg_param = None
-        self._return = Var('return')
+        self._return = Param('return')
 
     def _init_params(self):
         # Add descriptions/types to argument/return Variables.
@@ -1259,10 +1281,10 @@ class FuncDoc(ObjDoc):
                 # We couldn't figure out how to line up defaults with vars.
                 defaultindex=-1
             if type(params[i]) is types.StringType:
-                vars.append(Var(params[i]))
+                vars.append(Param(params[i]))
                 if defaultindex >= 0:
-                    try: vars[-1].set_value(`defaults[defaultindex]`)
-                    except: vars[-1].set_value('...')
+                    try: vars[-1].set_default(`defaults[defaultindex]`)
+                    except: vars[-1].set_default('...')
             elif defaultindex >= 0:
                 vars.append(self._params_to_vars(params[i],
                                                  defaults[defaultindex]))
@@ -1275,10 +1297,10 @@ class FuncDoc(ObjDoc):
         for base in cls.__bases__:
             if base.__dict__.has_key(name):
                 func = base.__dict__[name]
-                fuid = UID(func)
+                fuid = make_uid(func)
                 if fuid.is_function():
                     method = new.instancemethod(func, None, base)
-                    self._overrides = UID(method)
+                    self._overrides = make_uid(method)
                 elif fuid.is_routine():
                     self._overrides = fuid
                 break
@@ -1339,6 +1361,7 @@ class FuncDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
 
+    # , include_varargs, include_kwargs, include_return ??
     def parameter_list(self):
         """
         @return: A (flat) list of all parameters for the
@@ -1470,7 +1493,7 @@ class DocMap(UserDict.UserDict):
         """
         self._inherited = 0
         self._top = None
-        objID = UID(obj)
+        objID = make_uid(obj)
             
         #print 'Constructing docs for:', objID
         if self.data.has_key(objID): return
@@ -1495,7 +1518,7 @@ class DocMap(UserDict.UserDict):
             try: bases = obj.__bases__
             except: bases = []
             for base in bases:
-                baseID=UID(base)
+                baseID=make_uid(base)
                 if self.data.has_key(baseID):
                     self.data[baseID].add_subclass(obj)
                 if self._class_children.has_key(baseID):
@@ -1518,7 +1541,7 @@ class DocMap(UserDict.UserDict):
         @type obj: any
         @rtype: C{None}
         """
-        objID = UID(obj)
+        objID = make_uid(obj)
         if self.data.has_key(objID): return
 
         # Add ourselves.
@@ -1526,34 +1549,34 @@ class DocMap(UserDict.UserDict):
 
         # Recurse to any related objects.
         if objID.is_module():
-            for val in obj.__dict__.values():
-                valID = UID(val)
+            for (field, val) in obj.__dict__.items():
+                vuid = make_uid(val, objID, field)
 
                 # Skip any imported values.
-                if valID.is_class() or valID.is_function():
-                    if UID(val).module() != objID: continue
+                if vuid.is_class() or vuid.is_function():
+                    if make_uid(val).module() != objID: continue
 
-                if valID.is_class():
+                if vuid.is_class():
                     self.add(val)
-                elif valID.is_routine():
+                elif vuid.is_routine():
                     self.add(val)
         elif objID.is_class():
-            try: values = obj.__dict__.values()
-            except AttributeError: values = []
-            for val in values:
-                valID = UID(val)
+            try: items = obj.__dict__.items()
+            except AttributeError: items = []
+            for (field, val) in items:
+                vuid = make_uid(val, objID, field)
                     
-                if valID.is_function():
+                if vuid.is_function():
                     self.add(new.instancemethod(val, None, obj))
-                elif valID.is_routine():
+                elif vuid.is_routine():
                     self.add(val)
-                elif valID.is_class():
+                elif vuid.is_class():
                     self.add(val)
                     
             if self._document_bases:
                 # Make sure all bases are added.
                 for base in self.data[objID].bases():
-                    self.add(base.target().object())
+                    self.add(base.target().value())
 
     def _toplevel(self, uid):
         """
@@ -1616,12 +1639,13 @@ class DocMap(UserDict.UserDict):
 #             for cls in self.keys():
 #                 if not cls.is_class(): continue
 #                 self[cls].inherit(*[self.get(UID(baseid)) for baseid
-#                                     in cls.object().__bases__])
+#                                     in cls.value().__bases__])
 
         if isinstance(key, UID):
             return self.data[key]
         else:
-            return self.data[UID(key)]
+            print 'warning: lookup by value is bad'
+            return self.data[make_uid(key)]
 
     def __repr__(self):
         return '<Documentation: '+`len(self.data)`+' objects>'
