@@ -1013,9 +1013,6 @@ def findUID(name, container=None, docmap=None):
     if container and not (container.is_module() or container.is_class()
                           or container.is_routine()):
         container = container.cls() or container.module()
-    if container is None:
-        try: container = make_uid(sys.modules['__builtin__'])
-        except: container = None
 
     # Is it a function/method parameter?
     if container and container.is_routine():
@@ -1028,28 +1025,17 @@ def findUID(name, container=None, docmap=None):
 
     # Is it the short name for a member of the containing class?
     if container and container.is_class():
-        if _is_variable_in(name, container, docmap):
-            val = None # it may not be a real object
-            return make_uid(val, container, name)
-        elif container.value().__dict__.has_key(name):
-            cls = container.value()
-            obj = cls.__dict__[name]
-            if type(obj) is _FunctionType:
-                return make_uid(new.instancemethod(obj, None, cls),
-                                container, name)
-            else:
-                return make_uid(obj, container, name)
-        else:
-            container = container.module()
+        child = _find_class_child(name, container, docmap)
+        if child is not None: return child
+        else: container = container.module()
 
     if container:
         components = name.split('.')
         module = container.value()
     
         # Is it a variable in the containing module?
-        if _is_variable_in(name, container, docmap):
-            val = None # it may not be a real object
-            return make_uid(val, container, name)
+        var = _find_variable_in(name, container, docmap)
+        if var is not None: return var
 
         # Is it an object in the containing module?
         try:
@@ -1085,9 +1071,8 @@ def findUID(name, container=None, docmap=None):
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
                 mod = import_module(modname)
-                if _is_variable_in(name, make_uid(mod), docmap):
-                    val = None # it may not be a real object
-                    return make_uid(val, container, name)
+                var = _find_variable_in(name, container, docmap)
+                if var is not None: return var
                 obj = getattr(import_module(modname), objname)
                 return make_uid(obj, make_uid(mod), objname)
             except: pass
@@ -1104,9 +1089,8 @@ def findUID(name, container=None, docmap=None):
                 objname = '.'.join(components[j:-1])
                 fieldname = components[-1]
                 mod = import_module(modname)
-                if _is_variable_in(name, make_uid(mod), docmap):
-                    val = None # it may not be a real object
-                    return make_uid(val, container, name)
+                var = _find_variable_in(name, container, docmap)
+                if var is not None: return var
                 obj = getattr(import_module(modname), objname)
                 field = getattr(obj, fieldname)
                 return make_uid(field, make_uid(obj), fieldname)
@@ -1116,39 +1100,63 @@ def findUID(name, container=None, docmap=None):
     if name.startswith('self.'):
         return findUID(name[5:], original_container, docmap)
 
+    # Is it a builtin object?
+    builtins = sys.modules.get('__builtin__')
+    if builtins and builtins.__dict__.has_key(name):
+        return make_uid(builtins.__dict__.get(name),
+                        make_uid(builtins), name)
+
     # We couldn't find it; return None.
     return None
 
-def _is_variable_in(name, container, docmap):
+def _find_variable_in(name, container, docmap):
     """
-    @return: True if C{name} is a variable documented by
-        C{container} in C{docmap}.
-    @rtype: C{boolean}
-    @param name: The name to check.
-    @type name: C{string}
-    @param container: The UID of the object which might contain a
-        variable named C{name}.
-    @type container: L{UID}
-    @param docmap: A documentation map containing the documentation
-        for the object identified by C{container}.
-    @type docmap: L{objdoc.DocMap}
+    Search for a variable named C{name} in the module or class whose
+    UID is C{container}, given the DocMap C{docmap}.
+
+    @rtype: L{UID} or C{None}
+    @return: The UID of the variable named C{name}, if it exists; or
+        C{None} if it doesn't.
     """
-    if docmap is None or not docmap.has_key(container): return 0
+    if docmap is None or not docmap.has_key(container): return None
     container_doc = docmap.get(container)
     if container.is_module():
         for var in container_doc.variables():
-            if var.uid().shortname() == name: return 1
+            if var.name() == name: return var.uid()
     elif container.is_class():
         for var in container_doc.ivariables():
-            if var.uid().shortname() == name: return 1
+            if var.name() == name: return var.uid()
         for var in container_doc.cvariables(): 
-            if var.uid().shortname() == name: return 1
-    return 0
+            if var.name() == name: return var.uid()
+    return None
 
+def _find_class_child(name, container, docmap):
+    """
+    Search for a child object named C{name} in the class whose
+    UID is C{container}, given the DocMap C{docmap}.
+
+    @rtype: L{UID} or C{None}
+    @return: The UID of the variable named C{name}, if it exists; or
+        C{None} if it doesn't.
+    """
+    if docmap is None or not docmap.has_key(container): return None
+    cdoc = docmap.get(container)
+    for link in cdoc.allmethods() + cdoc.properties():
+        if link.name() == name: return link.target()
+    for var in cdoc.ivariables() + cdoc.cvariables():
+        if var.name() == name: return var.uid()
+    return None
+    
 def _is_parameter_for(name, container, docmap):
+    """
+    @rtype: C{boolean}
+    @return: True if C{name} is the name of a parameter for the
+    routine C{container}, given the DocMap C{docmap}.
+    """
     if docmap is None or not docmap.has_key(container): return 0
     container_doc = docmap.get(container)
     if container.is_routine():
         for param in container_doc.parameter_list():
             if param.name() == name: return 1
     return 0
+
