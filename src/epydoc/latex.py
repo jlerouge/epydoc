@@ -740,7 +740,11 @@ class LatexFormatter:
             str += '        \\begin{Ventry}{%s}\n\n' % (longest*'x')
             for param in fparam:
                 pname = self._text_to_latex(param.name())
-                str += (' '*10+'\\item[' + pname + ']\n\n')
+                str += ' '*10+'\\item[' + self._text_to_latex(pname)
+                if param.shared_descr_params():
+                    for p in param.shared_descr_params():
+                        str += ', %s' % self._text_to_latex(p.name())
+                str += ']\n\n'
                 if param.descr():
                     str += self._docstring_to_latex(param.descr(), 10)
                 if param.type():

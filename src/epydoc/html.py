@@ -1949,6 +1949,9 @@ class HTMLFormatter:
             # Add each parameter
             for param in group:
                 str += '      <dd><code><b>%s</b></code>' % param.name()
+                if param.shared_descr_params():
+                    for p in param.shared_descr_params():
+                        str += ', <code><b>%s</b></code>' % p.name()
                 if param.descr():
                     pdescr = self._docstring_to_html(param.descr(), fuid, 8)
                     str += ' -\n %s' % pdescr.rstrip()
