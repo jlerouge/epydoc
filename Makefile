@@ -4,6 +4,10 @@
 ##  Edward Loper
 ############################################################
 
+##//////////////////////////////////////////////////////////////////////
+## Configuration variables
+##//////////////////////////////////////////////////////////////////////
+
 # Python source files
 PY_SRC = $(wildcard src/epydoc/*.py)
 EXAMPLES_SRC = $(wildcard doc/*.py)
@@ -13,41 +17,57 @@ DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 HOST = shell.sf.net
 DIR = /home/groups/e/ep/epydoc/htdocs
 
-# The local location to build the web materials
+# Output directories
 WEBDIR = html
-API = doc/api
-EXAMPLES = doc/examples
+API = api
+EXAMPLES = examples
 STDLIB = stdlib
 
-############################################################
+##//////////////////////////////////////////////////////////////////////
+## Usage
+##//////////////////////////////////////////////////////////////////////
 
 .PHONY: all usage clean distributions web webpage xfer local
 .PHONY: checkdocs refdocs examples stdlib
 
 all: usage
-
 usage:
 	@echo "Usage:"
 	@echo "  make webpage -- build the webpage and copy it to sourceforge"
-	@echo "  make refdocs -- build the API reference docs"
+	@echo "    make refdocs -- build the API docs for epydoc"
+	@echo "    make examples -- build example API docs for the webpage"
 	@echo "  make checkdoc -- check the documentation completeness"
 	@echo "  make distributions -- build the distributions"
 	@echo "  make clean -- remove all built files"
 	@echo "  make stdlib -- build docs for the Python Standard Library"
+
+##//////////////////////////////////////////////////////////////////////
+## Clean
+##//////////////////////////////////////////////////////////////////////
 
 clean:
 	$(MAKE) -C src clean
 	rm -rf ${WEBDIR} ${API} ${EXAMPLES} ${STDLIB}
 	rm -rf .*.up2date
 
-distributions: src/dist/.up2date
-src/dist/.up2date: $(PY_SRC)
+##//////////////////////////////////////////////////////////////////////
+## Distributions
+##//////////////////////////////////////////////////////////////////////
+
+distributions: .distributions.up2date
+.distributions.up2date: $(PY_SRC) .html.up2date
 	$(MAKE) -C src distributions
+	touch .distributions.up2date
+
+##//////////////////////////////////////////////////////////////////////
+## Web page
+##//////////////////////////////////////////////////////////////////////
 
 web: xfer
 webpage: xfer
-xfer: .html.up2date
+xfer: .html.up2date stdlib
 	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
+	rsync -arzv -e ssh ${STDLIB} $(HOST):$(DIR)/stdlib
 
 local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
@@ -55,12 +75,14 @@ local: .html.up2date
 checkdocs:
 	epydoc --check ${PY_SRC}
 
-.html.up2date: refdocs examples doc/epydoc-man.html doc/epydocgui-man.html
+.html.up2date: .refdocs.up2date .examples.up2date \
+		doc/epydoc-man.html doc/epydocgui-man.html
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
 	cp -r ${API} ${WEBDIR}
 	cp -r ${EXAMPLES} ${WEBDIR}
+	touch .html.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
 # __docformat__ strings in each epydoc module.  (So just
@@ -108,39 +130,21 @@ doc/epydocgui-man.html: man/epydocgui.1
 	     | sed 's/<A HREF="\/cgi-bin\/man2html">man2html<\/A>/man2html/'\
 	     > doc/epydocgui-man.html
 
-#//////////////////////////////////////////////////////////////////////
-# Build documentation for the Python Standard Library
-SLNAME = 'Python 2.1 Standard Library'
-SLLINK = '<font size="-2">Python 2.1<br>Standard Library</font>'
-SLURL = 'http://www.python.org/doc/2.1/lib/lib.html'
-SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
-	      |grep -v '/python2.1/config/' \
-	      |grep -v '/python2.1/lib-old/' \
-	      |grep -v '/python2.1/site-packages/')
-stdlib:
+##//////////////////////////////////////////////////////////////////////
+## Standard Library docs
+##//////////////////////////////////////////////////////////////////////
+
+SLNAME = 'Python 2.2 Standard Library'
+SLLINK = '<font size="-2">Python 2.2<br>Standard Library</font>'
+SLURL = 'http://www.python.org/doc/2.2/lib/lib.html'
+SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
+	      |grep -v '/python2.2/config/' \
+	      |grep -v '/python2.2/lib-old/' \
+	      |grep -v '/python2.2/site-packages/')
+stdlib: .stdlib.up2date
+.stdlib.up2date: ${PY_SRC}
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
-	epydoc -o ${STDLIB} -c white --show-imports \
+	python2.2 src/epydoc/cli.py -o ${STDLIB} -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
-
-##//////////////////////////////////////////////////////////////////////
-## Build documentation for everything installed on this system.
-## Exclude the following libraries:
-##   - lib-old/ni.py: Implements packages, but they're already standard
-##   - eric: it fails and dies in an un-catchable way
-##   - gnome/score.py: it forks a new process
-#LNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
-#LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
-#	      |grep -v '/gnome/score.py' \
-#	      |grep -v '/eric/' \
-#	      |grep -v '/lib-old/ni.py')
-##	      |grep -v '/site-packages/') # for now (?)
-#
-#libdocs:
-#	mkdir -p libs
-#	epydoc -o libs -f -vvvv -q -n ${LNAME} \
-#	       -u http://www.python.org -c white ${LIBS} -builtins- #\
-##	       >libs/libdocs.out 2>libs/libdocs.err
-#	rm -f TESTLispG* SQLTEST.mar sqlwhere.py 
-#
