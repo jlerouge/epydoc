@@ -47,6 +47,7 @@ xfer: refdocs examples
 
 examples: .up2date.examples
 .up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
+	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
 	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
 	       -u http://epydoc.sourceforge.net --css blue
@@ -62,6 +63,7 @@ local: refdocs examples
 
 refdocs: .up2date.refdocs
 .up2date.refdocs: ${PY_SRC}
+	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc ${PY_SRC} -o ${API} -n epydoc \
 	       -u http://epydoc.sourceforge.net --css blue
