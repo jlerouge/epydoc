@@ -2202,13 +2202,17 @@ class FuncDoc(ObjDoc):
         # Initialize the signature
         if uid.is_method(): func = func.im_func
         if type(func) is types.FunctionType:
-            self._init_signature(func)
+            # If there's a builtin-style signature, then parse it, and
+            # ignore the real signature.
+            if self._init_builtin_signature(func):
+                docstring = re.sub(r'^\s*[^\n]*\n', '', docstring, 1)
+            else:
+                self._init_signature(func)
         elif uid.is_routine():
             # If there's a builtin signature, then just parse it;
             # don't include it in the description.
             if self._init_builtin_signature(func):
-                if '\n' in docstring:
-                    docstring = docstring.split('\n', 1)[1]
+                docstring = re.sub(r'^\s*[^\n]*\n', '', docstring, 1)
         else:
             raise TypeError("Can't document %s" % func)
 
