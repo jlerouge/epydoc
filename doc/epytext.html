@@ -8,6 +8,7 @@
 <body>
 <h1>The Epytext Markup Language</h1>
 
+<a name="overview"/>
 <h2> 1. Overview </h2>
 
 <p> Epytext is a lightweight markup language for Python docstrings.
@@ -28,6 +29,7 @@ the following categories: </p>
 </ul>
 
 <!-- =========== BLOCK STRUCTURE ============= -->
+<a name="block_structure"/>
 <h2> 2. Block Structure </h2>
 
 <p> Block structure is encoded using indentation, blank lines, and a
@@ -51,6 +53,7 @@ handful of special character sequences. </p>
 <p> The following sections describe how to use each type of block
 structure. </p>
 
+<a name="paragraph"/>
 <h3> 2.1. Paragraphs </h3>
 
 <p> A paragraph is the simplest type of basic block.  It consists of
@@ -82,7 +85,7 @@ illustrates how paragraphs can be used: </p>
   </td></tr>
 </table>
   
-  
+<a name="list"/> 
 <h3> 2.2. Lists </h3>
 
 <p> Epytext supports both ordered and unordered lists.  A list
@@ -184,6 +187,7 @@ used: </p>
   </td></tr>
 </table>
 
+<a name="section"/>
 <h3> 2.3. Sections </h3>
 
 <p> A section consists of a heading followed by one or more
@@ -235,6 +239,7 @@ child blocks. </p>
   This is a paragraph in section 2.
 </table>
 
+<a name="literal"/>
 <h3> 2.4. Literal Blocks </h3>
 
 <p> Literal blocks are used to represent "preformatted" text.
@@ -284,6 +289,7 @@ introduce them; for example, in the previous example, the word
 note that the double colon ("<code>::</code>") that introduces the
 literal block is rendered as a single colon. </p>
 
+<a name="doctest"/>
 <h3> 2.5. Doctest Blocks </h3>
 
 <p> Doctest blocks contain examples consisting of Python expressions
@@ -317,19 +323,16 @@ blocks can be used: </p>
 </td><td>
 <p> The following is a doctest block: </p>
 <pre>
-    <code class="prompt">&gt;&gt;&gt;</code> <code class="keyword">print</code> <code class="pycode">(1+3,</code>
-    <code class="prompt">...</code>        <code class="pycode">3+5)</code>
-    <code class="output">(4, 8)</code>
-    <code class="prompt">&gt;&gt;&gt;</code> <code class="string">'a-b-c-d-e'</code><code class="pycode">.split('-')</code>
-    <code class="output">['a', 'b', 'c', 'd', 'e']</code>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="keyword">print</code> <code class="pycode">(1+3,</code>
+<code class="prompt">...</code>        <code class="pycode">3+5)</code>
+<code class="output">(4, 8)</code>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="string">'a-b-c-d-e'</code><code class="pycode">.split('-')</code>
+<code class="output">['a', 'b', 'c', 'd', 'e']</code>
 </pre>
   <p>This is a paragraph following the doctest block.</p>
 </table>
 
-<p> Doctest blocks are indented relative to the paragraphs that
-introduce them; for example, in the previous example, the doctest
-block is displayed with four leading spaces, not eight. </p>
-
+<a name="fieldlist"/>
 <h3> 2.6. Fields </h3>
 
 <p> Fields are used to describe specific properties of a documented
@@ -485,6 +488,7 @@ tag; and the recommendation that field lists be separated from
 paragraphs by a blank line. </p> </div>
 
 <!-- =========== INLINE MARKUP ============= -->
+<a name="inline"/>
 <h2> 3. Inline Markup </h2>
 
 <p> Inline markup has the form
@@ -513,6 +517,7 @@ matched curly braces is immediately preceeded by a capital letter
 escape braces when writing Python dictionaries.  See <a
 href="#escaping">section 3.5</a> for a discussion of escaping.  </p>
 
+<a name="basic_inline"/>
 <h3> 3.1. Basic Inline Markup </h3>
 
 <p> Epytext defines four types of inline markup that specify how text
@@ -567,6 +572,7 @@ illustrates how the four basic markup types can be used: </p>
 </td></tr>
 </table>
 
+<a name="urls"/>
 <h3> 3.2. URLs </h3>
 
 <p> The inline markup construct
@@ -608,6 +614,7 @@ used: </p>
 </td></tr>
 </table>
 
+<a name="links"/>
 <h3> 3.3. Documentation Crossreference Links </h3>
 
 <p> The inline markup construct
@@ -670,6 +677,7 @@ epydoc checks the following locations, in order: </p>
 <p> If no object is found that corresponds with the given name, then
 epydoc issues a warning. </p>
 
+<a name="indexed"/>
 <h3> 3.4. Indexed Terms </h3>
 
 <p> Epydoc automatically creates an index of term definitions for the
@@ -691,7 +699,7 @@ The following example illustrates how index terms can be used: </p>
     <i>[...]</i>
 </pre>
 </td><td>
-  An <a name="index-index_term"><i>index term</i> is a term that
+  An <a name="index-index_term"/><i>index term</i> is a term that
   should be included in the index.
 
 </td></tr><tr><td>
@@ -710,7 +718,7 @@ The following example illustrates how index terms can be used: </p>
 </td></tr>
 </table>
 
-<a name="escaping">
+<a name="escaping"/>
 <h3> 3.5. Escaping </h3>
 
 <p> Escaping can be used to write text that would otherwise be
@@ -759,8 +767,10 @@ produce a right arrow; and "<code>E{&nbsp;}</code>" could be used to
 produce a non-breaking space. </p>
 
 <!-- =========== CHARACTERS ============= -->
+<a name="characters"/>
 <h2> 4. Characters </h2>
 
+<a name="valid_characters"/>
 <h3> 4.1. Valid Characters </h3>
 
 <p> Valid characters for an epytext docstring are space ("\040");
@@ -771,6 +781,7 @@ expanded to spaces, using the same algorithm used by the Python
 parser.  Carridge-return/newline pairs ("\015\012") are converted to
 newlines. </p>
 
+<a name="content_characters"/>
 <h3> 4.2. Content Characters </h3>
 
 <p> Characters in a docstring that are not involved in markup are
@@ -795,6 +806,7 @@ through.  For example, consider the following example: </p>
 <p> The docstring is rendered as "&lt;B&gt;test&lt;/B&gt;", and not
 as the word "test" in bold face. </p>
 
+<a name="whitespace"/>
 <h3> 4.3. Spaces and Newlines </h3>
 
 <p> In general, spaces and newlines within docstrings are treated as
@@ -826,7 +838,7 @@ targets, whitespace is ignored. </p>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Tue Oct  1 23:42:04 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Mon Oct  7 04:17:27 EDT 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
