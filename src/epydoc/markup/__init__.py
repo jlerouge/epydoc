@@ -398,6 +398,16 @@ class ParseError(Exception):
         """
         return self._fatal
 
+    def linenum(self):
+        """
+        @return: The line number on which the error occured (including
+        any offset).  If the line number is unknown, then return
+        C{None}.
+        @rtype: C{int} or C{None}
+        """
+        if self._linenum is None: return None
+        else: return self._offset + self._linenum
+
     def set_linenum_offset(self, offset):
         """
         Set the line number offset for this error.  This offset is the
