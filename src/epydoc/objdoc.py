@@ -48,7 +48,7 @@ __docformat__ = 'epytext en'
 import inspect, UserDict, string, new, re, sys, types
 import xml.dom.minidom
 
-import epytext, rst
+import epytext
 from epydoc.uid import UID, Link, make_uid
 
 # Python 2.2 types
@@ -685,7 +685,9 @@ class ObjDoc:
         try: self._docformat = self._docformat.split()[0]
         except: pass
 
-        # Check that it's an acceptable format.
+        # Check that it's an acceptable format.  Only issue a warning
+        # for the module, not a separate warning for every object in
+        # the module.
         if (self._docformat not in KNOWN_DOCFORMATS and
             self._uid.is_module()):
             estr = ("Unknown __docformat__ value %s; " % self._docformat +
@@ -698,10 +700,7 @@ class ObjDoc:
         if type(docstring) == type(''): docstring = docstring.strip()
         if docstring:
             self._documented = 1
-            if self._docformat in ('epytext', 'restructuredtext'):
-                self.__parse_docstring(docstring)
-            else:
-                self._descr = epytext.parse_as_literal(docstring)
+            self.__parse_docstring(docstring)
         else:
             self._documented = 0
     
@@ -835,8 +834,27 @@ class ObjDoc:
         if self._docformat == 'epytext':
             pdoc = epytext.parse(docstring, parse_errors, parse_warnings)
         elif self._docformat == 'restructuredtext':
-            pdoc = rst.parse(docstring)
-
+            already_imported = sys.modules.has_key('epydoc.rst')
+            try:
+                raise ImportError
+                import rst
+                pdoc = rst.parse(docstring)
+            except ImportError:
+                if not already_imported:
+                    estr = 'ReStructuredText is not installed; '
+                    estr += 'parsing docstring as plaintext.'
+                    parse_errors.append(estr)
+                self._descr = epytext.parse_as_literal(docstring)
+                return
+            except Exception, e:
+                estr = 'Error parsing ReStructuredText docstring: %s' % e
+                parse_errors.append(estr)
+                self._descr = epytext.parse_as_literal(docstring)
+                return
+        else:
+            self._descr = epytext.parse_as_literal(docstring)
+            return
+                
         # If there were any errors, handle them by simply treating
         # the docstring as a single literal block.
         if parse_errors:
@@ -912,8 +930,16 @@ class ObjDoc:
                 print >>stream, 'In %s docstring:' % self._uid
             print >>stream, '-'*75
             for error in parse_errors:
-                error.linenum += startline
-                print >>stream, error.as_error()
+                if type(error) == type(''):
+                    if startline is None:
+                        print >>stream, '       '+error
+                    else:
+                        estr =' Error: %s' % error
+                        estr = epytext.wordwrap(estr, 7, startindex=7).strip()
+                        print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
+                else:
+                    error.linenum += startline
+                    print >>stream, error.as_error()
             for warning in parse_warnings:
                 warning.linenum += startline
                 print >>stream, warning.as_warning()
