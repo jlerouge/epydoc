@@ -75,15 +75,51 @@ _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
                  '\\textbf{%s}']
 
 SYMBOL_TO_LATEX = {
-    r'<-': r'\gets', r'->': r'\to',
-    r'alpha': r'\alpha', r'beta': r'\beta', r'gamma': r'\gamma',
-    r'delta': r'\delta', r'epsilon': r'\epsilon', r'zeta': r'\zeta',  
-    r'eta': r'\eta', r'theta': r'\theta', r'iota': r'\iota', 
-    r'kappa': r'\kappa', r'lambda': r'\lambda', r'mu': r'\mu',  
-    r'nu': r'\nu', r'xi': r'\xi', r'omicon': r'\omicon',  
-    r'pi': r'\pi', r'rho': r'\rho', r'sigma': r'\sigma',  
-    r'tau': r'\tau', r'upsilon': r'\upsilon', r'phi': r'\phi',  
-    r'chi': r'\chi', r'psi': r'\psi', r'omega': r'\omega',  
+    # Symbols
+    '<-': r'\leftarrow', '->': r'\rightarrow',
+    '^': r'\uparrow', 'v': r'\downarrow',
+
+    # Greek letters
+    'alpha': r'\alpha', 'beta': r'\beta', 'gamma': r'\gamma',
+    'delta': r'\delta', 'epsilon': r'\epsilon', 'zeta': r'\zeta',  
+    'eta': r'\eta', 'theta': r'\theta', 'iota': r'\iota', 
+    'kappa': r'\kappa', 'lambda': r'\lambda', 'mu': r'\mu',  
+    'nu': r'\nu', 'xi': r'\xi', 'omicon': r'\omicon',  
+    'pi': r'\pi', 'rho': r'\rho', 'sigma': r'\sigma',  
+    'tau': r'\tau', 'upsilon': r'\upsilon', 'phi': r'\phi',  
+    'chi': r'\chi', 'psi': r'\psi', 'omega': r'\omega',
+    'Alpha': r'\Alpha', 'Beta': r'\Beta', 'Gamma': r'\Gamma',
+    'Delta': r'\Delta', 'Epsilon': r'\Epsilon', 'Zeta': r'\Zeta',  
+    'Eta': r'\Eta', 'Theta': r'\Theta', 'Iota': r'\Iota', 
+    'Kappa': r'\Kappa', 'Lambda': r'\Lambda', 'Mu': r'\Mu',  
+    'Nu': r'\Nu', 'Xi': r'\Xi', 'Omicon': r'\Omicon',  
+    'Pi': r'\Pi', 'Rho': r'\Rho', 'Sigma': r'\Sigma',  
+    'Tau': r'\Tau', 'Upsilon': r'\Upsilon', 'Phi': r'\Phi',  
+    'Chi': r'\Chi', 'Psi': r'\Psi', 'Omega': r'\Omega',
+
+    # HTML character entities
+    'larr': r'\leftarrow', 'rarr': r'\rightarrow',
+    'uarr': r'\uparrow', 'darr': r'\downarrow',
+    'harr': r'\leftrightarrow', 'crarr': r'\hookleftarrow',
+    'lArr': r'\Leftarrow', 'rArr': r'\Rightarrow',
+    'uArr': r'\Uparrow', 'dArr': r'\Downarrow',
+    'hArr': r'\Leftrightarrow', 'copy': r'\textcopyright', 
+    'times': r'\times', 'forall': r'\forall',
+    'exist': r'\exists', 'part': r'\partial',
+    'empty': r'\emptyset', 'isin': r'\in', 'notin': r'\notin',
+    'ni': r'\ni', 'prod': r'\prod', 'sum': r'\sum',
+    'prop': r'\propto', 'infin': r'\infty', 'ang': r'\angle',
+    'and': r'\wedge', 'or': r'\vee', 'cap': r'\cap', 'cup': r'\cup',
+    'int': r'\int', 'there4': r'\therefore', 'sim': r'\sim',
+    'cong': r'\cong', 'asymp': r'\approx', 'ne': r'\ne',
+    'equiv': r'\equiv', 'le': r'\le', 'ge': r'\ge',
+    'sub': r'\subset', 'sup': r'\subset', 'nsub': r'\nsubset',
+    'sube': r'\subseteq', 'supe': r'\supseteq', 'oplus': r'\oplus',
+    'otimes': r'\otimes', 'perp': r'\perp',
+
+    # Alternate (long) names
+    'infinity': r'\infty', 'integral': r'\int', 'product': r'\prod',
+    '<=': r'\le', '>=': r'\ge',
     }
 
 ##################################################
@@ -148,6 +184,10 @@ class LatexFormatter:
               separate chapters, or to include them as sections of
               their modules' chapters.  By default, they are not listed
               separately.  (type=C{boolean})
+            - C{exclude}: Whether to exclude inherited objects and
+              imported objects that are not defined by any of the
+              modules that are being documented.  By default, these
+              objects are excluded.  (type=C{boolean})
         """
         self._docmap = docmap
 
@@ -156,12 +196,13 @@ class LatexFormatter:
         self._prj_name = kwargs.get('prj_name', None)
         self._crossref = kwargs.get('crossref', 1)
         self._index = kwargs.get('index', 1)
-        self._top_section = 2
         self._list_classes_separately=kwargs.get('list_classes_separately',0)
+        self._inheritance = kwargs.get('inheritance', 'listed')
+        self._exclude = kwargs.get('exclude', 1)
+        self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
-        self._inheritance = kwargs.get('inheritance', 'listed')
-        
+
     def write(self, directory=None, progress_callback=None):
         """
         Write the API documentation for the entire project to the
@@ -196,6 +237,7 @@ class LatexFormatter:
                 if progress_callback: progress_callback(filename)
                 open(filename, 'w').write(self._module_to_latex(uid))
             elif uid.is_class() and self._list_classes_separately:
+                if self._excluded(uid): continue
                 filename = os.path.join(directory, ('%s-class.tex' %
                                                     uid.name()))
                 if progress_callback: progress_callback(filename)
@@ -250,7 +292,8 @@ class LatexFormatter:
         for uid in self._docmap.keys():
             if uid.is_private() and not self._show_private: continue
             if uid.is_module(): n += 1
-            elif uid.is_class() and self._list_classes_separately: n += 1
+            elif uid.is_class() and self._list_classes_separately:
+                if not self._excluded(uid): n += 1
         return n
         
     #////////////////////////////////////////////////////////////
@@ -302,6 +345,7 @@ class LatexFormatter:
         if self._list_classes_separately:
             for uid in uids:
                 if uid.is_class():
+                    if self._excluded(uid): continue
                     str += '\\include{%s-class}\n' % uid.name()
 
         str += self._start_of('Index')
@@ -337,31 +381,13 @@ class LatexFormatter:
 
         # If it's a package, list the sub-modules.
         if doc.ispackage() and doc.modules():
-            str += self._module_list(doc.modules(), doc.sortorder())
+            str += self._module_list(doc.modules(), doc.sortorder(),
+                                     doc.groups())
 
         # Class list. !! add summaries !!
-        if self._list_classes_separately:
-            classes = self._filtersort_links(doc.classes(), doc.sortorder())
-            if classes:
-                str += self._start_of('Classes')
-                str += self._section('Classes', 1)
-                str += '\\begin{itemize}'
-                str += '  \\setlength{\\parskip}{0ex}\n'
-                for link in classes:
-                    cname = link.name()
-                    cls = link.target()
-                    if not self._docmap.has_key(cls): continue
-                    cdoc = self._docmap[cls]
-                    str += '  ' + '\\item \\textbf{'
-                    str += self._text_to_latex(cname) + '}'
-                    if cdoc and cdoc.descr():
-                        str += ': %s\n' % self._summary(cdoc, cls.module())
-                    if self._crossref:
-                        str += ('\n  \\textit{(Section \\ref{%s}' %
-                                self._uid_to_label(cls))
-                        str += (', p.~\\pageref{%s})}\n\n' %
-                                self._uid_to_label(cls))
-                str += '\\end{itemize}'
+        if self._list_classes_separately and doc.classes():
+            str += self._class_list(doc.classes(), doc.sortorder(),
+                                    doc.groups())
                 
         # Function List
         str += self._func_list(doc.functions(), None, doc.groups())
@@ -378,7 +404,7 @@ class LatexFormatter:
         
         str += '    ' + self._indexterm(uid, 'end')
         return str
-                
+
     def _class_to_latex(self, uid):
         # Get the module's documentation.
         doc = self._docmap[uid]
@@ -434,6 +460,55 @@ class LatexFormatter:
         
         return str
 
+    #////////////////////////////////////////////////////////////
+    # Class List
+    #////////////////////////////////////////////////////////////
+    def _class_list(self, classes, sortorder, groups):
+        classes = self._filtersort_links(classes, sortorder)
+        if len(classes) == 0: return ''
+
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # properties are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [c for c in classes if c.target() in groupmembers]
+            if not group: continue
+            classes = [c for c in classes if c not in group]
+            # Print a header within the table
+            groupstr += '  \\item \\textbf{%s}\n' % groupname
+            groupstr += '  \\begin{itemize}\n'
+            # Add the lines for each func
+            for cls in group:
+                groupstr += self._class_list_line(cls)
+            groupstr += '  \end{itemize}\n'
+        
+        str = self._start_of('Classes')
+        str += self._section('Classes', 1)
+        str += '\\begin{itemize}'
+        str += '  \\setlength{\\parskip}{0ex}\n'
+        for link in classes:
+            str += self._class_list_line(link)
+        return str+groupstr+'\\end{itemize}'
+
+    def _class_list_line(self, link):
+        cname = link.name()
+        cls = link.target()
+        if not self._docmap.has_key(cls): return ''
+        cdoc = self._docmap[cls]
+        str = '  ' + '\\item \\textbf{'
+        str += self._text_to_latex(cname) + '}'
+        if cdoc and cdoc.descr():
+            str += ': %s\n' % self._summary(cdoc, cls.module())
+        if self._crossref:
+            str += ('\n  \\textit{(Section \\ref{%s}' %
+                    self._uid_to_label(cls))
+            str += (', p.~\\pageref{%s})}\n\n' %
+                    self._uid_to_label(cls))
+        return str
+        
     #////////////////////////////////////////////////////////////
     # Property List
     #////////////////////////////////////////////////////////////
@@ -624,7 +699,7 @@ class LatexFormatter:
             groupstr += self._sectionstar(groupname, seclevel+1)
             # Add the lines for each func
             for link in group:
-                groupstr += self._func_descr(link, cls)
+                groupstr += self._func_list_box(link, cls)
             if self._inheritance == 'listed' and cls is not None:
                 groupstr += self._inheritance_list(group, cls.uid())
 
@@ -633,14 +708,14 @@ class LatexFormatter:
 
         funcstr = ''
         for link in functions:
-            funcstr += self._func_descr(link, cls)
+            funcstr += self._func_list_box(link, cls)
         if self._inheritance == 'listed' and cls is not None:
             funcstr += self._inheritance_list(functions, cls.uid())
         funcstr += groupstr
         if funcstr == '': return ''
         else: return str+funcstr
 
-    def _func_descr(self, link, cls):
+    def _func_list_box(self, link, cls):
         str = ''
         fname = link.name()
         func = link.target()
@@ -801,6 +876,10 @@ class LatexFormatter:
                 str += ', '
         return str
 
+    #////////////////////////////////////////////////////////////
+    # Inheritance lists
+    #////////////////////////////////////////////////////////////
+    
     def _inheritance_list(self, links, cls):
         # Group the objects by defining class
         inh_dict = {}
@@ -1068,7 +1147,7 @@ class LatexFormatter:
                 str += self._module_tree_item(uid)
         return str +'\\end{itemize}\n'
 
-    def _module_list(self, modules, sortorder):
+    def _module_list(self, modules, sortorder, groups):
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
@@ -1082,9 +1161,27 @@ class LatexFormatter:
         str += '\\setlength{\\parskip}{0ex}\n'
         modules = self._filtersort_links(modules, sortorder)
         
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # properties are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [m for m in modules if m.target() in groupmembers]
+            if not group: continue
+            modules = [m for m in modules if m not in group]
+            # Print a header within the table
+            groupstr += '  \\item \\textbf{%s}\n' % groupname
+            groupstr += '  \\begin{itemize}\n'
+            # Add the lines for each func
+            for link in group:
+                groupstr += self._module_tree_item(link.target())
+            groupstr += '  \end{itemize}\n'
+        
         for link in modules:
             str += self._module_tree_item(link.target())
-        return str + '\\end{itemize}\n\n'
+        return str + groupstr + '\\end{itemize}\n\n'
 
     #////////////////////////////////////////////////////////////
     # Helpers
@@ -1394,3 +1491,16 @@ class LatexFormatter:
         else:
             return ''
 
+    def _excluded(self, x):
+        """
+        @return: True if the given object should be excluded from the
+        documentation (since it was imported or inherited from a
+        module that we're not documenting).
+        """
+        if not self._exclude: return 0
+        if isinstance(x, Link): x = x.target()
+        if isinstance(x, Var): x = x.var()
+        if x.is_module(): return 0
+        if x.module() is None: return 0
+        return not self._docmap.has_key(x.module())
+        
