@@ -757,7 +757,11 @@ class HTMLFormatter:
         
         # Get the class name.
         str = self._start_of('Class Description')
-        str += '<h2 class="class">Class ' + uid.shortname()+'</h2>\n\n'
+        if uid.is_type():
+            str += '<h2 class="class">Type '
+        else:
+            str += '<h2 class="class">Class '
+        str += uid.shortname()+'</h2>\n\n'
 
         # Get the base class tree
         if doc.bases():
@@ -1575,7 +1579,8 @@ class HTMLFormatter:
         str = (' '*depth + '<li> <b>' +
                self._uid_to_href(uid, uid.shortname())+'</b>')
         if doc and doc.descr():
-            str += ': <i>' + self._summary(doc, uid) + '</i>'
+            summary = self._summary(doc, uid)
+            if summary != '&nbsp;': str += ': <i>' + summary + '</i>'
         str += '\n'
         private.write(str)
         if uid.is_public(): public.write(str)
@@ -2697,8 +2702,10 @@ class HTMLFormatter:
         links = {}
         for (uid, doc) in self._docmap.items():
             if uid.is_function():
+                if uid.module() is None: continue # ouch.
                 link = Link(uid.name(), uid.module())
             elif uid.is_method():
+                if uid.cls() is None: continue # ouch.
                 link = Link(uid.name(), uid.cls())
             else:
                 link = Link(uid.name(), uid)
@@ -3012,6 +3019,8 @@ class HTMLFormatter:
                 return 'Return '+summary[:1].lower() + summary[1:]
             else:
                 return '&nbsp;'
+        # Hack: ignore CVS $Id$ tags.
+        summary = re.sub(r'\$[Ii][Dd]:[^\$]*\$', '', summary).strip()
         return summary or '&nbsp;'
 
     def _write_imports(self, public, private, doc):
