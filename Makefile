@@ -73,7 +73,7 @@ clean:
 ##//////////////////////////////////////////////////////////////////////
 
 distributions: .distributions.up2date
-.distributions.up2date: test $(PY_SRC) .html.up2date $(DOCS)
+.distributions.up2date: test $(PY_SRC) .webpage.up2date $(DOCS)
 	$(MAKE) -C src distributions
 	touch .distributions.up2date
 
@@ -83,18 +83,18 @@ distributions: .distributions.up2date
 
 web: xfer
 webpage: xfer
-xfer: test .html.up2date stdlib-html
+xfer: test .webpage.up2date stdlib-html
 	rsync -arzv -e ssh $(WEBDIR)/* $(HOST):$(DIR)
 	rsync -arzv -e ssh $(HTML_STDLIB)/ $(HOST):$(DIR)/stdlib
 
-local: .html.up2date
+local: .webpage.up2date
 	cp -r $(WEBDIR)/* /var/www/epydoc
 
 checkdoc: checkdocs
 checkdocs:
 	epydoc --check --tests=vars,types $(PY_SRC)
 
-.html.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
+.webpage.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
 		doc/epydoc-man.html doc/epydocgui-man.html $(DOCS)
 	rm -rf $(WEBDIR)
 	mkdir -p $(WEBDIR)
@@ -102,7 +102,7 @@ checkdocs:
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
 	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
-	touch .html.up2date
+	touch .webpage.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
 # __docformat__ strings in each epydoc module.  (So just
