@@ -79,6 +79,15 @@ h3.var-details    { background: transparent; color: #000000;
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                   { background: transparent; color: #008060; }  
 
+/* Doctest blocks */
+.pysrc            { background: transparent; color: #000000; }
+.pyprompt         { background: transparent; color: #003030;
+                    font-weight: bold;}
+.pystring         { background: transparent; color: #006030; }
+.pycomment        { background: transparent; color: #003060; }
+.pykeyword        { background: transparent; color: #402000; }
+.pyoutput         { background: transparent; color: #404040; }
+ 
 /* Navigation bar */ 
 table.navbar      { background: #a0c0ff; color: #000000;
                     border: 2px groove #c0d0d0; }
@@ -143,6 +152,15 @@ h3.var-details    { background: transparent; color: #000000;
 .summary-sig-name { background: transparent; font-weight: bold; }  
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                   { background: transparent; color: #008060; }  
+
+/* Doctest blocks */
+.pysrc            { background: transparent; color: #000000; }
+.pyprompt         { background: transparent; color: #003030;
+                    font-weight: bold;}
+.pystring         { background: transparent; color: #006030; }
+.pycomment        { background: transparent; color: #003060; }
+.pykeyword        { background: transparent; color: #402000; }
+.pyoutput         { background: transparent; color: #404040; }
  
 /* Navigation bar */ 
 table.navbar      { background: #607880; color: #b8d0d0;
