@@ -171,8 +171,9 @@ class _EpydocTranslator(HTMLTranslator):
                 if rawhtml_elt is None:
                     rawhtml_elt = self.doc.createElement('rawhtml')
                     parent.appendChild(rawhtml_elt)
+                    rawhtml_elt.appendChild(self.doc.createTextNode(''))
                 elt = self._fixup(elt)
-                rawhtml_elt.appendChild(self.doc.createTextNode(elt))
+                rawhtml_elt.childNodes[-1].data += elt
             elif isinstance(elt, xml.dom.minidom.Element):
                 # Link or Field.
                 rawhtml_elt = None
@@ -245,3 +246,45 @@ class _EpydocTranslator(HTMLTranslator):
         self._fields.append( (tag, arg, self._body_to_dom(self.body)) )
         self.body = self._body_stack.pop()
         
+def summary(epytext_doc):
+    """
+    Given a DOM document representing formatted documentation, return
+    a new DOM document containing the documentation's first sentence.
+
+    @param epytext_doc: A DOM document representing formatted
+        documentation, as produced by L{parse}.
+    @type epytext_doc: L{xml.dom.minidom.Document} or
+        L{xml.dom.minidom.Element}
+    @return: A DOM document containing the first sentence of the
+        documentation.
+    @rtype: L{xml.dom.minidom.Document}
+    """
+    doc = Document()
+    html = doc.createElement('html')
+    doc.appendChild(html)
+
+    if isinstance(epytext_doc, Document):
+        tree = epytext_doc.childNodes[0]
+    else:
+        tree = epytext_doc
+
+    # Extract the raw text (no html tags)
+    text = ''
+    for child in tree.childNodes:
+        if child.tagName == 'rawhtml':
+            text += re.sub('<[^>]*>', '', child.childNodes[0].data)
+        elif child.tagName == 'link':
+            text += child.childNodes[0].childNodes[0].data
+
+    # If we didn't find anything, return an empty document.
+    if text == '': return doc
+
+    # Extract the first sentence.
+    m = re.match(r'^(\s*[\w\W]*?[\.:])(\s|$)', text)
+    if m: text = m.group(1)
+
+    # Return an element containing the text.
+    rawhtml = doc.createElement('rawhtml')
+    html.appendChild(rawhtml)
+    rawhtml.appendChild(doc.createTextNode(text))
+    return doc
