@@ -79,7 +79,7 @@ h3.var-details     { background: transparent; color: #000000;
                    { background: transparent; color: #008060; }  
 .sig-default       { background: transparent; color: #602000; }  
 .summary-sig       { background: transparent; color: #000000; }  
-.summary-sig-name  { background: transparent; color: #0000ff; }
+.summary-sig-name  { background: transparent; color: #204080; }
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                    { background: transparent; color: #008060; }  
 
