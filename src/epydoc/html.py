@@ -894,7 +894,10 @@ class HTML_Doc:
                 inherit = 0
                 try: container = func.module()
                 except TypeError: container = None
-            
+
+            if not self._docmap.has_key(func):
+                print 'SKIPPING:', func
+                continue
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
@@ -968,7 +971,8 @@ class HTML_Doc:
             str += ('\n<table width="100%" class="func-details"'+
                     ' bgcolor="#e0e0e0">'+
                     '<tr><td>\n')
-            
+
+            if not self._docmap.has_key(func): continue
             fdoc = self._docmap[func]
 
             str += '  <a name="'+fname+'"></a>\n'
