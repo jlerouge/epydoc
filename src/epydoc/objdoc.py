@@ -2659,17 +2659,48 @@ class PropertyDoc(ObjDoc):
     """
     def __init__(self, uid, typ=None, verbosity=0):
         property = uid.value()
+        cls = uid.cls().value()
         if property.fget is None: self._fget = None
-        else: self._fget = make_uid(property.fget)
+        else: self._fget = self._make_uid(property.fget, cls)
         if property.fset is None: self._fset = None
-        else: self._fset = make_uid(property.fset)
+        else: self._fset = self._make_uid(property.fset, cls)
         if property.fdel is None: self._fdel = None
-        else: self._fdel = make_uid(property.fdel)
+        else: self._fdel = self._make_uid(property.fdel, cls)
         self._type = typ
         ObjDoc.__init__(self, uid, verbosity)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
+
+    def _make_uid(self, func, cls):
+        """
+        Return a UID for the given fget/fset/fdel function of the
+        property.  This is a heuristic function, which first looks for
+        the function within the current class (and its ancestors); and
+        then looks for it as a module-level function.  If the function
+        is actually defined somewhere else (e.g., in an unrelated
+        class), then it will be mistakenly interpreted as a module-
+        level function.
+
+        @param func: The function to get a uid for.
+        @param cls: The class containing the property.
+        """
+        # Find the order that bases are searched in.
+        base_order = _find_base_order(cls)
+        self._base_order = [make_uid(b) for b in base_order]
+
+        # Check if it's a method of the property's class, or any of
+        # its superclasses.
+        for base in base_order:
+            for (field, val) in base.__dict__.items():
+                if val == func:
+                    container = make_uid(base)
+                    return make_uid(getattr(base, field),
+                                    container, field)
+
+        # Otherwise, make a UID for it as a function (in the
+        # containing module).
+        return make_uid(func)
 
     def _process_field(self, tag, arg, descr, warnings):
         if tag == 'type':
