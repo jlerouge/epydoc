@@ -267,7 +267,8 @@ def _parse_args():
         else:
             _usage()
 
-    # Make sure inheritance has a valid value    if options['inheritance'] not in ('grouped', 'listed', 'included'):
+    # Make sure inheritance has a valid value
+    if options['inheritance'] not in ('grouped', 'listed', 'included'):
         estr = 'Bad inheritance style.  Valid options are '
         estr += 'grouped, listed, included'
         print >>sys.stderr, ('%s; run "%s -h" for usage' %
