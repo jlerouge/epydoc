@@ -29,10 +29,11 @@ Usage::
      -t PAGE, --top PAGE       The top page for the HTML documentation.
      -c SHEET, --css SHEET     CSS stylesheet for HTML files.
      --private-css SHEET       CSS stylesheet for private objects.
+     --inheritance STYLE       The format for showing inherited objects.
      -V, --version             Print the version of epydoc.
      -h, -?, --help, --usage   Display this usage message.
-     -h TOPIC, --help TOPIC    Display information about TOPIC
-                               (css, usage, docformat, or version).
+     -h TOPIC, --help TOPIC    Display information about TOPIC (docformat,
+                               css, inheritance, usage, or version).
 
  See the epytext(1) man page for a complete list of options.
 
