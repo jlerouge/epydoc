@@ -11,7 +11,9 @@
 # Python source files (don't include src/epydoc/test)
 PY_SRC = src/epydoc/
 EXAMPLES_SRC = $(wildcard doc/*.py)
-DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
+DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) \
+       $(wildcard doc/*.png) $(wildcard doc/*.ps) \
+       $(wildcard doc/*.pdf)
 
 # What version of python to use?
 PYTHON = python2.3
@@ -134,7 +136,7 @@ examples: .examples.up2date
 	$(EPYDOC) \
 	       -o $(HTML_EXAMPLES) -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue -t example --docformat=plaintext \
-	       --navlink 'epydoc examples' doc/epydoc_example.py sre
+	       --navlink 'epydoc examples' doc/epytext_example.py sre
 	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped \
 	       --inheritance=grouped \
 	       -n epydoc -u http://epydoc.sourceforge.net \
