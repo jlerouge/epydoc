@@ -39,9 +39,12 @@ body               { background: #ffffff; color: #000000; }
 /* Tables */ 
 table.summary, table.details, table.index
                    { background: #e8f0f8; color: #000000; } 
-tr.summary, tr.details, tr.index 
+tr.summary, tr.details, tr.index
                    { background: #70b0f0; color: #000000;  
                      text-align: left; font-size: 120%; } 
+tr.group           { background: #c0e0f8; color: #000000;
+                     text-align: left; font-size: 120%;
+                     font-style: italic; } 
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
@@ -141,6 +144,8 @@ tr.summary         { background: #c0e0e0; color: #000000;
 tr.details, tr.index
                    { background: #c0e0e0; color: #000000;
                      text-align: center; font-size: 120%; }
+tr.group           { background: #c8e0e8; color: #000000;
+                     text-align: left; font-size: 120%; } 
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
@@ -242,6 +247,8 @@ tr.summary         { background: #dcf4fc; color: #000000;
 tr.details, tr.index
                    { background: #dcf4fc; color: #000000;
                      text-align: center; font-size: 120%; }
+tr.group           { background: #c8e0e8; color: #000000;
+                     text-align: left; font-size: 120%; } 
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
