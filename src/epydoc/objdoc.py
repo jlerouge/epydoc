@@ -1650,9 +1650,9 @@ class DocMap(UserDict.UserDict):
         @rtype: C{None}
         """
         # Check that it's a good object, and if not, issue a warning.
-        if type(object) not in (_ModuleType, _ClassType, _TypeType,
-                                _BuiltinFunctionType, _BuiltinMethodType,
-                                _FunctionType, _MethodType):
+        if type(obj) not in (types.ModuleType, types.ClassType, types.TypeType,
+                             types.BuiltinFunctionType, types.MethodType,
+                             types.BuiltinMethodType, types.FunctionType):
             if sys.stderr.softspace: print >>sys.stderr
             estr = 'Error: docmap cannot add a %s' % type(object)
             print >>sys.stderr, estr
