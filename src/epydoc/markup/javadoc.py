@@ -6,33 +6,37 @@
 # $Id$
 #
 
-"""
-Epydoc parser for U{Javadoc<http://java.sun.com/j2se/javadoc/>}
+""" Epydoc parser for U{Javadoc<http://java.sun.com/j2se/javadoc/>}
 docstrings.  Javadoc is an HTML-based markup language that was
-developed for documenting Java APIs.  The returned DOM tree will
-conform to the following Document Type Description::
+developed for documenting Java APIs with inline comments.  It consists
+of raw HTML, augmented by Javadoc tags.  There are two types of
+Javadoc tag:
 
-   <!ELEMENT html ((rawhtml | link)*, fieldlist?)>
-   <!ELEMENT rawhtml (#PCDATA)>
-   
-   <!ELEMENT fieldlist (field+)>
-   <!ELEMENT field (tag, arg?, html)>
-   <!ELEMENT tag (#PCDATA)>
-   <!ELEMENT arg (#PCDATA)>
-   
-   <!ELEMENT link    (name, target)>
-   <!ELEMENT name    (#PCDATA)>
-   <!ELEMENT target  (#PCDATA)>
+  - X{Javadoc block tags} correspond to Epydoc fields.  They are
+    marked by starting a line with a string of the form \"C{@M{tag}
+    [M{arg}]}\", where C{M{tag}} indicates the type of block, and
+    C{M{arg}} is an optional argument.  (For fields that take
+    arguments, Javadoc assumes that the single word immediately
+    following the tag is an argument; multi-word arguments cannot be
+    used with javadoc.)  
+  
+  - X{inline Javadoc tags} are used for inline markup.  In particular,
+    epydoc uses them for crossreference links between documentation.
+    Inline tags may appear anywhere in the text, and have the form
+    \"C{{@M{tag} M{[args...]}}}\", where C{M{tag}} indicates the
+    type of inline markup, and C{M{args}} are optional arguments.
 
-This representation was chosen because it allows me to easily
-integrate Javadoc output into epydoc, while still supporting both
-crossreferences (marked with Javadoc C{{@link}}s) and fields (marked
-with Javadoc C{@tags}).
+Epydoc supports all Javadoc tags, I{except}:
+  - C{{@docRoot}}, which gives the (relative) URL of the generated
+    documentation's root.
+  - C{{@inheritDoc}}, which copies the documentation of the nearest
+    overridden object.  This can be used to combine the documentation
+    of the overridden object with the documentation of the
+    overridding object.
+  - C{@serial}, C{@serialField}, and C{@serialData} which describe the
+    serialization (pickling) of an object.
+  - C{{@value}}, which copies the value of a constant.
 
-@warning: This module does not exactly mimic Javadoc syntax.  In
-particular, the syntax for some fields (such as C{@see}) is different;
-and some fields (such as C{@value} and C{@docRoot}) are not
-implemented.
 @warning: Epydoc only supports HTML output for Javadoc docstrings.
 """
 __docformat__ = 'epytext en'
@@ -43,59 +47,166 @@ from xml.dom.minidom import *
 from epydoc.markup import *
 
 def parse_docstring(docstring, errors, **options):
-    return ParsedJavadocDocstring(docstring)
+    """
+    Parse the given docstring, which is formatted using Javadoc; and
+    return a C{ParsedDocstring} representation of its contents.
+    @param docstring: The docstring to parse
+    @type docstring: C{string}
+    @param errors: A list where any errors generated during parsing
+        will be stored.
+    @type errors: C{list} of L{ParseError}
+    @param options: Extra options.  Unknown options are ignored.
+        Currently, no extra options are defined.
+    @rtype: L{ParsedDocstring}
+    """
+    return ParsedJavadocDocstring(docstring, errors)
 
 class ParsedJavadocDocstring(ParsedDocstring):
-    def __init__(self, docstring):
-        self._docstring = docstring
+    """
+    An encoded version of a Javadoc docstring.  Since Javadoc is a
+    fairly simple markup language, we don't do any processing in
+    advance; instead, we wait to split fields or resolve
+    crossreference links until we need to.
 
-    # Which fields take arguments?
+    @group Field Splitting: split_fields, _ARG_FIELDS, _FIELD_RE
+    @cvar _ARG_FIELDS: A list of the fields that take arguments.
+        Since Javadoc doesn't mark arguments in any special way, we
+        must consult this list to decide whether the first word of a
+        field is an argument or not.
+    @cvar _FIELD_RE: A regular expression used to search for Javadoc
+        block tags.
+
+    @group HTML Output: to_html, _LINK_SPLIT_RE, _LINK_RE
+    @cvar _LINK_SPLIT_RE: A regular expression used to search for
+        Javadoc inline tags.
+    @cvar _LINK_RE: A regular expression used to process Javadoc
+        inline tags.
+    """
+    def __init__(self, docstring, errors=None):
+        """
+        Create a new C{ParsedJavadocDocstring}.
+        
+        @param docstring: The docstring that should be used to
+            construct this C{ParsedJavadocDocstring}.
+        @type docstring: C{string}
+        @param errors: A list where any errors generated during
+            parsing will be stored.  If no list is given, then
+            all errors are ignored.
+        @type errors: C{list} of L{ParseError}
+        """
+        self._docstring = docstring
+        if errors is None: errors = []
+        self._check_links(errors)
+
+    #////////////////////////////////////////////////////////////
+    # Field Splitting
+    #////////////////////////////////////////////////////////////
+
     _ARG_FIELDS = ('group variable var type cvariable cvar ivariable '+
                    'ivar return returns returntype rtype param '+
                    'parameter arg argument raise raises exception '+
-                   'except deffield newfield').split()
+                   'except deffield newfield keyword kwarg kwparam').split()
     _FIELD_RE = re.compile(r'(^\s*\@\w+[\s$])', re.MULTILINE)
+    
+    # Inherit docs from ParsedDocstring.
     def split_fields(self, errors=None):
-        descr = None
-        fields = []
-        
+
+        # Split the docstring into an alternating list of field tags
+        # and text (odd pieces are field tags).
         pieces = self._FIELD_RE.split(self._docstring)
+
+        # The first piece is the description.
         descr = ParsedJavadocDocstring(pieces[0])
+
+        # The remaining pieces are the block fields (alternating tags
+        # and bodies; odd pieces are tags).
+        fields = []
         for i in range(1, len(pieces)):
             if i%2 == 1:
+                # Get the field tag.
                 tag = pieces[i].strip()[1:]
             else:
+                # Get the field argument (if appropriate).
                 if tag in self._ARG_FIELDS:
                     (arg, body) = pieces[i].strip().split(None, 1)
                 else:
                     (arg, body) = (None, pieces[i])
-                fields.append(Field(tag, arg, ParsedJavadocDocstring(body)))
+
+                # Special processing for @see fields, since Epydoc
+                # allows unrestricted text in them, but Javadoc just
+                # uses them for xref links:
+                if tag == 'see': body = '{@link %s}' % body
+
+                # Construct the field.
+                parsed_body = ParsedJavadocDocstring(body)
+                fields.append(Field(tag, arg, parsed_body))
+
         return (descr, fields)
 
-    _LINK_SPLIT_RE = re.compile(r'({@link(?:plain)? [^}]+})')
-    _LINK_RE = re.compile(r'{@link(?:plain)? ' + r'([^\s\(]+)' +
+    #////////////////////////////////////////////////////////////
+    # HTML Output.
+    #////////////////////////////////////////////////////////////
+
+    _LINK_SPLIT_RE = re.compile(r'({@link(?:plain)?\s[^}]+})')
+    _LINK_RE = re.compile(r'{@link(?:plain)?\s+' + r'([\w#.]+)' +
                           r'(?:\([^\)]*\))?' + r'(\s+.*)?' + r'}')
+
+    # Inherit docs from ParsedDocstring.
     def to_html(self, docstring_linker, **options):
+        # Split the docstring into an alternating list of HTML and
+        # links (odd pieces are links).
+        pieces = self._LINK_SPLIT_RE.split(self._docstring)
+
+        # This function is used to translate {@link ...}s to HTML.
+        translate_xref = docstring_linker.translate_identifier_xref
+        
+        # Build up the HTML string from the pieces.  For HTML pieces
+        # (even), just add it to html.  For link pieces (odd), use
+        # docstring_linker to translate the crossreference link to
+        # HTML for us.
         html = ''
-        pieces = _LINK_SPLIT_RE.split(self._docstring)
         for i in range(len(pieces)):
             if i%2 == 0:
                 html += pieces[i]
             else:
-                m = _LINK_RE.match(pieces[i])
-                if m is None:
-                    field_warnings.append('Bad link: %r' % pieces[i])
-                    continue
+                # Decompose the link into pieces.
+                m = self._LINK_RE.match(pieces[i])
+                if m is None: continue # Error flagged by _check_links
                 (target, name) = m.groups()
+
+                # Normalize the target name.
                 if target[0] == '#': target = target[1:]
                 target = target.replace('#', '.')
                 target = re.sub(r'\(.*\)', '', target)
+
+                # Provide a name, if it wasn't specified.
                 if name is None: name = target
                 else: name = name.strip()
-                html += docstring_linker.translate_identifier_xref(target,
-                                                                   name)
+
+                # Use docstring_linker to convert the name to html.
+                html += translate_xref(target, name)
         return html
 
+    def _check_links(self, errors):
+        """
+        Make sure that all @{link}s are valid.  We need a separate
+        method for ths because we want to do this at parse time, not
+        html output time.  Any errors found are appended to C{errors}.
+        """
+        pieces = self._LINK_SPLIT_RE.split(self._docstring)
+        linenum = 0
+        for i in range(len(pieces)):
+            if i%2 == 1 and not self._LINK_RE.match(pieces[i]):
+                estr = 'Bad link %r' % pieces[i]
+                errors.append(ParseError(estr, linenum, is_fatal=0))
+            linenum += pieces[i].count('\n')
+
+    #////////////////////////////////////////////////////////////
+    # Plaintext Output.
+    #////////////////////////////////////////////////////////////
+
+    # Inherit docs from ParsedDocstring.  Since we don't define
+    # to_latex, this is used when generating latex output.
     def to_plaintext(self, docstring_linker, **options):
         return self._docstring
 
