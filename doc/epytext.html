@@ -128,23 +128,16 @@ list. </p>
 <p> List items can contain more than one paragraph; and they can also
 contain sublists, literal blocks, and doctest blocks.  All of the
 blocks contained by a list item must all have equal indentation, and
-that indentation must be greater than the indentation of th list
+that indentation must be greater than the indentation of the list
 item's bullet.  If the first contained block is a paragraph, it may
 appear on the same line as the bullet, separated from the bullet by
 one or more spaces, as shown in the previous example.  All other block
 types must follow on separate lines. </p>
 
 <p> Any line that begins with a bullet followed by a space or a
-newline is considered a list item.  Therefore, list items do not need
-to be separated by blank lines.  However, if a list follows a
-paragraph, it is recommended that you either separate it by a blank
-line, or indent it.  If a paragraph is immediately followed by an
-unindented list item, epydoc will generate a warning.  This helps to
-avoid accidentally placing a dash, minus sign, or sentence-final
-number at the beginning of a line. </p>
-
-<p> The following example illustrates how lists can be
-used: </p>
+newline is considered a list item.  In particular, list items do not
+need to be separated by blank lines.  The following example
+illustrates how lists can be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
   <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
@@ -185,6 +178,77 @@ used: </p>
     <p> This is the second paragraph. </p> </li>
   </ol>
   </td></tr>
+</table>
+
+<p> Lists should be separated from the surrounding text in one of two
+ways: either indent the list, or surround it with blank lines.  If you
+don't, epytext will generate a warning. </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This is a paragraph.
+      1. This list is separated by
+         indentation.
+
+    This is a paragraph.
+
+    1. This list is separated by
+       blank lines
+
+    This is a paragraph.
+    1. This list is not separated; it
+       will generate a warning (but
+       still be parsed as a list).
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  This is a paragraph.
+  <ol><li>This list is good: it is separated by indentation.</li></ol>
+  This is a paragraph.
+  <ol><li>This list is good: it is separated by blank lines.</li></ol>
+  This is a paragraph.
+  <ol><li>This list is not separated; it will generate a
+  warning (but still get parsed as a list).</li></ol>
+</td></tr>
+</table>
+
+<p> This helps epytext distinguish a list item from a dash or a
+sentence-final number that was word-wrapped to the beginning of a
+line.  If you want to include bullet-like text in a paragraph, then
+you must either ensure that it is not at the beginning of the line,
+or use <a href="#escaping">escaping</a> to prevent epytext from
+treating it as markup. </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This sentence ends with the number
+    1.  Epytext can't tell if the "1."
+    is a bullet or part of the paragraph,
+    so it will generate a warning.
+
+    This sentence ends with the number 1.
+
+    This sentence ends with the number
+    E{1}.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  This sentence ends with the number
+  <ol><li>Epytext can't tell if the "1." is a bullet or part of the
+    paragraph, so it will generate a warning. </li></ol>
+    This sentence ends with the number 1.
+    <p> This sentence ends with the number 1.</p>
+</td></tr>
 </table>
 
 <a name="section"/>
@@ -833,6 +897,170 @@ doctest blocks, spaces and newlines are preserved, and no
 word-wrapping occurs; and within URL targets and documentation link
 targets, whitespace is ignored. </p>
 
+<!-- =========== WARNINGS ============= -->
+<!-- (make sure this is consistant w/ the man page!!) -->
+<a name="warnings"/>
+<h2> 5. Warnings and Errors </h2>
+
+<p>If epydoc encounters an error while processing a docstring, it
+issues a warning message that describes the error, and attempts to
+continue generating documentation.  Errors related to epytext are
+divided into three categories: </p>
+
+<ul>
+  <li> <b>Epytext Warnings</b> are caused by epytext docstrings that
+  contain questionable or suspicious markup.  Epytext warnings do
+  not prevent the docstring in question from being parsed. </li>
+  <li> <b> Field Warnings</b> are caused by epytext docstrings
+  containing invalid fields.  The contents of the invalid field are
+  generally ignored. </li>
+  <li> <b>Epytext Errors</b> are caused by epytext docstrings that
+  contain invalid markup.  Whenever an epytext error is detected,
+  the docstring in question is treated as a plaintext docstring. </li>
+</ul>
+
+<p> The following sections list and describe the warning messages that
+epydoc can generate.  They are intended as a reference resource, which
+you can search for more information and possible causes if you
+encounter an error and do not understand it.  These descriptions are
+also available in the <a
+href="epydoc-man.html#lbAH"><code>epydoc(1)</code> man page</a>. </p>
+
+<h3> 5.1. Epytext Warnings </h3>
+<ul>
+  
+<li><b class="error">Improper doctest block indentation.</b> <br />
+  The doctest block dedents past the indentation of its initial prompt
+  line.
+
+<li><b class="error">Lists should be indented or separated by blank
+lines.</b> <br />
+  An unindented line immediately following a paragraph starts with a
+  list bullet.  Epydoc is not sure whether you meant to start a new
+  list item, or meant for a paragraph to include a word that looks
+  like a bullet.  If you intended the former, then indent the list, or
+  separate it from the paragraph by a blank line.  If you intended the
+  latter, then change the word-wrapping of the paragraph, or escape
+  the first character of the word that looks like a bullet.  Note: if
+  you include text on the same line as the comment-opening quote, then
+  you cannot use indentation to signal a list start, since epydoc
+  cannot determine the indentation for this first line.
+
+<li><b class="error">List item contents should be indented; Paragraphs
+should be separated from lists by blank lines or indentation.</b>
+<br />
+  A list item is immediately followed by a line with the same
+  indentation as the list item's bullet.  Epydoc is not sure whether
+  you meant to start a new paragraph, or to continue the list item.
+  To start a new paragraph, add a blank line before the line.  To
+  continue the list item, indent its contents.
+
+<li><b class="error">Possible mal-formatted field item.</b> <br />
+  Epytext detected a line that looks like a field item, but is not
+  correctly formatted.  This typically occurs when the trailing colon
+  (<b>":"</b>) is not included in the field tag.
+
+<li><b class="error">Possible heading typo.</b> <br />
+  Epytext detected a pair of lines that looks like a heading, but the
+  number of underline characters does not match the number of
+  characters in the heading.  The number of characters in these two
+  lines must match exactly for them to be considered a
+  heading.
+
+</ul>
+<h3> 5.2. Field Warnings </h3>
+<ul>
+  
+<li><b class="error"><code>@param</code> for unknown parameter <i>param</i>.</b> <br />
+  A <code>@param</code> field was used to specify the type for a parameter that is
+  not included in the function's signature.  This is typically caused
+  by a typo in the parameter name.
+
+<li><b class="error"><i>tag</i> did not expect an argument.</b> <br />
+  The field tag <i>tag</i> was used with an argument, but it does not
+  take one.
+
+<li><b class="error"><i>tag</i> expected an argument.</b> <br />
+  The field tag <i>tag</i> was used without an argument, but it
+  requires one.
+
+<li><b class="error"><code>@type</code> for unknown parameter <i>param</i>.</b> <br />
+  A <code>@type</code> field was used to specify the type for a parameter that is
+  not included in the function's signature.  This is typically caused
+  by a typo in the parameter name.
+
+<li><b class="error"><code>@type</code> for unknown variable <i>var</i>.</b> <br />
+  A <code>@type</code> field was used to specify the type for a variable, but no
+  other information is known about the variable.  This is typically
+  caused by a typo in the variable name.
+
+<li><b class="error">Unknown field tag <i>tag</i>.</b> <br />
+  A docstring contains a field with the unknown tag <i>tag</i>.
+
+<li><b class="error">Redefinition of <i>field</i>.</b> <br />
+  Multiple field tags define the value of <i>field</i> in the same
+  docstring, but <i>field</i> can only take a single value.
+  
+</ul>
+<h3> 5.3. Epytext Errors </h3> 
+<ul>
+
+<li><b class="error">Bad link target.</b> <br />
+  The target specified for an inline link contruction (<code>L{...}</code>)
+  is not well-formed.  Link targets must be valid python identifiers.
+
+<li><b class="error">Bad uri target.</b> <br />
+  The target specified for an inline uri contruction (<code>U{...}</code>)
+  is not well-formed.  This typically occurs if inline markup is
+  nested inside the URI target.
+
+<li><b class="error">Fields must be at the top level.</b> <br />
+  The list of fields (<code>@param</code>, etc.) is contained by some other
+  block structure (such as a list or a section).
+
+<li><b class="error">Fields must be the final elements in an epytext
+string.</b> <br />
+  The list of fields (<code>@param</code>, etc.) is not at the end of a
+  docstring.
+
+<li><b class="error">Headings must occur at top level.</b> <br />
+  The heading is contianed in some other block structure (such as a
+  list).
+
+<li><b class="error">Improper heading indentation.</b> <br />
+  The heading for a section is not left-aligned with the paragraphs in
+  the section that contains it.
+
+<li><b class="error">Improper paragraph indentation.</b> <br />
+  The paragraphs within a block are not left-aligned.  This error is
+  often generated when plaintext docstrings are parsed using epytext.
+
+<li><b class="error">Invalid escape.</b> <br />
+  An unknown escape sequence was used with the inline escape
+  construction (<code>E{...}</code>).
+
+<li><b class="error">Unbalanced '{'.</b> <br />
+  The docstring contains unbalanced braces.  Epytext requires that all
+  braces must be balanced.  To include a single unbalanced brace, use
+  the escape sequences <code>E{lb}</code> (left brace) and <code>E{rb}</code> (right brace).
+
+<li><b class="error">Unbalanced '}'.</b> <br />
+  The docstring contains unbalanced braces.  Epytext requires that all
+  braces must be balanced.  To include a single unbalanced brace, use
+  the escape sequences <code>E{lb}</code> (left brace) and <code>E{rb}</code> (right brace).
+
+<li><b class="error">Unknown inline markup tag.</b> <br />
+  An unknown tag was used with the inline markup construction
+  (<code><i>x</i>{...}</code>).
+
+<li><b class="error">Wrong underline character for heading.</b> <br />
+  The underline character used for this section heading does not
+  indicate an appopriate section level.  The "<code>=</code>" character
+  should be used to underline sections; "<code>-</code>" for subsections;
+  and "<code>~</code>" for subsubsections.
+
+</ul>
+
 <table width="100%" class="navbox" cellpadding="1" cellspacing="0">
   <tr>
   <td align="center" width="20%">
@@ -846,15 +1074,15 @@ targets, whitespace is ignored. </p>
   <td align="center" width="20%">
     <a class="nav" href="http://www.cis.upenn.edu/~edloper/">[Author]</a></td>
   <td align="center" width="20%">
-    <A href="http://sourceforge.net/projects/epydoc"> 
-    <IMG src="sflogo.png" 
+    <a href="http://sourceforge.net/projects/epydoc"> 
+    <img src="sflogo.png" 
     width="88" height="26" border="0" alt="SourceForge"
-    align="top"/></A></td>
+    align="top"/></a></td>
     </tr>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Sat Oct 19 02:08:51 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Mon Oct 28 01:38:14 EST 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
