@@ -160,11 +160,11 @@ def _find_module_from_filename(filename,verbosity):
             return rv
         finally:
             os.chdir(old_cwd)
-    except ImportError:
+    except ImportError, e:
         if re.match(r'^.*__init__\.py?$', filename):
-            _error("Run epydoc from the parent directory (%r)" %
-                   filename)
-        _error("Could not find module %r" % filename)
+            _error("Run epydoc from the parent directory (%r):\n%s" %
+                   (filename, e))
+        _error("Could not find module %r:\n%s" % (filename, e))
 
 def _find_modules(module_names, verbosity):
     """
