@@ -17,6 +17,28 @@ implement crossreferencing between C{ObjDoc}s.
 
 @sort: make_uid, UID, Link
 @see: L{epydoc.objdoc}
+
+@group Unique Identifiers: UID, RelativeUID, VariableUID, PropertyUID,
+    StaticMethodUID, ClassMethodUID
+@group Crossreferences: Link
+@sort: UID, RelativeUID, VariableUID, PropertyUID, StaticMethodUID,
+    ClassMethodUID
+
+@bug: UIDs are not generated correctly for nested classes; and in
+    general, nested classes are not well supported.  (E.g., they
+    are listed under their module, not their containing class).
+    The effect of this bug is that docstring "C{E{L}{links}}" that
+    refer to the nested class using its normal name (e.g.
+    C{ContainerClass.NestedClass}) won't be resolved correctly.  But
+    you should be able to link to it with just C{NestedClass}.
+@bug: C{PropertyDoc} usually creates an incorrect UID for its
+    fget, fset, and fdel accessors.  This arises because they
+    are represented as functions, not methods; so epydoc doesn't
+    have any way to tell what class they were defined in.  As
+    a result, it just assumes that they were installed at the
+    module level.  The effect of this bug is that the hyperlinks
+    from property accessor methods don't point to the right
+    targets.
 """
 __docformat__ = 'epytext en'
 
@@ -89,9 +111,9 @@ class UID:
         parent = self.parent()
         if parent and not parent._public:
             self._public = 0
-            
+        
         # Next, check the __all__ variable.
-        if (parent and parent.is_module() and
+        elif (parent and parent.is_module() and
             hasattr(parent._obj, '__all__')):
             try: self._public = (self.shortname() in parent._obj.__all__)
             except: pass
@@ -99,8 +121,8 @@ class UID:
         # Finally, check the short name.
         else:
             shortname = self.shortname()
-            self._public = (shortname[:1] == '_' and
-                            shortname[-1:] != '_')
+            self._public = (shortname[:1] != '_' or
+                            shortname[-1:] == '_')
 
     #//////////////////////////////////////////////////
     # UID Name & Value
@@ -171,6 +193,14 @@ class UID:
         """
         raise NotImplementedError()
 
+    def is_any_function(self):
+        """
+        @return: True if this is the UID for a function or a builtin
+            function.
+        @rtype: C{boolean}
+        """
+        return self.is_function() or self.is_builtin_function()
+        
     def is_builtin_function(self):
         """
         @return: True if this is the UID for a builtin function.
@@ -192,13 +222,22 @@ class UID:
         """
         raise NotImplementedError()
 
+    def is_any_method(self):
+        """
+        @return: True if this is the UID for a method or a builtin
+            method.
+        @rtype: C{boolean}
+        """
+        return self.is_method() or self.is_builtin_method()
+
     def is_routine(self):
         """
         @return: True if this is the UID for a function, a method, a
             builtin function, or a builtin method.
         @rtype: C{boolean}
         """
-        raise NotImplementedError()
+        return (self.is_function() or self.is_builtin_function() or
+                self.is_method() or self.is_builtin_method())
 
     def is_property(self):
         """
@@ -680,8 +719,8 @@ def make_uid(object, base_uid=None, shortname=None):
         if type(object) is _MethodType:
             key = (id(object.im_func), id(object.im_class))
         else: key = id(object)
-        try: return _object_uids[key]
-        except: pass
+        uid = _object_uids.get(key)
+        if uid is not None: return uid
 
         # We haven't seen this object before; create a new UID.
         uid = ObjectUID(object)
