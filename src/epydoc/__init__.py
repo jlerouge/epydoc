@@ -67,6 +67,10 @@ produce API documentation using the following steps:
       info by parsing python files.
     - C{Var} will be replaced by C{VarDoc}, a subclass of C{ObjDoc}.
 
+@bug: UIDs are not generated correctly for nested classes; and in
+    general, nested classes are not well supported.  (E.g., they
+    are listed under their module, not their containing class).
+
 @var __license__: The license governing the use and distribution of
     epydoc.
 @var __contributors__: Contributors to epydoc, in alphabetical
