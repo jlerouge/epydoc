@@ -28,7 +28,12 @@ usage:
 distributions:
 	$(MAKE) -C src distributions
 
-web: refdocs
+web: xfer
+webpage: xfer
+xfer: refdocs
+	rsync -arz -e ssh $(WEBDIR)/* $(HOST):$(DIR)
+
+old_web: refdocs
 	(cd ${WEBDIR} && tar -cvzf webpage.tgz *)
 	scp ${WEBDIR}/webpage.tgz ${HOST}:${DIR}
 	ssh ${HOST} "cd ${DIR} && tar -xvzf webpage.tgz && rm webpage.tgz"
