@@ -29,20 +29,35 @@ Usage::
     --version, -V
         Print the version of epydoc.
 
-    -o DIR, --output DIR, --target DIR
+    -o DIR, --output=DIR
         Output directory for HTML files
         
-    -n NAME, --name NAME
+    -n NAME, --name=NAME
         Project name (for HTML header/footer)
 
-    -u URL, --url URL
+    -u URL, --url=URL
         Project URL (for HTML header/footer)
 
-    -c SHEET, --css SHEET
+    -f, --frames
+        Generate a frame-based table of contents.
+
+    -c=SHEET, --css=SHEET
         CSS stylesheet for HTML files.  If SHEET is a file, then the
         stylesheet is copied from that file; otherwise, SHEET is taken
         to be the name of a built-in stylesheet.  For a list of the
         built-in stylesheets, run "epydoc --help css".
+
+    --private-css=SHEET
+        CSS stylesheet for the HTML files containing private API
+        documentation.  If SHEET is a file, then the stylesheet is
+        copied from that file; otherwise, SHEET is taken to be the
+        name of a built-in stylesheet.  For a list of the built-in
+        stylesheets, run "epydoc --help css".
+
+    --help-file=FILE
+        A file containing the body of the help page for the HTML
+        output.  If no file is specified, then a default help file is
+        used.
 
     --show-imports
         Include a list of the classes and functions that each module
@@ -64,8 +79,9 @@ Usage::
         Supress output of epytext warnings and errors.
 """
 
-import sys, os.path, re
-from epydoc.imports import import_module
+import sys, os.path, re, getopt
+
+PROFILE=0
 
 ##################################################
 ## Command-Line Interface
@@ -104,12 +120,10 @@ def _help(arg):
         format = '    %'+`-maxlen-1`+'s %s'
         for name in names:
             print format % (name, STYLESHEETS[name][1])
-    elif arg == 'usage':
-        _usage(0)
+        print
+        sys.exit(0)
     else:
-        _usage()
-    print
-    sys.exit(0)
+        _usage(0)
     
 def _version():
     """
@@ -129,7 +143,7 @@ def _error(message):
     @type message: C{string}
     @rtype: C{None}
     """
-    print "%s Error: %s" % (os.path.split(sys.argv[0])[-1], message)
+    print "%s error: %s" % (os.path.split(sys.argv[0])[-1], message)
     sys.exit(-1)
 
 def _parse_args():
@@ -142,64 +156,60 @@ def _parse_args():
         that value is used; otherwise, a default value is used.
         Currently, the following configuration parameters are set:
         C{target}; C{modules}; C{verbosity}; C{prj_name}; C{check};
-        C{show_private}; and C{check_all}.
+        C{check_private}; and C{check_all}.
     @rtype: C{None}
     """
     # Default values.
-    argvals = {'target':'html', 'modules':[], 'verbosity':0,
-               'prj_name':'', 'check':0, 'show_private':0,
-               'check_all':0, 'show_imports':0}
-    
-    # Get the args (backwards, since we will pop them)
-    args = sys.argv[1:]
-    args.reverse()
+    options = {'target':'html', 'modules':[], 'verbosity':0,
+               'prj_name':'', 'check':0, 'check_private':0,
+               'show_imports':0, 'frames':0, 'private':1,
+               'quiet':0}
 
-    while args:
-        arg = args.pop()
-        if arg[:1] == '-':
-            if arg in ('-o', '--output', '--target'):
-                try: argvals['target'] = args.pop()
-                except: _usage()
-            elif arg in ('-n', '--name'):
-                try: argvals['prj_name'] = args.pop()
-                except: _usage()
-            elif arg in ('-u', '--url'):
-                try: argvals['prj_url'] = args.pop()
-                except: _usage()
-            elif arg in ('-V', '--version'):
-                _version()
-            elif arg in ('-v', '--verbose'):
-                argvals['verbosity'] += 1
-            elif arg in ('-q', '--quiet'):
-                argvals['verbosity'] -= 3
-            elif re.match('^-v+$', arg):
-                argvals['verbosity'] += len(arg)-1
-            elif arg in ('--help', '-?', '--usage', '-h'):
-                if len(args) == 1: _help(args.pop())
-                elif len(args) == 0: _usage(0)
-                else: _usage()
-            elif arg in ('--check',):
-                argvals['check'] = 1
-            elif arg in ('--show-imports', '--show_imports'):
-                argvals['show_imports'] = 1
-            elif arg in ('-p',):
-                argvals['show_private'] = 1
-            elif arg in ('-a', '-check_all'):
-                argvals['check_all'] = 1
-            elif arg in ('--css', '-c'):
-                try: argvals['css'] = args.pop()
-                except: _usage()
-                if argvals['css'] == 'help': _csshelp()
-            else:
-                _usage()
+    # Get the command-line arguments, using getopts.
+    shortopts = 'c:fh:n:o:u:Vvpq?:'
+    longopts = ('check frames help= usage= helpfile= help-file= '+
+                'help_file= name= output= target= url= version verbose ' +
+                'private-css= private_css= quiet show-imports '+
+                'show_imports css= no_private no-private').split()
+    try:
+        (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
+    except getopt.GetoptError, e:
+        if e.opt in ('h', '?', 'help', 'usage'): _usage(0)
+        print ('%s; run "%s -h" for usage' %
+               (e,os.path.basename(sys.argv[0])))
+        sys.exit(-1)
+
+    # Parse the arguments.
+    for (opt, val) in opts:
+        if opt in ('--check',): options['check'] = 1
+        elif opt in ('--css', '-c'): options['css'] = val
+        elif opt in ('--frames', '-f'): options['frames'] = 1
+        elif opt in ('--help', '-?', '--usage', '-h'): _help(val)
+        elif opt in ('--helpfile', '--help-file', '--help_file'):
+            options['help'] = val
+        elif opt in ('--name', '-n'): options['prj_name']=val
+        elif opt in ('--no-private', '--no_private'): options['private']=0
+        elif opt in ('--output', '--target', '-o'): options['target']=val
+        elif opt in ('-p',): options['check_private'] = 1
+        elif opt in ('--private-css', '--private_css'):
+            options['private_css'] = val
+        elif opt in ('--quiet', '-q'): options['quiet'] -= 3
+        elif opt in ('--show-imports', '--show_imports'):
+            options['show_imports'] = 1
+        elif opt in ('--url', '-u'): options['prj_url']=val
+        elif opt in ('--verbose', '-v'): options['verbosity'] += 1
+        elif opt in ('--version', '-V'): _version()
         else:
-            argvals['modules'].append(arg)
+            _usage()
 
-    # This can prevent trouble sometimes when importing things.
-    sys.argv[:] = ['(imported)']
+    # Make sure we got some modules.
+    if len(modules) == 0:
+        print ('no modules specified; run "%s -h" for usage' %
+               os.path.basename(sys.argv[0]))
+        sys.exit(-1)
+    options['modules'] = modules
 
-    if argvals['modules'] == []: _usage()
-    return argvals
+    return options
 
 def _find_modules(module_names, verbosity):
     """
@@ -211,12 +221,16 @@ def _find_modules(module_names, verbosity):
     @param verbosity: Verbosity level for tracing output.
     @type verbosity: C{int}
     """
-    if verbosity > 0: print 'Importing %s modules...' % len(module_names)
+    from epydoc.imports import import_module
+
+    if verbosity > 0: print 'Importing %s modules.' % len(module_names)
     modules = []
-    mnum = 0
+    mnum = 1
+    TRACE_FORMAT = ("  [%%%dd/%d] Importing %%s" %
+                    (len(`len(module_names)`), len(module_names)))
     for name in module_names:
-        if verbosity > 1:
-            print ('[%d/%d] Importing %s' % (mnum+1, len(module_names), name))
+        if verbosity > 2:
+            print TRACE_FORMAT % (mnum, name)
             sys.stdout.flush()
             mnum += 1
 
@@ -225,9 +239,11 @@ def _find_modules(module_names, verbosity):
             module = import_module(name)
             if module not in modules:
                 modules.append(module)
-            elif verbosity > 3: print "  (duplicate)"
+            elif verbosity > 3:
+                print '  (duplicate)'
         except ImportError, e:
-            if verbosity >= 0: print 'Warning: %s' % e
+            if verbosity >= 0: 
+                print '  Warning: %s' % e
 
     if verbosity > 1 and len(modules) > 20: print "Done importing"
     return modules
@@ -238,71 +254,125 @@ def cli():
     
     @rtype: C{None}
     """
-    param = _parse_args()
+    # Parse the command line arguments.
+    options = _parse_args()
 
-    # This can occasionally help when importing various modules.
-    sys.stdin.close()
+    # Import all the specified modules.
+    modules = _find_modules(options['modules'], options['verbosity'])
 
-    try:
-        modules = _find_modules(param['modules'], param['verbosity'])
-    except ImportError, e:
-        if e.args: _error(e.args[0])
-        else: raise
+    # Build their documentation
+    docmap = _make_docmap(modules, options)
 
-    # Wait to do imports until now, to make "--help" faster.
-    from epydoc.html import HTML_Doc
+    # Perform the requested action.
+    if options['check']: _check(docmap, options)
+    else: _html(docmap, options)
+
+def _make_docmap(modules, options):
+    """
+    Construct the documentation map for the given modules.
+
+    @param modules: The modules that should be documented.
+    @type modules: C{list} of C{Module}
+    @param options: Options from the command-line arguments.
+    @type options: C{dict}
+    """
     from epydoc.objdoc import DocMap
-    from epydoc.checker import DocChecker
 
-    # Create dest directory, if necessary
-    if not os.path.isdir(param['target']):
-        if not os.path.exists(param['target']):
-            try: os.mkdir(param['target'])
-            except: _error("Could not create %r" % param['target'])
-        else:
-            _error("%r is not a directory" % param['target'])
-
-    def progress_callback(file, doc, verbosity=param['verbosity']):
-        if verbosity==2:
-            sys.stdout.write('.')
-            sys.stdout.flush()
-        elif verbosity>2:
-            if doc and doc.uid().is_module():
-                print 'Writing docs for module:', `doc.uid()`
-            elif doc and doc.uid().is_class():
-                print 'Writing docs for class: ', `doc.uid()`
-            else:
-                print 'Writing docs for file:  ', file
-        
-    # Construct the docmap.  Don't bother documenting base classes if
-    # we're just running checks.
-    d = DocMap(param['verbosity'], not param['check'])
+    # Don't bother documenting base classes if we're just running
+    # checks.
+    d = DocMap(options['quiet'], not options['check'])
     
-    # Build the documentation.
+    if options['verbosity'] > 0:
+        print 'Building API documentation for %d modules.' % len(modules)
+    TRACE_FORMAT = ("  [%%%dd/%d] Building docs for %%s" %
+                    (len(`len(modules)`), len(modules)))
+    mnum = 1
     for module in modules:
-        if param['verbosity'] > 0: print 'Building docs for', module.__name__
+        if options['verbosity'] > 1:
+            print TRACE_FORMAT % (mnum, module.__name__)
+            sys.stdout.flush()
+            mnum += 1
         d.add(module)
 
-    if param['check']:
-        # Run completeness checks.
-        if param['verbosity'] > 0: print 'Performing completeness checks'
-        checker = DocChecker(d)
-        if param['show_private']:
-            checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
-                          DocChecker.PRIVATE | DocChecker.DESCR_LAZY | 
-                          DocChecker.TYPE)
-        else:
-            checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
-                          DocChecker.DESCR_LAZY | DocChecker.TYPE)
-    else:
-        # Write documentation.
-        if param['verbosity'] == 2: print 'Writing docs to', param['target'],
-        elif param['verbosity'] > 0: print 'Writing docs to', param['target']
+    return d
 
-        htmldoc = HTML_Doc(d, **param)
-        htmldoc.write(param['target'], progress_callback)
-        if param['verbosity'] > 1: print
+def _html(docmap, options):
+    """
+    Create the HTML documentation for the objects in the given
+    documentation map.  
+
+    @param docmap: A documentation map containing the documentation
+        for the objects whose API documentation should be created.
+    @param options: Options from the command-line arguments.
+    @type options: C{dict}
+    """
+    from epydoc.html import HTML_Doc
+
+    # Create the documenter, and figure out how many files it will
+    # generate.
+    htmldoc = HTML_Doc(docmap, **options)
+    numfiles = htmldoc.num_files()
+        
+    # Produce pretty trace output.
+    def progress_callback(file, doc, verbosity=options['verbosity'],
+                          numfiles=numfiles, filenum=[1]):
+        if verbosity==2:
+            if filenum[0] == 1 and numfiles <= 70: sys.stdout.write('  [')
+            if (filenum[0] % 60) == 1 and numfiles > 70:
+                sys.stdout.write('  [%3d%%] ' % (100.0*filenum[0]/numfiles))
+            sys.stdout.write('.')
+            if (filenum[0] % 60) == 0 and numfiles > 70: print
+            if filenum[0] == numfiles:
+                if numfiles > 70: print
+                else: print ']'
+        elif verbosity>2:
+            TRACE_FORMAT = (('  [%%%dd/%d]' % (len(`numfiles`), numfiles)) +
+                            ' Writing docs for %s %s')
+            if doc and doc.uid().is_module():
+                print TRACE_FORMAT % (filenum[0], 'module:', `doc.uid()`)
+            elif doc and doc.uid().is_class():
+                print TRACE_FORMAT % (filenum[0], 'class: ', `doc.uid()`)
+            else:
+                print TRACE_FORMAT % (filenum[0], 'file:  ',
+                                      os.path.basename(file))
+        if verbosity > 1: sys.stdout.flush()
+        filenum[0] += 1
+        
+    # Write documentation.
+    if options['verbosity'] > 0:
+        print ('Writing API documentation (%d files) to %s.' %
+               (numfiles, options['target']))
+    htmldoc.write(options['target'], progress_callback)
+
+def _check(docmap, options):
+    """
+    Run completeness checks on the objects in the given documentation
+    map. 
+
+    @param docmap: A documentation map containing the documentation
+        for the objects whose API documentation should be created.
+    @param options: Options from the command-line arguments.
+    @type options: C{dict}
+    """
+    from epydoc.checker import DocChecker
+    
+    # Run completeness checks.
+    if options['verbosity'] > 0: print 'Performing completeness checks'
+    checker = DocChecker(docmap)
+    if options['check_private']:
+        checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
+                      DocChecker.PRIVATE | DocChecker.DESCR_LAZY | 
+                      DocChecker.TYPE)
+    else:
+        checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
+                      DocChecker.DESCR_LAZY | DocChecker.TYPE)
     
 if __name__ == '__main__':
-    cli()
+    if PROFILE:
+        from profile import Profile
+        profiler = Profile()
+        profiler.runcall(cli)
+        profiler.print_stats()
+    else:
+        cli()
     
