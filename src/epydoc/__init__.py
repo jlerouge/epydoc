@@ -7,9 +7,6 @@
 # Created [01/30/01 05:18 PM]
 # $Id$
 #
-# Compatable with Python 2.0 and up.
-# Requires inspect.py (which is standard for Python 2.1 and up)
-#
 
 """
 Automatic Python reference documentation generator.  Epydoc processes
@@ -23,36 +20,41 @@ produce API documentation using the following steps:
   2. Construct documentation for each object, using L{epydoc.objdoc}.
      - L{epydoc.uid} is used to create unique identifiers for each
        object.
-     - L{epydoc.epytext} is used to parse the objects' documentation
-       strings, if they are written using the U{epytext markup
-       language<http://epydoc.sourceforge.net/epytext.html>}.
-  3. Produce HTML output, using L{epydoc.html}.
-     - L{epydoc.css} is used to generate the CSS stylehseet.
-     - L{epydoc.help} is used to generate the help page.
+     - The L{epydoc.markup} package is used to parse the objects'
+       documentation strings.
+  3. Generate output, using L{epydoc.html} or L{epydoc.latex}.
+     - L{epydoc.css} is used to generate the CSS stylehseet for HTML output.
+     - L{epydoc.help} is used to generate the help page for HTML output.
      - L{epydoc.colorize} is used to colorize doctest blocks and
-       regular expressions variable values.
+       regular expressions variable values for HTML output.
 
 @group Interface Modules: cli, gui
 @group Inspection Modules: uid, objdoc, imports
-@group Docstring Parsing Modules: epytext, rst, javaoc
+@group Docstring Parsing Modules: markup
 @group Documentation Output Modules: html, css, help, colorize,
        latex, man
 @group Testing Modules: checker, test
 
-@sort: cli, gui, uid, objdoc, imports, epytext, html, css, help,
+@sort: cli, gui, uid, objdoc, imports, markup, html, css, help,
        colorize, latex, man
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
-@requires: Python 2.1, or Python 2.0 with
+@requires: Python 2.1+, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
 @version: 2.0S{alpha}
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
+@todo 2.0: Finish/fix new markup language framework
+  - latex
+  - javadoc
+  - rst
+@todo 2.0: Better field splitting for rst (parameters, etc)
+@todo 2.0: Groups for function parameters (eg Input/Output)
 @todo 2.0: Create a better default top_page than trees.html
+@todo 2.0: Improve ModuleDoc._find_imported_variables.
 
-@todo 2.1: Improve ModuleDoc._find_imported_variables.
 @todo 2.1: Modify L{epydoc.html} to write directly to streams,
            rather than building up strings.
     
@@ -103,4 +105,4 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 #   - staticmethod/classmethod
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
-
+#   - @summary
