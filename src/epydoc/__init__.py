@@ -42,7 +42,7 @@ produce API documentation using the following steps:
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '1.2'
+__version__ = '1.2 prerelease'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 
