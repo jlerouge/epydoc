@@ -666,16 +666,21 @@ class HTMLFormatter:
 
         # If it's a package, add a list of sub-modules.
         if doc.ispackage():
-            str += self._module_list(doc.modules(), doc.sortorder())
+            str += self._module_list(doc.modules(), doc.sortorder(),
+                                     doc.groups())
 
         # Show the summaries for classes, exceptions, functions, and
         # variables contained in the module.
         (classes,excepts) = self._split_classes(doc.classes())
         (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
-        str += self._class_summary(classes, doc.sortorder(), 'Classes')
-        str += self._class_summary(excepts, doc.sortorder(), 'Exceptions')
-        str += self._func_summary(doc.functions(), doc.sortorder(), None)
-        str += self._var_summary(doc.variables(), doc.sortorder(), uid)
+        str += self._class_summary(classes, doc.sortorder(),
+                                   doc.groups(), 'Classes')
+        str += self._class_summary(excepts, doc.sortorder(),
+                                   doc.groups(), 'Exceptions')
+        str += self._func_summary(doc.functions(), doc.sortorder(),
+                                  None, doc.groups(), 'Function Summary')
+        str += self._var_summary(doc.variables(), doc.sortorder(),
+                                 uid, doc.groups(), 'Variable Summary')
         str += self._imports(iclasses, iexcepts, doc.imported_functions(),
                              doc.sortorder())
 
@@ -735,11 +740,13 @@ class HTMLFormatter:
         # class variables contained in the class.
         allmethods = doc.methods()+doc.staticmethods()+doc.classmethods()
         str += self._func_summary(allmethods, doc.sortorder(),
-                                  doc, 'Method Summary')
+                                  doc, doc.groups(), 'Method Summary')
         str += self._var_summary(doc.ivariables(), doc.sortorder(),
-                                 uid, 'Instance Variable Summary')
+                                 uid, doc.groups(),
+                                 'Instance Variable Summary')
         str += self._var_summary(doc.cvariables(), doc.sortorder(),
-                                 uid, 'Class Variable Summary')
+                                 uid, doc.groups(),
+                                 'Class Variable Summary')
 
         # Show details for methods and variables
         if doc.staticmethods() or doc.classmethods():
@@ -1242,7 +1249,7 @@ class HTMLFormatter:
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  </ul>\n'
-        str += ' '*depth+'</li>'
+        str += ' '*depth+'</li>\n'
         return str
 
     def _module_tree(self, sortorder=None):
@@ -1263,7 +1270,7 @@ class HTMLFormatter:
                 str += self._module_tree_item(uid)
         return str +'</ul>\n'
 
-    def _module_list(self, modules, sortorder):
+    def _module_list(self, modules, sortorder, groups):
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
@@ -1271,18 +1278,44 @@ class HTMLFormatter:
         @rtype: C{string}
         """
         if len(modules) == 0: return ''
-        str = '<h3>Modules</h3>\n<ul>\n'
+        str = self._table_header('Submodules', 'details')
         modules = self._filtersort_links(modules, sortorder)
+        groupstr = ''
         
-        for link in modules:
-            str += self._module_tree_item(link.target())
-        return str + '</ul>\n'
+        # Create the portion of the list containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # modules are at the top.
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [m for m in modules if m.target() in groupmembers]
+            if not group: continue
+            modules = [m for m in modules if m not in group]
+            # Print a header within the list
+            groupstr += self._group_header(groupname)
+            #groupstr += ('  <tr rowspan="2" class="group"><td>\n'+
+            #             '%s\n  </td></tr>\n' % groupname)
+            groupstr += '  <tr><td><ul>\n\n'
+            # Add the lines for each func
+            for link in group:
+                groupstr += self._module_tree_item(link.target())
+            groupstr += '  </ul></td></tr>\n\n'
+
+        if modules:
+            str += '  <tr><td><ul>\n'
+            for link in modules:
+                str += self._module_tree_item(link.target())
+            str += '  </ul></td></tr>\n'
+        str += groupstr
+        str += '</table><br />\n\n'
+        return str
 
     #////////////////////////////////////////////////////////////
     # Class tables
     #////////////////////////////////////////////////////////////
     
-    def _class_summary(self, classes, sortorder, heading='Class Summary'):
+    def _class_summary(self, classes, sortorder,
+                       groups, heading='Class Summary'):
         """
         @return: The HTML code for the class summary table.  This is
             used by L{_module_to_html} to list the classes in a
@@ -1291,24 +1324,44 @@ class HTMLFormatter:
         """
         classes = self._filtersort_links(classes, sortorder)
         if len(classes) == 0: return ''
-        str = self._table_header(heading, 'summary')
+        
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # classs are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [c for c in classes if c.target() in groupmembers]
+            if not group: continue
+            classes = [c for c in classes if c not in group]
+            # Print a header within the table
+            groupstr += self._group_header(groupname)
+            # Add the lines for each func
+            for link in group:
+                groupstr += self._class_summary_line(link)
 
+        str = self._table_header(heading, 'summary')
         for link in classes:
-            cname = link.name()
-            cls = link.target()
-            if not self._docmap.has_key(cls): continue
-            cdoc = self._docmap[cls]
-            csum = self._summary(cdoc, cls.module())
-            str += '<tr><td width="15%">\n'
-            str += '  <b>'+self._link_to_html(link)
-            str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
+            str += self._class_summary_line(link)
         return str + '</table><br />\n\n'
+
+    def _class_summary_line(self, link):
+        cname = link.name()
+        cls = link.target()
+        if not self._docmap.has_key(cls): return ''
+        cdoc = self._docmap[cls]
+        csum = self._summary(cdoc, cls.module())
+        str = '<tr><td width="15%">\n'
+        str += '  <b>'+self._link_to_html(link)
+        str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
+        return str
 
     #////////////////////////////////////////////////////////////
     # Function tables
     #////////////////////////////////////////////////////////////
     
-    def _func_summary(self, functions, sortorder, cls,
+    def _func_summary(self, functions, sortorder, cls, groups, 
                       heading='Function Summary'):
         """
         @return: The HTML code for a function summary table.  This
@@ -1319,55 +1372,75 @@ class HTMLFormatter:
         """
         functions = self._filtersort_links(functions, sortorder)
         if len(functions) == 0: return ''
+
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # functions are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [f for f in functions if f.target() in groupmembers]
+            if not group: continue
+            functions = [f for f in functions if f not in group]
+            # Print a header within the table
+            groupstr += self._group_header(groupname)
+            # Add the lines for each func
+            for link in group:
+                groupstr += self._func_summary_line(link, cls)
+
         str = self._table_header(heading, 'summary')
-
         for link in functions:
-            func = link.target()
-            fname = link.name()
-            if func.is_method() or func.is_builtin_method():
-                container = func.cls()
-                inherit = (container != cls.uid())
-            else:
-                inherit = 0
-                try: container = func.module()
-                except TypeError: container = None
+            str += self._func_summary_line(link, cls)
+        return str + groupstr + '</table><br />\n\n'
 
-            # If we don't have documentation for the function, then we
-            # can't say anything about it.
-            if not self._docmap.has_key(func): continue
-            fdoc = self._docmap[func]
-            
-            # Try to find a documented ancestor.
-            while (not fdoc.documented() and fdoc.matches_override() and
-                   self._docmap.has_key(fdoc.overrides())):
-                fdoc = self._docmap[fdoc.overrides()]
+    def _func_summary_line(self, link, cls):
+        func = link.target()
+        fname = link.name()
+        if func.is_method() or func.is_builtin_method():
+            container = func.cls()
+            inherit = (container != cls.uid())
+        else:
+            inherit = 0
+            try: container = func.module()
+            except TypeError: container = None
 
-            rval = fdoc.returns()
-            if rval.type():
-                rtype = self._dom_to_html(rval.type(), container, 8)
-            else:
-                rtype = '&nbsp;'
+        # If we don't have documentation for the function, then we
+        # can't say anything about it.
+        if not self._docmap.has_key(func): return ''
+        fdoc = self._docmap[func]
+        
+        # Try to find a documented ancestor.
+        while (not fdoc.documented() and fdoc.matches_override() and
+               self._docmap.has_key(fdoc.overrides())):
+            fdoc = self._docmap[fdoc.overrides()]
 
-            descrstr = self._summary(fdoc, container)
-            if descrstr != '&nbsp;':
-                fsum = '<br />'+descrstr
-            else:
-                if inherit: fsum = '<br />\n'
-                else: fsum = ''
-            if inherit:
-                fsum += ('    <i>(inherited from %s)</i>\n' %
-                         self._uid_to_href(container, container.shortname()))
-            #if not fdoc.documented():
-            #    fsum = '    <br /><i>(undocumented)</i>\n'
-            str += '<tr><td align="right" valign="top" width="15%">'
-            str += '<font size="-1">'+rtype+'</font></td>\n  <td><code>'
-            if fdoc.documented() or inherit:
-                str += self._func_signature(fname, fdoc, 1, 0, 'summary-sig')
-            else:
-                str += '<a name="%s"></a>' % fname
-                str += self._func_signature(fname, fdoc, 0, 0, 'summary-sig')
-            str += '</code>\n' + fsum + '</td></tr>\n'
-        return str + '</table><br />\n\n'
+        rval = fdoc.returns()
+        if rval.type():
+            rtype = self._dom_to_html(rval.type(), container, 8)
+        else:
+            rtype = '&nbsp;'
+
+        descrstr = self._summary(fdoc, container)
+        if descrstr != '&nbsp;':
+            fsum = '<br />'+descrstr
+        else:
+            if inherit: fsum = '<br />\n'
+            else: fsum = ''
+        if inherit:
+            fsum += ('    <i>(inherited from %s)</i>\n' %
+                     self._uid_to_href(container, container.shortname()))
+        #if not fdoc.documented():
+        #    fsum = '    <br /><i>(undocumented)</i>\n'
+        str = '<tr><td align="right" valign="top" width="15%">'
+        str += '<font size="-1">'+rtype+'</font></td>\n  <td><code>'
+        if fdoc.documented() or inherit:
+            str += self._func_signature(fname, fdoc, 1, 0, 'summary-sig')
+        else:
+            str += '<a name="%s"></a>' % fname
+            str += self._func_signature(fname, fdoc, 0, 0, 'summary-sig')
+        str += '</code>\n' + fsum + '</td></tr>\n'
+        return str
 
     def _func_details(self, functions, cls, heading='Function Details'):
         """
@@ -1570,7 +1643,7 @@ class HTMLFormatter:
     #////////////////////////////////////////////////////////////
     
     def _var_summary(self, variables, sortorder, container,
-                     heading='Variable Summary'):
+                     groups, heading='Variable Summary'):
         """
         @return: The HTML code for a variable summary table.  This
             is used by L{_module_to_html} to list the variables in a
@@ -1580,29 +1653,49 @@ class HTMLFormatter:
         """
         variables = self._filtersort_vars(variables, sortorder)
         if len(variables) == 0: return ''
+
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # variables are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [v for v in variables if v.uid() in groupmembers]
+            if not group: continue
+            variables = [v for v in variables if v not in group]
+            # Print a header within the table
+            groupstr += self._group_header(groupname)
+            # Add the lines for each func
+            for var in group:
+                groupstr += self._var_summary_line(var, container)
+
         str = self._table_header(heading, 'summary')
-
         for var in variables:
-            vname = var.name()
-            if var.type():
-                vtype = self._dom_to_html(var.type(), container, 10).strip()
-            else: vtype = '&nbsp;'
-            if var.descr():
-                vsum = ' - ' +self._summary(var, container)
-            else: vsum = ''
-            str += '<tr><td align="right" valign="top" '
-            str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
-            str += '  <td><code><b>'
-
-            # If we don't have any info about it, then just list it in
-            # the summary (not the details).
-            if (var.descr() is None and var.type() is None and
-                not var.has_value()): 
-                str += '<a name="%s">%s</a>' % (vname, vname)
-            else:
-                str += '<a href="#%s">%s</a>' % (vname, vname)
-            str += '</b></code>\n  ' + vsum + '</td></tr>\n'
+            str += self._var_summary_line(var, container)
+        str += groupstr
         return str + '</table><br />\n\n'
+
+    def _var_summary_line(self, var, container):
+        vname = var.name()
+        if var.type():
+            vtype = self._dom_to_html(var.type(), container, 10).strip()
+        else: vtype = '&nbsp;'
+        if var.descr():
+            vsum = ' - ' +self._summary(var, container)
+        else: vsum = ''
+        str = '<tr><td align="right" valign="top" '
+        str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
+        str += '  <td><code><b>'
+
+        # If we don't have any info about it, then just list it in
+        # the summary (not the details).
+        if (var.descr() is None and var.type() is None and
+            not var.has_value()): 
+            str += '<a name="%s">%s</a>' % (vname, vname)
+        else:
+            str += '<a href="#%s">%s</a>' % (vname, vname)
+        return str + '</b></code>\n  ' + vsum + '</td></tr>\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
         """
@@ -1614,7 +1707,7 @@ class HTMLFormatter:
         """
         variables = self._filtersort_vars(variables)
         if len(variables) == 0: return ''
-        str = self._table_header(heading, 'details')+'</table>'
+        str = self._table_header(heading, 'details')+'</table>\n'
 
         numvars = 0
         for var in variables:
@@ -1823,18 +1916,8 @@ class HTMLFormatter:
             # Get index items from standard fields.
             for field in self._standard_field_values(doc):
                 self._get_term_index_items(field, link, index)
-            #self._get_term_index_items(doc.descr(), link, index)
-            #for see in doc.seealsos():
-            #    self._get_term_index_items(see, link, index)
-            #if doc.version() is not None: 
-            #    self._get_term_index_items(doc.version(), link, index)
-            #for author in doc.authors():
-            #    self._get_term_index_items(author, link, index)
-            #for require in doc.requires():
-            #    self._get_term_index_items(require, link, index)
-            #for warn in doc.warnings():
-            #    self._get_term_index_items(warn, link, index)
-            #for note in doc.notes():
+            if doc.descr():
+                self._get_term_index_items(doc.descr(), link, index)
 
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
@@ -2124,6 +2207,8 @@ class HTMLFormatter:
         elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
                               'name', 'target'):
             return childstr
+        elif tree.tagName == 'symbol':
+            return '&%s;' % childstr
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
     
@@ -2143,14 +2228,13 @@ class HTMLFormatter:
         """
         @return: A list of epytext field values that includes all
         fields that are common to all L{ObjDoc}s.
-        C{_standard_field_value} is used by L{_extract_term_index}.
+        C{_standard_field_values} is used by L{_extract_term_index}.
         @rtype: C{list} of L{xml.dom.minidom.Document}
         """
-        fields = (doc.seealsos() + doc.authors() + doc.requires() +
-                  doc.warnings() + doc.notes())
-        if doc.version(): fields.append(doc.version())
-        if doc.descr(): fields.append(doc.descr())
-        return fields
+        field_values = []
+        for field in doc.fields():
+            field_values += doc.field_value(field)
+        return field_values
 
     def _standard_fields(self, doc):
         """
@@ -2164,30 +2248,12 @@ class HTMLFormatter:
         else: container = uid.cls() or uid.module()
         str = ''
 
-        # Version.
-        if doc.version():
-            items = [self._dom_to_html(doc.version(), container)]
-            str += self._descrlist(items, 'Version')
-
-        # Authors
-        items = [self._dom_to_html(a, container) for a in doc.authors()]
-        str += self._descrlist(items, 'Author', 'Authors', short=1)
-
-        # Requirements
-        items = [self._dom_to_html(r, container) for r in doc.requires()]
-        str += self._descrlist(items, 'Requires')
-
-        # Warnings
-        items = [self._dom_to_html(w, container) for w in doc.warnings()]
-        str += self._descrlist(items, 'Warning', 'Warnings')
-        
-        # Warnings
-        items = [self._dom_to_html(n, container) for n in doc.notes()]
-        str += self._descrlist(items, 'Note', 'Notes')
-        
-        # See also
-        items = [self._dom_to_html(s, container) for s in doc.seealsos()]
-        str +=  self._descrlist(items, 'See also', short=1)
+        for field in doc.fields():
+            values = doc.field_value(field)
+            if not values: continue
+            items = [self._dom_to_html(v, container) for v in values]
+            str += self._descrlist(items, field.singular,
+                                   field.plural, field.short)
 
         return str
             
@@ -2630,6 +2696,12 @@ class HTMLFormatter:
         """
         return '\n<!-- =========== START OF '+heading.upper()+\
                ' =========== -->\n'
+    
+    def _group_header(self, group):
+        group = re.sub('&', '&amp;', group)
+        group = re.sub('<', '&lt;', group)
+        return '<tr bgcolor="#e8f0f8" class="group">\n'+\
+               '  <th colspan="2">' + '&nbsp;'*4 + group + '</th></tr>\n'
     
     def _table_header(self, heading, css_class):
         """
