@@ -1764,7 +1764,10 @@ class HTMLFormatter:
         if fuid.is_staticmethod():
             attribs.append('Static method')
         if inherited and self._inheritance != 'grouped':
-            href = self._uid_to_href(fuid.cls(), fuid.cls().shortname())
+            if fuid.cls() is None:
+                href = '<i>unknown</i>'
+            else:
+                href = self._uid_to_href(fuid.cls(), fuid.cls().shortname())
             attribs.append('Inherited from %s' % href)
         if attribs:
             fsum += '    <i>(' + '; '.join(attribs) + ')</i>\n'
@@ -2871,7 +2874,7 @@ class HTMLFormatter:
         """
         if plural is None: plural = singular
         if len(items) == 0: return ''
-        if len(items) == 1:
+        if len(items) == 1 and singular and singular is not None:
             return '<p><b>%s:</b> %s</p>\n\n' % (singular, items[0])
             #return '<p><b>%s:</b> %s<br /></p>\n\n' % (singular, items[0])
         if short:
