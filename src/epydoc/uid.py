@@ -36,10 +36,14 @@ try:
     _WrapperDescriptorType = type(list.__add__)
     _MethodDescriptorType = type(list.append)
     _PropertyType = property
+    _StaticMethodType = staticmethod
+    _ClassMethodType = classmethod
 except:
     _WrapperDescriptorType = None
     _MethodDescriptorType = None
     _PropertyType = None
+    _StaticMethodType = None
+    _ClassMethodType = None
 
 ##################################################
 ## Table of Contents
@@ -311,7 +315,7 @@ class UID:
         @rtype: C{int}
         @see: C{name}
         """
-        if not isinstance(other, ObjectUID): return -1
+        if not isinstance(other, UID): return -1
         return cmp(self.name(), other.name())
 
     def __hash__(self): raise NotImplementedError()
@@ -329,9 +333,13 @@ class ObjectUID(UID):
         underlying function for methods).  This is used for hashing.
     """
     def __init__(self, object):
+        #if type(object) is _MethodType: object = object.im_func
         self._obj = object
-        if type(object) is _MethodType: self._id = id(object.im_func)
-        else: self._id = id(object)
+        if type(object) is _MethodType:
+            self._id = id(object.im_func)
+        else:
+            self._id = id(object)
+        n = self.name()
 
     # The value of an ObjectUID is the object that was used to
     # construct the UID.
@@ -366,6 +374,8 @@ class ObjectUID(UID):
                  self._obj.__self__ is not None) or
                 type(self._obj) in (_WrapperDescriptorType,
                                     _MethodDescriptorType))
+    def is_classmethod(self): return 0
+    def is_staticmethod(self): return 0
     def is_property(self): return 0
     def is_variable(self): return 0
 
@@ -554,6 +564,8 @@ class RelativeUID(UID):
     def is_module(self): return 0
     def is_function(self): return 0
     def is_method(self): return 0
+    def is_classmethod(self): return 0
+    def is_staticmethod(self): return 0
     def is_package(self): return 0
     def is_class(self): return 0
     def is_builtin_function(self): return 0
@@ -586,14 +598,32 @@ class RelativeUID(UID):
         return hash( (self._base, self._shortname) )
 
     def __eq__(self, other):
-        return (isinstance(other, self.__class__) and
+        return (isinstance(other, RelativeUID) and
                 self._shortname == other._shortname and
                 self._base == other._base)
 
 class VariableUID(RelativeUID):
     def is_variable(self): return 1
+    
 class PropertyUID(RelativeUID):
     def is_property(self): return 1
+    
+class StaticMethodUID(RelativeUID):
+    def __init__(self, value, base_uid, shortname):
+        value = value.__get__(base_uid.value())
+        value = new.instancemethod(value, None, base_uid.value())
+        RelativeUID.__init__(self, value, base_uid, shortname)
+    def is_routine(self): return 1
+    def is_method(self): return 1
+    def is_staticmethod(self): return 1
+    
+class ClassMethodUID(RelativeUID):
+    def __init__(self, value, base_uid, shortname):
+        value = value.__get__(base_uid.value())
+        RelativeUID.__init__(self, value, base_uid, shortname)
+    def is_routine(self): return 1
+    def is_method(self): return 1
+    def is_classmethod(self): return 1
 
 ##################################################
 ## UID Construction
@@ -633,8 +663,7 @@ def make_uid(object, base_uid=None, shortname=None):
         # Return the UID.
         return uid
 
-    elif (type(object) is _PropertyType or
-          (base_uid is not None and shortname is not None)):
+    elif base_uid is not None and shortname is not None:
         # If we've already seen this variable, return its UID
         key = (base_uid.id(), shortname)
         try: return _variable_uids[key]
@@ -643,6 +672,10 @@ def make_uid(object, base_uid=None, shortname=None):
         # We haven't seen this variable before; create a new UID.
         if type(object) is _PropertyType:
             uid = PropertyUID(object, base_uid, shortname)
+        elif type(object) is _StaticMethodType:
+            uid = StaticMethodUID(object, base_uid, shortname)
+        elif type(object) is _ClassMethodType:
+            uid = ClassMethodUID(object, base_uid, shortname)
         else:
             uid = VariableUID(object, base_uid, shortname)
         _variable_uids[key] = uid
