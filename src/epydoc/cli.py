@@ -148,7 +148,7 @@ def _find_module_from_filename(filename):
             return rv
         finally:
             os.chdir(old_cwd)
-    except:
+    except ImportError:
         if re.match(r'^.*__init__\.py?$', filename):
             _error("Run epydoc from the parent directory (%r)" %
                    filename)
@@ -175,7 +175,7 @@ def _find_modules(module_names, verbosity):
                 if module not in modules:
                     modules.append(module)
                 elif verbosity > 3: print "  (duplicate)"
-            except:
+            except ImportError:
                 _error("Could not import %s" % name)
 
     return modules
