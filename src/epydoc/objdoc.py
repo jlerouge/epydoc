@@ -549,7 +549,7 @@ class ObjDoc:
     @group Accessors: documented, uid, descr, fields, field_values,
         sortorder
     @group Error Handling: _print_errors, _parse_warnings,
-        _parse_errors, _field_warnings
+        _parse_errors, _field_warnings, _misc_warnings
     @group Docstring Parsing: __parse_docstring, _process_field,
         _descr, _fields, FIELDS
 
@@ -572,7 +572,9 @@ class ObjDoc:
         contain a single textual description or a list of
         textual descriptions.
     @type FIELDS: C{List} of L{DocField}
-                   
+
+    @ivar _misc_warnings: Warnings that are not related to the
+        object's docstring.
     @ivar _parse_warnings: Warnings generated when parsing the
         object's docstring.
     @ivar _parse_errors: Errors generated when parsing the object's
@@ -649,6 +651,7 @@ class ObjDoc:
         self._parse_errors = []
         self._parse_warnings = []
         self._field_warnings = []
+        self._misc_warnings = []
 
         # Look up our module.  We use this to look up both
         # __docformat__ and __extra_epydoc_fields__.
@@ -658,7 +661,7 @@ class ObjDoc:
         # Give a warning if there's an __epydoc_sort__ attribute.
         if hasattr(obj, '__epydoc_sort__'):
             estr = 'Warning: __epydoc_sort__ is depreciated'
-            self._field_warnings.append(estr)
+            self._misc_warnings.append(estr)
         
         # Initialize fields.  Add any extra fields.
         self._fields = self.FIELDS[:]
@@ -692,7 +695,7 @@ class ObjDoc:
             self._uid.is_module()):
             estr = ("Unknown __docformat__ value %s; " % self._docformat +
                     "treating as plaintext.")
-            self._field_warnings.append(estr)
+            self._misc_warnings.append(estr)
             self._docformat = 'plaintext'
 
         # If there's a doc string, parse it.
@@ -893,41 +896,52 @@ class ObjDoc:
         Print any errors that were encountered while constructing this
         C{ObjDoc} to C{stream}.  This method should be called at the
         end of the constructor of every class that is derived from
-        C{ObjDoc}.
+        C{ObjDoc} (I{after} the base C{ObjDoc} constructor has been
+        called).
         
         @rtype: C{None}
         """
         parse_warnings = self._parse_warnings
         parse_errors = self._parse_errors
         field_warnings = self._field_warnings
+        misc_warnings = self._misc_warnings
 
         # Set it every time, in case something changed sys.stderr
         # (like epydoc.gui :) )
         if stream is None: stream = sys.stderr
         
         # Supress warnings/errors, if requested
+        if self.__verbosity <= -1: misc_warnings = []
         if self.__verbosity <= -1: parse_warnings = []
         if self.__verbosity <= -2: field_warnings = []
         if self.__verbosity <= -3: parse_errors = []
         
         # Print the errors and warnings.
-        if (parse_warnings or parse_errors or field_warnings):
+        if (parse_warnings or parse_errors or
+            field_warnings or misc_warnings):
+            
             # Figure out our file and line number, if possible.
             try:
                 (filename, startline) = _find_docstring(self._uid)
                 if startline is None: startline = 0
             except:
                 (filename, startline) = (None, 0)
-            
+
+            # Print the location of the error/warning.
+            if not (parse_warnings or parse_errors or field_warnings):
+                where = 'In %s' % self._uid
+            else:
+                where = 'In %s docstring' % self._uid
             if stream.softspace: print >>stream
             print >>stream, '='*75
             if filename is not None:
                 print >>stream, filename
-                print >>stream, ('In %s docstring (line %s):' %
-                                 (self._uid, startline+1))
+                print >>stream, ('%s (line %s):' % (where, startline+1))
             else:
-                print >>stream, 'In %s docstring:' % self._uid
+                print >>stream, '%s:' % where
             print >>stream, '-'*75
+
+            # Print parse errors.
             for error in parse_errors:
                 if type(error) == type(''):
                     if startline is None:
@@ -939,16 +953,21 @@ class ObjDoc:
                 else:
                     error.linenum += startline
                     print >>stream, error.as_error()
+
+            # Print parse warnings.
             for warning in parse_warnings:
                 warning.linenum += startline
                 print >>stream, warning.as_warning()
-            for warning in field_warnings:
+
+            # Print field warnings
+            for warning in field_warnings+misc_warnings:
                 if startline is None:
                     print >>stream, '       '+warning
                 else:
                     estr =' Warning: %s' % warning
                     estr = epytext.wordwrap(estr, 7, startindex=7).strip()
                     print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
+                    
             print >>stream
         
 #////////////////////////////////////////////////////////
@@ -979,16 +998,13 @@ class ModuleDoc(ObjDoc):
 
     @type _classes: C{list} of L{Link}
     @ivar _classes: A list of all classes contained in the
-        module/package. 
-    
+        module/package.     
     @type _functions: C{list} of L{Link}
     @ivar _functions: A list of all functions contained in the
         module/package.
-
     @type _variables: C{list} of L{Var}
     @ivar _variables: A list of all variables defined by this
         module/package. 
-    
     @type _modules: C{list} of L{Link}
     @ivar _modules: A list of all modules conained in the package
         (package only).
@@ -2160,13 +2176,13 @@ class FuncDoc(ObjDoc):
 
                 # Get the base & child argspecs.  If either fails,
                 # then one is probably a builtin of some sort, so
-                # _match_overrides should be 0 anyway.
+                # _matches_overrides should be 0 anyway.
                 try:
                     basespec = inspect.getargspec(base_method.im_func)
                     childspec = inspect.getargspec(self._uid.value().im_func)
                 except:
                     return 0
-                
+
                 # Does the signature of this method match the
                 # signature of the method it overrides?
                 if self._signature_match(basespec, childspec):
@@ -2177,7 +2193,7 @@ class FuncDoc(ObjDoc):
                             'parameters of the base class method '+
                             '%s; not inheriting documentation.')
                            % (self.uid(), make_uid(base_method)))
-                    self._field_warnings.append(estr)
+                    self._misc_warnings.append(estr)
                     
                 return 0
             else:
@@ -2361,6 +2377,9 @@ class FuncDoc(ObjDoc):
         if not hasattr(self, '_param_list'):
             self._param_list = _flatten(self._params)
         return self._param_list
+
+    def set_matches_override(self, value):
+        self._matches_override = value
 
 #////////////////////////////////////////////////////////
 #// PropertyDoc
