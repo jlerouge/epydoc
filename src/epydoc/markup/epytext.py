@@ -326,7 +326,7 @@ def _add_section(doc, heading_token, stack, indent_stack, errors, warnings):
     # Check for errors.
     for tok in stack[2:]:
         if tok.tagName != "section":
-            estr = "Headings may only occur at the top level."
+            estr = "Headings must occur at the top level."
             errors.append(StructuringError(estr, heading_token))
             break
     if (heading_token.level+2) > len(stack):
@@ -387,7 +387,7 @@ def _add_list(doc, bullet_token, stack, indent_stack, errors, warnings):
             for tok in stack[2:]:
                 if tok.tagName != "section":
                     #print [s.tagName for s in stack[1:]]
-                    estr = "Fields may only occur at the top level."
+                    estr = "Fields must be at the top level."
                     errors.append(StructuringError(estr, bullet_token))
                     break
             stack[2:] = []
@@ -725,7 +725,7 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
             else:
                 estr = ("List item contents should be indented; "+
                         "Paragraphs should be separated from "+
-                        "lists by blank lines.")
+                        "lists by blank lines or indentation.")
                 warnings.append(TokenizationError(estr, linenum, line))
                 break
 
@@ -797,6 +797,11 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
             # Field lists don't need to be separated/indented.
             if _LIST_BULLET_RE.match(line, indent):
                 estr = "Lists should be indented or separated by blank lines."
+                if linenum == 1 and indent == 0:
+                    estr += (' (When you include text on the same line as '+
+                             'the comment-opening quote, epytext cannot '+
+                             'determine its indentation; so a blank line '+
+                             'must be used in this case.)')
                 warnings.append(TokenizationError(estr, linenum, line))
             break
         brace_level += line.count('{')        
@@ -1273,7 +1278,7 @@ def to_debug(tree, indent=4, seclevel=0):
     @rtype: C{string}
     """
     if isinstance(tree, Document):
-        return to_epytext(tree.childNodes[0], indent, seclevel)
+        return to_debug(tree.childNodes[0], indent, seclevel)
     if isinstance(tree, Text):
         str = re.sub(r'\{', '\0', tree.data)
         str = re.sub(r'\}', '\1', str)
@@ -1377,7 +1382,7 @@ def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
     for word in words:
         if charindex+len(word) > right and charindex > 0:
             out_str += '\n' + ' '*indent
-            charindex = 0
+            charindex = indent
         out_str += word+' '
         charindex += len(word)+1
     return out_str.rstrip()+'\n'
@@ -1769,4 +1774,3 @@ def summary(epytext_doc):
         para.appendChild(parachild.cloneNode(1))
 
     return doc
-
