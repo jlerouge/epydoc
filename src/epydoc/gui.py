@@ -983,7 +983,7 @@ def _version():
 
 def _usage():
     print
-    print 'Usage: epydocgui [OPTIONS] FILE.prj | MODULES...'
+    print 'Usage: epydocgui [OPTIONS] [FILE.prj | MODULES...]'
     print
     print '    FILE.prj                  An epydoc GUI project file.'
     print '    MODULES...                A list of Python modules to document.'
@@ -1027,12 +1027,10 @@ def gui():
         gui = EpydocGUI()
         gui.open(projects[0])
         gui.mainloop()
-    elif len(modules) > 0:
+    else:
         gui = EpydocGUI()
         for module in modules: gui.add_module(module, check=1)
         gui.mainloop()
-    else:
-        _error('No modules specified')
 
 if __name__ == '__main__': gui()
 
