@@ -45,29 +45,29 @@ produce API documentation using the following steps:
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
-@version: 1.2 alpha
+@version: 2.0 alpha
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 1.2: Add support for Docutils/ReST?
-@todo 1.2: Add support for escape characters & groups to the latex
-    outputter.
-@todo 1.2: Finish the man-page style outputter.
-@todo 1.2: Create a better default top_page than trees.html
-@todo 1.2: More options for --check (--check all, --check basic)
-@todo 1.2: Add more symbols (like E{E}{->}).
-@todo 1.2: Add --no-inheritance?
-@todo 1.2: Add --check for doc inheritance? (??)
+@todo 2.0: Add support for escape characters & groups to the latex
+           outputter.
+@todo 2.0: Finish the man-page style outputter.
+@todo 2.0: Create a better default top_page than trees.html
+@todo 2.0: More options for --check (--check all, --check basic)
+@todo 2.0: Add more symbols (like E{E}{->}).
+@todo 2.0: Add --no-inheritance? (don't inherit docs)
+@todo 2.0: Add --check for doc inheritance? (??)
 
-@todo 1.3: Modify L{epydoc.html} to write directly to streams,
-    rather than building up strings.
+@todo 2.1: Modify L{epydoc.html} to write directly to streams,
+           rather than building up strings.
     
-@todo 2.0: Refactor L{epydoc.objdoc.ObjDoc}: ObjDoc will just
-    contain info about objects, but not gather it.  An 'inspection' 
-    module will be responsible for gathering the info.
-@todo 2.0: Add an alternative 'parsing' module that can gather
-    info by parsing python files, instead of using inspection.
+@todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}: ObjDoc will just
+           contain info about objects, but not gather it.  An
+           'inspection' module will be responsible for gathering the
+           info.
+@todo 3.0: Add an alternative 'parsing' module that can gather
+           info by parsing python files, instead of using inspection.
 
 @var __license__: The license governing the use and distribution of
     epydoc.
@@ -77,7 +77,7 @@ produce API documentation using the following steps:
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '1.2 alpha'
+__version__ = '2.0 alpha'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 
@@ -108,3 +108,4 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 #   - staticmethod/classmethod
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
+
