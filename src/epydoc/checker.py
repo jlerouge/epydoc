@@ -26,7 +26,6 @@ from types import BuiltinMethodType as _BuiltinMethodType
 from types import MethodType as _MethodType
 from types import StringType as _StringType
 
-import epydoc.epytext as epytext
 from epydoc.uid import UID, Link
 from epydoc.objdoc import ModuleDoc, FuncDoc, PropertyDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
@@ -365,7 +364,7 @@ class DocChecker:
         if not self._check_name_publicity(var.name()): return
         if var.name() == 'return':
             if (var.type() and
-                epytext.to_plaintext(var.type()).strip().lower() == 'none'):
+                var.type().to_plaintext().strip().lower() == 'none'):
                 return
         if (self._checks & DocChecker.DESCR) and (not var.descr()):
             self._warn('No descr', name+'.'+var.name())
