@@ -528,7 +528,12 @@ class ObjectUID(UID):
                 self._cls = ObjectUID(obj.im_class)
             elif (type(obj) is _BuiltinMethodType and
                   obj.__self__ is not None):
-                self._cls = ObjectUID(type(obj.__self__))
+                if obj.__name__ == '__new__':
+                    # __new__ is a class method of sorts
+                    self._cls = ObjectUID(obj.__self__)
+                else:
+                    self._cls = ObjectUID(type(obj.__self__))
+                
             elif type(obj) in (_WrapperDescriptorType, _MethodDescriptorType):
                 self._cls = ObjectUID(obj.__objclass__)
             else:
