@@ -266,7 +266,8 @@ class Link:
         @type target: L{UID}
         """
         self._name = name
-        self._target = UID(target)
+        if isinstance(target, UID): self._target = target
+        else: self._target = UID(target)
 
     def __repr__(self):
         """
@@ -290,6 +291,10 @@ class Link:
         @rtype: L{UID}
         """
         return self._target
+
+    def __cmp__(self, other):
+        if not isinstance(other, Link): return -1
+        return cmp(self._target, other._target)
 
 def _find_function_module(func):
     """
