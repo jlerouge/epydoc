@@ -9,10 +9,19 @@
 """
 Predefined CSS stylesheets for the HTML outputter (L{epydoc.html}).
 
+@type STYLESHEETS: C{dictionary} from C{string} to C{(string, string)}
 @var STYLESHEETS: A dictionary mapping from stylesheet names to CSS
-    stylesheets.  A single stylesheet may have multiple names.  For a
-    list of available stylesheet names, call C{STYLESHEETS.keys()}.
-@type STYLESHEETS: C{dictionary} from C{string} to C{string}
+    stylesheets and descriptions.  A single stylesheet may have
+    multiple names.  Currently, the following stylesheets are defined:
+      - C{default}: The default stylesheet (synonym for C{white}).
+      - C{white}: Black on white, with blue highlights (similar to
+        javadoc).
+      - C{blue}: Black on steel blue.
+      - C{green}: Black on green.
+      - C{black}: White on black, with blue highlights
+      - C{grayscale}: Grayscale black on white.
+      - C{none}: An empty stylesheet.
+      - C{empty}: Synonym for C{none}.
 """
 
 import re
@@ -59,11 +68,16 @@ h3.var-details    { background: transparent; color: #000000;
                     margin: 0 0 1em 0; }
 
 /* Function signatures */
-.sig              { background: transparent; color: #000000; }  
+.sig              { background: transparent; color: #000000;
+                    font-weight: bold; }  
 .sig-name         { background: transparent; color: #006080; }  
 .sig-arg, .sig-kwarg, .sig-vararg
                   { background: transparent; color: #008060; }  
 .sig-default      { background: transparent; color: #602000; }  
+.summary-sig      { background: transparent; color: #000000; }  
+.summary-sig-name { background: transparent; font-weight: bold; }  
+.summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
+                  { background: transparent; color: #008060; }  
 
 /* Navigation bar */ 
 table.navbar      { background: #a0c0ff; color: #000000;
@@ -119,12 +133,16 @@ h3.var-details    { background: transparent; color: #000000;
                     margin: 0 0 1em 0; }
 
 /* Function signatures */
-.sig              { background: transparent; color: #000000; }  
+.sig              { background: transparent; color: #000000;
+                    font-weight: bold; }  
 .sig-name         { background: transparent; color: #006080; }  
-.sig-arg          { background: transparent; color: #008060; }  
+.sig-arg, .sig-kwarg, .sig-vararg
+                  { background: transparent; color: #008060; }  
 .sig-default      { background: transparent; color: #602000; }  
-.sig-kwarg        { background: transparent; color: #008060; }  
-.sig-vararg       { background: transparent; color: #008060; }  
+.summary-sig      { background: transparent; color: #000000; }  
+.summary-sig-name { background: transparent; font-weight: bold; }  
+.summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
+                  { background: transparent; color: #008060; }  
  
 /* Navigation bar */ 
 table.navbar      { background: #607880; color: #b8d0d0;
@@ -156,6 +174,11 @@ def _rv(match):
     """
     Given a regexp match for a color, return the reverse-video version
     of that color.
+
+    @param match: A regular expression match.
+    @type match: C{Match}
+    @return: The reverse-video color.
+    @rtype: C{string}
     """
     str = '#'
     for color in match.groups():
@@ -176,13 +199,12 @@ _GRAYSCALE = _COLOR_RE.sub(r'#\2\2\2', _WHITE)
 ############################################################
 
 STYLESHEETS = {
-    'white': _WHITE,
-    'blue': _BLUE,
-    'green': _GREEN,
-    'black': _BLACK,
-    'grayscale': _GRAYSCALE,
-    'default': _WHITE,
-    'empty': '',
-    'none': ''
+    'white': (_WHITE, "Black on white, with blue highlights"),
+    'blue': (_BLUE, "Black on steel blue"),
+    'green': (_GREEN, "Black on green"),
+    'black': (_BLACK, "White on black, with blue highlights"),
+    'grayscale': (_GRAYSCALE, "Grayscale black on white"),
+    'default': (_WHITE, "Default stylesheet (=white)"),
+    'empty': ('', "An empty stylesheet"),
+    'none': ('', "An empty stylesheet (=empty)"),
     }
-
