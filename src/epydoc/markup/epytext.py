@@ -91,7 +91,13 @@ Description::
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
+@var SYMBOLS: A list of the of escape symbols that are supported
+      by epydoc.  Currently the following symbols are supported:
+<<<SYMBOLS>>>
 """
+# Note: the symbol list is appended to the docstring automatically,
+# below.
+
 __docformat__ = 'epytext en'
 
 # Code organization..
@@ -119,17 +125,44 @@ _HEADING_CHARS = "=-~"
 _ESCAPES = {'lb':'{', 'rb': '}'}
 
 # Symbols.  These can be generated via E{...} escapes.
-SYMBOLS = {
-    '<-': 1, '->': 1, 
-    'alpha': 1, 'beta': 1, 'gamma': 1,
-    'delta': 1, 'epsilon': 1, 'zeta': 1,  
-    'eta': 1, 'theta': 1, 'iota': 1, 
-    'kappa': 1, 'lambda': 1, 'mu': 1,  
-    'nu': 1, 'xi': 1, 'omicon': 1,  
-    'pi': 1, 'rho': 1, 'sigma': 1,  
-    'tau': 1, 'upsilon': 1, 'phi': 1,  
-    'chi': 1, 'psi': 1, 'omega': 1,  
-    }
+SYMBOLS = [
+    # Arrows
+    '<-', '->', '^', 'v', 
+
+    # Greek letters
+    'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta',  
+    'eta', 'theta', 'iota', 'kappa', 'lambda', 'mu',  
+    'nu', 'xi', 'omicon', 'pi', 'rho', 'sigma',  
+    'tau', 'upsilon', 'phi', 'chi', 'psi', 'omega',
+    'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta',  
+    'Eta', 'Theta', 'Iota', 'Kappa', 'Lambda', 'Mu',  
+    'Nu', 'Xi', 'Omicon', 'Pi', 'Rho', 'Sigma',  
+    'Tau', 'Upsilon', 'Phi', 'Chi', 'Psi', 'Omega',
+    
+    # HTML character entities
+    'larr', 'rarr', 'uarr', 'darr', 'harr', 'crarr',
+    'lArr', 'rArr', 'uArr', 'dArr', 'hArr', 
+    'copy', 'times', 'forall', 'exist', 'part',
+    'empty', 'isin', 'notin', 'ni', 'prod', 'sum',
+    'prop', 'infin', 'ang', 'and', 'or', 'cap', 'cup',
+    'int', 'there4', 'sim', 'cong', 'asymp', 'ne',
+    'equiv', 'le', 'ge', 'sub', 'sup', 'nsub',
+    'sube', 'supe', 'oplus', 'otimes', 'perp',
+
+    # Alternate (long) names
+    'infinity', 'integral', 'product',
+    '>=', '<=', 
+    ]
+# Convert to a dictionary, for quick lookup
+_SYMBOLS = {}
+for symbol in SYMBOLS: _SYMBOLS[symbol] = 1
+
+# Add symbols to the docstring.
+symblist = ''
+for symbol in SYMBOLS:
+    symblist += '          - C{E{E}{%s}}: E{%s}\n' % (symbol, symbol)
+__doc__ = __doc__.replace('<<<SYMBOLS>>>', symblist)
+
 
 # Tags for colorizing text.
 _COLORIZING_TAGS = {
@@ -141,6 +174,7 @@ _COLORIZING_TAGS = {
     'U': 'uri',
     'L': 'link',       # A Python identifier that should be linked to 
     'E': 'escape',     # escapes characters or creates symbols
+    'S': 'symbol',
     }
 
 # Which tags can use "link syntax" (e.g., U{Python<www.python.org>})?
@@ -973,6 +1007,24 @@ def _colorize(doc, token, errors, warnings=None, tagName='para'):
             if end > start:
                 stack[-1].appendChild(doc.createTextNode(str[start:end]))
 
+            # Special handling for symbols:
+            if stack[-1].tagName == 'symbol':
+                if (len(stack[-1].childNodes) != 1 or
+                    not isinstance(stack[-1].childNodes[0], Text)):
+                    estr = "Invalid symbol."
+                    errors.append(ColorizingError(estr, token, end))
+                else:
+                    symb = stack[-1].childNodes[0].data
+                    if _SYMBOLS.has_key(symb):
+                        # It's a symbol
+                        symbol = doc.createElement('symbol')
+                        stack[-2].removeChild(stack[-1])
+                        stack[-2].appendChild(symbol)
+                        symbol.appendChild(doc.createTextNode(symb))
+                    else:
+                        estr = "Invalid symbol."
+                        errors.append(ColorizingError(estr, token, end))
+                        
             # Special handling for escape elements:
             if stack[-1].tagName == 'escape':
                 if (len(stack[-1].childNodes) != 1 or
@@ -981,13 +1033,7 @@ def _colorize(doc, token, errors, warnings=None, tagName='para'):
                     errors.append(ColorizingError(estr, token, end))
                 else:
                     escp = stack[-1].childNodes[0].data
-                    if SYMBOLS.has_key(escp):
-                        # It's a symbol
-                        symbol = doc.createElement('symbol')
-                        stack[-2].removeChild(stack[-1])
-                        stack[-2].appendChild(symbol)
-                        symbol.appendChild(doc.createTextNode(escp))
-                    elif _ESCAPES.has_key(escp):
+                    if _ESCAPES.has_key(escp):
                         # It's an escape from _ESCPAES
                         stack[-2].removeChild(stack[-1])
                         escp = _ESCAPES[escp]
