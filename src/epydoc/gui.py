@@ -24,16 +24,19 @@ files; any other command line arguments will be added as modules (if
 possible).  
 """
 
+import sys, os.path, re
+import glob
 from Tkinter import *
 from tkFileDialog import askopenfilename, asksaveasfilename
 from thread import start_new_thread, exit_thread
 from pickle import dump, load
-import sys
+from StringIO import StringIO
 
 from epydoc.css import STYLESHEETS
-from epydoc.cli import _find_modules
+from epydoc.imports import import_module
 from epydoc.html import HTMLFormatter
 from epydoc.objdoc import DocMap
+from epydoc.uid import reset_uid_cache
 
 ##/////////////////////////////////////////////////////////////////////////
 ## CONSTANTS
@@ -45,9 +48,21 @@ DEBUG = 0
 BG_COLOR='#90a0b0'
 ACTIVEBG_COLOR='#8090a0'
 TEXT_COLOR='black'
-ENTRY_COLOR='#506080'
+ENTRYSELECT_COLOR = '#8090a0'
+SELECT_COLOR = '#208070'
+MESSAGE_COLOR = '#000060'
+ERROR_COLOR = '#600000'
+GUIERROR_COLOR = '#600000'
+WARNING_COLOR = '#604000'
+HEADER_COLOR = '#000000'
+
+# Convenience dictionaries for specifying widget colors
 COLOR_CONFIG = {'background':BG_COLOR, 'highlightcolor': BG_COLOR,
                 'foreground':TEXT_COLOR, 'highlightbackground': BG_COLOR}
+ENTRY_CONFIG = {'background':BG_COLOR, 'highlightcolor': BG_COLOR,
+                'foreground':TEXT_COLOR, 'highlightbackground': BG_COLOR,
+                'selectbackground': ENTRYSELECT_COLOR,
+                'selectforeground': TEXT_COLOR}
 SB_CONFIG = {'troughcolor':BG_COLOR, 'activebackground':BG_COLOR,
              'background':BG_COLOR, 'highlightbackground':BG_COLOR}
 LISTBOX_CONFIG = {'highlightcolor': BG_COLOR, 'highlightbackground': BG_COLOR,
@@ -57,6 +72,17 @@ BUTTON_CONFIG = {'background':BG_COLOR, 'highlightthickness':0, 'padx':4,
                  'highlightbackground': BG_COLOR, 'foreground':TEXT_COLOR,
                  'highlightcolor': BG_COLOR, 'activeforeground': TEXT_COLOR,
                  'activebackground': ACTIVEBG_COLOR, 'pady':0}
+CBUTTON_CONFIG = {'background':BG_COLOR, 'highlightthickness':0, 'padx':4, 
+                  'highlightbackground': BG_COLOR, 'foreground':TEXT_COLOR,
+                  'highlightcolor': BG_COLOR, 'activeforeground': TEXT_COLOR,
+                  'activebackground': ACTIVEBG_COLOR, 'pady':0,
+                  'selectcolor': SELECT_COLOR}
+SHOWMSG_CONFIG = CBUTTON_CONFIG.copy()
+SHOWMSG_CONFIG['foreground'] = MESSAGE_COLOR
+SHOWWRN_CONFIG = CBUTTON_CONFIG.copy()
+SHOWWRN_CONFIG['foreground'] = WARNING_COLOR
+SHOWERR_CONFIG = CBUTTON_CONFIG.copy()
+SHOWERR_CONFIG['foreground'] = ERROR_COLOR
 
 # Colors for the progress bar
 PROGRESS_HEIGHT = 16
@@ -74,57 +100,78 @@ else:
     DX = 1; DY = 1
     DH = 1; DW = 3
 
-# How much of the progress is building the docs? (0-1)
-BUILD_PROGRESS = 0.3
-WRITE_PROGRESS = 1.0 - BUILD_PROGRESS
+# How much of the progress is in each subtask?
+IMPORT_PROGRESS = 0.1
+BUILD_PROGRESS  = 0.2
+WRITE_PROGRESS  = 1.0 - BUILD_PROGRESS - IMPORT_PROGRESS
 
 ##/////////////////////////////////////////////////////////////////////////
 ## IMAGE CONSTANTS
 ##/////////////////////////////////////////////////////////////////////////
 
+UP_GIF = '''\
+R0lGODlhCwAMALMAANnZ2QDMmQCZZgBmZgAAAAAzM////////wAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAACH5BAEAAAAALAAAAAALAAwAAAQjEMhJKxCW4gzCIJxXZIEwFGDlDadqsii1sq1U0nA64+ON
+5xEAOw==
+'''
+DOWN_GIF = '''\
+R0lGODlhCwAMALMAANnZ2QDMmQCZZgBmZgAAAAAzM////////wAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAACH5BAEAAAAALAAAAAALAAwAAAQmEIQxgLVUCsppsVPngVtXEFfIfWk5nBe4xuSL0tKLy/cu
+7JffJQIAOw==
+'''
 LEFT_GIF='''\
-R0lGODlhDAALAPcAAAAAAAAAMwAAZgAAmQAAzAAA/zMAADMAMzMAZjMAmTMAzDMA/2YAAGYAM2YA
-ZmYAmWYAzGYA/5kAAJkAM5kAZpkAmZkAzJkA/8wAAMwAM8wAZswAmcwAzMwA//8AAP8AM/8AZv8A
-mf8AzP8A/wAzAAAzMwAzZgAzmQAzzAAz/zMzADMzMzMzZjMzmTMzzDMz/2YzAGYzM2YzZmYzmWYz
-zGYz/5kzAJkzM5kzZpkzmZkzzJkz/8wzAMwzM8wzZswzmcwzzMwz//8zAP8zM/8zZv8zmf8zzP8z
-/wBmAABmMwBmZgBmmQBmzABm/zNmADNmMzNmZjNmmTNmzDNm/2ZmAGZmM2ZmZmZmmWZmzGZm/5lm
-AJlmM5lmZplmmZlmzJlm/8xmAMxmM8xmZsxmmcxmzMxm//9mAP9mM/9mZv9mmf9mzP9m/wCZAACZ
-MwCZZgCZmQCZzACZ/zOZADOZMzOZZjOZmTOZzDOZ/2aZAGaZM2aZZmaZmWaZzGaZ/5mZAJmZM5mZ
-ZpmZmZmZzJmZ/8yZAMyZM8yZZsyZmcyZzMyZ//+ZAP+ZM/+ZZv+Zmf+ZzP+Z/wDMAADMMwDMZgDM
-mQDMzADM/zPMADPMMzPMZjPMmTPMzDPM/2bMAGbMM2bMZmbMmWbMzGbM/5nMAJnMM5nMZpnMmZnM
-zJnM/8zMAMzMM8zMZszMmczMzMzM///MAP/MM//MZv/Mmf/MzP/M/wD/AAD/MwD/ZgD/mQD/zAD/
-/zP/ADP/MzP/ZjP/mTP/zDP//2b/AGb/M2b/Zmb/mWb/zGb//5n/AJn/M5n/Zpn/mZn/zJn//8z/
-AMz/M8z/Zsz/mcz/zMz/////AP//M///Zv//mf//zP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAANcALAAAAAAMAAsA
-AAg6AK8JHEhw0iSCBSe5UYLwmsGFShgOfBgx4kSFFStecwMxo0aBAEqU8ChxYMiRHxGeTKlSZMmG
-10IGBAA7
+R0lGODlhDAALAKIAANnZ2QDMmQCZZgBmZgAAAAAzM////////yH5BAEAAAAALAAAAAAMAAsAAAM4
+CLocgaCrESiDoBshOAoAgBEyMzgAEIGCowsiOLoLgEBVOLoIqlSFo4OgC1RYM4Ogq1RYg6DLVJgA
+Ow==
+'''
+RIGHT_GIF='''\
+R0lGODlhDAALAKIAANnZ2QDMmQBmZgCZZgAzMwAAAP///////yH5BAEAAAAALAAAAAAMAAsAAAM5
+GIGgyzIYgaCrIigTgaALIigyEQiqKLoTgaAoujuDgKJLVAgqIoJEBQAIIkKEhaArRFgIukqFoMsJ
+ADs=
 '''
 
-RIGHT_GIF='''\
-R0lGODlhDAALAPcAAAAAAAAAMwAAZgAAmQAAzAAA/zMAADMAMzMAZjMAmTMAzDMA/2YAAGYAM2YA
-ZmYAmWYAzGYA/5kAAJkAM5kAZpkAmZkAzJkA/8wAAMwAM8wAZswAmcwAzMwA//8AAP8AM/8AZv8A
-mf8AzP8A/wAzAAAzMwAzZgAzmQAzzAAz/zMzADMzMzMzZjMzmTMzzDMz/2YzAGYzM2YzZmYzmWYz
-zGYz/5kzAJkzM5kzZpkzmZkzzJkz/8wzAMwzM8wzZswzmcwzzMwz//8zAP8zM/8zZv8zmf8zzP8z
-/wBmAABmMwBmZgBmmQBmzABm/zNmADNmMzNmZjNmmTNmzDNm/2ZmAGZmM2ZmZmZmmWZmzGZm/5lm
-AJlmM5lmZplmmZlmzJlm/8xmAMxmM8xmZsxmmcxmzMxm//9mAP9mM/9mZv9mmf9mzP9m/wCZAACZ
-MwCZZgCZmQCZzACZ/zOZADOZMzOZZjOZmTOZzDOZ/2aZAGaZM2aZZmaZmWaZzGaZ/5mZAJmZM5mZ
-ZpmZmZmZzJmZ/8yZAMyZM8yZZsyZmcyZzMyZ//+ZAP+ZM/+ZZv+Zmf+ZzP+Z/wDMAADMMwDMZgDM
-mQDMzADM/zPMADPMMzPMZjPMmTPMzDPM/2bMAGbMM2bMZmbMmWbMzGbM/5nMAJnMM5nMZpnMmZnM
-zJnM/8zMAMzMM8zMZszMmczMzMzM///MAP/MM//MZv/Mmf/MzP/M/wD/AAD/MwD/ZgD/mQD/zAD/
-/zP/ADP/MzP/ZjP/mTP/zDP//2b/AGb/M2b/Zmb/mWb/zGb//5n/AJn/M5n/Zpn/mZn/zJn//8z/
-AMz/M8z/Zsz/mcz/zMz/////AP//M///Zv//mf//zP///wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAANcALAAAAAAMAAsA
-AAg5ACdNukawoEElbgQaPKgEocKF1xo2TDiQoUSHFSNevOjGjcaLJUoAKAhSpMWQIxcqQQmRoMmW
-BAMCADs=
-'''
+##/////////////////////////////////////////////////////////////////////////
+## MessageIO
+##/////////////////////////////////////////////////////////////////////////
+
+class _PipeIO:
+    """
+    A file-like class that captures strings and prints them.  For
+    thread safety, it monotonically increases _data (is this
+    necessary?).
+    """
+    def __init__(self):
+        self.clear()
+
+    def clear(self):
+        self._data = []
+        self._n = 0
+        self.softspace = 0
+
+    def write(self, str):
+        # If we detect an exception, then start writing everything to
+        # the real stderr.
+        global DEBUG
+        if str.startswith('Traceback') or str.startswith('Exception'):
+            DEBUG = 1
+        if DEBUG: sys.__stderr__.write(str)
+
+        # Save the data.
+        self._data.append(str)
+        
+    def read(self):
+        if self._n >= len(self._data):
+            return None
+        else:
+            str = self._data[self._n]
+            self._n += 1
+            return str
 
 ##/////////////////////////////////////////////////////////////////////////
 ## THREADED DOCUMENTER
 ##/////////////////////////////////////////////////////////////////////////
 
-def document(modules, options, progress, cancel):
+def document(options, progress, cancel):
     """
     Create the documentation for C{modules}, using the options
     specified by C{options}.  C{document} is designed to be started in
@@ -142,37 +189,75 @@ def document(modules, options, progress, cancel):
         creating the documentation.
     @type progress: C{list}
     """
-    
-    # Create the documentation map.
-    d = DocMap()
-
-    # Build the documentation.
     progress[0] = 0.02
-    for module in modules:
-        if cancel[0]:
-            progress[0] = 'cancel'
-            exit_thread()
-        d.add(module)
-        progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
 
-    htmldoc = HTMLFormatter(d, **options)
-    numfiles = htmldoc.num_files()
+    try:
+        # Import the modules.
+        modnames = options['modules']
+        modules = []
+        for (name, num) in zip(modnames, range(len(modnames))):
+            if cancel[0]: exit_thread()
+            sys.stderr.write('***Importing %s\n***' % name)
+            try:
+                module = import_module(name)
+                if module not in modules:
+                    modules.append(module)
+            except ImportError, e:
+                sys.stderr.write('!!!Error importing %s: %s\n!!!', (mname, e))
+            progress[0] += (IMPORT_PROGRESS*0.98)/len(modnames)
+        
+        # Create the documentation map.
+        d = DocMap()
+    
+        # Build the documentation.
+        for (module, num) in zip(modules, range(len(modules))):
+            if cancel[0]: exit_thread()
+            sys.stderr.write('***Building docs for %s\n***' % module.__name__)
+            d.add(module)
+            progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
+    
+        htmldoc = HTMLFormatter(d, **options)
+        numfiles = htmldoc.num_files()
+    
+        # Set up the progress callback.
+        n = htmldoc.num_files()
+        def progress_callback(path, doc, numfiles=numfiles,
+                              progress=progress, cancel=cancel, num=[1]):
+            if cancel[0]: exit_thread()
 
-    # Set up the progress callback.
-    def progress_callback(f, d, numfiles=numfiles,
-                          progress=progress, cancel=cancel):
-        if cancel[0]:
-            progress[0] = 'cancel'
-            exit_thread()
-        if DEBUG: print 'documenting', f, d
-        progress[0] += (WRITE_PROGRESS*0.98)/numfiles
+            # Find the short name of the file we're writing.
+            (dir, file) = os.path.split(path)
+            (root, d) = os.path.split(dir)
+            if d in ('public', 'private'): fname = os.path.join(d, file)
+            else: fname = file
+                
+            sys.stderr.write('***Writing %s\n***' % fname)
+            progress[0] += (WRITE_PROGRESS*0.98)/numfiles
+            num[0] += 1
+    
+        # Write the documentation.
+        htmldoc.write(options.get('outdir', 'html'), progress_callback)
+    
+        # We're done.
+        sys.stderr.write('***Finished!\n***')
+        progress[0] = 'done'
 
-    # Write the documentation.
-    htmldoc.write(options.get('outdir', 'html'), progress_callback)
-
-    # We're done.
-    progress[0] = 'done'
-
+    except SystemExit:
+        # Cancel.
+        sys.stderr.write('!!!Cancel!\n!!!')
+        progress[0] = 'cancel'
+        raise
+    except Exception, e:
+        # We failed.
+        sys.stderr.write('!!!Internal error: %s\n!!!' % e)
+        progress[0] = 'cancel'
+        raise
+    except:
+        # We failed.
+        sys.stderr.write('!!!Internal error\n!!!')
+        progress[0] = 'cancel'
+        raise
+    
 ##/////////////////////////////////////////////////////////////////////////
 ## GUI
 ##/////////////////////////////////////////////////////////////////////////
@@ -183,37 +268,68 @@ class EpydocGUI:
     """
     def __init__(self):
         self._afterid = 0
-        self._modules = []
         self._progress = [None]
         self._cancel = [0]
         self._filename = None
 
+        # Store a copy of sys.modules, so that we can restore it
+        # later.  This is useful for making sure that we reload
+        # everything when we re-build its documentation.  This will
+        # *not* reload the modules that are present when the EpydocGUI
+        # is created, but that should only contain some builtins, some
+        # epydoc modules, Tkinter, pickle, and thread..
+        self._old_modules = sys.modules.keys()
+
         # Create the main window.
-        self._top = Tk()
-        self._top['background']=BG_COLOR
-        self._top.bind('<Control-q>', self.destroy)
-        self._top.bind('<Control-x>', self.destroy)
-        self._top.bind('<Control-d>', self.destroy)
-        self._top.title('Epydoc')
-        self._topframe = Frame(self._top, background=BG_COLOR,
+        self._root = Tk()
+        self._root['background']=BG_COLOR
+        self._root.bind('<Control-q>', self.destroy)
+        self._root.bind('<Alt-q>', self.destroy)
+        self._root.bind('<Alt-x>', self.destroy)
+        #self._root.bind('<Control-d>', self.destroy)
+        self._root.title('Epydoc')
+        self._rootframe = Frame(self._root, background=BG_COLOR,
                                border=2, relief='raised')
-        self._topframe.pack(expand=1, fill='both', padx=2, pady=2)
-                            
-        mainframe = Frame(self._topframe, background=BG_COLOR)
-        mainframe.pack(expand=1, fill='both', side='left')
+        self._rootframe.pack(expand=1, fill='both', padx=2, pady=2)
+
+        # Set up the basic frames.  Do not pack the options frame or
+        # the messages frame; the GUI has buttons to expand them.
+        leftframe = Frame(self._rootframe, background=BG_COLOR)
+        leftframe.pack(expand=1, fill='both', side='left')
+        optsframe = Frame(self._rootframe, background=BG_COLOR)
+        mainframe = Frame(leftframe, background=BG_COLOR)
+        mainframe.pack(expand=1, fill='both', side='top')
+        ctrlframe = Frame(mainframe, background=BG_COLOR)
+        ctrlframe.pack(side="bottom", fill='x', expand=0)
+        msgsframe = Frame(leftframe, background=BG_COLOR)
+
+        self._optsframe = optsframe
+        self._msgsframe = msgsframe
 
         # Initialize all the frames, etc.
         self._init_menubar()
-        self._init_options(mainframe)
         self._init_progress_bar(mainframe)
         self._init_module_list(mainframe)
+        self._init_options(optsframe, ctrlframe)
+        self._init_messages(msgsframe, ctrlframe)
         self._init_bindings()
 
+        # Replace stderr with a _PipeIO stream, so we can capture
+        # messages.
+        self._errpipe = _PipeIO()
+        sys.stderr = self._errpipe
+
+        # Open the messages pane by default.
+        self._messages_toggle()
+        
     def _init_menubar(self):
-        menubar = Menu(self._top, borderwidth=2,
+        menubar = Menu(self._root, borderwidth=2,
                        background=BG_COLOR,
                        activebackground=BG_COLOR)
         filemenu = Menu(menubar, tearoff=0)
+        filemenu.add_command(label='New Project', underline=0,
+                             command=self._new,
+                             accelerator='Ctrl-n')
         filemenu.add_command(label='Open Project', underline=0,
                              command=self._open,
                              accelerator='Ctrl-o')
@@ -232,7 +348,7 @@ class EpydocGUI:
         gomenu.add_command(label='Run Epydoc',  command=self._open,
                            underline=0, accelerator='Alt-g')
         menubar.add_cascade(label='Run', menu=gomenu, underline=0)
-        self._top.config(menu=menubar)
+        self._root.config(menu=menubar)
         
     def _init_module_list(self, mainframe):
         mframe1 = Frame(mainframe, relief='groove', border=2,
@@ -245,15 +361,15 @@ class EpydocGUI:
         mframe2.pack(side="top", fill='both', expand=1)
         mframe3 = Frame(mframe1, background=BG_COLOR)
         mframe3.pack(side="bottom", fill='x', expand=0)
-        self._module_list = Listbox(mframe2, **LISTBOX_CONFIG)
+        self._module_list = Listbox(mframe2, width=80, height=10,
+                                    **LISTBOX_CONFIG)
         self._module_list.pack(side="left", fill='both', expand=1)
-        self._module_scroll = Scrollbar(mframe2, orient='vertical',
-                                        **SB_CONFIG)
-        self._module_scroll.config(command=self._module_list.yview)
-        self._module_scroll.pack(side='right', fill='y')
-        self._module_list.config(yscrollcommand=self._module_scroll.set)
+        sb = Scrollbar(mframe2, orient='vertical',**SB_CONFIG)
+        sb['command']=self._module_list.yview
+        sb.pack(side='right', fill='y')
+        self._module_list.config(yscrollcommand=sb.set)
         Label(mframe3, text="Add:", **COLOR_CONFIG).pack(side='left')
-        self._module_entry = Entry(mframe3, **COLOR_CONFIG)
+        self._module_entry = Entry(mframe3, **ENTRY_CONFIG)
         self._module_entry.pack(side='left', fill='x', expand=1)
         self._module_entry.bind('<Return>', self._entry_module)
         self._module_browse = Button(mframe3, text="Browse",
@@ -264,7 +380,7 @@ class EpydocGUI:
     def _init_progress_bar(self, mainframe):
         pframe1 = Frame(mainframe, background=BG_COLOR)
         pframe1.pack(side="bottom", fill='x', expand=0)
-        self._go_button = Button(pframe1, width=4, text='Go!',
+        self._go_button = Button(pframe1, width=4, text='Start',
                                  underline=0, command=self._go,
                                  **BUTTON_CONFIG)
         self._go_button.pack(side='left', padx=4)
@@ -286,22 +402,89 @@ class EpydocGUI:
                                       outline='')
         self._canvas.bind('<Configure>', self._configure)
 
-    def _configure(self, event):
-        self._W = event.width-DW
+    def _init_messages(self, msgsframe, ctrlframe):
+        self._downImage = PhotoImage(master=self._root, data=DOWN_GIF)
+        self._upImage = PhotoImage(master=self._root, data=UP_GIF)
 
-    def _init_options(self, mainframe):
-        self._leftImage=PhotoImage(master=self._top, data=LEFT_GIF)
-        self._rightImage=PhotoImage(master=self._top, data=RIGHT_GIF)
+        # Set up the messages control frame
+        b1 = Button(ctrlframe, text="Messages", justify='center',
+                    command=self._messages_toggle, underline=0, 
+                    highlightthickness=0, activebackground=BG_COLOR, 
+                    border=0, relief='flat', padx=2, pady=0, **COLOR_CONFIG) 
+        b2 = Button(ctrlframe, image=self._downImage, relief='flat', 
+                    border=0, command=self._messages_toggle,
+                    activebackground=BG_COLOR, **COLOR_CONFIG) 
+        self._message_button = b2
+        self._messages_visible = 0
+        b2.pack(side="left")
+        b1.pack(side="left")
+
+        f = Frame(msgsframe, background=BG_COLOR)
+        f.pack(side='top', expand=1, fill='both')
+        messages = Text(f, width=80, height=10, **ENTRY_CONFIG)
+        messages['state'] = 'disabled'
+        messages.pack(fill='both', expand=1, side='left')
+        self._messages = messages
+
+        # Add a scrollbar
+        sb = Scrollbar(f, orient='vertical', **SB_CONFIG)
+        sb.pack(fill='y', side='right')
+        sb['command'] = messages.yview
+        messages['yscrollcommand'] = sb.set
+
+        # Set up some colorization tags
+        messages.tag_config('error', foreground=ERROR_COLOR)
+        messages.tag_config('warning', foreground=WARNING_COLOR)
+        messages.tag_config('guierror', foreground=GUIERROR_COLOR)
+        messages.tag_config('message', foreground=MESSAGE_COLOR)
+        messages.tag_config('header', foreground=HEADER_COLOR)
+        messages.tag_config('uline', underline=1)
+
+        # Keep track of tag state..
+        self._in_header = 0
+        self._last_tag = 'error'
+
+        # Add some buttons
+        buttons = Frame(msgsframe, background=BG_COLOR)
+        buttons.pack(side='bottom', fill='x')
+        self._show_errors = IntVar(self._root)
+        self._show_errors.set(1)
+        self._show_warnings = IntVar(self._root)
+        self._show_warnings.set(1)
+        self._show_messages = IntVar(self._root)
+        self._show_messages.set(1)
+        Checkbutton(buttons, text='Show Messages', var=self._show_messages,
+                    command=self._update_msg_tags, 
+                    **SHOWMSG_CONFIG).pack(side='left')
+        Checkbutton(buttons, text='Show Warnings', var=self._show_warnings,
+                    command=self._update_msg_tags, 
+                    **SHOWWRN_CONFIG).pack(side='left')
+        Checkbutton(buttons, text='Show Errors', var=self._show_errors,
+                    command=self._update_msg_tags, 
+                    **SHOWERR_CONFIG).pack(side='left')
+
+    def _update_msg_tags(self, *e):
+        elide_errors = not self._show_errors.get()
+        elide_warnings = not self._show_warnings.get()
+        elide_messages = not self._show_messages.get()
+        elide_headers = elide_errors and elide_warnings
+        self._messages.tag_config('error', elide=elide_errors)
+        self._messages.tag_config('guierror', elide=elide_errors)
+        self._messages.tag_config('warning', elide=elide_warnings)
+        self._messages.tag_config('message', elide=elide_messages)
+        self._messages.tag_config('header', elide=elide_headers)
+
+    def _init_options(self, optsframe, ctrlframe):
+        self._leftImage=PhotoImage(master=self._root, data=LEFT_GIF)
+        self._rightImage=PhotoImage(master=self._root, data=RIGHT_GIF)
 
         # Set up the options control frame
-        oframe1 = Frame(mainframe, background=BG_COLOR)
-        oframe1.pack(side="bottom", fill='x', expand=0)
-        b1 = Button(oframe1, text="Options", justify='center',
+        b1 = Button(ctrlframe, text="Options", justify='center',
                     border=0, relief='flat',
                     command=self._options_toggle, padx=2,
                     underline=0, pady=0, highlightthickness=0,
                     activebackground=BG_COLOR, **COLOR_CONFIG) 
-        b2 = Button(oframe1, image=self._rightImage, relief='flat', 
+        b2 = Button(ctrlframe, image=self._rightImage, relief='flat', 
                     border=0, command=self._options_toggle,
                     activebackground=BG_COLOR, **COLOR_CONFIG) 
         self._option_button = b2
@@ -309,103 +492,194 @@ class EpydocGUI:
         b2.pack(side="right")
         b1.pack(side="right")
 
-        # Set up the options frame
-        oframe2 = Frame(self._topframe, relief='groove', border=2,
+        oframe2 = Frame(optsframe, relief='groove', border=2,
                         background=BG_COLOR)
-        self._option_frame = oframe2
-        l2 = Label(oframe2, text="Project Name:", **COLOR_CONFIG)
-        l2.grid(row=2, col=0, columnspan=2, sticky='e')
-        l3 = Label(oframe2, text="Project URL:", **COLOR_CONFIG)
-        l3.grid(row=3, col=0, columnspan=2, sticky='e')
-        l4 = Label(oframe2, text="Output Directory:", **COLOR_CONFIG)
-        l4.grid(row=4, col=0, columnspan=2, sticky='e')
-        l5 = Label(oframe2, text="CSS Stylesheet:", **COLOR_CONFIG)
-        l5.grid(row=5, col=0, columnspan=2, sticky='e')
-        self._name_entry = Entry(oframe2, **COLOR_CONFIG)
-        self._name_entry.grid(row=2, col=2, sticky='ew', columnspan=2)
-        self._url_entry = Entry(oframe2, **COLOR_CONFIG)
-        self._url_entry.grid(row=3, col=2, sticky='ew', columnspan=2)
-        self._out_entry = Entry(oframe2, **COLOR_CONFIG)
-        self._out_entry.grid(row=4, col=2, sticky='ew')
-        self._out_browse = Button(oframe2, text="Browse",
+        oframe2.pack(side="right", fill='both',
+                     expand=0, padx=4, pady=3, ipadx=4)
+        
+        Label(oframe2, text="Project Options", font='helvetica -16',
+              **COLOR_CONFIG).pack(anchor='w')
+        oframe3 = Frame(oframe2, background=BG_COLOR)
+        oframe3.pack(fill='x')
+        oframe4 = Frame(oframe2, background=BG_COLOR)
+        oframe4.pack(fill='x')
+        div = Frame(oframe2, background=BG_COLOR, border=1, relief='sunk')
+        div.pack(ipady=1, fill='x', padx=4, pady=2)
+
+        Label(oframe2, text="Help File", font='helvetica -16',
+              **COLOR_CONFIG).pack(anchor='w')
+        oframe5 = Frame(oframe2, background=BG_COLOR)
+        oframe5.pack(fill='x')
+        div = Frame(oframe2, background=BG_COLOR, border=1, relief='sunk')
+        div.pack(ipady=1, fill='x', padx=4, pady=2)
+
+        Label(oframe2, text="CSS Stylesheets", font='helvetica -16',
+              **COLOR_CONFIG).pack(anchor='w')
+        oframe6 = Frame(oframe2, background=BG_COLOR)
+        oframe6.pack(fill='x')
+
+        # -n NAME, --name NAME
+        row = 0
+        l = Label(oframe3, text="Project Name:", **COLOR_CONFIG)
+        l.grid(row=row, col=0, sticky='e')
+        self._name_entry = Entry(oframe3, **ENTRY_CONFIG)
+        self._name_entry.grid(row=row, col=1, sticky='ew', columnspan=3)
+
+        # -u URL, --url URL
+        row += 1
+        l = Label(oframe3, text="Project URL:", **COLOR_CONFIG)
+        l.grid(row=row, col=0, sticky='e')
+        self._url_entry = Entry(oframe3, **ENTRY_CONFIG)
+        self._url_entry.grid(row=row, col=1, sticky='ew', columnspan=3)
+
+        # -o DIR, --output DIR
+        row += 1
+        l = Label(oframe3, text="Output Directory:", **COLOR_CONFIG)
+        l.grid(row=row, col=0, sticky='e')
+        self._out_entry = Entry(oframe3, **ENTRY_CONFIG)
+        self._out_entry.grid(row=row, col=1, sticky='ew', columnspan=2)
+        self._out_browse = Button(oframe3, text="Browse",
                                   command=self._browse_out,
                                   **BUTTON_CONFIG) 
-        self._out_browse.grid(row=4, col=3, sticky='ew', padx=2)
-        self._out_entry.insert(0, 'html')
+        self._out_browse.grid(row=row, col=3, sticky='ew', padx=2)
 
+        # --no-frames
+        row = 0
+        self._frames_var = IntVar(self._root)
+        self._frames_var.set(1)
+        l = Label(oframe4, text="Generate a frame-based table of contents",
+                  **COLOR_CONFIG)
+        l.grid(row=row, col=1, sticky='w')
+        cb = Checkbutton(oframe4, var=self._frames_var, **CBUTTON_CONFIG)
+        cb.grid(row=row, col=0, sticky='e')
+
+        # --no-private
+        row += 1
+        self._private_var = IntVar(self._root)
+        self._private_var.set(1)
+        l = Label(oframe4, text="Generate documentation for private objects",
+                  **COLOR_CONFIG)
+        l.grid(row=row, col=1, sticky='w')
+        cb = Checkbutton(oframe4, var=self._private_var, **CBUTTON_CONFIG)
+        cb.grid(row=row, col=0, sticky='e')
+
+        # --show-imports
+        row += 1
+        self._imports_var = IntVar(self._root)
+        self._imports_var.set(0)
+        l = Label(oframe4, text="List imported classes and functions",
+                  **COLOR_CONFIG)
+        l.grid(row=row, col=1, sticky='w')
+        cb = Checkbutton(oframe4, var=self._imports_var, **CBUTTON_CONFIG)
+        cb.grid(row=row, col=0, sticky='e')
+
+        # --help-file FILE
+        row = 0
+        self._help_var = StringVar(self._root)
+        self._help_var.set('default')
+        b = Radiobutton(oframe5, var=self._help_var,
+                        text='Default',
+                        value='default', **CBUTTON_CONFIG)
+        b.grid(row=row, col=1, sticky='w')
+        row += 1
+        b = Radiobutton(oframe5, var=self._help_var,
+                        text='Select File',
+                        value='-other-', **CBUTTON_CONFIG)
+        b.grid(row=row, col=1, sticky='w')
+        self._help_entry = Entry(oframe5, **ENTRY_CONFIG)
+        self._help_entry.grid(row=row, col=2, sticky='ew')
+        self._help_browse = Button(oframe5, text='Browse',
+                                   command=self._browse_help,
+                                   **BUTTON_CONFIG)
+        self._help_browse.grid(row=row, col=3, sticky='ew', padx=2)
+        
         items = STYLESHEETS.items()
         def _css_sort(css1, css2):
             if css1[0] == 'default': return -1
             elif css2[0] == 'default': return 1
             else: return cmp(css1[0], css2[0])
         items.sort(_css_sort)
-            
-        i = 6
-        css_var = self._css_var = StringVar(self._top)
-        css_var.set('default')
-        for (name, (sheet, descr)) in items:
-            b = Radiobutton(oframe2, text=name, var=css_var, 
-                            value=name, selectcolor='#208070',
-                            **BUTTON_CONFIG)
-            b.grid(row=i, col=1, sticky='w')
-            l = Label(oframe2, text=descr, **COLOR_CONFIG)
-            l.grid(row=i, col=2, columnspan=2, sticky='w')
-            i += 1
 
-        b = Radiobutton(oframe2, text='Select File', var=css_var, 
-                        value='-other-', selectcolor='#208080',
-                        **BUTTON_CONFIG)
-        b.grid(row=i, col=1, sticky='w')
-        self._css_entry = Entry(oframe2, **COLOR_CONFIG)
-        self._css_entry.grid(row=i, col=2, sticky='ew')
-        self._css_browse = Button(oframe2, text="Browse",
+        # -c CSS, --css CSS
+        # --private-css CSS
+        row = 0
+        l = Label(oframe6, text="Public", **COLOR_CONFIG)
+        l.grid(row=row, col=0, sticky='e')
+        l = Label(oframe6, text="Private", **COLOR_CONFIG)
+        l.grid(row=row, col=1, sticky='w')
+        row += 1
+        css_var = self._css_var = StringVar(self._root)
+        css_var.set('default')
+        private_css_var = self._private_css_var = StringVar(self._root)
+        private_css_var.set('default')
+        for (name, (sheet, descr)) in items:
+            b = Radiobutton(oframe6, var=css_var, value=name, **CBUTTON_CONFIG)
+            b.grid(row=row, col=0, sticky='e')
+            b = Radiobutton(oframe6, var=private_css_var, value=name, 
+                            text=name, **CBUTTON_CONFIG)
+            b.grid(row=row, col=1, sticky='w')
+            l = Label(oframe6, text=descr, **COLOR_CONFIG)
+            l.grid(row=row, col=2, sticky='w')
+            row += 1
+        b = Radiobutton(oframe6, var=css_var, value='-other-', 
+                        **CBUTTON_CONFIG)
+        b.grid(row=row, col=0, sticky='e')
+        b = Radiobutton(oframe6, text='Select File', var=private_css_var, 
+                        value='-other-', **CBUTTON_CONFIG)
+        b.grid(row=row, col=1, sticky='w')
+        self._css_entry = Entry(oframe6, **ENTRY_CONFIG)
+        self._css_entry.grid(row=row, col=2, sticky='ew')
+        self._css_browse = Button(oframe6, text="Browse",
                                   command=self._browse_css,
                                   **BUTTON_CONFIG) 
-        self._css_browse.grid(row=i, col=3, sticky='ew', padx=2)
+        self._css_browse.grid(row=row, col=3, sticky='ew', padx=2)
 
     def _init_bindings(self):
-        self._top.bind('<Delete>', self._delete_module)
-        self._top.bind('<Alt-o>', self._options_toggle)
-        self._top.bind('<Alt-g>', self._go)
-        self._top.bind('<Alt-s>', self._go)
-        self._top.bind('<Control-g>', self._go)
-
-        self._top.bind('<Control-o>', self._open)
-        self._top.bind('<Control-s>', self._save)
-        self._top.bind('<Control-a>', self._saveas)
+        self._root.bind('<Delete>', self._delete_module)
+        self._root.bind('<Alt-o>', self._options_toggle)
+        self._root.bind('<Alt-m>', self._messages_toggle)
+        self._root.bind('<F5>', self._go)
+        self._root.bind('<Alt-s>', self._go)
+        
+        self._root.bind('<Control-n>', self._new)
+        self._root.bind('<Control-o>', self._open)
+        self._root.bind('<Control-s>', self._save)
+        self._root.bind('<Control-a>', self._saveas)
 
     def _options_toggle(self, *e):
         if self._options_visible:
-            self._option_frame.forget()
+            self._optsframe.forget()
             self._option_button['image'] = self._rightImage
             self._options_visible = 0
         else:
-            self._option_frame.pack(side="right", fill='both',
-                                    expand=0, padx=4, pady=3)
+            self._optsframe.pack(fill='both', side='right')
             self._option_button['image'] = self._leftImage
             self._options_visible = 1
 
-    def add_module(self, name, beep=1):
-        if DEBUG: print 'importing', name
-        try: [module] = _find_modules([name], 0)
-        except:
-            if beep: self._top.bell()
-            return 0
-        if module in self._modules:
-            if beep: self._top.bell()
-            return 0
-        self._modules.append(module)
-        self._module_list.insert('end', module.__name__)
-        return 1
+    def _messages_toggle(self, *e):
+        if self._messages_visible:
+            self._msgsframe.forget()
+            self._message_button['image'] = self._downImage
+            self._messages_visible = 0
+        else:
+            self._msgsframe.pack(fill='both', side='bottom', expand=1)
+            self._message_button['image'] = self._upImage
+            self._messages_visible = 1
+
+    def _configure(self, event):
+        self._W = event.width-DW
 
     def _delete_module(self, *e):
         selection = self._module_list.curselection()
         if len(selection) != 1: return
-        del self._modules[int(selection[0])]
         self._module_list.delete(selection[0])
 
     def _entry_module(self, *e):
-        self.add_module(self._module_entry.get())
+        modules = [self._module_entry.get()]
+        if glob.has_magic(modules[0]):
+            modules = glob.glob(modules[0])
+        for name in modules:
+            self.add_module(name, check=1)
         self._module_entry.delete(0, 'end')
 
     def _browse_module(self, *e):
@@ -414,58 +688,129 @@ class EpydocGUI:
         filename = askopenfilename(filetypes=ftypes,
                                    defaultextension='.py')
         if not filename: return
-        self.add_module(filename)
+        self.add_module(filename, check=1)
         
     def _browse_css(self, *e):
-        self._css_var.set('-other-')
-        ftypes = [('CSS Stylesheet', '.css'),
-                  ('All files', '*')]
+        #self._css_var.set('-other-')
+        ftypes = [('CSS Stylesheet', '.css'), ('All files', '*')]
         filename = askopenfilename(filetypes=ftypes,
                                    defaultextension='.css')
         if not filename: return
         self._css_entry.delete(0, 'end')
         self._css_entry.insert(0, filename)
 
+    def _browse_private_css(self, *e):
+        self._private_css_var.set('-other-')
+        ftypes = [('CSS Stylesheet', '.css'), ('All files', '*')]
+        filename = askopenfilename(filetypes=ftypes,
+                                   defaultextension='.css')
+        if not filename: return
+        self._private_css_entry.delete(0, 'end')
+        self._private_css_entry.insert(0, filename)
+
+    def _browse_help(self, *e):
+        self._help_var.set('-other-')
+        ftypes = [('HTML file', '.html'), ('All files', '*')]
+        filename = askopenfilename(filetypes=ftypes,
+                                   defaultextension='.html')
+        if not filename: return
+        self._help_entry.delete(0, 'end')
+        self._help_entry.insert(0, filename)
+
     def _browse_out(self, *e):
         ftypes = [('All files', '*')]
         filename = asksaveasfilename(filetypes=ftypes)
         if not filename: return
-        self._css_entry.delete(0, 'end')
-        self._css_entry.insert(0, filename)
+        self._out_entry.delete(0, 'end')
+        self._out_entry.insert(0, filename)
 
     def destroy(self, *e):
-        if self._top is None: return
-        self._top.destroy()
-        self._top = None
+        if self._root is None: return
 
+        # Unload any modules that we've imported
+        for m in sys.modules.keys():
+            if m not in self._old_modules: del sys.modules[m]
+        self._root.destroy()
+        self._root = None
+
+    def add_module(self, name, check=0):
+        # Check that it's a good module, if requested.
+        if check:
+            try:
+                m = import_module(name)
+                # This would normalize the name.  But that seems to
+                # mess up some modules (e.g., xml.dom.minidom), so
+                # don't do it:
+                ##if hasattr(m, '__file__'): name = m.__file__
+                ##if name[-4:-1] == '.py': name = name[:-1]
+            except:
+                print >>sys.stderr, "Error importing module: %s" % name
+                self._update_messages()
+                self._root.bell()
+                return
+
+        # Add the module to the list of modules.
+        self._module_list.insert('end', name)
+        self._module_list.yview('end')
+        
     def mainloop(self, *args, **kwargs):
-        self._top.mainloop(*args, **kwargs)
+        self._root.mainloop(*args, **kwargs)
 
     def _getopts(self):
         options = {}
-        options['prj_name'] = self._name_entry.get() or None
+        options['modules'] = self._module_list.get(0, 'end')
+        options['prj_name'] = self._name_entry.get() or ''
         options['prj_url'] = self._url_entry.get() or None
         options['outdir'] = self._out_entry.get() or 'html'
+        options['frames'] = self._frames_var.get()
+        options['private'] = self._private_var.get()
+        options['show_imports'] = self._imports_var.get()
+        if self._help_var.get() == '-other-':
+            options['help'] = self._help_entry.get() or None
+        else:
+            options['help'] = None
         if self._css_var.get() == '-other-':
             options['css'] = self._css_entry.get() or 'default'
         else:
             options['css'] = self._css_var.get() or 'default'
+        if self._private_css_var.get() == '-other-':
+            options['private_css'] = self._css_entry.get() or 'default'
+        else:
+            options['private_css'] = self._private_css_var.get() or 'default'
         return options
     
     def _go(self, *e):
-        if len(self._modules) == 0:
-            self._top.bell()
+        if len(self._module_list.get(0,'end')) == 0:
+            self._root.bell()
             return
 
         if self._progress[0] != None:
             self._cancel[0] = 1
             return
-        
-        # Start documenting
+
+        # Construct the argument list for document().
+        opts = self._getopts()
         self._progress[0] = 0.0
         self._cancel[0] = 0
-        args = (self._modules, self._getopts(),
-                self._progress, self._cancel)
+        args = (opts, self._progress, self._cancel)
+
+        # Clear the messages window.
+        self._messages['state'] = 'normal'
+        self._messages.delete('0.0', 'end')
+        self._messages['state'] = 'disabled'
+        self._errpipe.clear()
+
+        # Restore the module list.  This will force re-loading of
+        # anything that we're documenting.
+        for m in sys.modules.keys():
+            if m not in self._old_modules:
+                del sys.modules[m]
+
+        # Reset the uid cache (otherwise, we would get UID conflicts,
+        # since we just re-loaded everything).
+        reset_uid_cache()
+    
+        # Start documenting
         start_new_thread(document, args)
 
         # Start the progress bar.
@@ -474,14 +819,54 @@ class EpydocGUI:
         dt = 300 # How often to update, in milliseconds
         self._update(dt, self._afterid)
 
+    def _update_messages(self):
+        # Update messages (using the _PipeIO that we installed on
+        # sys.stderr).
+        while 1:
+            data = self._errpipe.read()
+            if data is None: break
+            self._messages['state'] = 'normal'
+            if data.startswith('***') and data.endswith('***'):
+                self._messages.insert('end', data[3:-3], 'message')
+            elif data.startswith('!!!') and data.endswith('!!!'):
+                self._messages.insert('end', data[3:-3], 'guierror')
+            else:
+                if data == '\n':
+                    if self._last_tag != 'header2':
+                        self._messages.insert('end', '\n', self._last_tag)
+                elif data == '='*75:
+                    if self._messages.get('end-3c', 'end') == '\n\n\n':
+                        self._messages.delete('end-1c')
+                    self._in_header = 1
+                    self._messages.insert('end', ' '*75, 'uline header')
+                    self._last_tag = 'header'
+                elif data == '-'*75:
+                    self._in_header = 0
+                    self._last_tag = 'header2'
+                elif self._in_header:
+                    self._messages.insert('end', data, 'header')
+                    self._last_tag = 'header'
+                elif re.match(r'\s*L\d+: Warning: ', data):
+                    self._messages.insert('end', data, 'warning')
+                    self._last_tag = 'warning'
+                else:
+                    self._messages.insert('end', data, 'error')
+                    self._last_tag = 'error'
+
+            self._messages['state'] = 'disabled'
+            self._messages.yview('end')
+
     def _update(self, dt, id):
-        if self._top is None: return
+        if self._root is None: return
         if self._progress[0] is None: return
         if id != self._afterid: return
 
+        # Update the messages box
+        self._update_messages()
+
         # Update the progress bar.
         if self._progress[0] == 'done': p = self._W + DX
-        elif self._progress[0] == 'cancel': p = 0
+        elif self._progress[0] == 'cancel': p = -5
         else: p = DX + self._W * self._progress[0]
         self._canvas.coords(self._r1, DX+1, DY+1, p, self._H+1)
         self._canvas.coords(self._r2, DX, DY, p-1, self._H)
@@ -489,11 +874,28 @@ class EpydocGUI:
 
         # Are we done?
         if self._progress[0] in ('done', 'cancel'):
+            if self._progress[0] == 'cancel': self._root.bell()
             self._go_button['text'] = 'Start'
             self._progress[0] = None
             return
 
-        self._top.after(dt, self._update, dt, id)
+        self._root.after(dt, self._update, dt, id)
+
+    def _new(self, *e):
+        self._module_list.delete(0, 'end')
+        self._name_entry.delete(0, 'end')
+        self._url_entry.delete(0, 'end')
+        self._out_entry.delete(0, 'end')
+        self._module_entry.delete(0, 'end')
+        self._css_entry.delete(0, 'end')
+        self._help_entry.delete(0, 'end')
+        self._frames_var.set(1)
+        self._private_var.set(1)
+        self._imports_var.set(0)
+        self._css_var.set('default')
+        self._private_css_var.set('default')
+        self._help_var.set('default')
+        self._filename = None
 
     def _open(self, *e):
         ftypes = [('Project file', '.prj'),
@@ -505,41 +907,67 @@ class EpydocGUI:
 
     def open(self, prjfile):
         self._filename = prjfile
-        if 1:#try:
+        try:
             opts = load(open(prjfile, 'r'))
-            opts['modules'].sort(lambda e1, e2: cmp(e1[1], e2[1]))
+            
+            modnames = list(opts.get('modules', []))
+            modnames.sort()
+            self._module_list.delete(0, 'end')
+            for name in modnames:
+                self.add_module(name)
+            self._module_entry.delete(0, 'end')
+                
             self._name_entry.delete(0, 'end')
             if opts.get('prj_name'):
                 self._name_entry.insert(0, opts['prj_name'])
+                
             self._url_entry.delete(0, 'end')
             if opts.get('prj_url'):
                 self._url_entry.insert(0, opts['prj_url'])
+
+            self._help_entry.delete(0, 'end')
+            if opts.get('help') is None:
+                self._help_var.set('default')
+            else:
+                self._help_var.set('-other-')
+                self._help_entry.insert(0, opts.get('help'))
+                
             self._out_entry.delete(0, 'end')
             self._out_entry.insert(0, opts.get('outdir', 'html'))
+
+            self._frames_var.set(opts.get('frames', 1))
+            self._private_var.set(opts.get('private', 1))
+            self._imports_var.set(opts.get('show_imports', 0))
+            
             self._css_entry.delete(0, 'end')
             if opts.get('css', 'default') in STYLESHEETS.keys():
                 self._css_var.set(opts.get('css', 'default'))
             else:
                 self._css_var.set('-other-')
                 self._css_entry.insert(0, opts.get('css', 'default'))
-            for (file, name) in opts.get('modules', []):
-                if not self.add_module(file, 0):
-                    self.add_module(name, 0)
-        #except:
-        #    self._top.bell()
+
+            if opts.get('private_css', 'default') in STYLESHEETS.keys():
+                self._private_css_var.set(opts.get('private_css', 'default'))
+            else:
+                self._private_css_var.set('-other-')
+                self._css_entry.insert(0, opts.get('private_css', 'default'))
+                                                   
+        except Exception, e:
+            sys.stderr.write('!!!Error opening %s: %s\n!!!' % (prjfile, e))
+            self._root.bell()
         
     def _save(self, *e):
         if self._filename is None: return self._saveas()
         try:
             opts = self._getopts()
-            opts['modules'] = [(hasattr(m, '__file__') and m.__file__,
-                                m.__name__)
-                               for m in self._modules]
-            opts['modules'].sort(lambda e1, e2: cmp(e1[1], e2[1]))
             dump(opts, open(self._filename, 'w'))
         except Exception, e:
-            if DEBUG: print e
-            self._top.bell()
+            if self._filename is None:
+                sys.stderr.write('!!!Error saving: %s\n!!!' %  e)
+            else:
+                sys.stderr.write('!!!Error saving %s: %s\n!!!' %
+                                 (self._filename, e))
+            self._root.bell()
              
     def _saveas(self, *e): 
         ftypes = [('Project file', '.prj'), ('All files', '*')]
@@ -550,6 +978,7 @@ class EpydocGUI:
         self._save()
 
 def gui():
+    sys.stderr = sys.__stderr__
     gui = EpydocGUI()
     for arg in sys.argv[1:]:
         if arg[-4:] == '.prj':
@@ -560,3 +989,4 @@ def gui():
     gui.mainloop()
 
 if __name__ == '__main__': gui()
+
