@@ -1115,7 +1115,7 @@ class LatexFormatter:
         str = ''
 
         for field in doc.fields():
-            values = doc.field_value(field)
+            values = doc.field_values(field)
             if not values: continue
             items = [self._dom_to_latex(v) for v in values]
             str += self._descrlist(items, field.singular,
