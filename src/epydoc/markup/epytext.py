@@ -110,8 +110,8 @@ from xml.dom.minidom import Element, Text
 ## Constants
 ##################################################
 
-# Default screen width, for printing.
-SCRWIDTH = 75
+# Default screen width, for word-wrapping
+SCRWIDTH = 73
 
 # The possible heading underline characters, listed in order of
 # heading depth. 
@@ -157,6 +157,25 @@ def parse_as_literal(str):
     lit = Element('literalblock')
     epytext.appendChild(lit)
     lit.appendChild(Text(str))
+    return epytext
+
+def parse_as_para(str):
+    """
+    Return a DOM tree matching the epytext DTD, containing a single
+    paragraph.  That paragraph will include the contents of the given
+    string.  This can be used to wrap some forms of automatically
+    generated information (such as type names) in paragraphs.
+
+    @param str: The string which should be enclosed in a paragraph.
+    @type str: C{string}
+    
+    @return: A DOM tree containing C{str} in a single paragraph.
+    @rtype: C{xml.dom.minidom.Element}
+    """
+    epytext = Element('epytext')
+    para = Element('para')
+    epytext.appendChild(para)
+    para.appendChild(Text(str))
     return epytext
 
 def summary(tree):
@@ -378,7 +397,7 @@ def _add_para(para_token, stack, indent_stack, errors, warnings):
         #            "blockquotes are not supported")
         #    errors.append(StructuringError(estr, para_token))
         #else:
-        estr = "Improper paragraph indentation"
+        estr = "Improper paragraph indentation."
         errors.append(StructuringError(estr, para_token))
 
 def _add_section(heading_token, stack, indent_stack, errors, warnings):
@@ -386,17 +405,17 @@ def _add_section(heading_token, stack, indent_stack, errors, warnings):
     if indent_stack[-1] == None:
         indent_stack[-1] = heading_token.indent
     elif indent_stack[-1] != heading_token.indent:
-        estr = "Improper heading indentation"
+        estr = "Improper heading indentation."
         errors.append(StructuringError(estr, heading_token))
 
     # Check for errors.
     for tok in stack[2:]:
         if tok.tagName != "section":
-            estr = "Headings may only occur at the top level"
+            estr = "Headings may only occur at the top level."
             errors.append(StructuringError(estr, heading_token))
             break
     if (heading_token.level+2) > len(stack):
-        estr = "Wrong underline character for heading"
+        estr = "Wrong underline character for heading."
         errors.append(StructuringError(estr, heading_token))
 
     # Pop the appropriate number of headings so we're at the
@@ -453,7 +472,7 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
             for tok in stack[2:]:
                 if tok.tagName != "section":
                     #print [s.tagName for s in stack[1:]]
-                    estr = "Fields may only occur at the top level"
+                    estr = "Fields may only occur at the top level."
                     errors.append(StructuringError(estr, bullet_token))
                     break
             stack[2:] = []
@@ -664,7 +683,7 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
         # A Dedent past block_indent givs a warning.
         if indent < block_indent:
             min_indent = min(min_indent, indent)
-            estr = 'Bad Doctest block indentation'
+            estr = 'Bad Doctest block indentation.'
             warnings.append(TokenizationError(estr, linenum, line))
 
         # Go on to the next line.
@@ -871,7 +890,7 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
 
         # Check for mal-formatted field items.
         if line[indent] == '@':
-            estr = "Possible mal-formatted field item"
+            estr = "Possible mal-formatted field item."
             warnings.append(TokenizationError(estr, linenum, line))
             
         # Go on to the next line.
@@ -956,7 +975,7 @@ def _tokenize(str, warnings):
         else:
             # Check for mal-formatted field items.
             if line[indent] == '@':
-                estr = "Possible mal-formatted field item"
+                estr = "Possible mal-formatted field item."
                 warnings.append(TokenizationError(estr, linenum, line))
             
             # anything else is either a paragraph or a heading.
@@ -1040,8 +1059,8 @@ def _colorize(token, errors, warnings=None, tagName='para'):
                 if (end-1) > start:
                     stack[-1].appendChild(Text(str[start:end-1]))
                 if not _COLORIZING_TAGS.has_key(str[end-1]):
-                    estr = ("'{' must be preceeded by a valid colorizing tag")
-                    errors.append(ColorizingError(estr, token, end))
+                    estr = "Unknown colorizing tag."
+                    errors.append(ColorizingError(estr, token, end-1))
                     stack.append(Element('unknown'))
                 else:
                     stack.append(Element(_COLORIZING_TAGS[str[end-1]]))
@@ -1056,7 +1075,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
         elif match.group() == '}':
             # Check for (and ignore) unbalanced braces.
             if len(stack) <= 1:
-                estr = "Unbalanced '}'"
+                estr = "Unbalanced '}'."
                 errors.append(ColorizingError(estr, token, end))
                 start = end + 1
                 continue
@@ -1069,7 +1088,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
             if stack[-1].tagName == 'escape':
                 if (len(stack[-1].childNodes) != 1 or
                     not isinstance(stack[-1].childNodes[0], Text)):
-                    estr = "Invalid escape"
+                    estr = "Invalid escape."
                     errors.append(ColorizingError(estr, token, end))
                 else:
                     if _ESCAPES.has_key(stack[-1].childNodes[0].data):
@@ -1082,7 +1101,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
                         stack[-2].removeChild(stack[-1])
                         stack[-2].appendChild(Text(escp))
                     else:
-                        estr = "Invalid escape"
+                        estr = "Invalid escape."
                         errors.append(ColorizingError(estr, token, end))
 
             # Special handling for literal braces elements:
@@ -1109,7 +1128,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
         stack[-1].appendChild(Text(str[start:]))
         
     if len(stack) != 1: 
-        estr = "Unbalanced "+`'{'`
+        estr = "Unbalanced '{'."
         errors.append(ColorizingError(estr, token, openbrace_stack[-1]))
 
     return stack[0]
@@ -1119,7 +1138,7 @@ def _colorize_link(link, token, end, warnings, errors):
 
     # If the last child isn't text, we know it's bad.
     if not isinstance(children[-1], Text):
-        estr = "Bad %s target" % link.tagName
+        estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
     
@@ -1132,7 +1151,7 @@ def _colorize_link(link, token, end, warnings, errors):
     elif len(children) == 1:
         target = children[0].data
     else:
-        estr = "Bad %s target" % link.tagName
+        estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
 
@@ -1149,7 +1168,7 @@ def _colorize_link(link, token, end, warnings, errors):
             target = 'http://'+target
     elif link.tagName=='link':
         if not re.match(r'^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$', target):
-            estr = "Bad link target"
+            estr = "Bad link target."
             errors.append(ColorizingError(estr, token, end))
             return
 
@@ -1401,7 +1420,7 @@ def to_debug(tree, indent=4, seclevel=0):
 ## Helper Functions
 ##################################################
 
-def wordwrap(str, indent=0, right=SCRWIDTH):
+def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
     """
     Word-wrap the given string.  All sequences of whitespace are
     converted into spaces, and the string is broken up into lines,
@@ -1417,12 +1436,16 @@ def wordwrap(str, indent=0, right=SCRWIDTH):
     @type indent: C{int}
     @param right: The right margin of the string.
     @type right: C{int}
+    @type startindex: C{int}
+    @param startindex: The index at which the first line starts.  This
+        is useful if you want to include other contents on the first
+        line. 
     @return: A word-wrapped version of C{str}.
     @rtype: C{string}
     """
     words = str.split()
-    out_str = ' '*indent
-    charindex = 0
+    out_str = ' '*(indent-startindex)
+    charindex = startindex
     for word in words:
         if charindex+len(word) > right and charindex > 0:
             out_str += '\n' + ' '*indent
@@ -1603,9 +1626,8 @@ class TokenizationError(ParseError):
         self.line = line
     
     def _repr(self, typ):
-        return (typ+' on line ' + `self.linenum` +
-                ' during tokenization:\n'+wordwrap(self.descr, 2) +
-                '  ' + `self.line`)
+        str = '%5s: %s: ' % ('L'+`self.linenum`, typ)
+        return str + wordwrap(self.descr, 7, startindex=len(str))[:-1]
 
 class StructuringError(ParseError):
     """
@@ -1629,11 +1651,8 @@ class StructuringError(ParseError):
         self.linenum = token.startline + 1
 
     def _repr(self, typ):
-        # Do we want to include the token here?  That might be an
-        # entire paragraph!!
-        return(typ+' on the ' + self.token.tag + ' at line '
-               + `self.linenum` + ' during structuring:\n' +
-               wordwrap(self.descr, 2)[:-1])
+        str = '%5s: %s: ' % ('L'+`self.linenum`, typ)
+        return str + wordwrap(self.descr, 7, startindex=len(str))[:-1]
 
 class ColorizingError(ParseError):
     """
@@ -1674,7 +1693,8 @@ class ColorizingError(ParseError):
             right = (self.token.contents[self.charnum:self.charnum+RANGE]
                      + '...')
         
-        return(typ+' colorizing the ' + self.token.tag +
-               ' at line ' + `self.linenum` + ':\n' +
-               wordwrap(self.descr, 2) + '  ' +
-               left+right + '\n  '+ (' '*len(left)) +'^')
+        str = '%5s: %s: ' % ('L'+`self.linenum`, typ)
+        str += wordwrap(self.descr, 7, startindex=len(str))
+        return (str + '\n       %s%s\n       %s^' %
+                (left, right, ' '*len(left)))
+                
