@@ -57,6 +57,7 @@ def _internal_error(e=None):
     Print a warning message about an internal error.
     @return: The return value from calling C{func}
     """
+    if isinstance(e, KeyboardError): raise
     _encountered_internal_error = 1
     if sys.stderr.softspace: print >>sys.stderr
     if e: print >>sys.stderr, "INTERNAL ERROR: %s" % e
