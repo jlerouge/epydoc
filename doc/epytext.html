@@ -97,8 +97,8 @@ items consist of a series of numbers followed by periods, such as
 "<code>12.</code>" or "<code>1.2.8.</code>". </p>
 
 <p> List items typically consist of a bullet followed by a space and a
-single paragraph.  The paragraph must be indented more than the list
-item's bullet.  Typically, the paragraph is intended two or three
+single paragraph.  The paragraph may be indented more than the list
+item's bullet; often, the paragraph is intended two or three
 characters, so that its left margin lines up with the right side of
 the bullet.  The following example illustrates a simple ordered
 list. </p>
@@ -111,33 +111,35 @@ list. </p>
     <code class="string">"""
     1. This is an ordered list item.
 
-    2. This is another list item.  Note that
-       this paragraph is indented three spaces
-       past the indentation of the list.
+    2. This is a another ordered list
+    item.
+
+    3. This is a third list item.  Note that
+       the paragraph may be indented more
+       than the bullet.
     """</code>
     <i>[...]</i>
 </pre>
 </td><td>
   <ol>
     <li> This is an ordered list item. </li>
-    <li> This is another list item.  Note that this paragraph is
-    indented three spaces past the indentation of the list. </li>
+    <li> This is another ordered list item. </li>
+    <li> This is a third list item.  Note that the paragraph may be
+    indented more than the bullet.</li>
   </td></tr>
 </table>
 
 <p> List items can contain more than one paragraph; and they can also
 contain sublists, literal blocks, and doctest blocks.  All of the
 blocks contained by a list item must all have equal indentation, and
-that indentation must be greater than the indentation of the list
-item's bullet.  If the first contained block is a paragraph, it may
-appear on the same line as the bullet, separated from the bullet by
-one or more spaces, as shown in the previous example.  All other block
-types must follow on separate lines. </p>
+that indentation must be greater than or equal to the indentation of
+the list item's bullet.  If the first contained block is a paragraph,
+it may appear on the same line as the bullet, separated from the
+bullet by one or more spaces, as shown in the previous example.  All
+other block types must follow on separate lines. </p>
 
-<p> Any line that begins with a bullet followed by a space or a
-newline is considered a list item.  In particular, list items do not
-need to be separated by blank lines.  The following example
-illustrates how lists can be used: </p>
+<p> Every list must be separated from surrounding blocks by
+indentation: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
   <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
@@ -145,23 +147,75 @@ illustrates how lists can be used: </p>
 <pre>
 <code class="keyword">def</code> <code class="function">example</code>():
     <code class="string">"""
-    1. This is a list item.
-      - This is a sublist.
-      - The sublist contains two items.
-        - The second item of the sublist
-          has its own own sublist.
-
-    2. This list item contains two
-       paragraphs and a doctest block.
-
-       &gt;&gt;&gt; print 'This is a doctest block'
-       This is a doctest block
-
-       This is the second paragraph.
+    This is a paragraph.
+      1. This is a list item.
+      2. This a second list
+         item.
+           - This is a sublist
     """</code>
     <i>[...]</i>
 </pre>
 </td><td>
+  This is a paragraph. 
+  <ol>
+    <li> This is a list item. </li>
+    <li> This is a second list item. 
+    <ul><li>This is a sublist.</li></ul></li>
+  </ol>
+  </td></tr>
+</table>
+
+<p> Note that sublists must be separated from the blocks in their
+parent list item by indentation.  In particular, the following
+docstring generates an error, since the sublist is not separated from
+the paragraph in its parent list item by indentation: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    1. This is a list item.  Its
+       paragraph is indented 7 spaces.
+       - This is a sublist.  It is
+         indented 7 spaces.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+   <b>L5: Error: Lists must be indented.</b>
+  </td></tr>
+</table>
+
+<p> The following example illustrates how lists can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This is a paragraph.
+      1. This is a list item.
+        - This is a sublist.
+        - The sublist contains two
+          items.
+            - The second item of the 
+              sublist has its own sublist.
+
+      2. This list item contains two
+         paragraphs and a doctest block.
+
+         &gt;&gt;&gt; print 'This is a doctest block'
+         This is a doctest block
+
+         This is the second paragraph.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  This is a paragraph. 
   <ol>
     <li> This is a list item. </li>
     <ul>
@@ -180,49 +234,11 @@ illustrates how lists can be used: </p>
   </td></tr>
 </table>
 
-<p> Lists should be separated from the surrounding text in one of two
-ways: either indent the list, or surround it with blank lines.  If you
-don't, epytext will generate a warning. </p>
-
-<table border="1" cellspacing="0" cellpadding="3" width="100%">
-  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
-  <tr valign="top"><td>
-<pre>
-<code class="keyword">def</code> <code class="function">example</code>():
-    <code class="string">"""
-    This is a paragraph.
-      1. This list is separated by
-         indentation.
-
-    This is a paragraph.
-
-    1. This list is separated by
-       blank lines
-
-    This is a paragraph.
-    1. This list is not separated; it
-       will generate a warning (but
-       still be parsed as a list).
-    """</code>
-    <i>[...]</i>
-</pre>
-</td><td>
-  This is a paragraph.
-  <ol><li>This list is good: it is separated by indentation.</li></ol>
-  This is a paragraph.
-  <ol><li>This list is good: it is separated by blank lines.</li></ol>
-  This is a paragraph.
-  <ol><li>This list is not separated; it will generate a
-  warning (but still get parsed as a list).</li></ol>
-</td></tr>
-</table>
-
-<p> This helps epytext distinguish a list item from a dash or a
-sentence-final number that was word-wrapped to the beginning of a
-line.  If you want to include bullet-like text in a paragraph, then
+<p> Epytext will treat any line that begins with a bullet as a list
+item.  If you want to include bullet-like text in a paragraph, then
 you must either ensure that it is not at the beginning of the line,
 or use <a href="#escaping">escaping</a> to prevent epytext from
-treating it as markup. </p>
+treating it as markup: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
   <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
@@ -233,8 +249,17 @@ treating it as markup. </p>
     This sentence ends with the number
     1.  Epytext can't tell if the "1."
     is a bullet or part of the paragraph,
-    so it will generate a warning.
-
+    so it generates an error.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+<b> L4: Error: Lists must be indented. </b>
+</td></tr>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
     This sentence ends with the number 1.
 
     This sentence ends with the number
@@ -243,9 +268,6 @@ treating it as markup. </p>
     <i>[...]</i>
 </pre>
 </td><td>
-  This sentence ends with the number
-  <ol><li>Epytext can't tell if the "1." is a bullet or part of the
-    paragraph, so it will generate a warning. </li></ol>
     This sentence ends with the number 1.
     <p> This sentence ends with the number 1.</p>
 </td></tr>
@@ -929,32 +951,6 @@ href="epydoc-man.html#lbAH"><code>epydoc(1)</code> man page</a>. </p>
 <h3> 5.1. Epytext Warnings </h3>
 <ul>
   
-<li><b class="error">Improper doctest block indentation.</b> <br />
-  The doctest block dedents past the indentation of its initial prompt
-  line.
-
-<li><b class="error">Lists should be indented or separated by blank
-lines.</b> <br />
-  An unindented line immediately following a paragraph starts with a
-  list bullet.  Epydoc is not sure whether you meant to start a new
-  list item, or meant for a paragraph to include a word that looks
-  like a bullet.  If you intended the former, then indent the list, or
-  separate it from the paragraph by a blank line.  If you intended the
-  latter, then change the word-wrapping of the paragraph, or escape
-  the first character of the word that looks like a bullet.  Note: if
-  you include text on the same line as the comment-opening quote, then
-  you cannot use indentation to signal a list start, since epydoc
-  cannot determine the indentation for this first line.
-
-<li><b class="error">List item contents should be indented; Paragraphs
-should be separated from lists by blank lines or indentation.</b>
-<br />
-  A list item is immediately followed by a line with the same
-  indentation as the list item's bullet.  Epydoc is not sure whether
-  you meant to start a new paragraph, or to continue the list item.
-  To start a new paragraph, add a blank line before the line.  To
-  continue the list item, indent its contents.
-
 <li><b class="error">Possible mal-formatted field item.</b> <br />
   Epytext detected a line that looks like a field item, but is not
   correctly formatted.  This typically occurs when the trailing colon
@@ -1027,6 +1023,10 @@ string.</b> <br />
   The heading is contianed in some other block structure (such as a
   list).
 
+<li><b class="error">Improper doctest block indentation.</b> <br />
+  The doctest block dedents past the indentation of its initial prompt
+  line.
+
 <li><b class="error">Improper heading indentation.</b> <br />
   The heading for a section is not left-aligned with the paragraphs in
   the section that contains it.
@@ -1039,6 +1039,15 @@ string.</b> <br />
   An unknown escape sequence was used with the inline escape
   construction (<code>E{...}</code>).
 
+<li><b class="error">Lists must be indented.</b> <br />
+  An unindented line immediately following a paragraph starts with a
+  list bullet.  Epydoc is not sure whether you meant to start a new
+  list item, or meant for a paragraph to include a word that looks
+  like a bullet.  If you intended the former, then indent the list.
+  If you intended the latter, then change the word-wrapping of the
+  paragraph, or escape the first character of the word that looks like
+  a bullet.
+  
 <li><b class="error">Unbalanced '{'.</b> <br />
   The docstring contains unbalanced braces.  Epytext requires that all
   braces must be balanced.  To include a single unbalanced brace, use
@@ -1082,7 +1091,7 @@ string.</b> <br />
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Mon Oct 28 02:40:10 EST 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Oct 30 15:07:19 EST 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
