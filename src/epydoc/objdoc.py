@@ -39,15 +39,9 @@ WARN_SKIPPING = 0
 
 import inspect, UserDict, epytext, string, new
 from xml.dom.minidom import Text as _Text
-from types import ModuleType as _ModuleType
-from types import ClassType as _ClassType
-from types import FunctionType as _FunctionType
-from types import BuiltinFunctionType as _BuiltinFunctionType
-from types import BuiltinMethodType as _BuiltinMethodType
-from types import MethodType as _MethodType
 from types import StringType as _StringType
 
-from epydoc.uid import UID, Link
+from epydoc.uid import UID, Link, _makeuid
 
 ##################################################
 ## ObjDoc
@@ -440,27 +434,26 @@ class ModuleDoc(ObjDoc):
         self._functions = []
         self._variables = []
         for (field, val) in mod.__dict__.items():
+            vuid = _makeuid(val)
+            # Don't do anything for introspection specials.
             if field in ('__builtins__', '__doc__',
                          '__file__', '__path__', '__name__'):
                 continue
-
+            # Don't do anything if it doesn't have a UID.
+            if not vuid: continue
             # Don't do anything for modules.
-            if type(val) == _ModuleType: continue
+            if vuid.is_module(): continue
 
-            if type(val) in (_FunctionType, _ClassType):
-                try:
-                    if UID(val).module() != self._uid:
-                        if WARN_SKIPPING:
-                            print 'Skipping imported value', val
-                        continue
-                except:
-                    print 'ouch', val
+            if vuid.is_class() or vuid.is_function():
+                if vuid.module() != self._uid:
+                    if WARN_SKIPPING:
+                        print 'Skipping imported value', val
                     continue
 
             # Add the field to the appropriate place.
-            if type(val) == _FunctionType:
+            if vuid.is_function():
                 self._functions.append(Link(field, UID(val)))
-            elif type(val) == _ClassType:
+            elif vuid.is_class():
                 self._classes.append(Link(field, UID(val)))
 
         # Add descriptions and types to variables
@@ -641,20 +634,23 @@ class ClassDoc(ObjDoc):
         self._methods = []
 
         for (field, val) in cls.__dict__.items():
+            vuid = _makeuid(val)
+            # Don't do anything for introspection specials.
             if field in ('__doc__', '__module__'):
                 continue
-            
+            # Don't do anything if it doesn't have a UID.
+            if not vuid: continue
             # Don't do anything for modules.
-            if type(val) == _ModuleType: continue
+            if vuid.is_module(): continue
 
             # Add the field to the appropriate place.
             # Note that, since we got it via __dict__, it'll be a
             # Function, not a Method.
-            if type(val) is _FunctionType:
+            if vuid.is_function():
                 method = new.instancemethod(val, None, cls)
                 self._methods.append(Link(field, UID(method)))
-            elif type(val) is _BuiltinMethodType:
-                self._methods.append(Link(field, UID(val)))
+            elif vuid.is_builtin_method():
+                self._methods.append(Link(field, vuid))
                 
         # Add descriptions and types to class variables
         self._cvariables = []
@@ -749,20 +745,31 @@ class ClassDoc(ObjDoc):
 
     def _inherit_methods(self, base):
         for (field, val) in base.__dict__.items():
-            if type(val) not in (_FunctionType, _BuiltinMethodType):
+            vuid = _makeuid(val)
+            if vuid is None: continue
+            if not (vuid.is_function() or vuid.is_builtin_method()):
                 continue
             if self._methodbyname.has_key(field):
                 continue
             self._methodbyname[field] = 1
-            if type(val) is _FunctionType:
+            if vuid.is_function():
                 method = new.instancemethod(val, None, base)
                 self._methods.append(Link(field, UID(method)))
-            elif type(val) is _BuiltinMethodType:
+            elif vuid.is_builtin_method():
                 self._methods.append(Link(field, UID(val)))
 
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
             
+            # Don't do anything for introspection specials.
+            if field in ('__builtins__', '__doc__',
+                         '__file__', '__path__', '__name__'):
+                continue
+            # Don't do anything if it doesn't have a UID.
+            if not vuid: continue
+            # Don't do anything for modules.
+            if vuid.is_module(): continue
+
 #     # This never gets called right now!
 #     def inherit(self, *basedocs):
 #         self._inh_cvariables = []
@@ -913,7 +920,7 @@ class FuncDoc(ObjDoc):
 
         # If we're a method, extract the underlying function.
         cls = None
-        if type(func) == _MethodType:
+        if self._uid.is_method():
             cls = func.im_class
             func = func.im_func
 
@@ -984,9 +991,12 @@ class FuncDoc(ObjDoc):
         for base in cls.__bases__:
             if base.__dict__.has_key(name):
                 func = base.__dict__[name]
-                if type(func) == _FunctionType:
+                fuid = UID(func)
+                if fuid.is_function():
                     method = new.instancemethod(func, None, base)
                     self._overrides = UID(method)
+                elif fuid.is_builtin_method():
+                    self._overrides = fuid
                 break
             else:
                 self._find_override(base)
@@ -1151,7 +1161,7 @@ class DocMap(UserDict.UserDict):
         #print 'Constructing docs for:', objID
         if self.data.has_key(objID): return
         
-        if type(obj) == _ModuleType:
+        if objID.is_module():
             self.data[objID] = ModuleDoc(obj)
             for module in self._package_children.get(objID, []):
                 self.data[objID].add_module(module)
@@ -1164,7 +1174,7 @@ class DocMap(UserDict.UserDict):
                 else:
                     self._package_children[packageID] = [obj]
             
-        elif type(obj) == _ClassType:
+        elif objID.is_class():
             self.data[objID] = ClassDoc(obj)
             for child in self._class_children.get(objID, []):
                 self.data[objID].add_subclass(child)
@@ -1187,7 +1197,7 @@ class DocMap(UserDict.UserDict):
             #    for method in self.data[objID].methods():
             #        self.add(method.target().object())
                     
-        elif type(obj) in (_MethodType, _FunctionType):
+        elif objID.is_function() or objID.is_method():
             self.data[objID] = FuncDoc(obj)
 
     def __setitem__(self, obj):
@@ -1207,25 +1217,32 @@ class DocMap(UserDict.UserDict):
         self.add_one(obj)
 
         # Recurse to any related objects.
-        if type(obj) == _ModuleType:
+        if objID.is_module():
             for val in obj.__dict__.values():
+                valID = _makeuid(val)
+                # Skip unidentifiable values.
+                if not valID: continue
 
                 # Skip any imported values.
-                if type(val) in (_FunctionType, _ClassType):
+                if valID.is_class() or valID.is_function():
                     if UID(val).module() != objID:
                         if WARN_SKIPPING:
                             print 'Skipping imported value', val
                         continue
 
-                if type(val) == _ClassType:
+                if valID.is_class():
                     self.add(val)
-                elif type(val) in (_FunctionType, _BuiltinFunctionType):
+                elif valID.is_function() or valID.is_builtin_function():
                     self.add(val)
-        elif type(obj) == _ClassType:
+        elif objID.is_class():
             for val in obj.__dict__.values():
-                if type(val) is _FunctionType:
+                valID = _makeuid(val)
+                # Skip unidentifiable values.
+                if not valID: continue
+                    
+                if valID.is_function():
                     self.add(new.instancemethod(val, None, obj))
-                elif type(val) is _BuiltinMethodType:
+                elif valID.is_builtin_method():
                     self.add(val)
 
     add = __setitem__
