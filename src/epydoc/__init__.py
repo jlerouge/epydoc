@@ -53,14 +53,13 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
                    'checker']
 
 # To do for release 1.1:
+#   - add an option to specify the "top" object
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - turn off function doc inheritance?
 #     - add --check for doc inheritance?
 #   - add escape characters to epytext
 #   - add option: don't include vars and cvars that have no descr?
-#   - use __all__ when determining whether a name is private???
-#     - change _is_private to only take uids?  or var+uid?
 #   - update docs
 
 # To do after release 1.1:
@@ -70,3 +69,4 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 #   - curses.wrapper names both a function and a module; how to
 #     distinguish them?  Use html names like module-curses.wrapper
 #     vs. function-curses.wrapper?  Ick.  Or just ignore it... :)
+    
