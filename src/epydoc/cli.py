@@ -65,6 +65,7 @@ Usage::
 """
 
 import sys, os.path, re
+from epydoc.imports import import_module
 
 ##################################################
 ## Command-Line Interface
@@ -174,7 +175,7 @@ def _parse_args():
             elif re.match('^-v+$', arg):
                 argvals['verbosity'] += len(arg)-1
             elif arg in ('--help', '-?', '--usage', '-h'):
-                if len(args) == 1: _help(args[0])
+                if len(args) == 1: _help(args.pop())
                 elif len(args) == 0: _usage(0)
                 else: _usage()
             elif arg in ('--check',):
@@ -186,9 +187,9 @@ def _parse_args():
             elif arg in ('-a', '-check_all'):
                 argvals['check_all'] = 1
             elif arg in ('--css', '-c'):
-                argvals['css'] = args.pop()
-                if argvals['css'] == 'help':
-                    _csshelp()
+                try: argvals['css'] = args.pop()
+                except: _usage()
+                if argvals['css'] == 'help': _csshelp()
             else:
                 _usage()
         else:
@@ -200,60 +201,6 @@ def _parse_args():
     if argvals['modules'] == []: _usage()
     return argvals
 
-def _find_module_from_filename(filename,verbosity):
-    """
-    @return: The module contained in C{filename}.
-    @rtype: C{module}
-    @param filename: The filename that contains the module.
-    @type filename: C{int}
-    @param verbosity: Verbosity level for tracing output.
-    @type verbosity: C{int}
-    """
-    import epydoc.uid
-
-    # Normalize the filename
-    filename = os.path.normpath(os.path.abspath(filename))
-    
-    # Extract the module name and the base directory.
-    name = re.sub(r'/?__init__\.py.?$', '', filename)
-    name = re.sub(r'\.py[ocw]?$', '', name)
-    name = re.sub(r'\.so$', '', name)
-    name = re.sub(r'/$', '', name)
-    (basedir, module) = os.path.split(name)
-    
-    # If there's a package, then find its base directory.
-    if os.path.exists(os.path.join(basedir, '__init__.py')):
-        # Otherwise, find the base package directory.
-        package = []
-        while os.path.exists(os.path.join(basedir, '__init__.py')):
-            (basedir,dir) = os.path.split(basedir)
-            if dir == '': break
-            package.append(dir)
-        package.reverse()
-        module = '.'.join(package+[module])
-
-    # Import the module.
-    try:
-        if verbosity > 1: print 'Importing', filename
-        #if verbosity > 3: print '  (%r, %r)' % (basedir, module)
-        if verbosity > 1: sys.stdout.flush()
-        if basedir:
-            sys.path = [basedir] + sys.path
-        try: return epydoc.uid._import_module(module)
-        except Exception, e:
-            print e
-            print 'Warning: could not import %r [1]' % filename
-        except SystemExit, e:
-            print e
-            print 'Warning: could not import %r [2]' % filename
-        except:
-            print 'Warning: could not import %r [3]' % filename
-    except ImportError, e:
-        if re.match(r'^.*__init__\.py?$', filename):
-            raise ImportError("Run epydoc from the parent directory "+
-                              "(%r):\n%s" % (filename, e))
-        raise ImportError("Could not find module %r:\n%s" % (filename, e))
-
 def _find_modules(module_names, verbosity):
     """
     @return: A list of the modules contained in the given files.
@@ -264,40 +211,23 @@ def _find_modules(module_names, verbosity):
     @param verbosity: Verbosity level for tracing output.
     @type verbosity: C{int}
     """
-    # Save sys and builtins, in case the modules that we import play
-    # with them.
-    old_sys = sys.__dict__.copy()
-    old_sys_modules = sys.modules.copy()
-    old_sys_path = sys.path[:]
-    old_builtins = __builtins__.__dict__.copy()
-
-    import epydoc.uid
+    if verbosity > 0: print 'Importing %s modules...' % len(module_names)
     modules = []
+    mnum = 0
     for name in module_names:
+        if verbosity > 1:
+            print ('[%d/%d] Importing %s' % (mnum+1, len(module_names), name))
+            sys.stdout.flush()
+            mnum += 1
+
+        # Import the module, and add it to the list.
         try:
-            if '/' in name or re.match('\.py[cow]?$|\.so$', name):
-                module = _find_module_from_filename(name, verbosity)
-                if module is None: continue
-                if module not in modules:
-                    modules.append(module)
-                elif verbosity > 3: print "  (duplicate)"
-            else:
-                if verbosity > 1: print 'Importing', name
-                if verbosity > 1: sys.stdout.flush()
-                try: module = epydoc.uid._import_module(name)
-                except: print 'Warning: could not import %r [4]' % name
-                if module is None: continue
-                if module not in modules:
-                    modules.append(module)
-                elif verbosity > 3: print "  (duplicate)"
-        finally:
-            # Restore sys and builtins, in case the module we imported
-            # played with them.  This also restores sys.path, which
-            # _find_module_from_filename changed.
-            __builtins__.__dict__.update(old_builtins)
-            sys.__dict__.update(old_sys)
-            #sys.modules = old_sys_modules
-            sys.path = old_sys_path
+            module = import_module(name)
+            if module not in modules:
+                modules.append(module)
+            elif verbosity > 3: print "  (duplicate)"
+        except ImportError, e:
+            if verbosity >= 0: print 'Warning: %s' % e
 
     if verbosity > 1 and len(modules) > 20: print "Done importing"
     return modules
@@ -319,7 +249,7 @@ def cli():
         if e.args: _error(e.args[0])
         else: raise
 
-    # Wait to do imports, to make --usage faster.
+    # Wait to do imports until now, to make "--help" faster.
     from epydoc.html import HTML_Doc
     from epydoc.objdoc import DocMap
     from epydoc.checker import DocChecker
@@ -346,7 +276,7 @@ def cli():
         
     # Construct the docmap.  Don't bother documenting base classes if
     # we're just running checks.
-    d = DocMap(not param['check'], param['verbosity'])
+    d = DocMap(param['verbosity'], not param['check'])
     
     # Build the documentation.
     for module in modules:
