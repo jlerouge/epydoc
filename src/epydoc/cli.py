@@ -103,10 +103,12 @@ def _usage(exit_code=-1):
     @type exit_code: C{int}
     @rtype: C{None}
     """
+    if exit_code == 0: stream = sys.stdout
+    else: stream = sys.stderr
     NAME = os.path.split(sys.argv[0])[-1]
     if NAME == '(imported)': NAME = 'epydoc'
-    print '\nUsage:'
-    print __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
+    print >>stream, '\nUsage:'
+    print >>stream, __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
     sys.exit(exit_code)
 
 def _help(arg):
@@ -150,7 +152,8 @@ def _error(message):
     @type message: C{string}
     @rtype: C{None}
     """
-    print "%s error: %s" % (os.path.split(sys.argv[0])[-1], message)
+    print >>sys.stderr, ("%s error: %s" %
+                         (os.path.split(sys.argv[0])[-1], message))
     sys.exit(-1)
 
 def _parse_args():
@@ -183,8 +186,8 @@ def _parse_args():
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
         if e.opt in ('h', '?', 'help', 'usage'): _usage(0)
-        print ('%s; run "%s -h" for usage' %
-               (e,os.path.basename(sys.argv[0])))
+        print >>sys.stderr, ('%s; run "%s -h" for usage' %
+                              (e,os.path.basename(sys.argv[0])))
         sys.exit(-1)
 
     # Parse the arguments.
@@ -215,8 +218,8 @@ def _parse_args():
 
     # Make sure we got some modules.
     if len(modules) == 0:
-        print ('no modules specified; run "%s -h" for usage' %
-               os.path.basename(sys.argv[0]))
+        print >>sys.stderr, ('no modules specified; run "%s -h" for usage' %
+                             os.path.basename(sys.argv[0]))
         sys.exit(-1)
     options['modules'] = modules
 
@@ -234,29 +237,38 @@ def _find_modules(module_names, verbosity):
     """
     from epydoc.imports import import_module
 
-    if verbosity > 0: print 'Importing %s modules.' % len(module_names)
+    if verbosity > 0:
+        print >>sys.stderr, 'Importing %s modules.' % len(module_names)
     modules = []
-    mnum = 1
+    module_num = 1
+    num_modules = len(module_names)
     TRACE_FORMAT = ("  [%%%dd/%d] Importing %%s" %
-                    (len(`len(module_names)`), len(module_names)))
+                    (len(`num_modules`), num_modules))
     for name in module_names:
-        if verbosity > 2:
-            print TRACE_FORMAT % (mnum, name)
-            sys.stdout.flush()
-            mnum += 1
+        if verbosity == 1:
+            if module_num == 1 and num_modules <= 70: sys.stderr.write('  [')
+            if (module_num % 60) == 1 and num_modules > 70:
+                sys.stderr.write('  [%3d%%] ' % (100.0*module_num/num_modules))
+            sys.stderr.write('.')
+            if (module_num % 60) == 0 and num_modules > 70: print >>sys.stderr
+            if module_num == num_modules:
+                if num_modules > 70: print >>sys.stderr
+                else: print  >>sys.stderr, ']'
+        elif verbosity > 1:
+            print  >>sys.stderr, TRACE_FORMAT % (module_num, name)
+        module_num += 1
 
         # Import the module, and add it to the list.
         try:
             module = import_module(name)
             if module not in modules:
                 modules.append(module)
-            elif verbosity > 3:
-                print '  (duplicate)'
+            elif verbosity > 2:
+                print  >>sys.stderr, '  (duplicate)'
         except ImportError, e:
             if verbosity >= 0: 
-                print '  Warning: %s' % e
+                print  >>sys.stderr, '\n  Warning: %s' % e
 
-    if verbosity > 1 and len(modules) > 20: print "Done importing"
     return modules
 
 def cli():
@@ -293,16 +305,27 @@ def _make_docmap(modules, options):
     # checks.
     d = DocMap(options['quiet'], not options['check'])
     
+    num_modules = len(modules)
     if options['verbosity'] > 0:
-        print 'Building API documentation for %d modules.' % len(modules)
+        print  >>sys.stderr, ('Building API documentation for %d modules.'
+                              % num_modules)
     TRACE_FORMAT = ("  [%%%dd/%d] Building docs for %%s" %
-                    (len(`len(modules)`), len(modules)))
-    mnum = 1
+                    (len(`num_modules`), num_modules))
+    module_num = 1
     for module in modules:
-        if options['verbosity'] > 1:
-            print TRACE_FORMAT % (mnum, module.__name__)
-            sys.stdout.flush()
-            mnum += 1
+        if options['verbosity'] == 1:
+            if module_num == 1 and num_modules <= 70: sys.stderr.write('  [')
+            if (module_num % 60) == 1 and num_modules > 70:
+                sys.stderr.write('  [%3d%%] ' % (100.0*module_num/num_modules))
+            sys.stderr.write('.')
+            sys.stderr.softspace = 1
+            if (module_num % 60) == 0 and num_modules > 70: print >>sys.stderr
+            if module_num == num_modules:
+                if num_modules <= 70: sys.stderr.write(']')
+                print >>sys.stderr
+        elif options['verbosity'] > 1:
+            print >>sys.stderr, TRACE_FORMAT % (module_num, module.__name__)
+        module_num += 1
         d.add(module)
 
     return d
@@ -322,37 +345,38 @@ def _html(docmap, options):
     # Create the documenter, and figure out how many files it will
     # generate.
     htmldoc = HTML_Doc(docmap, **options)
-    numfiles = htmldoc.num_files()
+    num_files = htmldoc.num_files()
         
     # Produce pretty trace output.
     def progress_callback(file, doc, verbosity=options['verbosity'],
-                          numfiles=numfiles, filenum=[1]):
-        if verbosity==2:
-            if filenum[0] == 1 and numfiles <= 70: sys.stdout.write('  [')
-            if (filenum[0] % 60) == 1 and numfiles > 70:
-                sys.stdout.write('  [%3d%%] ' % (100.0*filenum[0]/numfiles))
-            sys.stdout.write('.')
-            if (filenum[0] % 60) == 0 and numfiles > 70: print
-            if filenum[0] == numfiles:
-                if numfiles > 70: print
-                else: print ']'
-        elif verbosity>2:
-            TRACE_FORMAT = (('  [%%%dd/%d]' % (len(`numfiles`), numfiles)) +
+                          num_files=num_files, file_num=[1]):
+        if verbosity==1:
+            if file_num[0] == 1 and num_files <= 70: sys.stderr.write('  [')
+            if (file_num[0] % 60) == 1 and num_files > 70:
+                sys.stderr.write('  [%3d%%] ' % (100.0*file_num[0]/num_files))
+            sys.stderr.write('.')
+            if (file_num[0] % 60) == 0 and num_files > 70: print >>sys.stderr
+            if file_num[0] == num_files:
+                if num_files > 70: print >>sys.stderr
+                else: print >>sys.stderr, ']'
+        elif verbosity>1:
+            TRACE_FORMAT = (('  [%%%dd/%d]' % (len(`num_files`), num_files)) +
                             ' Writing docs for %s %s')
             if doc and doc.uid().is_module():
-                print TRACE_FORMAT % (filenum[0], 'module:', doc.uid())
+                print >>sys.stderr, (TRACE_FORMAT %
+                                     (file_num[0], 'module:', doc.uid()))
             elif doc and doc.uid().is_class():
-                print TRACE_FORMAT % (filenum[0], 'class: ', doc.uid())
+                print >>sys.stderr, (TRACE_FORMAT %
+                                     (file_num[0], 'class: ', doc.uid()))
             else:
-                print TRACE_FORMAT % (filenum[0], 'file:  ',
-                                      os.path.basename(file))
-        if verbosity > 1: sys.stdout.flush()
-        filenum[0] += 1
+                print >>sys.stderr, (TRACE_FORMAT % (file_num[0], 'file:  ',
+                                                     os.path.basename(file)))
+        file_num[0] += 1
         
     # Write documentation.
     if options['verbosity'] > 0:
-        print ('Writing API documentation (%d files) to %s.' %
-               (numfiles, options['target']))
+        print  >>sys.stderr, ('Writing API documentation (%d files) to %s.' %
+                              (num_files, options['target']))
     htmldoc.write(options['target'], progress_callback)
 
 def _check(docmap, options):
@@ -368,7 +392,8 @@ def _check(docmap, options):
     from epydoc.checker import DocChecker
     
     # Run completeness checks.
-    if options['verbosity'] > 0: print 'Performing completeness checks'
+    if options['verbosity'] > 0:
+        print  >>sys.stderr, 'Performing completeness checks'
     checker = DocChecker(docmap)
     if options['check_private']:
         checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
