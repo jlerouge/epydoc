@@ -82,9 +82,10 @@ produce API documentation using the following steps:
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '2.0 alpha'
+__version__ = '2.0a'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
+__license__ = 'IBM Open Source License'
 
 # To do:
 #   - Change html to write directly to files, instead of building up strings
@@ -97,11 +98,8 @@ __url__ = 'http://epydoc.sourceforge.net'
 
 # Changes needed for docs:
 #   - document the method for deciding what's public/private
-#   - fields are defined slightly differently (@group)
-#   - new fields (@group: order is significant??; @sort)
-#   - depreciated __epydoc_sort__
-#   - staticmethod/classmethod
+#   - epytext: fields are defined slightly differently (@group)
+#   - new fields
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
-#   - @summary
 #   - @type a,b,c: ...
