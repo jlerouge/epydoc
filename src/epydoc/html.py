@@ -1563,17 +1563,17 @@ class HTML_Doc:
     
     def _get_index_items(self, tree, link, dict):
         """
-        @param dict: in/out parameter.
+        @param dict: in/out parameter. 
+        @rtype: C{None}
         """ 
         if tree is None: return
-        if (self._is_private(link.target().name()) and
-            not self._show_private): return 
-    
-        if isinstance(tree, _Text): return dict
+        if isinstance(tree, _Text): return
         elif tree.tagName != 'index':
+            # Look for index items in the child nodes.
             for child in tree.childNodes:
                 self._get_index_items(child, link, dict)
         else:
+            # We found an index item.
             children = [self._dom_to_html(c) for c in tree.childNodes]
             key = ''.join(children).lower().strip()
             if dict.has_key(key):
@@ -1584,10 +1584,14 @@ class HTML_Doc:
     def _extract_index(self):
         """
         @return: A dictionary mapping from terms to lists of source
-            documents. 
+            documents.
+        @rtype: C{dictionary}
         """
         index = {}
         for (uid, doc) in self._docmap.items():
+            if (not self._show_private) and self._is_private(`uid`):
+                continue
+            
             if uid.is_function():
                 link = Link(`uid`, uid.module())
             elif uid.is_method():
@@ -1606,17 +1610,23 @@ class HTML_Doc:
 
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
-                for param in doc.variables():
-                    self._get_index_items(param.descr(), link, index)
-                    self._get_index_items(param.type(), link, index)
+                for var in doc.variables():
+                    if ((not self._show_private) and
+                        self._is_private(var.name())): continue
+                    self._get_index_items(var.descr(), link, index)
+                    self._get_index_items(var.type(), link, index)
             elif isinstance(doc, ClassDoc):
-                for param in doc.ivariables() + doc.cvariables():
-                    self._get_index_items(param.descr(), link, index)
-                    self._get_index_items(param.type(), link, index)
+                for var in doc.ivariables() + doc.cvariables():
+                    if ((not self._show_private) and
+                        self._is_private(var.name())): continue
+                    self._get_index_items(var.descr(), link, index)
+                    self._get_index_items(var.type(), link, index)
             elif isinstance(doc, FuncDoc):
                 extra_p = [v for v in [doc.vararg(), doc.kwarg(),
                                        doc.returns()] if v is not None]
                 for param in doc.parameter_list()+extra_p:
+                    if ((not self._show_private) and
+                        self._is_private(param.name())): continue
                     self._get_index_items(param.descr(), link, index)
                     self._get_index_items(param.type(), link, index)
                 for fraise in doc.raises():
