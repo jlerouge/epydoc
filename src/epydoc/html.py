@@ -81,7 +81,7 @@ HEADER = '''<?xml version="1.0" encoding="iso-8859-1"?>
 <head>
   <title>%s</title>
   <link rel="stylesheet" href="epydoc.css" type="text/css" />
-<script type="javascript" language="javascript">
+<script type="text/javascript">
 <!--
 function setFrame(url1, url2){
     parent.frames[1].location.href = url1;
