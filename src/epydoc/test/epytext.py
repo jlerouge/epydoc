@@ -14,10 +14,10 @@ The test cases currently implemented are by no means comprehensive.
 __docformat__ = 'epytext en'
 
 if __name__ == '__main__':
-    import epydoc.epytext; reload(epydoc.epytext)
+    import epydoc.markup.epytext; reload(epydoc.markup.epytext)
 
 import unittest, re
-from epydoc.epytext import *
+from epydoc.markup.epytext import *
 
 ##//////////////////////////////////////////////////////
 ##  Parse Tests
