@@ -11,6 +11,7 @@ Regression testing for the epytext markup language.
 
 The test cases currently implemented are by no means comprehensive.
 """
+__docformat__ = 'epytext en'
 
 if __name__ == '__main__':
     import epydoc.epytext; reload(epydoc.epytext)
