@@ -67,6 +67,16 @@ except:
     _StaticMethodType = None
     _ClassMethodType = None
 
+# Zope extension class types
+try:
+    from ExtensionClass import PythonMethodType as _ZopeMethodType
+    from ExtensionClass import ExtensionMethodType as _ZopeFunctionType
+    from ExtensionClass import ExtensionClass as _ZopeType
+except:
+    _ZopeType = types.ClassType
+    _ZopeMethodType = types.MethodType
+    _ZopeFunctionType = types.FunctionType
+
 ##################################################
 ## Table of Contents
 ##################################################
@@ -391,7 +401,7 @@ class ObjectUID(UID):
     def __init__(self, object):
         #if type(object) is _MethodType: object = object.im_func
         self._obj = object
-        if type(object) is _MethodType:
+        if type(object) in (_MethodType, _ZopeMethodType):
             self._id = id(object.im_func)
         else:
             self._id = id(object)
@@ -415,17 +425,21 @@ class ObjectUID(UID):
     # The following methods figure out the object type by examining
     # self._obj.  Docstrings are defined in UID.
     def is_module(self): return type(self._obj) is _ModuleType
-    def is_function(self): return type(self._obj) is _FunctionType
-    def is_method(self): return type(self._obj) is _MethodType
+    def is_function(self): return (type(self._obj) in
+                                   (_FunctionType, _ZopeFunctionType))
+    def is_method(self): return (type(self._obj) in
+                                 (_MethodType, _ZopeMethodType))
     def is_package(self): return (type(self._obj) is _ModuleType and
                                   hasattr(self._obj, '__path__'))
-    def is_class(self): return ((type(self._obj) is _ClassType) or
-                                isinstance(self._obj, _TypeType))
+    def is_class(self):
+        return ((type(self._obj) in (_ClassType, _ZopeType)) or
+                isinstance(self._obj, _TypeType))
     def is_routine(self):
         return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
                                    _MethodType, _BuiltinMethodType,
                                    _WrapperDescriptorType,
-                                   _MethodDescriptorType)
+                                   _MethodDescriptorType,
+                                   _ZopeMethodType, _ZopeFunctionType)
     def is_builtin_function(self): 
         return (type(self._obj) is _BuiltinFunctionType and
                 self._obj.__self__ is None)
@@ -445,6 +459,9 @@ class ObjectUID(UID):
     def _findname(self):
         obj = self._obj
         typ = type(obj)
+        if not hasattr(obj, '__name__'):
+            try: return str(obj) 
+            except: return '??'
         objname = obj.__name__
         
         if typ is _ModuleType:
@@ -455,13 +472,22 @@ class ObjectUID(UID):
                 return objname
         elif typ is _ClassType:
             return '%s.%s' % (self.module(), objname)
-        elif typ is _FunctionType:
+        elif typ is _ZopeType:
+            if hasattr(obj, '__module__'):
+                return '%s.%s' % (obj.__module__, objname)
+            else:
+                # We have a non-wrapped base C Class.
+                if hasattr(obj, '__doc__') and objname == obj.__doc__:
+                    return '%s.%s' % ('ExtensionClass', objname)
+                else:
+                    raise ValueError, 'Malformed Zope base class!'
+        elif typ in (_FunctionType, _ZopeFunctionType):
             if objname[0] == '<':
                 return '%s.unknown-%s' % (self.module(), id(obj))
             else:
                 return '%s.%s' % (self.module(), objname)
-        elif typ is _MethodType or (typ is _BuiltinMethodType and
-                                    obj.__self__ is not None):
+        elif (typ in (_MethodType, _ZopeMethodType) or
+              (typ is _BuiltinMethodType and obj.__self__ is not None)):
             if objname[0] == '<':
                 return '%s.unknown-%s' % (self.module(), id(obj))
             else:
@@ -486,7 +512,7 @@ class ObjectUID(UID):
     def cls(self):
         if not hasattr(self, '_cls'):
             obj = self._obj
-            if type(obj) is _MethodType:
+            if type(obj) in (_MethodType, _ZopeMethodType):
                 self._cls = ObjectUID(obj.im_class)
             elif (type(obj) is _BuiltinMethodType and
                   obj.__self__ is not None):
@@ -507,9 +533,18 @@ class ObjectUID(UID):
                     return None
                 if typ is _ClassType:
                     self._module = ObjectUID(import_module(obj.__module__))
-                elif typ is _FunctionType:
+                elif typ is _ZopeType:
+                    if hasattr(obj, '__module__'):
+                        self._module = ObjectUID(import_module(obj.__module__))
+                    else:
+                        # We have a non-wrapped base C Class.
+                        if hasattr(obj, '__doc__') and objname == obj.__doc__:
+                            return ObjectUID(import_module('ExtensionClass'))
+                        else:
+                            raise ValueError, 'Malformed Zope base class!'
+                elif typ in (_FunctionType, _ZopeFunctionType):
                     self._module = ObjectUID(_find_function_module(obj))
-                elif typ is _MethodType:
+                elif typ in (_MethodType, _ZopeMethodType):
                     module = import_module(obj.im_class.__module__)
                     self._module = ObjectUID(module)
                 elif typ is _BuiltinFunctionType and obj.__self__ is None:
@@ -713,10 +748,11 @@ def make_uid(object, base_uid=None, shortname=None):
                         _BuiltinFunctionType, _BuiltinMethodType,
                         _FunctionType, _MethodType,
                         _WrapperDescriptorType,
-                        _MethodDescriptorType) or
+                        _MethodDescriptorType, _ZopeType, 
+                        _ZopeMethodType, _ZopeFunctionType) or
         isinstance(object, _TypeType)):
         # If we've already seen this object, return its UID.
-        if type(object) is _MethodType:
+        if type(object) in (_MethodType, _ZopeMethodType):
             key = (id(object.im_func), id(object.im_class))
         else: key = id(object)
         uid = _object_uids.get(key)
