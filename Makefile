@@ -10,6 +10,7 @@
 
 # Python source files (don't include src/epydoc/test)
 PY_SRC = src/epydoc/
+PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) \
        $(wildcard doc/*.png) $(wildcard doc/*.ps) \
@@ -75,7 +76,7 @@ clean:
 ##//////////////////////////////////////////////////////////////////////
 
 distributions: .distributions.up2date
-.distributions.up2date: test $(PY_SRC) .webpage.up2date $(DOCS)
+.distributions.up2date: test $(PY_SRCFILES) .webpage.up2date $(DOCS)
 	$(MAKE) -C src distributions
 	touch .distributions.up2date
 
@@ -111,7 +112,7 @@ checkdocs:
 # xml.dom.minidom and a few Docutils modules get plaintext
 # docstrings).
 api-html: .api-html.up2date
-.api-html.up2date: $(PY_SRC)
+.api-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_API)
 	mkdir -p $(HTML_API)
 	$(EPYDOC) \
@@ -122,7 +123,7 @@ api-html: .api-html.up2date
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
-.api-pdf.up2date: $(PY_SRC)
+.api-pdf.up2date: $(PY_SRCFILES)
 	rm -rf $(LATEX_API)
 	mkdir -p $(LATEX_API)
 	$(EPYDOC) --pdf -o $(LATEX_API) \
@@ -130,7 +131,7 @@ api-pdf: .api-pdf.up2date
 	touch .api-pdf.up2date
 
 examples: .examples.up2date
-.examples.up2date: $(EXAMPLES_SRC) $(PY_SRC)
+.examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)
 	rm -rf $(HTML_EXAMPLES)
 	mkdir -p $(HTML_EXAMPLES)
 	$(EPYDOC) \
@@ -193,7 +194,7 @@ SLFILES = $(shell find /usr/lib/python2.3/ -name '*.py' -o -name '*.so' \
               |grep -v 'python2.3/encodings/idna.py')
 export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die?
 stdlib-html: .stdlib-html.up2date
-.stdlib-html.up2date: $(PY_SRC)
+.stdlib-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_STDLIB)
 	mkdir -p $(HTML_STDLIB)
 	$(EPYDOC) -o $(HTML_STDLIB) -c white \
@@ -203,7 +204,7 @@ stdlib-html: .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
 stdlib-pdf: .stdlib-pdf.up2date
-.stdlib-pdf.up2date: $(PY_SRC)
+.stdlib-pdf.up2date: $(PY_SRCFILES)
 	rm -rf $(LATEX_STDLIB)
 	mkdir -p $(LATEX_STDLIB)
 	$(EPYDOC) --pdf -o $(LATEX_STDLIB) \
@@ -224,7 +225,7 @@ test:
 docutils: docutils-html docutils-pdf
 
 docutils-html: .docutils-html.up2date
-.docutils-html.up2date: $(PY_SRC)
+.docutils-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML)/docutils
 	mkdir -p $(HTML)/docutils
 	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html \
@@ -233,7 +234,7 @@ docutils-html: .docutils-html.up2date
 	touch .docutils-html.up2date
 
 docutils-pdf: .docutils-pdf.up2date
-.docutils-pdf.up2date: $(PY_SRC)
+.docutils-pdf.up2date: $(PY_SRCFILES)
 	rm -rf $(LATEX)/docutils
 	mkdir -p $(LATEX)/docutils
 	$(EPYDOC) -o $(LATEX)/docutils -n 'Docutils' --pdf \
