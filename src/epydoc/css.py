@@ -86,7 +86,18 @@ h3.var-details    { background: transparent; color: #000000;
 .pycomment        { background: transparent; color: #003060; }
 .pykeyword        { background: transparent; color: #600000; }
 .pyoutput         { background: transparent; color: #404040; }
-pre.doctestblock     { padding: .5em; margin: 1em; border: 1px solid #708890; }
+pre.doctestblock  { background: #f4faff; color: #000000; 
+                    padding: .5em; margin: 1em;
+                    border: 1px solid #708890; }
+table pre.doctestblock
+                  { background: #dce4ec; color: #000000; 
+                    padding: .5em; margin: 1em;
+                    border: 1px solid #708890; }
+
+/* Variable values */
+pre.variable      { background: #dce4ec; color: #000000;
+                    padding: .5em; margin: 0;
+                    border: 1px solid #708890; }
  
 /* Navigation bar */ 
 table.navbar      { background: #a0c0ff; color: #000000;
@@ -167,6 +178,11 @@ pre.doctestblock  { background: #90a8b0; color: #000000;
 table pre.doctestblock
                   { background: #b0c8d0; color: #000000; 
                     padding: .5em; margin: 1em;
+                    border: 1px solid #708890; }
+ 
+/* Variable values */
+pre.variable      { background: #b0c8d0; color: #000000; 
+                    padding: .5em; margin: 0;
                     border: 1px solid #708890; }
  
 /* Navigation bar */ 
