@@ -885,7 +885,7 @@ class FuncDoc(ObjDoc):
         if it has none.
     @type _return: L{Var}
     @ivar _return: This function's return value.
-    @type _raises: C{list} of C{Raise}
+    @type _raises: C{list} of L{Raise}
     @ivar _raises: The exceptions that may be raised by this
         function. 
     """
@@ -1191,7 +1191,7 @@ class DocMap(UserDict.UserDict):
         elif type(obj) in (_MethodType, _FunctionType):
             self.data[objID] = FuncDoc(obj)
 
-    def add(self, obj):
+    def __setitem__(self, obj):
         """
         Add the documentation for an object, and everything contained
         by that object, to this documentation map.
@@ -1228,6 +1228,8 @@ class DocMap(UserDict.UserDict):
                     self.add(new.instancemethod(val, None, obj))
                 elif type(val) is _BuiltinMethodType:
                     self.add(val)
+
+    add = __setitem__
 
     def _toplevel(self, uid):
         """
