@@ -124,8 +124,8 @@ def _find_docstring(uid):
         else: muid = uid.module()
         filename = muid.object().__file__
     except: return (None, None)
-    if string.lower(filename[-4:-1]) == '.py':
-        filename = filename[:-4] + '.py'
+    if filename[-4:-1].lower() == '.py':
+        filename = filename[:-1]
 
     # Read the source file's contents.
     try: lines = open(filename).readlines()
