@@ -275,7 +275,7 @@ class Param:
         @rtype: C{None} or C{list} of L{Param}
         @return: A list of C{Param}s that share the description given
         by this parameter.  This is used in cases where multiple
-        parameters are descrubed in one C{@param} field, such as:
+        parameters are descrubed in one C{@param} field, such as::
 
             @param *varargs, **kwargs: extra args for f.
 
@@ -302,8 +302,8 @@ class Param:
         """
         Register a list of C{Param}s that share the description given
         by this parameter.
-        @type C{shared_descr_params}: C{list} of L{Param}
-        @param C{shared_descr_params}: The C{Param}s that share the
+        @type shared_descr_params: C{list} of L{Param}
+        @param shared_descr_params: The C{Param}s that share the
             description given by this parameter
         @rtype: C{None}
         @see: L{shared_descr_params}
@@ -318,7 +318,7 @@ class Param:
         """
         Remove a parameter from the list of C{Param}s that share the
         description given by this parameter.
-        @type {param}: L{Param}
+        @type param: L{Param}
         @see: L{shared_descr_params}
         """
         self._shared_descr_params.remove(param)
