@@ -143,7 +143,8 @@ class DocChecker:
     @cvar DESCR: Check specifier that indicates that every object
         should have a description.  
     @type ALL_C: C{int}
-    @cvar ALL_C: Check specifier that all checks should be run.
+    @cvar ALL_C: Check specifier that indicates that  all checks
+        should be run.
 
     @type PUBLIC: C{int}
     @cvar PUBLIC: Specifier that indicates that public objects should
