@@ -775,8 +775,8 @@ class ObjDoc:
             try:
                 field = _descr_to_docfield(arg, descr)
                 self._fieldtypes.append(field)
-            except ValueError:
-                warnings.append('Bad %s' % tag)
+            except ValueError, e:
+                warnings.append('Bad %s: %s' % (tag, e))
             return
         
         if tag == 'sort':
@@ -2968,7 +2968,7 @@ def _descr_to_identifiers(descr):
 def _descr_to_docfield(arg, descr):
     tags = [s.lower() for s in re.split('[:;, ] *', arg)]
     descr = descr.to_plaintext(None).strip()
-    args = re.split('[:;, ] *', descr)
+    args = re.split('[:;,] *', descr)
     if len(args) == 0 or len(args) > 3:
         raise ValueError, 'Wrong number of arguments'
     singular = args[0]
