@@ -787,7 +787,8 @@ class HTMLFormatter:
 
         # Show the summaries for methods, instance variables, and
         # class variables contained in the class.
-        str += self._func_summary(doc.methods(), doc.sortorder(),
+        allmethods = doc.methods()+doc.staticmethods()+doc.classmethods()
+        str += self._func_summary(allmethods, doc.sortorder(),
                                   doc, 'Method Summary')
         str += self._var_summary(doc.ivariables(), doc.sortorder(),
                                  uid, 'Instance Variable Summary')
@@ -795,8 +796,16 @@ class HTMLFormatter:
                                  uid, 'Class Variable Summary')
 
         # Show details for methods and variables
-        str += self._func_details(doc.methods(), doc, 
-                                  'Method Details')
+        if doc.staticmethods() or doc.classmethods():
+            str += self._func_details(doc.methods(), doc, 
+                                      'Instance Method Details')
+            str += self._func_details(doc.staticmethods(), doc, 
+                                      'Static Method Details')
+            str += self._func_details(doc.classmethods(), doc, 
+                                      'Class Method Details')
+        else:
+            str += self._func_details(doc.methods(), doc, 
+                                      'Method Details')
         str += self._var_details(doc.ivariables(), uid,
                                  'Instance Variable Details')
         str += self._var_details(doc.cvariables(), uid,
