@@ -27,17 +27,13 @@ class ParseTestCase(unittest.TestCase):
     def setUp(self):
         pass
 
-    def failIfParseError(self, text, errors, warnings):
+    def failIfParseError(self, text, errors):
         estr = '\n' + '~'*70 + '\n' + text
         if errors:
             estr += '\n'+'_'*70+'\nERRORS:\n'
             for e in errors: estr += '%s\n' % e
-        if warnings:
-            estr += '\n'+'_'*70+'\nWARNINGS:\n'
-            for w in warnings: estr += '%s\n' % w
-        if errors or warnings:
+        if errors:
             self.fail(estr+'~'*70)
-
 
     def checkParse(self, epytext, xml=None):
         """
@@ -45,31 +41,29 @@ class ParseTestCase(unittest.TestCase):
         X{xml}, with no warnings or errors.
         """
         errors = []
-        warnings = []
-        out = parse(epytext, errors, warnings)
+        out = parse(epytext, errors)
         if out is None: out = ''
         else: out = out.childNodes[0].toxml().strip()
         if out[:9] == '<epytext>' and out[-10:] == '</epytext>':
             out = out[9:-10]
             
-        self.failIfParseError(epytext, errors, warnings)
+        self.failIfParseError(epytext, errors)
         if xml:
             self.failUnlessEqual(`out`, `xml.strip()`)
 
     def checkParseError(self, epytext, errtype, linenum):
         errors = []
-        warnings = []
-        out = parse(epytext, errors, warnings)
+        out = parse(epytext, errors)
 
         for err in errors:
-            if isinstance(err, errtype) and err.linenum == linenum:
+            if isinstance(err, errtype) and err.linenum() == linenum:
                 errors.remove(err)
                 break
         else:
             self.fail("No %s generated on line %s" %
                       (errtype.__name__, linenum))
 
-        self.failIfParseError(epytext, errors, warnings)
+        self.failIfParseError(epytext, errors)
 
     def testPara(self):
         self.checkParse("""
