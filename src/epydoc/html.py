@@ -7,7 +7,16 @@
 #
 
 """
-Documentation to HTML converter.
+Documentation to HTML converter.  This module defines a single class,
+L{HTMLFormatter}, which translates the API documentation encoded in a
+L{DocMap} into a set of HTML files.
+
+@var HEADER: The header for standard documentation HTML pages.
+@var FOOTER: The footer for standard documentation HTML pages.
+@var REDIRECT_INDEX: The contents of redirect index page.  This page
+    is only used if the supplied top page is external.
+@var SPECIAL_METHODS: A dictionary providing names for the special
+    methods that a class can define.
 """
 __docformat__ = 'epytext en'
 
@@ -446,9 +455,16 @@ class HTMLFormatter:
         # Report any failed xrefs
         if self._failed_xrefs:
             if sys.stderr.softspace: print >>sys.stderr
-            print >>sys.stderr, 'Warning: Failed crossreference links: '
-            estr = ', '.join(self._failed_xrefs.keys())
-            print >>sys.stderr, markup.wordwrap(estr, indent=9)
+            print >>sys.stderr, ('Warning: Failed identifier '+
+                                 'crossreference targets:')
+            failed_identifiers = self._failed_xrefs.keys()
+            failed_identifiers.sort()
+            for identifier in failed_identifiers:
+                uids = self._failed_xrefs[identifier].keys()
+                uids.sort()
+                print '    - %s' % identifier
+                for uid in uids:
+                    print '      (from %s)' % uid
 
     def _write(self, directory, progress_callback):
         """
@@ -1247,7 +1263,7 @@ class HTMLFormatter:
             doc = self._docmap.get(uid, None)
             str = ' '*depth + '<li> <b>' + self._uid_to_href(uid)+'</b>'
             if doc and doc.descr():
-                str += ': <i>' + self._summary(doc, uid.module()) + '</i>'
+                str += ': <i>' + self._summary(doc, uid) + '</i>'
             str += '\n'
             if doc and doc.subclasses():
                 str += ' '*depth + '  <ul>\n'
@@ -1282,7 +1298,7 @@ class HTMLFormatter:
     # Module hierarchy trees
     #////////////////////////////////////////////////////////////
     
-    def _module_tree_item(self, uid=None, depth=0):
+    def _module_tree_item(self, uid, depth=0):
         """
         Helper function for L{_module_tree} and L{_module_list}.
         
@@ -1406,7 +1422,7 @@ class HTMLFormatter:
         cls = link.target()
         if not self._docmap.has_key(cls): return ''
         cdoc = self._docmap[cls]
-        csum = self._summary(cdoc, cls.module())
+        csum = self._summary(cdoc, cls)
         str = '<tr><td width="15%">\n'
         str += '  <b>'+self._link_to_html(link)
         str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
@@ -1456,13 +1472,11 @@ class HTMLFormatter:
     def _func_summary_line(self, link, cls):
         func = link.target()
         fname = link.name()
-        if func.is_method() or func.is_builtin_method():
-            container = func.cls()
-            inherit = (container != cls.uid())
-        else:
-            inherit = 0
-            try: container = func.module()
-            except TypeError: container = None
+
+        if func.is_module() or func.is_class(): container = func
+        else: container = func.cls() or func.module()
+        inherit = ((func.is_method() or func.is_builtin_method())
+                   and container != cls.uid())
 
         if inherit and self._inheritance == 'listed': return ''
 
@@ -1475,14 +1489,15 @@ class HTMLFormatter:
         while (not fdoc.documented() and fdoc.matches_override() and
                self._docmap.has_key(fdoc.overrides())):
             fdoc = self._docmap[fdoc.overrides()]
+        inhfunc = fdoc.uid()
 
         rval = fdoc.returns()
         if rval.type():
-            rtype = self._docstring_to_html(rval.type(), container, 8)
+            rtype = self._docstring_to_html(rval.type(), inhfunc, 8)
         else:
             rtype = '&nbsp;'
 
-        descrstr = self._summary(fdoc, container)
+        descrstr = self._summary(fdoc, inhfunc)
         if descrstr != '&nbsp;':
             fsum = '<br />'+descrstr
         else:
@@ -1529,13 +1544,12 @@ class HTMLFormatter:
         for link in functions:
             fname = link.name()
             func = link.target()
-            if func.is_method() or func.is_builtin_method():
-                container = func.cls()
-                inherit = (container != cls.uid())
-            else:
-                inherit = 0
-                try: container = func.module()
-                except TypeError: container = None
+
+            if func.is_module() or func.is_class(): container = func
+            else: container = func.cls() or func.module()
+            inherit = ((func.is_method() or func.is_builtin_method())
+                       and container != cls.uid())
+                
             if not self._docmap.has_key(func):
                 continue
 
@@ -1573,6 +1587,7 @@ class HTMLFormatter:
 
             # Use the inherited docs for everything but the signature.
             fdoc = inhdoc
+            func = inhdoc.uid()
 
             fdescr=fdoc.descr()
             fparam = fdoc.parameter_list()[:]
@@ -1587,7 +1602,7 @@ class HTMLFormatter:
 
             # Description
             if fdescr:
-                str += self._docstring_to_html(fdescr, container, 2)
+                str += self._docstring_to_html(fdescr, func, 2)
             str += '  <dl><dt></dt><dd>\n'
 
             # Parameters
@@ -1598,12 +1613,12 @@ class HTMLFormatter:
                     str += '      <dd><code><b>' + pname +'</b></code>'
                     if param.descr():
                         pdescr = self._docstring_to_html(param.descr(),
-                                                         container, 8)
+                                                         func, 8)
                         str += ' -\n %s' % pdescr.rstrip()
                     str += '\n'
                     if param.type():
                         ptype = self._docstring_to_html(param.type(),
-                                                        container, 14)
+                                                        func, 14)
                         str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
                     str += '      </dd>\n'
@@ -1614,15 +1629,15 @@ class HTMLFormatter:
                 str += '    <dl><dt><b>Returns:</b></dt>\n      <dd>\n'
                 if freturn.descr():
                     str += self._docstring_to_html(freturn.descr(),
-                                                   container, 8)
+                                                   func, 8)
                     if freturn.type():
                         rtype = self._docstring_to_html(freturn.type(),
-                                                        container,14)
+                                                        func,14)
                         str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % rtype.strip()
                 elif freturn.type():
                     str += self._docstring_to_html(freturn.type(),
-                                                   container, 8)
+                                                   func, 8)
                 str += '      </dd>\n    </dl>\n'
 
             # Raises
@@ -1632,7 +1647,7 @@ class HTMLFormatter:
                     str += '      '
                     str += '<dd><code><b>'+fraise.name()+'</b></code> -\n'
                     str += self._docstring_to_html(fraise.descr(),
-                                                   container, 8)
+                                                   func, 8)
                     str +'      </dd>\n'
                 str += '    </dl>\n'
 
@@ -1758,11 +1773,11 @@ class HTMLFormatter:
 
         # Get the property's type, if it has one.
         if pdoc.type():
-            ptype = self._docstring_to_html(pdoc.type(), container, 10).strip()
+            ptype = self._docstring_to_html(pdoc.type(), prop, 10).strip()
         else: ptype = '&nbsp;'
 
         # Get the summary of the description.
-        descrstr = self._summary(pdoc, container)
+        descrstr = self._summary(pdoc, prop)
         if descrstr != '&nbsp;': psum = ': '+descrstr
         else: psum = ''
         
@@ -1803,7 +1818,7 @@ class HTMLFormatter:
             str += '<h3>'+pname+'</h3>\n'
 
             if pdoc.descr():
-                str += self._docstring_to_html(pdoc.descr(), container)
+                str += self._docstring_to_html(pdoc.descr(), prop)
 
             # Print the accessors for the property (fget=get property
             # value; fset=set value, and fdel=delete value).
@@ -1877,10 +1892,10 @@ class HTMLFormatter:
             
         vname = var.name()
         if var.type():
-            vtype = self._docstring_to_html(var.type(), container, 10).strip()
+            vtype = self._docstring_to_html(var.type(), var.uid(), 10).strip()
         else: vtype = '&nbsp;'
         if var.descr():
-            vsum = ': ' +self._summary(var.descr(), container)
+            vsum = ': ' +self._summary(var.descr(), var.uid())
         else:
             title = self._var_value_tooltip(var)
             val = self._pprint_var_value(var, context='summary')
@@ -1947,14 +1962,14 @@ class HTMLFormatter:
                     continue
 
             if var.descr():
-                str += self._docstring_to_html(var.descr(), container)
+                str += self._docstring_to_html(var.descr(), var.uid())
                 
             if vtyp is not None or hasval:
                 str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
                 
             if vtyp:
                 str += '      <dt><b>Type:</b></dt>\n      <dd>\n' 
-                str += self._docstring_to_html(vtyp, container)
+                str += self._docstring_to_html(vtyp, var.uid())
                 str += '\n      </dd>\n'
 
             str += '<span title="%s">' % self._var_value_tooltip(var)
@@ -2322,31 +2337,15 @@ class HTMLFormatter:
         s = re.sub(r'\s\s+', '-', term.to_plaintext(None))
         return "index-"+re.sub("[^a-zA-Z0-9]", "_", s)
 
-    class _HTMLDocstringLinker(markup.DocstringLinker):
-        def __init__(self, docformatter, container):
-            self._docformatter = docformatter
-            self._container = container
-            self._docmap = docformatter._docmap
-        def translate_indexterm(self, indexterm):
-            key = self._docformatter._term_index_to_anchor(indexterm)
-            return ('<a name="%s"></a><i class="indexterm">%s</i>' %
-                    (key, indexterm.to_html(self)))
-        def translate_identifier_xref(self, identifier, label=None):
-            if label is None: label = markup.plaintext_to_html(identifier)
-            uid = findUID(identifier, self._container, self._docmap)
-            if uid is None:
-                failure = identifier #'%s->%s' % (self._container, identifier)
-                self._docformatter._failed_xrefs[failure] = 1
-            return self._docformatter._uid_to_href(uid, label, 'link')
-            
-    def _docstring_to_html(self, docstring, container=None, indent=0):
+#    def _docstring_to_html(self, docstring, container=None, indent=0):
+    def _docstring_to_html(self, docstring, uid, indent=0):
         """
         @return: A string containing the HTML encoding for the given
             C{ParsedDocstring}
         @rtype: L{markup.ParsedDocstring}
         """
         if docstring is None: return ''
-        linker = self._HTMLDocstringLinker(self, container)
+        linker = _HTMLDocstringLinker(self, uid)
         return docstring.to_html(linker, indent=indent)
 
     #////////////////////////////////////////////////////////////
@@ -2380,7 +2379,7 @@ class HTMLFormatter:
         for field in doc.fields():
             values = doc.field_values(field)
             if not values: continue
-            items = [self._docstring_to_html(v, container) for v in values]
+            items = [self._docstring_to_html(v, uid) for v in values]
             str += self._descrlist(items, field.singular,
                                    field.plural, field.short)
 
@@ -2652,7 +2651,7 @@ class HTMLFormatter:
         timestamp = time.asctime(time.localtime(time.time()))
         return FOOTER % (epydoc.__version__, timestamp)
 
-    def _summary(self, doc, container):
+    def _summary(self, doc, uid):
         """
         @return: The HTML code for the summary description of the
             object documented by C{doc}.  A summary description is the
@@ -2664,10 +2663,7 @@ class HTMLFormatter:
         @param doc: The documentation for the object whose summary
             should be returned.
         @type doc: L{objdoc.ObjDoc}
-        @param container: The container object for C{doc}, or C{None}
-            if there is none.  This container object is used to
-            resolve links (E{L}{...}) in the epytext.
-        @type container: L{uid.UID}
+        @type uid: L{uid.UID}
         """
         # Try to find a documented ancestor
         if isinstance(doc, FuncDoc):
@@ -2675,12 +2671,12 @@ class HTMLFormatter:
                    self._docmap.has_key(doc.overrides())):
                 doc = self._docmap[doc.overrides()]
                 
-        summary = self._docstring_to_html(doc.summary(), container).strip()
+        summary = self._docstring_to_html(doc.summary(), uid).strip()
         if not summary:
             if (isinstance(doc, FuncDoc) and
                 doc.returns().descr() is not None):
                 summary = doc.returns().descr().summary()
-                summary = self._docstring_to_html(summary, container).strip()
+                summary = self._docstring_to_html(summary, uid).strip()
                 return 'Return '+summary[:1].lower() + summary[1:]
             else:
                 return '&nbsp;'
@@ -2917,3 +2913,24 @@ class HTMLFormatter:
             str = str[:-2] + '\n      <br />\n'
         return str[:-13] + '\n    </td></tr>\n'
 
+class _HTMLDocstringLinker(markup.DocstringLinker):
+    def __init__(self, docformatter, uid):
+        self._docformatter = docformatter
+        self._uid = uid
+        self._docmap = docformatter._docmap
+        if uid.is_module() or uid.is_class(): self._container = uid
+        else: self._container = uid.cls() or uid.module()
+    def translate_indexterm(self, indexterm):
+        key = self._docformatter._term_index_to_anchor(indexterm)
+        return ('<a name="%s"></a><i class="indexterm">%s</i>' %
+                (key, indexterm.to_html(self)))
+    def translate_identifier_xref(self, identifier, label=None):
+        if label is None: label = markup.plaintext_to_html(identifier)
+        uid = findUID(identifier, self._container, self._docmap)
+        if uid is None:
+            failed_xrefs = self._docformatter._failed_xrefs
+            if not failed_xrefs.has_key(identifier):
+                failed_xrefs[identifier] = {}
+            failed_xrefs[identifier][self._uid] = 1    
+        return self._docformatter._uid_to_href(uid, label, 'link')
+        
