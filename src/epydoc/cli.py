@@ -197,7 +197,7 @@ def _help(arg):
         print 'followed by a language code (such as "en" for English).  Epydoc'
         print 'currently recognizes the following markup language names:'
         import epydoc.objdoc
-        for format in eypdoc.objdoc.KNOWN_DOCFORMATS:
+        for format in epydoc.objdoc.KNOWN_DOCFORMATS:
             print '  - %s' % format
         print
     else:
@@ -244,25 +244,28 @@ def _parse_args():
     """
     # Default values.
     options = {'target':None, 'modules':[], 'verbosity':1,
-               'prj_name':'', 'action':'html', 'tests':{},
+               'prj_name':'', 'action':'html', 'tests':{'basic':1},
                'show_imports':0, 'frames':1, 'private':None,
                'list_classes_separately': 0, 'debug':0,
                'docformat':None, 'top':None, 'inheritance': None,
                'ignore_param_mismatch': 0}
 
     # Get the command-line arguments, using getopts.
-    shortopts = 'c:fh:n:o:t:u:Vvq?:'
-    longopts = ('check frames help= usage= helpfile= help-file= '+
-                'help_file= output= target= url= version verbose ' +
-                'private-css= private_css= quiet show-imports '+
-                'show_imports css= no_private no-private name= '+
+    shortopts = 'c:h:n:o:t:u:Vvq?:'
+    longopts = ('html latex dvi ps pdf check '+
+                'output= name= url= top= css= private-css= private_css= '+
+                'docformat= doc-format= doc_format= private '+
+                'show_imports no_private no-private '+
                 'builtins no-frames no_frames noframes debug '+
-                'docformat= doc-format= doc_format= top=  navlink= '+
-                'nav_link= nav-link= latex html dvi ps pdf '+
+                'help= usage= helpfile= help-file= help_file= '+
                 'separate-classes separate_classes '+
+                'quiet show-imports show_imports '+
+                'target= version verbose '+
+                'navlink= nav_link= nav-link= '+
+                
                 'inheritance= inheritence= '+
                 'ignore_param_mismatch ignore-param-mismatch '+
-                'test= tests= checks= private').split()
+                'test= tests= checks=').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -457,7 +460,10 @@ def _make_docmap(modules, options):
             else: _internal_error()
 
     if not options['ignore_param_mismatch']:
-        report_param_mismatches(d)
+        if not report_param_mismatches(d):
+            estr = '    (To supress these warnings, '
+            estr += 'use --ignore-param-mismatch)'
+            print >>sys.stderr, estr
 
     return d
 
