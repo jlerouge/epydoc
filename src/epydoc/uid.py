@@ -915,6 +915,7 @@ def findUID(name, container=None, docmap=None):
     @rtype: L{UID} or C{None}
     """
     if name == '': return None
+    name = re.sub(r'\(.*\)$', '', name)
     if container and not (container.is_module() or container.is_class()):
         raise ValueError('Bad container %r' % container)
     if container is None:
