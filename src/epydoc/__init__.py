@@ -50,15 +50,13 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Add support for escape characters & groups to the latex
-           outputter.
-@todo 2.0: Finish the man-page style outputter.
+@todo 2.0: Add support for groups to the latex outputter (for vars,
+     classes, modules, & properties).
+@todo 2.0: Finish the man-page style outputter. (epyman)
 @todo 2.0: Create a better default top_page than trees.html
-@todo 2.0: More options for --check (--check all, --check basic)
 @todo 2.0: Add more symbols (like E{E}{->}).
-@todo 2.0: Add --no-inheritance? (don't inherit docs)
-@todo 2.0: Add --check for doc inheritance? (??)
 
+@todo 2.1: Add --no-inheritance? (don't inherit docs)
 @todo 2.1: Modify L{epydoc.html} to write directly to streams,
            rather than building up strings.
     
