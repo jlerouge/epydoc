@@ -104,7 +104,7 @@ class ParsedJavadocDocstring(ParsedDocstring):
     #////////////////////////////////////////////////////////////
 
     _ARG_FIELDS = ('group variable var type cvariable cvar ivariable '+
-                   'ivar return returns returntype rtype param '+
+                   'ivar param '+
                    'parameter arg argument raise raises exception '+
                    'except deffield newfield keyword kwarg kwparam').split()
     _FIELD_RE = re.compile(r'(^\s*\@\w+[\s$])', re.MULTILINE)
@@ -215,3 +215,11 @@ class ParsedJavadocDocstring(ParsedDocstring):
     def to_plaintext(self, docstring_linker, **options):
         return self._docstring
 
+    # Jeff's hack to get summary working
+    def summary(self):
+        m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', self._docstring)
+        if m:
+            return ParsedJavadocDocstring(m.group(1))
+        else:
+            summary = self._docstring.split('\n', 1)[0]+'...'
+            return ParsedJavadocDocstring(summary)
