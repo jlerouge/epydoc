@@ -72,6 +72,7 @@ Description::
    <!ELEMENT olist (li+)>
    <!ELEMENT li (para | literalblock | doctestblock | ulist | olist)+>
    <!ATTLIST li bullet NMTOKEN #IMPLIED>
+   <!ATTLIST olist start NMTOKEN #IMPLIED>
 
    <!ELEMENT uri    (name, target)>
    <!ELEMENT link   (name, target)>
@@ -84,21 +85,14 @@ Description::
    <!ELEMENT bold   (#PCDATA | %colorized;)*>
    <!ELEMENT index  (#PCDATA | %colorized;)>
 
-This package also contains a number of formatters, which can be used
-to convert the XML/DOM representations of Epytext strings to HTML,
-LaTeX, and a number of other formats.
-
-Supported features:
-  - literal blocks (introduced with ::)
-  - unordered lists (bullet is '-')
-  - ordered lists (bullet is '\d+.')
-  - I{colorizing}
-  - sections
-
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
 """
+
+# To do:
+#   - convert tabs to spaces
+#   - Replace \015\012 with \012
 
 # Replace "index" entity with "indexed"?
 
@@ -109,7 +103,7 @@ Supported features:
 #   4. helpers
 #   5. testing
 
-import re, epydoc.uid
+import re, epydoc.uid, string
 from xml.dom.minidom import Element, Text
 
 ##################################################
@@ -238,6 +232,10 @@ def parse(str, errors = None, warnings = None):
         raise_on_error = 1
     else:
         raise_on_error = 0
+
+    # Preprocess the string.
+    str = re.sub('\015\012', '\012', str)
+    str = string.expandtabs(str)
 
     # Tokenize the input string.
     tokens = _tokenize(str, warnings)
@@ -398,8 +396,21 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
     else:
         print 'WARNING: Bad bullet', bullet_token.contents
         list_type = 'ulist'
-    
+
+    # Is this a new list?
+    newlist = 0
     if stack[-1].tagName != list_type:
+        newlist = 1
+    elif list_type == 'olist' and stack[-1].tagName == 'olist':
+        old_listitem = stack[-1].childNodes[-1]
+        old_bullet = old_listitem.getAttribute("bullet").split('.')[:-1]
+        new_bullet = bullet_token.contents.split('.')[:-1]
+        if (new_bullet[:-1] != old_bullet[:-1] or
+            int(new_bullet[-1]) != int(old_bullet[-1])+1):
+            newlist = 1
+
+    # Create the new list.
+    if newlist:
         if stack[-1].tagName in ('ulist', 'olist', 'fieldlist'):
             stack.pop()
             indent_stack.pop()
@@ -420,6 +431,10 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
         stack[-1].appendChild(lst)
         stack.append(lst)
         indent_stack.append(bullet_token.indent)
+        if list_type == 'olist':
+            start = bullet_token.contents.split('.')[:-1]
+            if start != '1':
+                lst.setAttribute("start", start[-1])
 
     # Fields are treated somewhat specially: A "fieldlist"
     # node is created to make the parsing simpler, but fields
@@ -1057,42 +1072,48 @@ def _colorize_link(link, token, end, warnings, errors):
 
     # If the last child isn't text, we know it's bad.
     if not isinstance(children[-1], Text):
-        estr = "Bad %s URI" % link.tagName
+        estr = "Bad %s target" % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
     
-    # Did they provide an explicit URL?
+    # Did they provide an explicit target?
     match2 = _TARGET_RE.match(children[-1].data)
     if match2:
-        (text, uri) = match2.groups()
+        (text, target) = match2.groups()
         children[-1].data = text
-    # Can we extract an implicit URL?
+    # Can we extract an implicit target?
     elif len(children) == 1:
-        uri = children[0].data
+        target = children[0].data
     else:
-        estr = "Bad %s URI" % link.tagName
+        estr = "Bad %s target" % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
 
     # Construct the name element.
-    name = Element('name')
+    name_elt = Element('name')
     for child in children:
-        name.appendChild(link.removeChild(child))
+        name_elt.appendChild(link.removeChild(child))
 
     # Clean up the target.  For URIs, assume http if they don't
     # specify (no relative urls)
-    uri = re.sub(r'\s', '', uri)
-    if link.tagName=='uri' and not re.match(r'\w+:', uri):
-        uri = 'http://'+uri
+    if link.tagName=='uri':
+        target = re.sub(r'\s', '', target)
+        if not re.match(r'\w+:', target):
+            target = 'http://'+target
+    elif link.tagName=='link':
+        if not re.match(r'^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$', target):
+            estr = "Bad link target"
+            errors.append(ColorizingError(estr, token, end))
+            return
 
     # Construct the target element.
-    target = Element('target')
-    target.appendChild(Text(re.sub(r'\s', '', uri)))
+    target_elt = Element('target')
+    target_elt.appendChild(Text(target))
 
     # Add them to the link element.
-    link.appendChild(name)
-    link.appendChild(target)
-            
+    link.appendChild(name_elt)
+    link.appendChild(target_elt)
+
 ##################################################
 ## Formatters
 ##################################################
@@ -1799,6 +1820,16 @@ Standard syntax:
 - With a colorized name/target: L{I{italic} name<target>}
 """
 
+test5 = """
+1. hi
+2. there
+3. bob
+8. so
+  8.1. hi
+  8.2. zippy
+  9.3. foo
+"""
+
 #def profile_parse():
 #    s=open("epytext.test")
 #    import profile
@@ -1818,7 +1849,7 @@ if __name__ == '__main__':
     #print to_epytext(pparse(test1))
     #print '#'*75
     #print to_plaintext(pparse(test3))
-    print to_debug(pparse(ambig_test))
+    print to_debug(pparse(test5))
     #print '#'*75
     #print to_epytext(parse(test4))
     #print '='*50
