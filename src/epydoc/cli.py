@@ -341,7 +341,7 @@ def _html(docmap, options):
             sys.stderr.softspace = 1
             if (file_num[0] % 60) == 0 and num_files > 70: print >>sys.stderr
             if file_num[0] == num_files:
-                if num_modules <= 70: sys.stderr.write(']')
+                if num_files <= 70: sys.stderr.write(']')
                 print >>sys.stderr
         elif verbosity>1:
             TRACE_FORMAT = (('  [%%%dd/%d]' % (len(`num_files`), num_files)) +
