@@ -270,10 +270,10 @@ class ObjDoc:
         
         # Save the remaining docstring as the description..
         if pdoc.hasChildNodes():
-            if epytext.to_html(pdoc) == '':
-                print 'WARNING: DIDN"T CATCH'
-                print pdoc.toxml()
-                raise ValueError()
+            #if epytext.to_html(pdoc) == '':
+            #    print 'WARNING: DIDN"T CATCH'
+            #    print pdoc.toxml()
+            #    raise ValueError()
             self._descr = pdoc
         else:
             self._descr = None
