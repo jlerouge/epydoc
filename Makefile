@@ -90,7 +90,7 @@ SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 stdlib:
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
-	epydoc -o ${STDLIB} -f -vvvv -q -c white --show-imports \
+	epydoc -o ${STDLIB} -f -v -q -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --builtins ${SLFILES}
 
 ##//////////////////////////////////////////////////////////////////////
