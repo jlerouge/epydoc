@@ -26,6 +26,8 @@ from types import BuiltinMethodType as _BuiltinMethodType
 from types import MethodType as _MethodType
 from types import StringType as _StringType
 
+__all__ = ['UID', 'Link']
+
 class UID:
     """
     A globally unique identifier used to refer to a Python object.

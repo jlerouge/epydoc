@@ -18,3 +18,12 @@ the form of HTML pages.
 """
 
 __version__ = 0.2
+
+__all__ = [
+    'objdoc',
+    'epytext',
+    'uid',
+    'html',
+    'checker',
+    'cli',
+    ]
