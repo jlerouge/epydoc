@@ -3267,7 +3267,7 @@ def _find_base_order(cls):
         they should be searched for attributes.  Each base ancestor
         should be listed exactly once.  The base order list includes
         the given class as its first element.
-    @type: C{list} of C{class}
+    @rtype: C{list} of C{class}
     """
     # Try using mro (method resolution operator), if available.
     if hasattr(cls, '__mro__'): return cls.__mro__
