@@ -4,11 +4,7 @@
 ##  Edward Loper
 ############################################################
 
-ll: distributions
-
-# Tests.
-test: 
-	python epydoc/test/__init__.py -v epydoc/test/*.py
+all: distributions
 
 # Clean.  
 #    - Erase any pyc and pyo files.
