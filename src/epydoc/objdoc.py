@@ -595,14 +595,14 @@ class ObjDoc:
         # Initialize fields.  Add any extra fields.
         self._fieldtypes = self.STANDARD_FIELDS[:]
         if module is not None:
-            # Gather any extra fields from this module and all of its
-            # ancestor packages.
-            extra_fields = []
-            m = module
-            while m is not None:
-                try: extra_fields += m.value().__extra_epydoc_fields__
-                except: pass
-                m = m.parent()
+            # Gather any extra fields from this module and all of its 
+            # ancestor packages. 
+            extra_fields = [] 
+            m = module 
+            while m is not None: 
+                try: extra_fields += m.value().__extra_epydoc_fields__ 
+                except: pass 
+                m = m.parent() 
             
             # Create the specified extra fields.
             for field in extra_fields:
