@@ -18,21 +18,16 @@ author of a module.  Each field consists of a <i>tag</i>, an optional
 
 <p> Each docstring markup langauge marks fields differently.  The
 following table shows examples of fields for each markup language.
-For more information, see the definition of fields for the markup
-language that your docstrings use: <a
-href="epytext.html#fieldlist">Epytext</a>, <a
-href="http://docutils.sourceforge.net/spec/rst/reStructuredText.html#field-lists">ReStructuredText</a>,
-or <a
-href="http://java.sun.com/j2se/1.4.2/docs/tooldocs/solaris/javadoc.html#javadoctags">Javadoc</a>. </p>
+For more information, see the definition of field syntax for each
+markup language. </p>
 
 <center>
 <table border="1" cellspacing="0" cellpadding="3">
   <tr>
-    <th><a href="epytext.html">Epytext</a></th>
-    <th><a href="http://docutils.sourceforge.net/rst.html"
-      >ReStructuredText</a></th>
-    <th><a href="http://java.sun.com/j2se/javadoc/"
-      >JavaDoc</a></th></tr>
+    <th width="33%">Epytext</th>
+    <th width="33%">ReStructuredText</th>
+    <th width="33%">JavaDoc</th>
+  </tr>
   <tr>
     <td>
       <code>@<i>tag</i>: <i>contents</i></code>...</br>
@@ -47,23 +42,33 @@ href="http://java.sun.com/j2se/1.4.2/docs/tooldocs/solaris/javadoc.html#javadoct
       <code>@<i>tag</i> <i>arg</i> <i>contents</i></code>...</br>
     </td>
   </tr>
+<tr>
+<td align="center"><a
+href="epytext.html#fieldlist">Definition of<br/>epytext fields</a></td>
+<td align="center"><a
+href="http://docutils.sourceforge.net/spec/rst/reStructuredText.html#field-lists">Definition of<br/>ReStructuredText fields</a></td>
+<td align="center"><a
+href="http://java.sun.com/j2se/1.4.2/docs/tooldocs/solaris/javadoc.html#javadoctags">Definition of<br/>Javadoc fields</a></td>
+</tr>
 </table>
 </center>
 
 <h2>Supported Fields</h2>
 
 <p> The following table lists the fields that epydoc currently
-recognizes.  Fields are written in epytext format; if you are using a
-different markup language, then adjust the syntax accordingly. </p>
+recognizes.  Field tags are written using epytext markup; if you are
+using a different markup language, then you should adjust the markup
+accordingly. </p>
 
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
   <!-- ========== Functions & Methods ========== -->
-  <tr><th colspan="2" align="left">Functions and Methods</th></tr>
+  <tr><th colspan="2" align="left">Functions and Methods
+  <i>(function or method docstrings)</i></th></tr>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>param</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
-    A description of parameter <code><i>p</i></code> for a function or
-    method. </td></tr>
+    A description of the parameter <code><i>p</i></code> for a
+    function or method. </td></tr>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>type</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
@@ -76,7 +81,7 @@ different markup language, then adjust the syntax accordingly. </p>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>rtype</b>:</code>&nbsp;... </td><td>
-    The return value type for a function or method. </td></tr>
+    The type of the return value for a function or method. </td></tr>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>raise</b>&nbsp;<i>e</i>:</code>&nbsp;... </td><td>
@@ -84,7 +89,8 @@ different markup language, then adjust the syntax accordingly. </p>
     method raises exception <code><i>e</i></code>. </td></tr>
 
   <!-- ========== Variables ========== -->
-  <tr><th colspan="2" align="left">Variables</th></tr>
+  <tr><th colspan="2" align="left">Variables
+  <i>(module or class docstrings)</i></th></tr>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>ivar</b>&nbsp;<i>v</i>:</code>&nbsp;... </td><td>
     A description of the class instance variable
@@ -105,15 +111,14 @@ different markup language, then adjust the syntax accordingly. </p>
     The type of the variable
     <code><i>v</i></code>. </td></tr>
   
-  <!-- ========== Related Topics ========== -->
-  <tr><th colspan="2" align="left">Related Topics</th></tr>
-  <tr><td width="10%" align="left" valign="top"> <code>@<b>see</b>:</code>&nbsp;... </td><td>
-    A description of a related topic.  <code>see</code> fields
-    typically use documentation crossreference links or external
-    hyperlinks that link to the related topic. </td></tr>
-    
+  <tr><td width="10%" align="left" valign="top">
+  <code>@<b>type</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
+    The type of the property
+    <code><i>p</i></code>. </td></tr>
+  
   <!-- ========== Grouping & Sorting ========== -->
-  <tr><th colspan="2" align="left">Grouping and Sorting</th></tr>
+  <tr><th colspan="2" align="left">Grouping and Sorting
+  <i>(module or class docstrings)</i></th></tr>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>group</b>&nbsp;<i>g</i>:&nbsp;<i>c<sub>1</sub
     >,...,c<sub>n</sub></i></code> </td><td>
@@ -133,6 +138,13 @@ different markup language, then adjust the syntax accordingly. </p>
     the children from this list, in alphabetical order.
     </td></tr>
         
+  <!-- ========== Related Topics ========== -->
+  <tr><th colspan="2" align="left">Related Topics</th></tr>
+  <tr><td width="10%" align="left" valign="top"> <code>@<b>see</b>:</code>&nbsp;... </td><td>
+    A description of a related topic.  <code>see</code> fields
+    typically use documentation crossreference links or external
+    hyperlinks that link to the related topic. </td></tr>
+    
   <!-- ========== Notes & Warnings ========== -->
   <tr><th colspan="2" align="left">Notes and Warnings</th></tr>
   <tr><td width="10%" align="left" valign="top">
@@ -244,9 +256,9 @@ different markup language, then adjust the syntax accordingly. </p>
 <h2>Field Synonyms</h2>
 
 <p> Several fields have "synonyms," or alternate tags.  The following
-table lists all field synonyms.  Fields are written in epytext format;
-if you are using a different markup language, then adjust the syntax
-accordingly. </p>
+table lists all field synonyms.  Field tags are written using epytext
+markup; if you are using a different markup language, then you should
+adjust the markup accordingly. </p>
 
 <center>
 <table class="transparent">
