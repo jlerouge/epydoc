@@ -402,8 +402,8 @@ class NamespaceDoc(ValueDoc):
     """
     _STR_FIELDS = ValueDoc._STR_FIELDS + ['children']
 
-    def __init__(self):
-        ValueDoc.__init__(self)
+    def __init__(self, dotted_name=None):
+        ValueDoc.__init__(self, dotted_name=dotted_name)
 
         self.children = {}
         """The contents of the namespace, encoded as a dictionary
@@ -454,9 +454,9 @@ class ModuleDoc(NamespaceDoc):
     _STR_FIELDS = (NamespaceDoc._STR_FIELDS +
                    ['package', 'docformat', 'public_names'])
     
-    def __init__(self):
+    def __init__(self, dotted_name=None):
         """Create a new C{ModuleDoc}."""
-        NamespaceDoc.__init__(self)
+        NamespaceDoc.__init__(self, dotted_name=dotted_name)
 
         self.package = None
         """API documentation for the module's containing package.
