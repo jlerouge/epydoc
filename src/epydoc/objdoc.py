@@ -37,11 +37,35 @@ WARN_SKIPPING = 0
 ## Imports
 ##################################################
 
-import inspect, UserDict, epytext, string, new
+import inspect, UserDict, epytext, string, new, re
 from xml.dom.minidom import Text as _Text
 from types import StringType as _StringType
 
 from epydoc.uid import UID, Link, _makeuid
+
+##################################################
+## Helper
+##################################################
+def _flatten(tree):
+    """
+    Recursively explore C{tree}, and return an in-order list of all
+    leaves.
+    
+    @return: An in-order list of the leaves of C{tree}.
+    @param tree: The tree whose leaves should be returned.  The tree
+        structure of C{tree} is represented by tuples and lists.  In
+        particular, every tuple or list contained in C{tree} is
+        considered a subtree; and any other element is considered a
+        leaf. 
+    @type tree: C{list} or C{tuple}
+    """
+    lst = []
+    for elt in tree:
+        if type(elt) in (type(()), type([])):
+            lst.extend(_flatten(elt))
+        else:
+            lst.append(elt)
+    return lst
 
 ##################################################
 ## ObjDoc
@@ -451,7 +475,7 @@ class ModuleDoc(ObjDoc):
                     continue
 
             # Add the field to the appropriate place.
-            if vuid.is_function():
+            if vuid.is_function() or vuid.is_builtin_function():
                 self._functions.append(Link(field, UID(val)))
             elif vuid.is_class():
                 self._classes.append(Link(field, UID(val)))
@@ -895,35 +919,77 @@ class FuncDoc(ObjDoc):
     @ivar _raises: The exceptions that may be raised by this
         function. 
     """
-    def _params_to_vars(self, params, defaults):
-        vars = []
-        if defaults == None: defaults = []
-        for i in range(len(params)):
-            defaultindex = i-(len(params)-len(defaults))
-            if type(params[i]) == _StringType:
-                vars.append(Var(params[i]))
-                if defaultindex >= 0:
-                    vars[-1].set_default(`defaults[defaultindex]`)
-            elif defaultindex >= 0:
-                vars.extend(self._params_to_vars(params[i],
-                                                 defaults[defaultindex]))
-            else:
-                vars.extend(self._params_to_vars(params[i], []))
-        return vars
-    
     def __init__(self, func):
         # Initilize the module from its docstring.
         self._tmp_param = {}
         self._tmp_type = {}
         self._raises = []
+        self._overrides = None
         ObjDoc.__init__(self, func)
 
-        # If we're a method, extract the underlying function.
-        cls = None
-        if self._uid.is_method():
-            cls = func.im_class
-            func = func.im_func
+        if self._uid.is_function():
+            self._init_signature(func)
+            self._init_params()
+        elif self._uid.is_method():
+            self._init_signature(func.im_func)
+            self._init_params()
+            self._find_override(func.im_class)
+        elif self._uid.is_builtin_function() or self._uid.is_builtin_method():
+            self._init_builtin_signature(func)
+            self._init_params()
+        else:
+            raise TypeError("Can't document %s" % func)
 
+    def _init_builtin_signature(self, func):
+        self._params = []
+        self._kwarg_param = None
+        self._vararg_param = None
+        self._return = Var('return')
+            
+        # Check if there's a "builtin signature" available.
+        signature_re = (r'^\s*((?P<class>\w+)\.)?' +
+                        r'(?P<func>%s)' % func.__name__ +
+                        r'\((?P<params>(\w+(,\s*\w+)*)?)\)' +
+                        r'(\s*->\s*(?P<return>\S.*))?'+
+                        r'\s*(\n|\s+--\s+|$)')
+        m = re.match(signature_re, func.__doc__)
+        if m:
+            # Extract the parameters from the signature
+            if m.group('params'):
+                for name in m.group('params').split(','):
+                    name = name.strip()
+                    if name == '...':
+                        self._vararg_param = Var('...')
+                    elif name.startswith('**'):
+                        self._kwarg_param = Var(name[1:])
+                    elif name.startswith('*'):
+                        self._vararg_param = Var(name[1:])
+                    else:
+                        self._params.append(Var(name.strip()))
+            # Extract the return type from the signature
+            if m.group('return'):
+                rtype = m.group('return')
+                self._return.set_type(epytext.parse(rtype))
+
+            # Remove the signature from the description.
+            text = self._descr.childNodes[0].childNodes[0]
+            text.data = re.sub(signature_re, '', text.data, 1)
+        else:
+            self._vararg_param = Var('...')
+
+        # What do we do with documented parameters?
+        ## If they specified parameters, use them. ??
+        ## What about ordering??
+        #if self._tmp_param or self._tmp_type:
+        #    vars = {}
+        #    for (name, descr) in self._tmp_param.items():
+        #        vars[name] = Var(name, descr)
+        #    for (name, type_descr) in self._tmp_type.items():
+        #        if not vars.has_key(name): vars[name] = Var(name)
+        #        vars[name].set_type(type_descr)
+        #    self._params = 
+
+    def _init_signature(self, func):
         # Get the function's signature
         (args, vararg, kwarg, defaults) = inspect.getargspec(func)
 
@@ -935,8 +1001,9 @@ class FuncDoc(ObjDoc):
         else: self._kwarg_param = None
         self._return = Var('return')
 
+    def _init_params(self):
         # Add descriptions/types to argument/return Variables.
-        vars = self._params[:]
+        vars = self.parameter_list()[:]
         if self._vararg_param: vars.append(self._vararg_param)
         if self._kwarg_param: vars.append(self._kwarg_param)
         if self._return: vars.append(self._return)
@@ -961,31 +1028,25 @@ class FuncDoc(ObjDoc):
         del self._tmp_param
         del self._tmp_type
 
-        # If we're a method, figure out what we override.
-        self._overrides = None
-        if cls: self._find_override(cls)
-
-#         # If we got a return description, but no overview, create an
-#         # overview based on the return description.
-#         if (self._descr is None) and (self._return.descr() is not None):
-#             self._descr = self._return.descr()
-#             self._return.set_descr(None)
-#             children = self._descr.childNodes
-#             while (len(children) > 0):
-#                 if children[0].tagName == 'para':
-#                     para = children[0]
-#                     if para.hasChildNodes():
-#                         para.insertBefore(_Text('Return '),
-#                                           para.childNodes[0])
-#                     else:
-#                         para.appendChild(_Text('Return '))
-#                     break
-#                 if children[0].tagName in ('epytext', 'section',
-#                                            'ulist', 'olist'):
-#                     children = children[0].childNodes
-#                 else:
-#                     children = children[1:]
-
+    def _params_to_vars(self, params, defaults):
+        vars = []
+        if defaults == None: defaults = []
+        for i in range(len(params)):
+            try: defaultindex = i-(len(params)-len(defaults))
+            except TypeError:
+                # We couldn't figure out how to line up defaults with vars.
+                defaultindex=-1
+            if type(params[i]) == _StringType:
+                vars.append(Var(params[i]))
+                if defaultindex >= 0:
+                    vars[-1].set_default(`defaults[defaultindex]`)
+            elif defaultindex >= 0:
+                vars.append(self._params_to_vars(params[i],
+                                                 defaults[defaultindex]))
+            else:
+                vars.append(self._params_to_vars(params[i], []))
+        return vars
+    
     def _find_override(self, cls):
         name = self.uid().shortname()
         for base in cls.__bases__:
@@ -1055,11 +1116,35 @@ class FuncDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
 
+    def parameter_list(self):
+        """
+        @return: A (flat) list of all parameters for the
+            function/method documented by this C{FuncDoc}.  If you are
+            interested in the signature of the function/method, you
+            should use L{parameters} instead.
+        @rtype: C{list} of L{Var}
+        @see: L{parameters}
+        """
+        if not hasattr(self, '_param_list'):
+            self._param_list = _flatten(self._params)
+        return self._param_list
+
     def parameters(self):
         """
-        @return: A list of all parameters for the function/method
-            documented by this C{FuncDoc}.
         @rtype: C{list} of L{Var}
+        @return: The parameters for the function/method documented by
+            this C{FuncDoc}.  This is typically a list of parameters,
+            but it can contain sublists if the function/method's
+            signature contains sublists.  For example, for the function:
+
+                >>> def f(a, (b, c), d): pass
+
+            C{parameters} will return a three-element list, whose
+            second element is a sublist containing C{Var}s for C{b}
+            and C{c}.
+
+            If you just want a list of all parameters used by the
+            function/method, use L{parameter_list} instead. 
         """
         return self._params
     
@@ -1198,6 +1283,8 @@ class DocMap(UserDict.UserDict):
             #        self.add(method.target().object())
                     
         elif objID.is_function() or objID.is_method():
+            self.data[objID] = FuncDoc(obj)
+        elif objID.is_builtin_function():
             self.data[objID] = FuncDoc(obj)
 
     def __setitem__(self, obj):
