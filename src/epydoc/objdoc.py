@@ -254,6 +254,11 @@ class ObjDoc:
         
         @param obj: The object to document.
         @type obj: any
+        @param verbosity: The verbosity of output produced when
+            creating documentation for the object.  More positive
+            numbers produce more verbose output; negative numbers
+            supress warnings and errors.
+        @type verbosity: C{int}
         """
         self._uid = UID(obj)
 
@@ -463,7 +468,6 @@ class ModuleDoc(ObjDoc):
         (package only).
     """
     def __init__(self, mod, verbosity=0):
-        # Initilize the module from its docstring.
         self._tmp_var = {}
         self._tmp_type = {}
         ObjDoc.__init__(self, mod, verbosity)
@@ -510,7 +514,8 @@ class ModuleDoc(ObjDoc):
                 var.set_type(self._tmp_type[name])
                 del self._tmp_type[name]
         if self._tmp_type != {}:
-            raise SyntaxError('Type for unknown var')
+            for key in self._tmp_type.keys():
+                print 'Type for unknown var '+key+' in '+`self._uid`
         del self._tmp_var
         del self._tmp_type
 
@@ -686,7 +691,6 @@ class ClassDoc(ObjDoc):
     @ivar _bases: A list of the identifiers of this class's bases.
     """
     def __init__(self, cls, verbosity=0):
-        # Initilize the module from its docstring.
         self._tmp_ivar = {}
         self._tmp_cvar = {}
         self._tmp_type = {}
@@ -714,7 +718,7 @@ class ClassDoc(ObjDoc):
                 self._methods.append(Link(field, UID(method)))
             elif vuid.is_builtin_method():
                 self._methods.append(Link(field, vuid))
-                
+
         # Add descriptions and types to class variables
         self._cvariables = []
         for (name, descr) in self._tmp_cvar.items():
@@ -959,12 +963,11 @@ class FuncDoc(ObjDoc):
         function. 
     """
     def __init__(self, func, verbosity=0):
-        # Initilize the module from its docstring.
         self._tmp_param = {}
         self._tmp_type = {}
         self._raises = []
         self._overrides = None
-        ObjDoc.__init__(self, func, verbosity=0)
+        ObjDoc.__init__(self, func, verbosity)
 
         if self._uid.is_function():
             self._init_signature(func)
@@ -991,7 +994,7 @@ class FuncDoc(ObjDoc):
                         r'\((?P<params>(\w+(,\s*\w+)*)?)\)' +
                         r'(\s*->\s*(?P<return>\S.*))?'+
                         r'\s*(\n|\s+--\s+|$)')
-        m = re.match(signature_re, _getdoc(func))
+        m = re.match(signature_re, (_getdoc(func) or ''))
         if m:
             # Extract the parameters from the signature
             if m.group('params'):
@@ -1332,7 +1335,7 @@ class DocMap(UserDict.UserDict):
         elif objID.is_builtin_function():
             self.data[objID] = FuncDoc(obj, self._verbosity)
 
-    def __setitem__(self, obj):
+    def add(self, obj):
         """
         Add the documentation for an object, and everything contained
         by that object, to this documentation map.
@@ -1342,6 +1345,7 @@ class DocMap(UserDict.UserDict):
         @type obj: any
         @rtype: C{None}
         """
+        #print 'adding', obj
         objID = UID(obj)
         if self.data.has_key(objID): return
 
@@ -1376,8 +1380,6 @@ class DocMap(UserDict.UserDict):
                     self.add(new.instancemethod(val, None, obj))
                 elif valID.is_builtin_method():
                     self.add(val)
-
-    add = __setitem__
 
     def _toplevel(self, uid):
         """
