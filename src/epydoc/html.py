@@ -509,7 +509,7 @@ class HTMLFormatter:
 
         @rtype: C{None}
         """
-        for uid in self._filtersort_uids(self._docmap.keys()):
+        for uid in self._filter_private(self._docmap.keys()):
             doc = self._docmap[uid]
             filename = os.path.join(directory, self._uid_to_uri(uid))
             if isinstance(doc, ModuleDoc):
@@ -551,7 +551,7 @@ class HTMLFormatter:
         open(filename, 'w').write(str)
 
         # Write the table of contents for each module.
-        for uid in self._filtersort_uids(self._docmap.keys()):
+        for uid in self._filter_private(self._docmap.keys()):
             if uid.is_module():
                 doc = self._docmap[uid]
                 filename = os.path.join(directory, 'toc-%s' %
@@ -713,25 +713,22 @@ class HTMLFormatter:
 
         # If it's a package, add a list of sub-modules.
         if doc.ispackage():
-            str += self._module_list(doc.modules(), doc.sortorder(),
-                                     doc.groups())
+            str += self._module_list(doc.modules(), doc.groups())
 
         # Show the summaries for classes, exceptions, functions, and
         # variables contained in the module.
         (classes,excepts) = self._split_classes(doc.classes())
-        str += self._class_summary(classes, doc.sortorder(),
-                                   doc.groups(), 'Classes')
-        str += self._class_summary(excepts, doc.sortorder(),
-                                   doc.groups(), 'Exceptions')
-        str += self._func_summary(doc.functions(), doc.sortorder(),
-                                  None, doc.groups(), 'Function Summary')
-        str += self._var_summary(doc.variables(), doc.sortorder(),
-                                 uid, doc.groups(), 'Variable Summary')
+        str += self._class_summary(classes, doc.groups(), 'Classes')
+        str += self._class_summary(excepts, doc.groups(), 'Exceptions')
+        str += self._func_summary(doc.functions(), None, doc.groups(),
+                                  'Function Summary')
+        str += self._var_summary(doc.variables(), uid, doc.groups(),
+                                 'Variable Summary')
 
         # Show a list of all imported objects.
         (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
         str += self._imports(iclasses, iexcepts, doc.imported_functions(),
-                             doc.imported_variables(), doc.sortorder())
+                             doc.imported_variables())
 
         # Show details for the functions and variables.
         str += self._func_details(doc.functions(), None)
@@ -787,16 +784,13 @@ class HTMLFormatter:
 
         # Show the summaries for methods, instance variables, and
         # class variables contained in the class.
-        allmethods = doc.methods()+doc.staticmethods()+doc.classmethods()
-        str += self._func_summary(allmethods, doc.sortorder(),
-                                  doc, doc.groups(), 'Method Summary')
-        str += self._property_summary(doc.properties(), doc.sortorder(),
-                                      uid, doc.groups(), 'Property Summary')
-        str += self._var_summary(doc.ivariables(), doc.sortorder(),
-                                 uid, doc.groups(),
+        str += self._func_summary(doc.allmethods(), doc, doc.groups(), 
+                                  'Method Summary')
+        str += self._property_summary(doc.properties(), uid, doc.groups(), 
+                                      'Property Summary')
+        str += self._var_summary(doc.ivariables(), uid, doc.groups(),
                                  'Instance Variable Summary')
-        str += self._var_summary(doc.cvariables(), doc.sortorder(),
-                                 uid, doc.groups(),
+        str += self._var_summary(doc.cvariables(), uid, doc.groups(),
                                  'Class Variable Summary')
 
         # Show details for methods and variables
@@ -931,7 +925,7 @@ class HTMLFormatter:
             page. 
         @rtype: C{string}
         """
-        uids = self._filtersort_uids(self._docmap.keys())
+        uids = self._filter_private(self._docmap.keys())
 
         # Header
         str = self._header('Table of Contents')
@@ -993,17 +987,16 @@ class HTMLFormatter:
         # documented.  In particular, do not include base classes,
         # inherited methods, and imported objects from other modules
         # in the index.
-        documented_modules = [uid for uid in self._docmap.keys()
-                              if uid.is_module()]
-        documented_modules.append(None)
+        documented_modules = _dictset(self._docmap.keys())
+        documented_modules[None] = 1
         classes = [c for c in classes
-                   if c.target().module() in documented_modules]
+                   if documented_modules.has_key(c.target().module())]
         excepts = [e for e in excepts
-                   if e.target().module() in documented_modules]
+                   if documented_modules.has_key(e.target().module())]
         funcs = [f for f in funcs
-                 if f.target().module() in documented_modules]
+                 if documented_modules.has_key(f.target().module())]
         vars = [v for v in vars
-                if v.uid().module() in documented_modules]
+                if documented_modules.has_key(v.uid().module())]
 
         # Class and excpetion lists.
         str += self._start_of('All Classes')
@@ -1268,21 +1261,20 @@ class HTMLFormatter:
             if doc and doc.subclasses():
                 str += ' '*depth + '  <ul>\n'
                 children = [l.target() for l
-                            in self._filtersort_links(doc.subclasses())]
+                            in self._filter_private(doc.subclasses())]
                 for child in children:
                     str += self._class_tree_item(child, depth+4)
                 str += ' '*depth + '  </ul>\n'
         return str
 
-    def _class_tree(self, sortorder=None):
+    def _class_tree(self):
         """
         @return: The HTML code for the class hierarchy tree.  This is
             used by L{_trees_to_html} to construct the hierarchy page.
         @rtype: C{string}
         """
         str = '<ul>\n'
-        uids = self._filtersort_uids(self._docmap.keys())
-        #docs.sort(lambda a,b: cmp(a[0], b[0]))
+        uids = self._filter_private(self._docmap.keys())
         for uid in uids:
             doc = self._docmap[uid]
             if not isinstance(doc, ClassDoc): continue
@@ -1316,24 +1308,23 @@ class HTMLFormatter:
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  <ul>\n'
             modules = [l.target() for l in 
-                       self._filtersort_links(doc.modules(), doc.sortorder())]
+                       self._filter_private(doc.modules())]
             for module in modules:
                 str += self._module_tree_item(module, depth+4)
             str += ' '*depth + '  </ul>\n'
         str += ' '*depth+'</li>\n'
         return str
 
-    def _module_tree(self, sortorder=None):
+    def _module_tree(self):
         """
         @return: The HTML code for the module hierarchy tree.  This is
             used by L{_trees_to_html} to construct the hiearchy page.
         @rtype: C{string}
         """
         str = '<ul>\n'
-        uids = self._filtersort_uids(self._docmap.keys())
-        #docs.sort(lambda a,b: cmp(a[0], b[0]))
+        uids = self._filter_private(self._docmap.keys())
         # Find all top-level packages. (what about top-level
-        # modules?)
+        # modules?) XXXXXXXXXXXXX
         for uid in uids:
             doc = self._docmap[uid]
             if not isinstance(doc, ModuleDoc): continue
@@ -1341,7 +1332,7 @@ class HTMLFormatter:
                 str += self._module_tree_item(uid)
         return str +'</ul>\n'
 
-    def _module_list(self, modules, sortorder, groups):
+    def _module_list(self, modules, groups):
         """
         @return: The HTML code for the module hierarchy tree,
             containing the given modules.  This is used by
@@ -1350,7 +1341,7 @@ class HTMLFormatter:
         """
         if len(modules) == 0: return ''
         str = self._table_header('Submodules', 'details')
-        modules = self._filtersort_links(modules, sortorder)
+        modules = self._filter_private(modules)
         groupstr = ''
         
         # Create the portion of the list containing the group
@@ -1359,9 +1350,11 @@ class HTMLFormatter:
         # modules are at the top.
         for groupname, groupmembers in groups:
             # Extract the group
-            group = [m for m in modules if m.target() in groupmembers]
+            groupset = _dictset(groupmembers)
+            group = [m for m in modules if groupset.has_key(m.target())]
             if not group: continue
-            modules = [m for m in modules if m not in group]
+            modules = [m for m in modules
+                       if not groupset.has_key(m.target())]
             # Print a header within the list
             groupstr += self._group_header(groupname)
             #groupstr += ('  <tr rowspan="2" class="group"><td>\n'+
@@ -1385,15 +1378,14 @@ class HTMLFormatter:
     # Class tables
     #////////////////////////////////////////////////////////////
     
-    def _class_summary(self, classes, sortorder,
-                       groups, heading='Class Summary'):
+    def _class_summary(self, classes, groups, heading='Class Summary'):
         """
         @return: The HTML code for the class summary table.  This is
             used by L{_module_to_html} to list the classes in a
             module.
         @rtype: C{string}
         """
-        classes = self._filtersort_links(classes, sortorder)
+        classes = self._filter_private(classes)
         if len(classes) == 0: return ''
         
         # Create the portion of the table containing the group
@@ -1403,9 +1395,11 @@ class HTMLFormatter:
         groupstr = ''
         for groupname, groupmembers in groups:
             # Extract the group
-            group = [c for c in classes if c.target() in groupmembers]
+            groupset = _dictset(groupmembers)
+            group = [c for c in classes if groupset.has_key(c.target())]
             if not group: continue
-            classes = [c for c in classes if c not in group]
+            classes = [c for c in classes
+                       if not groupset.has_key(c.target())]
             # Print a header within the table
             groupstr += self._group_header(groupname)
             # Add the lines for each func
@@ -1432,7 +1426,7 @@ class HTMLFormatter:
     # Function tables
     #////////////////////////////////////////////////////////////
     
-    def _func_summary(self, functions, sortorder, cls, groups, 
+    def _func_summary(self, functions, cls, groups, 
                       heading='Function Summary'):
         """
         @return: The HTML code for a function summary table.  This
@@ -1441,7 +1435,7 @@ class HTMLFormatter:
             functions. 
         @rtype: C{string}
         """
-        functions = self._filtersort_links(functions, sortorder)
+        functions = self._filter_private(functions)
         if len(functions) == 0: return ''
 
         # Create the portion of the table containing the group
@@ -1451,9 +1445,11 @@ class HTMLFormatter:
         groupstr = ''
         for groupname, groupmembers in groups:
             # Extract the group
-            group = [f for f in functions if f.target() in groupmembers]
+            groupset = _dictset(groupmembers)
+            group = [f for f in functions if groupset.has_key(f.target())]
             if not group: continue
-            functions = [f for f in functions if f not in group]
+            functions = [f for f in functions
+                         if not groupset.has_key(f.target())]
             # Print a header within the table
             groupstr += self._group_header(groupname)
             # Add the lines for each func
@@ -1536,7 +1532,7 @@ class HTMLFormatter:
             functions.
         @rtype: C{string}
         """
-        functions = self._filtersort_links(functions)
+        functions = self._filter_private(functions)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
 
@@ -1729,9 +1725,9 @@ class HTMLFormatter:
     #////////////////////////////////////////////////////////////
     # Property tables
     #////////////////////////////////////////////////////////////
-    def _property_summary(self, properties, sortorder, container,
-                          groups, heading='Property Summary'):
-        properties = self._filtersort_links(properties, sortorder)
+    def _property_summary(self, properties, container, groups,
+                          heading='Property Summary'):
+        properties = self._filter_private(properties)
         if len(properties) == 0: return ''
 
         # Create the portion of the table containing the group
@@ -1741,9 +1737,11 @@ class HTMLFormatter:
         groupstr = ''
         for groupname, groupmembers in groups:
             # Extract the group
-            group = [p for p in properties if p.target() in groupmembers]
+            groupset = _dictset(groupmembers)
+            group = [p for p in properties if groupset.has_key(p.target())]
             if not group: continue
-            properties = [p for p in properties if p not in group]
+            properties = [p for p in properties
+                          if not groupset.has_key(p.target())]
             # Print a header within the table
             groupstr += self._group_header(groupname)
             # Add the lines for each func
@@ -1793,7 +1791,7 @@ class HTMLFormatter:
 
     def _property_details(self, properties, container,
                           heading='Property Details'):
-        properties = self._filtersort_links(properties)
+        properties = self._filter_private(properties)
         if len(properties) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
 
@@ -1849,8 +1847,8 @@ class HTMLFormatter:
     # Variable tables
     #////////////////////////////////////////////////////////////
     
-    def _var_summary(self, variables, sortorder, container,
-                     groups, heading='Variable Summary'):
+    def _var_summary(self, variables, container, groups,
+                     heading='Variable Summary'):
         """
         @return: The HTML code for a variable summary table.  This
             is used by L{_module_to_html} to list the variables in a
@@ -1858,7 +1856,7 @@ class HTMLFormatter:
             variables and class variables.
         @rtype: C{string}
         """
-        variables = self._filtersort_vars(variables, sortorder)
+        variables = self._filter_private(variables)
         if len(variables) == 0: return ''
 
         # Create the portion of the table containing the group
@@ -1868,9 +1866,11 @@ class HTMLFormatter:
         groupstr = ''
         for groupname, groupmembers in groups:
             # Extract the group
-            group = [v for v in variables if v.uid() in groupmembers]
+            groupset = _dictset(groupmembers)
+            group = [v for v in variables if groupset.has_key(v.uid())]
             if not group: continue
-            variables = [v for v in variables if v not in group]
+            variables = [v for v in variables
+                         if not groupset.has_key(v.uid())]
             # Print a header within the table
             groupstr += self._group_header(groupname)
             # Add the lines for each func
@@ -1925,7 +1925,7 @@ class HTMLFormatter:
             variables and class variables.
         @rtype: C{string}
         """
-        variables = self._filtersort_vars(variables)
+        variables = self._filter_private(variables)
         if len(variables) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
 
@@ -2182,112 +2182,28 @@ class HTMLFormatter:
 
     def _extract_identifier_index(self):
         """
-        @rtype: C{list} of C{(string, string)}
+        @rtype: C{list} of L{UID}
         """
         # List of (sort-key, UID), where sort-key is
         # uid.shortname().lower().
-        uids = []
+        decorated_uids = []
 
         for (uid, doc) in self._docmap.items():
             if (not self._show_private) and uid.is_private():
                 continue
             
-            uids.append( (uid.shortname().lower(), uid) )
+            decorated_uids.append( (uid.shortname().lower(), uid) )
             if uid.is_module():
-                uids += [(v.name().lower(), v.uid())
-                         for v in doc.variables()
-                         if not v.uid().is_private()]
+                decorated_uids += [(v.name().lower(), v.uid())
+                                   for v in doc.variables()
+                                   if not v.uid().is_private()]
             elif uid.is_class():
-                uids += [(v.name().lower(), v.uid())
-                         for v in doc.ivariables() + doc.cvariables()
-                         if not v.uid().is_private()]
+                decorated_uids += [(v.name().lower(), v.uid())
+                                   for v in doc.ivariables() + doc.cvariables()
+                                   if not v.uid().is_private()]
 
-        uids.sort()
-        return [u[1] for u in uids]
-
-        # list of (name, href, descr) tripples
-        identifiers = []
-        
-        for (uid, doc) in self._docmap.items():
-            if (not self._show_private) and uid.is_private():
-                continue
-            if uid.is_module():
-                # Add the module to the index.
-                if uid.is_package() and uid.package():
-                    descr = 'Subpackage in package '
-                    descr += self._uid_to_href(uid.package())
-                elif uid.package():
-                    descr = 'Module in package '
-                    descr += self._uid_to_href(uid.package())
-                else: descr = 'Module'
-                href = self._uid_to_href(uid, uid.shortname())
-                identifiers.append( (uid.shortname(), href, descr) )
-
-                # Add all of the module's variables to the index.
-                descr = ' Variable in module %s' % self._uid_to_href(uid)
-                for var in doc.variables():
-                    if ((not self._show_private) and var.uid().is_private()):
-                        continue
-                    href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.name(), var.name()))
-                    identifiers.append( (var.name(), href, descr) )
-                    
-            elif uid.is_class():
-                # Add the class to the index.
-                descr = ('Class in module %s' %
-                         self._uid_to_href(uid.module()))
-                href = self._uid_to_href(uid, uid.shortname())
-                identifiers.append( (uid.shortname(), href, descr) )
-
-                # Add all the class variables to the index.
-                descr = ('Class variable in class %s' %
-                         self._uid_to_href(uid))
-                for var in doc.cvariables():
-                    if ((not self._show_private) and var.uid().is_private()):
-                        continue
-                    href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.name(), var.name()))
-                    identifiers.append( (var.name(), href, descr) )
-
-                # Add all the instance variables to the index.
-                descr = ('Instance variable in class %s' %
-                         self._uid_to_href(uid))
-                for var in doc.ivariables():
-                    if ((not self._show_private) and var.uid().is_private()):
-                        continue
-                    href = ('<a href="%s#%s">%s</a>' %
-                            (self._uid_to_uri(uid), var.name(), var.name()))
-                    identifiers.append( (var.name(), href, descr) )
-
-            elif uid.is_routine():
-                # Add the function/method to the index.
-                if uid.is_function() or uid.is_builtin_function():
-                    descr = ('Function in module %s' %
-                             self._uid_to_href(uid.module()))
-                else:
-                    descr = ('Method in class %s' %
-                             self._uid_to_href(uid.cls()))
-                href = self._uid_to_href(uid, uid.shortname())
-                identifiers.append( (uid.shortname(), href, descr) )
-
-                # Add the parameters to the index.
-                if self._index_parameters:
-                    if uid.is_function() or uid.is_builtin_function():
-                        descr = 'Parameter to function '
-                        dsecr += self._uid_to_href(uid)
-                    else:
-                        descr = 'Parameter to method '
-                        dsecr += self._uid_to_href(uid)
-                    extra_p = [v for v in [doc.vararg(), doc.kwarg()]
-                               if v is not None]
-                    for var in doc.parameter_list()+extra_p:
-                        href = self._uid_to_href(uid, var.name())
-                        identifiers.append( (var.name(), href, descr) )
-            else:
-                raise AssertionError, 'fix me'
-
-        identifiers.sort(lambda a,b: cmp(a[0].lower(),b[0].lower()))
-        return [id[1:3] for id in identifiers]
+        decorated_uids.sort()        
+        return [u[1] for u in decorated_uids]
 
     #////////////////////////////////////////////////////////////
     # Table of contents (frames) generation
@@ -2297,7 +2213,11 @@ class HTMLFormatter:
         # Sort & filter the links
         if not self._show_private:
             links = [o for o in links if not o.target().is_private()]
-        links.sort(lambda x,y: cmp(x.name().lower(), y.name().lower()))
+
+        # Sort the links by name
+        decorated = [(link.name().lower(), link) for link in links]
+        decorated.sort()
+        links = [d[-1] for d in decorated]
 
         if not links: return ''
         str = self._start_of(section)
@@ -2311,8 +2231,11 @@ class HTMLFormatter:
         # Sort & filter the vars.
         if not self._show_private:
             vars = [v for v in vars if not v.uid().is_private()]
-        vars.sort(lambda v1, v2: cmp(v1.name().lower(),
-                                     v2.name().lower()))
+
+        # Sort the variables by name
+        decorated = [(var.name().lower(),var) for var in vars]
+        decorated.sort()
+        vars = [d[-1] for d in decorated]
 
         if not vars: return ''
         str = self._start_of(section)
@@ -2516,125 +2439,14 @@ class HTMLFormatter:
         # There is no top-level object.
         return None
 
-    def _cmp_name(self, name1, name2):
+    def _filter_private(self, items):
         """
-        Compare uid1 and uid2 by their names, using the following rules: 
-          - C{'__init__'} < anything.
-          - public < private.
-          - otherwise, sort alphabetically by name (ignoring case)
-    
-        @return: -1 if C{uid1<uid2}; 0 if C{uid1==uid2}; and 1 if
-            C{uid1>uid2}.
-        @rtype: C{int}
+        If L{_show_private} is true, then return C{items}; otherwise,
+        return a copy of C{items} with all private items removed.
         """
-        if (name2 == '__init__'): return 1
-        if (name1 == '__init__'): return -1
-        if name1 == name2: return 0
-        if self._is_private(name1) and not self._is_private(name2): return 1
-        if self._is_private(name2) and not self._is_private(name1): return -1
-        return cmp(name1.lower(), name2.lower())
+        if self._show_private: return items
+        else: return [i for i in items if not i.is_private()]
 
-    def _filtersort_links(self, links, sortorder=None):
-        """
-        Sort and filter a list of C{Link}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
-
-        @param links: The list of C{Link}s to be sorted and filtered.
-        @type links: C{list} of L{Link}
-        @param sortorder: A list of link names, typically generated
-            from C{__epydoc__sort__}, and returned by
-            L{ObjDoc.sortorder}.  Links whose name are in C{sortorder}
-            are placed at the beginning of the sorted list, in the
-            order that they appear in C{sortorder}.
-        @type sortorder: C{list} of C{string}
-        @return: The sorted list of links.
-        @rtype: C{list} of L{Link}
-        """
-        # Filter out private objects.
-        if not self._show_private:
-            links = [l for l in links if not l.target().is_private()]
-        else:
-            links = list(links)
-
-        # Check the sortorder.  If available, then use it to sort the
-        # objects.
-        if (type(sortorder) not in (type(()), type([]))):
-            so_links = []
-        else:
-            if type(sortorder) == type(()): sortorder = list(sortorder)
-            so_links = sortorder[:]
-            for link in links:
-                try: so_links[sortorder.index(link.name())] = link 
-                except ValueError: continue
-            so_links = [l for l in so_links if type(l) != type('')]
-            for link in so_links: links.remove(link)
-
-        # Sort any links not contained in sortorder.
-        links.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        
-        return so_links + links
-
-    def _filtersort_uids(self, uids):
-        """
-        Sort and filter a list of C{UID}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
-
-        @param uids: The list of C{UID}s to be sorted and filtered.
-        @type uids: C{list} of L{UID}
-        @return: The sorted list of UIDs.
-        @rtype: C{list} of L{UID}
-        """
-        # Filter out private objects
-        if not self._show_private:
-            uids = [u for u in uids if not u.is_private()]
-
-        # Sort and return the UIDs.
-        uids.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        return uids
-
-    def _filtersort_vars(self, vars, sortorder=None):
-        """
-        Sort and filter a list of C{Var}s.  If L{_show_private} is
-        false, then filter out all private objects; otherwise, perform
-        no filtering.
-
-        @param vars: The list of C{Var}s to be sorted and filtered.
-        @type vars: C{list} of L{Var}
-        @param sortorder: A list of variable names, typically generated
-            from C{__epydoc__sort__}, and returned by
-            L{ObjDoc.sortorder}.  Vars whose name are in C{sortorder}
-            are placed at the beginning of the sorted list, in the
-            order that they appear in C{sortorder}.
-        @type sortorder: C{list} of C{string}
-        @return: The sorted list of variables.
-        @rtype: C{list} of L{Var}
-        """
-        # Filter out private objects.
-        if not self._show_private:
-            vars = [v for v in vars if not v.uid().is_private()]
-        else:
-            vars = list(vars)
-
-        # Check the sortorder.  If available, then use it to sort the
-        # objects.
-        if (type(sortorder) not in (type(()), type([]))):
-            so_vars = []
-        else:
-            if type(sortorder) == type(()): sortorder = list(sortorder)
-            so_vars = sortorder[:]
-            for var in vars:
-                try: so_vars[sortorder.index(var.name())] = var
-                except ValueError: continue
-            so_vars = [v for v in so_vars if type(v) != type('')]
-            for var in so_vars: vars.remove(var)
-
-        # Sort any variables not contained in sortorder.
-        vars.sort(lambda x,y,c=self._cmp_name: c(x.name(), y.name()))
-        
-        return so_vars + vars
-        
     def _header(self, name):
         """
         @return: The HTML code for the header of a page with the given
@@ -2682,16 +2494,16 @@ class HTMLFormatter:
                 return '&nbsp;'
         return summary or '&nbsp;'
 
-    def _imports(self, classes, excepts, functions, variables, sortorder):
+    def _imports(self, classes, excepts, functions, variables):
         if not self._show_imports: return ''
         class_items = [self._link_to_html(c)
-                       for c in self._filtersort_links(classes, sortorder)]
+                       for c in self._filter_private(classes)]
         except_items = [self._link_to_html(e)
-                        for e in self._filtersort_links(excepts, sortorder)]
+                        for e in self._filter_private(excepts)]
         func_items = [self._link_to_html(f)
-                      for f in self._filtersort_links(functions, sortorder)]
+                      for f in self._filter_private(functions)]
         var_items = ['<code>%s</code>' % v.name()
-                     for v in self._filtersort_vars(variables, sortorder)]
+                     for v in self._filter_private(variables)]
         if not (class_items or except_items or func_items):
             return ''
         str = self._start_of('Imports')+'<dl>\n'
@@ -2902,7 +2714,8 @@ class HTMLFormatter:
         
         str = '  <tr><td colspan="2">\n'
         inh_items = inh_dict.items()
-        inh_items.sort(lambda a,b: cmp(a[0], b[0]))
+        inh_items.sort(lambda a,b: cmp(a[0], b[0])) # sort by base
+        
         for (base, obj_links) in inh_items:
             str += '    <b>Inherited from %s:</b>\n' % base.shortname()
             for link in obj_links:
@@ -2934,3 +2747,9 @@ class _HTMLDocstringLinker(markup.DocstringLinker):
             failed_xrefs[identifier][self._uid] = 1    
         return self._docformatter._uid_to_href(uid, label, 'link')
         
+def _dictset(list):
+    dictset = {}
+    for elt in list:
+        dictset[elt] = 1
+    return dictset
+    
