@@ -105,13 +105,16 @@ contents</i>: </p>
 <center>
 <table class="summary" border="1" cellspacing="0" cellpadding="3">
   <tr heigh="30%%">
-    <td align="center"> Project<br>Contents<hr>...</td>
+    <td align="center">
+       <font size="-1">Project<br>Contents<hr>...</td></font>
     <td align="center" rowspan="2" width="70%%">
-      API<br>Documentation<br>Frame
+      API<br>Documentation<br>Frame<br><br><br>
     </td>
   </tr>
   <tr>
-    <td align="center"> Module<br>Contents<hr>&nbsp;<br>...<br>&nbsp;</td>
+    <td align="center">
+      <font size="-1">Module<br>Contents<hr>&nbsp;<br>...<br>&nbsp;</font>
+    </td>
   </tr>
 </table><br>
 </center>
