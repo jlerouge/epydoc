@@ -2193,17 +2193,25 @@ class FuncDoc(ObjDoc):
         self._return = Param('return')
 
     def _init_params(self):
+        tmp_param = self._tmp_param
+        tmp_type = self._tmp_type
+        
         # Add descriptions/types to argument/return Variables.
         vars = self.parameter_list()[:]
         if self._return: vars.append(self._return)
         for arg in vars:
             name = arg.name()
-            if self._tmp_param.has_key(name):
-                arg.set_descr(self._tmp_param[name])
-                del self._tmp_param[name]
-            if self._tmp_type.has_key(name):
-                arg.set_type(self._tmp_type[name])
-                del self._tmp_type[name]
+            if tmp_param.has_key(name):
+                descr = tmp_param[name]
+                if descr is None:
+                    estr = '@keyword used for explicit parameter %s' % name
+                    self._field_warnings.append(estr)
+                else:
+                    arg.set_descr(tmp_param[name])
+                del tmp_param[name]
+            if tmp_type.has_key(name):
+                arg.set_type(tmp_type[name])
+                del tmp_type[name]
 
         # Deal with keyword params.
         if self._keywords:
@@ -2212,17 +2220,21 @@ class FuncDoc(ObjDoc):
                 self._field_warnings.append(estr)
             else:
                 for param in self._keywords:
-                    if self._tmp_type.has_key(param.name()):
-                        param.set_type(self._tmp_type[param.name()])
-                        del self._tmp_type[param.name()]
+                    if tmp_type.has_key(param.name()):
+                        param.set_type(tmp_type[param.name()])
+                        del tmp_type[param.name()]
+
+        # Delete _tmp_param entries that were added by keywords.
+        for (k,v) in tmp_param.items():
+            if v is None: del tmp_param[k]
 
         # Flag warnings if we didn't use any @param or @types.
-        if self._tmp_param != {}:
-            for key in self._tmp_param.keys():
+        if tmp_param != {}:
+            for key in tmp_param.keys():
                 estr = '@param for unknown parameter %s' % key
                 self._field_warnings.append(estr)
-        if self._tmp_type != {}:
-            for key in self._tmp_type.keys():
+        if tmp_type != {}:
+            for key in tmp_type.keys():
                 estr = '@type for unknown parameter %s' % key
                 self._field_warnings.append(estr)
         del self._tmp_param
@@ -2305,7 +2317,7 @@ class FuncDoc(ObjDoc):
                 warnings.append(tag+' expected a single argument')
                 return
             if self._tmp_param.has_key(arg):
-                warnings.append('Redefinition of @%s %s' % (tag, arg))
+                warnings.append('Redefinition of parameter %s' % arg)
             self._tmp_param[arg] = descr
         elif tag == 'type':
             if arg is None:
@@ -2320,8 +2332,9 @@ class FuncDoc(ObjDoc):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            #if self._keywords.has_key(arg):
-            #    warnings.append('Redefinition of @%s %s' % (tag, arg))
+            if self._tmp_param.has_key(arg):
+                warnings.append('Redefinition of parameter %s' % arg)
+            self._tmp_param[arg] = None # To check for redefinition.
             self._keywords.append(Param(arg, descr))
         elif tag in ('raise', 'raises', 'exception', 'except'):
             if arg is None:
