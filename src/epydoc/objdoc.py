@@ -205,7 +205,7 @@ class ObjDoc:
           C{__epydoc_sort__} variable.
 
     @ivar _uid: The object's unique identifier
-    @type _uid: C{UID}
+    @type _uid: L{UID}
     
     @ivar _descr: The object's description, encoded as epytext.
     @type _descr: C{Element}
@@ -397,32 +397,32 @@ class ModuleDoc(ObjDoc):
     consists of standard documentation fields (descr, author, etc.)
     and the following module-specific fields:
     
-        - X{classes}: A list of any classes contained in the
+        - X{classes}: A list of all classes contained in the
           module/package 
-        - X{functions}: A list of any functions contained in the
+        - X{functions}: A list of all functions contained in the
           module/package
-        - X{variables}: A list of any variables contained in the
+        - X{variables}: A list of all variables contained in the
           module/package
-        - X{modules}: A list of any modules contained in the
+        - X{modules}: A list of all modules contained in the
           package (packages only)
 
     For more information on the standard documentation fields, see
     L{ObjDoc}.
 
-    @type _classes: C{list} of C{Link}
-    @ivar _classes: A list of any classes contained in the
+    @type _classes: C{list} of L{Link}
+    @ivar _classes: A list of all classes contained in the
         module/package. 
     
-    @type _functions: C{list} of C{Link}
-    @ivar _functions: A list of any functions contained in the
+    @type _functions: C{list} of L{Link}
+    @ivar _functions: A list of all functions contained in the
         module/package.
 
-    @type _variables: C{list} of C{Var}
-    @ivar _variables: A list of any variables defined by this
+    @type _variables: C{list} of L{Var}
+    @ivar _variables: A list of all variables defined by this
         module/package. 
     
-    @type _modules: C{list} of C{Link}
-    @ivar _modules: A list of any modules conained in the package
+    @type _modules: C{list} of L{Link}
+    @ivar _modules: A list of all modules conained in the package
         (package only).
     """
     def __init__(self, mod):
@@ -515,19 +515,80 @@ class ModuleDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
         
-    def functions(self): return self._functions
-    def classes(self): return self._classes
-    def variables(self): return self._variables
-    def package(self): return self._uid.package()
+    def functions(self):
+        """
+        @return: A list of all functions contained in the
+            module/package documented by this C{ModuleDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._functions
+    
+    def classes(self):
+        """
+        @return: A list of all classes contained in the
+            module/package documented by this C{ModuleDoc}. 
+        @rtype: C{list} of L{Link}
+        """
+        return self._classes
+    
+    def variables(self):
+        """
+        @return: A list of all variables defined by this
+            module/package documented by this C{ModuleDoc}. 
+        @rtype: C{list} of L{Var}
+        """
+        return self._variables
+    
+    def package(self):
+        """
+        @return: The package that contains the module documented by
+            this C{ModuleDoc}, or C{None} if no package contains the
+            module. 
+        @rtype: L{UID} or C{None}
+        """
+        return self._uid.package()    
 
-    def ispackage(self): return self._modules != None
-    def ismodule(self): return self._modules == None
+    def ispackage(self):
+        """
+        @return: True if this C{ModuleDoc} documents a package (not a
+            module). 
+        @rtype: C{boolean}
+        """
+        return self._modules != None
+    
+    def ismodule(self):
+        """
+        @return: True if this C{ModuleDoc} documents a module (not a
+            package). 
+        @rtype: C{boolean}
+        """
+        return self._modules == None
+    
     def modules(self):
+        """
+        @return: A list of the known modules and subpackages conained
+            in the package documented by this C{ModuleDoc}. 
+        @rtype: C{list} of L{Link}
+        @raise TypeError: If this C{ModuleDoc} does not document a
+            package. 
+        """
         if self._modules == None:
             raise TypeError('This ModuleDoc does not '+
                             'document a package.')
         return self._modules
+    
     def add_module(self, module):
+        """
+        Register a submodule for the package doumented by this
+        C{ModuleDoc}.  This must be done externally, since we can't
+        determine the submodules of a package through introspection
+        alone.  This is automatically called by L{DocMap.add} when new
+        modules are added to a C{DocMap}.
+
+        @param module: The unique identifier of the module or subpackage.
+        @type module: L{UID}
+        @rtype: C{None}
+        """
         if self._modules == None:
             raise TypeError('This ModuleDoc does not '+
                             'document a package.')
@@ -544,7 +605,7 @@ class ClassDoc(ObjDoc):
     following class-specific fields:
     
         - X{bases}: A list of the class's base classes
-        - X{children}: A list of the class's known child classes
+        - X{subclasses}: A list of the class's known subclasses
         - X{methods}: A list of the methods defined by the class
         - X{ivariables}: A list of the instance variables defined by the
           class
@@ -555,18 +616,18 @@ class ClassDoc(ObjDoc):
     For more information on the standard documentation fields, see
     L{ObjDoc}.
 
-    @type _methods: C{list} of C{Link}
-    @ivar _methods: A list of any methods contained in this class. 
+    @type _methods: C{list} of L{Link}
+    @ivar _methods: A list of all methods contained in this class. 
 
-    @type _ivariables: C{list} of C{Var}
-    @ivar _ivariables: A list of any instance variables defined by this 
+    @type _ivariables: C{list} of L{Var}
+    @ivar _ivariables: A list of all instance variables defined by this 
         class.
     
-    @type _cvariables: C{list} of C{Var}
-    @ivar _cvariables: A list of any class variables defined by this 
+    @type _cvariables: C{list} of L{Var}
+    @ivar _cvariables: A list of all class variables defined by this 
         class.
 
-    @type _bases: C{list} of C{Link}
+    @type _bases: C{list} of L{Link}
     @ivar _bases: A list of the identifiers of this class's bases.
     """
     def __init__(self, cls):
@@ -625,9 +686,9 @@ class ClassDoc(ObjDoc):
         for base in cls.__bases__:
             self._bases.append(Link(base.__name__, base))
 
-        # Initialize child class list.  (Child classes get added
-        # externally with add_child())
-        self._children = []
+        # Initialize subclass list.  (Subclasses get added
+        # externally with add_subclass())
+        self._subclasses = []
 
         # How do I want to handle inheritance?
         self._methodbyname = {}
@@ -673,7 +734,7 @@ class ClassDoc(ObjDoc):
         str = '<ClassDoc: '+`self._uid`+' ('
         if (not self._bases and not self._methods and
             not self._cvariables and not self._ivariables and
-            not self._children):
+            not self._subclasses):
             return str[:-2]+'>'
         if self._bases:
             str += `len(self._bases)`+' base classes; '
@@ -683,8 +744,8 @@ class ClassDoc(ObjDoc):
             str += `len(self._cvariables)`+' class variabless; '
         if self._ivariables:
             str += `len(self._ivariables)`+' instance variables; '
-        if self._children:
-            str += `len(self._children)`+' child classes; '
+        if self._subclasses:
+            str += `len(self._subclasses)`+' subclasses; '
         return str[:-2]+')>'
 
     def _inherit_methods(self, base):
@@ -703,27 +764,27 @@ class ClassDoc(ObjDoc):
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
             
-    # This never gets called right now!
-    def inherit(self, *basedocs):
-        self._inh_cvariables = []
-        self._inh_ivariables = []
-        for basedoc in basedocs:
-            if basedoc is None: continue
+#     # This never gets called right now!
+#     def inherit(self, *basedocs):
+#         self._inh_cvariables = []
+#         self._inh_ivariables = []
+#         for basedoc in basedocs:
+#             if basedoc is None: continue
             
-            cvars = [cv.name() for cv
-                     in self._cvariables + self._inh_cvariables]
-            ivars = [iv.name() for iv
-                     in self._ivariables + self._inh_ivariables]
+#             cvars = [cv.name() for cv
+#                      in self._cvariables + self._inh_cvariables]
+#             ivars = [iv.name() for iv
+#                      in self._ivariables + self._inh_ivariables]
           
-            for cvar in basedoc.cvariables():
-                if cvar.name() not in cvars:
-                    self._inh_cvariables.append(cvar)
+#             for cvar in basedoc.cvariables():
+#                 if cvar.name() not in cvars:
+#                     self._inh_cvariables.append(cvar)
     
-            for ivar in basedoc.ivariables():
-                if ivar.name() not in ivars:
-                    self._inh_ivariables.append(ivar)
-        print self.uid(), 'IC', self._inh_cvariables
-        print self.uid(), 'IV', self._inh_ivariables
+#             for ivar in basedoc.ivariables():
+#                 if ivar.name() not in ivars:
+#                     self._inh_ivariables.append(ivar)
+#         print self.uid(), 'IC', self._inh_cvariables
+#         print self.uid(), 'IV', self._inh_ivariables
 
     #////////////////////////////
     #// Accessors
@@ -732,20 +793,67 @@ class ClassDoc(ObjDoc):
 #     def inherited_cvariables(self): return self._inh_cvariables 
 #     def inherited_ivariables(self): return self._inh_ivariables
 
-    def is_exception(self): return self._is_exception
+    def is_exception(self):
+        """
+        @return: True if this C{ClassDoc} documents an exception
+            class. 
+        @rtype: C{boolean}
+        """
+        return self._is_exception
 
-    def overrides(self, method):
-        return self._overrides.get(method, [])
-    
     def methods(self):
+        """
+        @return: A list of all methods defined by the class documented
+            by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
         return self._methods
-    def cvariables(self): return self._cvariables
-    def ivariables(self): return self._ivariables
+    
+    def cvariables(self):
+        """
+        @return: A list of all class variables defined by the class
+            documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Var}
+        """
+        return self._cvariables
+    
+    def ivariables(self):
+        """
+        @return: A list of all instance variables defined by the class
+            documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Var}
+        """
+        return self._ivariables
 
-    def bases(self): return self._bases
-    def children(self): return self._children
-    def add_child(self, cls):
-        self._children.append(Link(cls.__name__, cls))
+    def bases(self):
+        """
+        @return: A list of all base classes for the class documented
+            by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._bases
+    
+    def subclasses(self):
+        """
+        @return: A list of known subclasses for the class documented by
+            this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._subclasses
+    
+    def add_subclass(self, cls):
+        """
+        Register a subclass for the class doumented by this
+        CC{ClassDoc}.  This must be done externally, since we can't
+        determine a class's subclasses through introspection
+        alone.  This is automatically called by L{DocMap.add} when new
+        classes are added to a C{DocMap}.
+
+        @param cls: The unique identifier of the subclass.
+        @type cls: L{UID}
+        @rtype: C{None}
+        """
+        self._subclasses.append(Link(cls.__name__, cls))
 
 #////////////////////////////////////////////////////////
 #// FuncDoc
@@ -767,15 +875,15 @@ class FuncDoc(ObjDoc):
     For more information on the standard documentation fields, see
     L{ObjDoc}.
 
-    @type _params: C{list} of C{Var}
+    @type _params: C{list} of L{Var}
     @ivar _params: A list of this function's normal parameters.
-    @type _vararg_param: C{Var}
+    @type _vararg_param: L{Var}
     @ivar _vararg_param: This function's vararg parameter, or C{None}
         if it has none.
-    @type _kwarg_param: C{Var}
+    @type _kwarg_param: L{Var}
     @ivar _kwarg_param: This function's keyword parameter, or C{None}
         if it has none.
-    @type _return: C{Var}
+    @type _return: L{Var}
     @ivar _return: This function's return value.
     @type _raises: C{list} of C{Raise}
     @ivar _raises: The exceptions that may be raised by this
@@ -938,12 +1046,58 @@ class FuncDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
 
-    def parameters(self): return self._params
-    def vararg(self): return self._vararg_param
-    def kwarg(self): return self._kwarg_param
-    def returns(self): return self._return
-    def raises(self): return self._raises
-    def overrides(self): return self._overrides
+    def parameters(self):
+        """
+        @return: A list of all parameters for the function/method
+            documented by this C{FuncDoc}.
+        @rtype: C{list} of L{Var}
+        """
+        return self._params
+    
+    def vararg(self):
+        """
+        @return: The vararg parameter for the function/method
+            documented by this C{FuncDoc}, or C{None} if it has no
+            vararg parameter.
+        @rtype: L{Var} or C{None}
+        """
+        return self._vararg_param
+    
+    def kwarg(self):
+        """
+        @return: The keyword parameter for the function/method
+            documented by this C{FuncDoc}, or C{None} if it has no
+            keyword parameter.
+        @rtype: L{Var} or C{None}
+        """
+        return self._kwarg_param
+    
+    def returns(self):
+        """
+        @return: The return value for the function/method
+            documented by this C{FuncDoc}, or C{None} if it has no
+            return value.
+        @rtype: L{Var} or C{None}
+        """
+        return self._return
+    
+    def raises(self):
+        """
+        @return: A list of exceptions that may be raised by the
+            function/method documented by this C{FuncDoc}.
+        @rtype: C{list} of L{Raise}
+        """
+        return self._raises
+    
+    def overrides(self):
+        """
+        @return: The method overridden by the method documented by
+            this C{FuncDoc}; or C{None} if the method documented by
+            this C{FuncDoc} does not override any method, or if this
+            C{FuncDoc} documents a function.
+        @rtype: L{Link} or C{None}
+        """
+        return self._overrides    
 
 ##################################################
 ## Documentation Management
@@ -964,8 +1118,16 @@ class DocMap(UserDict.UserDict):
         <FuncDoc: epydoc.epytext.parse (3 parameters; 1 exceptions)>
     """
     
-    def __init__(self):
-        """Create a new empty documentation map."""
+    def __init__(self, document_bases=1):
+        """
+        Create a new empty documentation map.
+
+        @param document_bases: Whether or not documentation should
+            automatically be built for the bases of classes that are
+            added to the documentation map.
+        @type document_bases: C{boolean}
+        """
+        self._document_bases = document_bases
         self.data = {} # UID -> ObjDoc
         self._class_children = {} # UID -> list of UID
         self._package_children = {} # UID -> list of UID
@@ -1006,19 +1168,25 @@ class DocMap(UserDict.UserDict):
         elif type(obj) == _ClassType:
             self.data[objID] = ClassDoc(obj)
             for child in self._class_children.get(objID, []):
-                self.data[objID].add_child(child)
+                self.data[objID].add_subclass(child)
             for base in obj.__bases__:
                 baseID=UID(base)
                 if self.data.has_key(baseID):
-                    self.data[baseID].add_child(obj)
+                    self.data[baseID].add_subclass(obj)
                 if self._class_children.has_key(baseID):
                     self._class_children[baseID].append(obj)
                 else:
                     self._class_children[baseID] = [obj]
-            # Make sure all methods are added (even inherited ones).
-            for method in self.data[objID].methods():
-                self.add(method.target().object())
-                self.add(method.target().cls().object())
+
+            if self._document_bases:
+                # Make sure all bases are added.
+                for base in self.data[objID].bases():
+                    self.add(base.target().object())
+            #else:
+            #    # Make sure all methods are added
+            #    # (even inherited ones).
+            #    for method in self.data[objID].methods():
+            #        self.add(method.target().object())
                     
         elif type(obj) in (_MethodType, _FunctionType):
             self.data[objID] = FuncDoc(obj)
