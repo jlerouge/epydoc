@@ -1028,11 +1028,12 @@ class HTMLFormatter:
         public.write(str); private.write(str)
 
         # Write pointers to the packages' tables of contents
-        str = self._start_of('Packages')
-        str += '<h2 class="tocheading">Packages</h2>\n'
-        public.write(str); private.write(str)
-        for uid in uids:
-            if uid.is_package():
+        packages = [uid for uid in uids if uid.is_package()]
+        if packages:
+            str = self._start_of('Packages')
+            str += '<h2 class="tocheading">Packages</h2>\n'
+            public.write(str); private.write(str)
+            for uid in packages:
                 fname = self._uid_to_filename(uid)
                 str = (('<p class="toc"><a target="moduleFrame" '+
                         'href="toc-%s" '+
@@ -2854,9 +2855,6 @@ class HTMLFormatter:
                    (self._uid_to_uri(link.target()), link.name()))
             private.write(str)
             if link.is_public(): public.write(str)
-
-        # Write a footer
-        public.write(str); private.write(str)
 
     #////////////////////////////////////////////////////////////
     # Docstring -> HTML Conversion
