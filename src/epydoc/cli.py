@@ -183,8 +183,8 @@ def _help(arg):
         print 'string, consisting the name of a markup language, optionally '
         print 'followed by a language code (such as "en" for English).  Epydoc'
         print 'currently recognizes the following markup language names:'
-        import objdoc
-        for format in objdoc.KNOWN_DOCFORMATS:
+        import epydoc.objdoc
+        for format in eypdoc.objdoc.KNOWN_DOCFORMATS:
             print '  - %s' % format
         print
     else:
