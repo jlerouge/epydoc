@@ -79,13 +79,13 @@ h3.var-details     { background: transparent; color: #000000;
                    { background: transparent; color: #008060; }  
 
 /* Doctest blocks */
-.pysrc             { background: transparent; color: #000000; }
-.pyprompt          { background: transparent; color: #005050;
+.py-src            { background: transparent; color: #000000; }
+.py-prompt         { background: transparent; color: #005050;
                      font-weight: bold;}
-.pystring          { background: transparent; color: #006030; }
-.pycomment         { background: transparent; color: #003060; }
-.pykeyword         { background: transparent; color: #600000; }
-.pyoutput          { background: transparent; color: #404040; }
+.py-string         { background: transparent; color: #006030; }
+.py-comment        { background: transparent; color: #003060; }
+.py-keyword        { background: transparent; color: #600000; }
+.py-output         { background: transparent; color: #404040; }
 pre.doctestblock   { background: #f4faff; color: #000000; 
                      padding: .5em; margin: 1em;
                      border: 1px solid #708890; }
@@ -98,8 +98,14 @@ table pre.doctestblock
 pre.variable       { background: #dce4ec; color: #000000;
                      padding: .5em; margin: 0;
                      border: 1px solid #708890; }
-.variable-linewrap { background: transparent; color: #006080; }
-.variable-ellipsis { background: transparent; color: #006080; }
+.variable-linewrap { background: transparent; color: #604000; }
+.variable-ellipsis { background: transparent; color: #604000; }
+.variable-quote    { background: transparent; color: #604000; }
+.re                { background: transparent; color: #000000; }
+.re-char           { background: transparent; color: #006030; }
+.re-op             { background: transparent; color: #600000; }
+.re-group          { background: transparent; color: #003060; }
+.re-ref            { background: transparent; color: #404040; }
 
 /* Navigation bar */ 
 table.navbar       { background: #a0c0ff; color: #000000;
@@ -167,13 +173,13 @@ h3.var-details     { background: transparent; color: #000000;
                    { background: transparent; color: #008060; }  
 
 /* Doctest blocks */
-.pysrc             { background: transparent; color: #000000; }
-.pyprompt          { background: transparent; color: #005050;
+.py-src            { background: transparent; color: #000000; }
+.py-prompt         { background: transparent; color: #005050;
                      font-weight: bold;}
-.pystring          { background: transparent; color: #006030; }
-.pycomment         { background: transparent; color: #003060; }
-.pykeyword         { background: transparent; color: #600000; }
-.pyoutput          { background: transparent; color: #404040; }
+.py-string         { background: transparent; color: #006030; }
+.py-comment        { background: transparent; color: #003060; }
+.py-keyword        { background: transparent; color: #600000; }
+.py-output         { background: transparent; color: #404040; }
 pre.doctestblock   { background: #90a8b0; color: #000000; 
                      padding: .5em; margin: 1em;
                      border: 1px solid #708890; }
@@ -186,8 +192,14 @@ table pre.doctestblock
 pre.variable       { background: #b0c8d0; color: #000000; 
                      padding: .5em; margin: 0;
                      border: 1px solid #708890; }
-.variable-linewrap { background: transparent; color: #006080; }
-.variable-ellipsis { background: transparent; color: #006080; }
+.variable-linewrap { background: transparent; color: #604000; }
+.variable-ellipsis { background: transparent; color: #604000; }
+.variable-quote    { background: transparent; color: #604000; }
+.re                { background: transparent; color: #000000; }
+.re-char           { background: transparent; color: #006030; }
+.re-op             { background: transparent; color: #600000; }
+.re-group          { background: transparent; color: #003060; }
+.re-ref            { background: transparent; color: #404040; }
  
 /* Navigation bar */ 
 table.navbar       { background: #607880; color: #b8d0d0;
