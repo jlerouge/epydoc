@@ -50,7 +50,7 @@ The returned DOM tree will confirm to the the following Document Type
 Description::
 
    <!ENTITY % colorized '(code | math | index | italic |
-                          bold | uri | link)*'>
+                          bold | uri | link | symbol)*'>
 
    <!ELEMENT epytext ((para | literalblock | doctestblock |
                       section | ulist | olist)*, fieldlist?)>
@@ -61,8 +61,8 @@ Description::
                       section | ulist | olist)+>
 
    <!ELEMENT fieldlist (field+)>
-   <!ELEMENT field (tag, (para | listblock | doctestblock)
-                          ulist | olist)+)>
+   <!ELEMENT field (tag, arg, (para | listblock | doctestblock)
+                               ulist | olist)+)>
    <!ELEMENT tag (#PCDATA)>
    
    <!ELEMENT literalblock (#PCDATA)>
@@ -84,6 +84,8 @@ Description::
    <!ELEMENT italic  (#PCDATA | %colorized;)*>
    <!ELEMENT bold    (#PCDATA | %colorized;)*>
    <!ELEMENT indexed (#PCDATA | %colorized;)>
+
+   <!ELEMENT symbol (#PCDATA)>
 
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
@@ -115,6 +117,22 @@ _HEADING_CHARS = "=-~"
 # Escape codes.  These should be needed very rarely.
 _ESCAPES = {'lb':'{', 'rb': '}'}
 
+# Symbols.  These can be generated via E{...} escapes.
+_SYMBOLS = {
+    # Symbols
+    '<-': 'larr', '->': 'rarr', 
+
+    # Greek letters
+    'alpha': 'alpha', 'beta': 'beta', 'gamma': 'gamma',
+    'delta': 'delta', 'epsilon': 'epsilon', 'zeta': 'zeta',  
+    'eta': 'eta', 'theta': 'theta', 'iota': 'iota', 
+    'kappa': 'kappa', 'lambda': 'lambda', 'mu': 'mu',  
+    'nu': 'nu', 'xi': 'xi', 'omicon': 'omicon',  
+    'pi': 'pi', 'rho': 'rho', 'sigma': 'sigma',  
+    'tau': 'tau', 'upsilon': 'upsilon', 'phi': 'phi',  
+    'chi': 'chi', 'psi': 'psi', 'omega': 'omega',  
+    }
+
 # Tags for colorizing text.
 _COLORIZING_TAGS = {
     'C': 'code',
@@ -124,7 +142,7 @@ _COLORIZING_TAGS = {
     'B': 'bold',
     'U': 'uri',
     'L': 'link',       # A Python identifier that should be linked to 
-    'E': 'escape',     # "escape" is a special tag.
+    'E': 'escape',     # escapes characters or creates symbols
     }
 
 # Which tags can use "link syntax" (e.g., U{Python<www.python.org>})?
@@ -393,15 +411,15 @@ def _add_list(doc, bullet_token, stack, indent_stack, errors, warnings):
     # the "fieldlist" node.
     if list_type == 'fieldlist':
         li = doc.createElement("field")
-        tagwords = bullet_token.contents[1:-1].split()
-        assert 0 < len(tagwords) < 3, "Bad field tag"
-        tag = doc.createElement("tag")
-        tag.appendChild(doc.createTextNode(tagwords[0]))
-        li.appendChild(tag)
-        if len(tagwords) > 1:
-            arg = doc.createElement("arg")
-            arg.appendChild(doc.createTextNode(tagwords[1]))
-            li.appendChild(arg)
+        token_words = bullet_token.contents[1:-1].split(None, 1)
+        tag_elt = doc.createElement("tag")
+        tag_elt.appendChild(doc.createTextNode(token_words[0]))
+        li.appendChild(tag_elt)
+
+        if len(token_words) > 1:
+            arg_elt = doc.createElement("arg")
+            arg_elt.appendChild(doc.createTextNode(token_words[1]))
+            li.appendChild(arg_elt)
     else:
         li = doc.createElement("li")
         if list_type == 'olist':
@@ -531,7 +549,7 @@ class Token:
 # a docstring.
 _ULIST_BULLET = '[-]( +|$)'
 _OLIST_BULLET = '(\d+[.])+( +|$)'
-_FIELD_BULLET = '@\w+( +[\w\.]+)?:( +|$)'
+_FIELD_BULLET = '@\w+( [^{}:\n]+)?:( +|$)'
 _BULLET_RE = re.compile(_ULIST_BULLET + '|' +
                         _OLIST_BULLET + '|' +
                         _FIELD_BULLET)
@@ -964,13 +982,21 @@ def _colorize(doc, token, errors, warnings=None, tagName='para'):
                     estr = "Invalid escape."
                     errors.append(ColorizingError(estr, token, end))
                 else:
-                    if _ESCAPES.has_key(stack[-1].childNodes[0].data):
-                        escp = _ESCAPES[stack[-1].childNodes[0].data]
+                    escp = stack[-1].childNodes[0].data
+                    if _SYMBOLS.has_key(escp):
+                        # It's a symbol
+                        symbol = doc.createElement('symbol')
                         stack[-2].removeChild(stack[-1])
+                        stack[-2].appendChild(symbol)
+                        escp = _SYMBOLS[escp]
+                        symbol.appendChild(doc.createTextNode(escp))
+                    elif _ESCAPES.has_key(escp):
+                        # It's an escape from _ESCPAES
+                        stack[-2].removeChild(stack[-1])
+                        escp = _ESCAPES[escp]
                         stack[-2].appendChild(doc.createTextNode(escp))
-                    # Single-character escape.
-                    elif len(stack[-1].childNodes[0].data) == 1:
-                        escp = stack[-1].childNodes[0].data
+                    elif len(escp) == 1:
+                        # It's a single-character escape (eg E{.})
                         stack[-2].removeChild(stack[-1])
                         stack[-2].appendChild(doc.createTextNode(escp))
                     else:
@@ -1131,18 +1157,24 @@ def to_epytext(tree, indent=0, seclevel=0):
         lines = [(indent+1)*' '+line for line in str.split('\n')]
         return '\2' + '\n'.join(lines) + '\n\n'
     elif tree.tagName == 'field':
-        if (len(tree.childNodes) > 1 and
-            tree.childNodes[1].tagName == 'arg'):
-            return (indent*' '+'@'+children[0]+'('+
-                    children[1]+'):\n'+''.join(children[2:]))
-        else:
-            return (indent*' '+'@'+children[0]+':\n'+
-                    ''.join(children[1:]))
+        numargs = 0
+        while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = (indent)*' '+'@'+children[0]
+        if args: str += '(' + ', '.join(args) + ')'
+        return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
         return '<%s>' % childstr
     elif tree.tagName in ('fieldlist', 'tag', 'arg', 'epytext',
                           'section', 'olist', 'ulist', 'name'):
         return childstr
+    elif tree.tagName == 'symbol':
+        for (key, val) in _SYMBOLS.items():
+            if val == childstr:
+                return 'E{%s}' % key
+        return 'E{%s}' % childstr
     else:
         for (tag, name) in _COLORIZING_TAGS.items():
             if name == tree.tagName:
@@ -1203,7 +1235,16 @@ def to_plaintext(tree, indent=0, seclevel=0):
         lines = [(indent+1)*' '+line for line in childstr.split('\n')]
         return '\n'.join(lines) + '\n\n'
     elif tree.tagName == 'fieldlist':
-        return indent*' '+'{omitted fieldlist}\n'
+        return childstr
+    elif tree.tagName == 'field':
+        numargs = 0
+        while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = (indent)*' '+'@'+children[0]
+        if args: str += '(' + ', '.join(args) + ')'
+        return str + ':\n' + ''.join(body)
     elif tree.tagName == 'uri':
         if len(children) != 2: raise ValueError('Bad URI ')
         elif children[0] == children[1]: return '<%s>' % children[1]
@@ -1216,6 +1257,11 @@ def to_plaintext(tree, indent=0, seclevel=0):
         for child in children:
             if child.count('\n') > 2: return childstr
         return childstr.replace('\n\n', '\n')+'\n'
+    elif tree.tagName == 'symbol':
+        for (key, val) in _SYMBOLS.items():
+            if val == childstr:
+                return '%s' % key
+        return '[%s]' % childstr
     else:
         # Assume that anything else can be passed through.
         return childstr
@@ -1291,18 +1337,24 @@ def to_debug(tree, indent=4, seclevel=0):
         lines[0] = ' LIT>'+lines[0][5:]
         return '\2' + '\n'.join(lines) + '\n     |\n'
     elif tree.tagName == 'field':
-        if (len(tree.childNodes) > 1 and
-            tree.childNodes[1].tagName == 'arg'):
-            return (' FLD>|'+(indent-6)*' '+'@'+children[0]+'('+
-                    children[1]+'):\n'+''.join(children[2:]))
-        else:
-            return (' FLD>|'+(indent-6)*' '+'@'+children[0]+':\n'+
-                    ''.join(children[1:]))
+        numargs = 0
+        while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = ' FLD>|'+(indent-6)*' '+'@'+children[0]
+        if args: str += '(' + ', '.join(args) + ')'
+        return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
         return '<%s>' % childstr
     elif tree.tagName in ('fieldlist', 'tag', 'arg', 'epytext',
                           'section', 'olist', 'ulist', 'name'):
         return childstr
+    elif tree.tagName == 'symbol':
+        for (key, val) in _SYMBOLS.items():
+            if val == childstr:
+                return 'E{%s}' % key
+        return 'E{%s}' % childstr
     else:
         for (tag, name) in _COLORIZING_TAGS.items():
             if name == tree.tagName:
