@@ -9,63 +9,54 @@ Terminiology:
 
 .. inheritancegraph:: APIDoc, VariableDoc, ValueDoc, etc..
 
- Architecture graph::
+Architecture graph::
 
-            +-----------+       
- python --> | Inspector |
- object     +-----------+
-                  |
-                  V
-             +---------+      +--------+
-  source --> | Shallow |      |  Full  | <-- source
-   code      | Parser  |      | Parser |      code
-             +---------+      +--------+
-                      |        |
-                      |        |
-                      V        V
-                   +---------------+
-                   |  Name Finder  |
-                   +---------------+
-                           |
-                           V
-                  +------------------+
-                  | Docstring Parser |
-                  +------------------+
-                           |
-                           V
-                      +---------+
-                      | Writers |
-                      +---------+
+   Python object             Module source code
+         |                           |
+         V                           V
+  +--------------+             +-----------+
+  | DocInspector |             | DocParser |
+  +--------------+             +-----------+
+         |                           |
+         +---------+     +-----------+
+                   |     |
+                   V     V
+                +-----------+     Merges the output from
+                | DocMerger |     DocParser into the output from
+                +-----------+     DocInspector.
+                      |
+                      V
+             +-----------------+  Parses all docstrings, and
+             | DocstringParser |  processes all docstring fields.
+             +-----------------+
+                      |
+                      V
+                +----------+      Assigns a cannonical name to
+                | DocNamer |      every  ValueDoc.
+                +----------+
+                      |
+                      V
+                +-----------+     Resolves ValueDocProxys (from 
+                | DocLinker |     DocParser)
+                +-----------+
+                      |
+                      V
+               +------------+     Outputs the APIDoc objects to
+               | DocWriters |     appropriate formats
+               +------------+
 
-Blocks:
-  - Inspector: creates a ValueDoc from a Python object
-  - Shallow Parser: finds variable docstrings & imports
-
-Stages:
-  1. Create DocMap
-  2. Run Inspector
-     2a. Do inspection
-     2b. Find a unique name for each object
-  3. Run Parser
-  4. Parse & process Docstrings
-  5. Send to Writer...
+- Combine DocNamer into DocLinker?
+- Define DocMap interface, that automatically takes care of looking
+  up docs for a given object, or name?
 
 - APIDoc: API documentation about *something*
-  - DocstringAcceptingAPIDoc -- has docstring, descr, summary, metadata
-    - VariableDoc -- contains ValueDoc, has name
-    - ValueDoc -- has value, canonical dotted name
+  - VariableDoc -- contains ValueDoc, has name
+  - ValueDoc -- has value, canonical dotted name
       - ModuleDoc
       - ClassDoc
       - RoutineDoc
       - PropertyDoc
   - ArgDoc -- an argument to a routine
-
-But.. param can have a descr..  So why not just say that all APIDoc
-objects *can* have a docstring, but some are unlikely to (eg function
-arguments).
-
-.. [XX] Better name for VariableOrValueDoc??
-
 """
 
 # A sentinel is a unique value.
@@ -172,6 +163,9 @@ class DottedName:
 
     def __repr__(self):
         return '.'.join(self._identifiers)
+
+    def __add__(self, other):
+        return DottedName(self, other)
 
     def __getitem__(self, i):
         if isinstance(i, types.SliceType):
@@ -377,14 +371,14 @@ class ValueDoc(APIDoc):
     API documentation information about a single Python value.
     """
     _STR_FIELDS = (['dotted_name']+APIDoc._STR_FIELDS+
-                   ['value', 'repr', 'type'])
+                   ['value', 'repr', 'ast', 'type'])
     
     NO_VALUE = sentinel()
     """A unique object that is used as the value of L{ValueDoc._value}
     when the value is unknown."""
     
     def __init__(self, dotted_name=None, value=NO_VALUE, repr=None,
-                 type=None):
+                 ast=None, type=None):
         """Create a new C{ValueDoc}."""
         APIDoc.__init__(self)
 
@@ -393,6 +387,9 @@ class ValueDoc(APIDoc):
         
         self.value = value
         """The python object described by this C{ValueDoc}."""
+
+        self.ast = ast
+        """The syntax tree of the code for the value."""
 
         self.repr = repr
         """A string representation of the value."""
@@ -568,6 +565,29 @@ class PropertyDoc(ValueDoc):
         self.fdel = None
         """API documentation for the property's delete function.
         @type: L{RoutineDoc}"""
+        
+######################################################################
+## Proxy for ValueDoc
+######################################################################
+
+class ValueDocProxy:
+    """
+    A stand-in for a ValueDoc when we can't get the real valuedoc.
+    During merging, try to repalce these with the real valuedocs.
+    """
+    def __init__(self, dotted_name):
+        """Create a new C{ValueAliasDoc}."""
+
+        self.dotted_name = dotted_name
+        """The fully-qualified dotted name of a variable containing
+        the actual ValueDoc."""
+
+        self.subclasses = []
+        """Hack for now.  What to do about this?  (Subclasses adding
+        themselves in process_classdef)"""
+
+    def __repr__(self):
+        return '<ValueDoc Proxy for %s>' % self.dotted_name
         
 ######################################################################
 ## Argument Documentation Objects
