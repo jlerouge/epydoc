@@ -213,7 +213,7 @@ def document(options, progress, cancel):
                 module = import_module(name)
                 if module not in modules: modules.append(module)
             except ImportError, e:
-                sys.stderr.write('!!!Error importing %s: %s\n!!!', (mname, e))
+                sys.stderr.write('!!!Error importing %s: %s\n!!!' % (name, e))
             progress[0] += (IMPORT_PROGRESS*0.98)/len(modnames)
         
         # Create the documentation map.
