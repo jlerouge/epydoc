@@ -26,20 +26,20 @@
 /*===================================================================*/
 /* Default body appearance */
 
-body    { background: #8098a0; color: #000000; }        /* = .dark */
+body    { background: #b0c8d0; color: #000000; }        /* = .dark */
 
 @media print {
   body { font-family: times,serif; font-size: 10pt; }
 }
 
 @media screen {
-  body    { background: #8098a0; color: #000000; }        /* = .dark */
+  body    { background: #b0c8d0; color: #000000; }        /* = .dark */
 }
 
 /*===================================================================*/
 /* Headlines. */
 
-h1 { color: #000030; background: transparent; 
+h1 { color: #000060; background: transparent; 
      font-size: 180%; font-weight: bold; text-align: center; }
 h2 { font-size: 150%; font-weight: bold; }
 h3 { font-size: 140%; font-weight: bold; font-style: italic; }
@@ -146,12 +146,12 @@ b.error i { background: transparent; color: #503000; }
 /* Navigation box (used as a footer).  Implemented with a table. */
 
 .navbox { 
-    background: #607880; color: #b8d0d0;                /* = .darkest */
+    background: #688088; color: #d8f0f0;
     border: 2px groove #c0d0d0; 
 }
 
-a.nav:link    { background: transparent; color: #b8d0d0; } 
-a.nav:visited { background: transparent; color: #b8d0d0; } 
+a.nav:link    { background: transparent; color: #d8f0f0; }
+a.nav:visited { background: transparent; color: #d8f0f0; }
 
 /*===================================================================*/
 /* End of stylesheet */
