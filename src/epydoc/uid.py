@@ -52,8 +52,8 @@ class UID:
     A globally unique identifier.
 
     UID is an abstract base class.  The base class defines
-    X{shortname}, X{__str__}, and X{__repr__}; all other methods must
-    be defined by derived classes.
+    X{shortname}, X{is_private}, X{__str__}, and X{__repr__}; all
+    other methods must be defined by derived classes.
 
     @ivar __name: This UID's globally unique name.
     @type __name: C{string}
@@ -169,6 +169,44 @@ class UID:
         @rtype: C{boolean}
         """
         raise NotImplementedError()
+
+    def is_private(self):
+        """
+        @return: True if this is a private object, or if any of its
+            ancestors are private objects.
+              - An object whose parent is a module that defines
+                the C{__all__} variable is private if and only if it is
+                not contained in C{__all__}.  If C{__all__} is not a
+                list, or if any error occurs while accessing
+                C{__all__}, then it is ignored.
+              - All other objects are private if and only if their
+                (short) name begins with a single underscore, but
+                does not end with an underscore.
+        @rtype: C{boolean}
+        """
+        if not hasattr(self, '_private'):
+            # Note: the order of these checks is significant.
+            shortname = self.shortname()
+
+            # First, check if the parent is private.
+            parent = self.parent()
+            if parent and parent.is_private():
+                self._private = 1
+                return 1
+            
+            # Next, check the __all__ variable.
+            if (parent and parent.is_module() and
+                hasattr(parent._obj, '__all__')):
+                try:
+                    self._private = (shortname not in parent._obj.__all__)
+                    return self._private
+                except: pass
+
+            # Finally, check the short name.
+            self._private = (shortname[:1] == '_' and
+                             shortname[-1:] != '_')
+
+        return self._private
 
     #//////////////////////////////////////////////////
     # Ancestors & Descendants
@@ -306,7 +344,11 @@ class ObjectUID(UID):
         if not hasattr(self, '_name'):
             typ = type(self._obj)
             if typ is _ModuleType:
-                self._name = self._obj.__name__
+                if self.package():
+                    shortname = self._obj.__name__.split('.')[-1]
+                    self._name = '%s.%s' % (self.package(), shortname)
+                else:
+                    self._name = self._obj.__name__
             elif typ is _ClassType or typ is _FunctionType:
                 self._name = '%s.%s' % (self.module(), self._obj.__name__)
             elif typ is _MethodType or (typ is _BuiltinMethodType and
@@ -375,7 +417,11 @@ class ObjectUID(UID):
         if not hasattr(self, '_pkg'):
             # Find the module.
             if type(self._obj) is _ModuleType: mname = self._obj.__name__
-            else: mname = self.module()._obj.__name__
+            elif self.module() is not None:
+                mname = self.module()._obj.__name__
+            else:
+                self._pkg = None
+                return None
 
             # Look up the package.
             dot = mname.rfind('.')
@@ -597,8 +643,14 @@ def _find_builtin_obj_module(obj, show_warnings=1):
     builtin_modules = []
     py_modules = []
     for module in sys.modules.values():
+        # Skip it if there's no module, if we've already seen it, or
+        # if it's __main__.
         if module is None: continue
+        if module in so_modules: continue
+        if module in builtin_modules: continue
+        if module in py_modules: continue
         if module.__name__ == '__main__': continue
+        
         for val in module.__dict__.values():
             if val is obj:
                 if (module.__name__ in sys.builtin_module_names or
@@ -608,27 +660,33 @@ def _find_builtin_obj_module(obj, show_warnings=1):
                     so_modules.append(module)
                 else:
                     py_modules.append(module)
+                break # Stop looking in this module.
 
     if so_modules:
         if len(so_modules) > 1:
             if show_warnings:
-                print 'Warning: %r appears in multiple .so modules' % obj
+                print >>sys.stderr, ('\nWarning: '+`obj`+
+                                 ' appears in multiple .so modules')
         module = so_modules[0]
     elif builtin_modules:
         if len(builtin_modules) > 1:
+            print builtin_modules
             if show_warnings:
-                print 'Warning: %r appears in multiple builtin modules' % obj
+                print >>sys.stderr, ('\nWarning: '+`obj`+
+                                 ' appears in multiple builtin modules')
         module = builtin_modules[0]
     elif py_modules:
         # Give precedence to the "types" module.
         if types in py_modules: py_modules = [types]
         if len(py_modules) > 1:
             if show_warnings:
-                print 'Warning: %r appears in multiple .py modules' % obj
+                print >>sys.stderr, ('\nWarning: '+`obj`+
+                                 ' appears in multiple .py modules')
         module = py_modules[0]
     else:
         if show_warnings:
-            print 'Warning: could not find a module for %r' % obj
+            print >>sys.stderr, ('\nWarning: could not find a '+
+                                 'module for %r' % obj)
         module = None
     _find_builtin_obj_module_cache[id(obj)] = module
     return module
