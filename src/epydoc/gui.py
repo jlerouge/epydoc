@@ -155,10 +155,8 @@ def document(modules, options, progress, cancel):
         d.add(module)
         progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
 
-    # How many files does HTML_Doc need to write?
-    numfiles = 4
-    for uid in d.keys():
-        if uid.is_module() or uid.is_class(): numfiles += 2
+    htmldoc = HTML_Doc(d, **options)
+    numfiles = htmldoc.num_files()
 
     # Set up the progress callback.
     def progress_callback(f, d, numfiles=numfiles,
@@ -170,7 +168,6 @@ def document(modules, options, progress, cancel):
         progress[0] += (WRITE_PROGRESS*0.98)/numfiles
 
     # Write the documentation.
-    htmldoc = HTML_Doc(d, **options)
     htmldoc.write(options.get('outdir', 'html'), progress_callback)
 
     # We're done.
