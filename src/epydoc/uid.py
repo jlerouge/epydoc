@@ -30,6 +30,14 @@ from types import MethodType as _MethodType
 from types import StringType as _StringType
 from epydoc.imports import import_module
 
+# Python 2.2 types
+try:
+    _WrapperDescriptorType = type(list.__add__)
+    _MethodDescriptorType = type(list.append)
+except:
+    _WrapperDescriptorType = None
+    _MethodDescriptorType = None
+
 __epydoc_sort__ = ['make_uid', 'UID', 'Link']
 
 ##################################################
@@ -339,13 +347,17 @@ class ObjectUID(UID):
                                 isinstance(self._obj, _TypeType))
     def is_routine(self):
         return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
-                                   _MethodType, _BuiltinMethodType)
+                                   _MethodType, _BuiltinMethodType,
+                                   _WrapperDescriptorType,
+                                   _MethodDescriptorType)
     def is_builtin_function(self): 
         return (type(self._obj) is _BuiltinFunctionType and
                 self._obj.__self__ is None)
     def is_builtin_method(self):
-        return (type(self._obj) is _BuiltinMethodType and
-                self._obj.__self__ is not None)
+        return ((type(self._obj) is _BuiltinMethodType and
+                 self._obj.__self__ is not None) or
+                type(self._obj) in (_WrapperDescriptorType,
+                                    _MethodDescriptorType))
     def is_variable(self): return 0
 
     def name(self):
@@ -372,6 +384,8 @@ class ObjectUID(UID):
                 else:
                     name = _find_name_in(self._obj, self.module()._obj)
                     self._name = '%s.%s' % (self.module(), name)
+            elif typ in (_WrapperDescriptorType, _MethodDescriptorType):
+                self._name = '%s.%s' % (self.cls(), self._obj.__name__)
             else:
                 raise ValueError("Can't find name for %r" % self._obj)
         return self._name
@@ -384,6 +398,8 @@ class ObjectUID(UID):
             elif (type(obj) is _BuiltinMethodType and
                   obj.__self__ is not None):
                 self._cls = ObjectUID(type(obj.__self__))
+            elif type(obj) in (_WrapperDescriptorType, _MethodDescriptorType):
+                self._cls = ObjectUID(obj.__objclass__)
             else:
                 self._cls = None
         return self._cls
@@ -412,6 +428,11 @@ class ObjectUID(UID):
                     module = _find_builtin_obj_module(cls)
                     if module is None: self._module = None
                     else: self._module = ObjectUID(module)
+                elif typ in (_WrapperDescriptorType, _MethodDescriptorType):
+                    cls = obj.__objclass__
+                    module = _find_builtin_obj_module(cls)
+                    if module is None: self._module = None
+                    else: self._module = ObjectUID(module)
                 elif typ is _TypeType and hasattr(obj, '__module__'):
                     self._module = ObjectUID(import_module(obj.__module__))
                     if (self._module is not None and
@@ -424,7 +445,7 @@ class ObjectUID(UID):
                     if module is None: self._module = None
                     else: self._module = ObjectUID(module)
                 else:
-                    raise ValueError("Cant find module for %r" % self._obj)
+                    raise ValueError("Can't find module for %r" % self._obj)
             except ImportError, e:
                 # Error importing the module
                 if sys.stderr.softspace: print >>sys.stderr
@@ -569,7 +590,9 @@ def make_uid(object, base_uid=None, shortname=None):
     """
     if type(object) in (_ModuleType, _ClassType, _TypeType,
                         _BuiltinFunctionType, _BuiltinMethodType,
-                        _FunctionType, _MethodType):
+                        _FunctionType, _MethodType,
+                        _WrapperDescriptorType,
+                        _MethodDescriptorType):
         # If we've already seen this object, return its UID.
         if type(object) is _MethodType: key = id(object.im_func)
         else: key = id(object)
@@ -581,11 +604,12 @@ def make_uid(object, base_uid=None, shortname=None):
         _object_uids[key] = uid
 
         # Make sure there's no naming conflict.
-        if _name_to_uid.has_key(uid.name()):
-            if sys.stderr.softspace: print >>sys.stderr
-            print >>sys.stderr, ('Warning: UID conflict '+
-                                 'detected: %s' % uid)
-        _name_to_uid[uid.name()] = uid
+        if uid.shortname() != '__new__':
+            if _name_to_uid.has_key(uid.name()):
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, ('Warning: UID conflict '+
+                                     'detected: %s' % uid)
+            _name_to_uid[uid.name()] = uid
 
         # Return the UID.
         return uid
@@ -743,7 +767,6 @@ def _find_builtin_obj_module(obj, show_warnings=1):
     # Otherwise, check the builtin modules.
     elif builtin_modules:
         if len(builtin_modules) > 1:
-            print builtin_modules
             if show_warnings:
                 if sys.stderr.softspace: print >>sys.stderr
                 print >>sys.stderr, ('Warning: '+`obj`+
@@ -804,7 +827,7 @@ def _find_function_module(func):
 ##################################################
 # Clean this up a lot!
 
-def findUID(name, container, docmap=None):
+def findUID(name, container=None, docmap=None):
     """
     Attempt to find the UID for the object that can be accessed with
     the name C{name} from the module C{module}.
@@ -812,8 +835,9 @@ def findUID(name, container, docmap=None):
     @param name: The name used to identify the object.
     @type name: C{string}
     @param container: The UID of the class or module containing the
-        object.
-    @type container: L{UID}
+        object.  If no container is specified, then L{__builtin__}
+        is used.
+    @type container: L{UID} or C{None}
     @param docmap: A documentation map, which is used to check if
         C{name} is the name of a module variable, class variable,
         or instance variable.
@@ -824,12 +848,14 @@ def findUID(name, container, docmap=None):
     @rtype: L{UID} or C{None}
     """
     if name == '': return None
-    if container is None: return None
-    if not (container.is_module() or container.is_class()):
+    if container and not (container.is_module() or container.is_class()):
         raise ValueError('Bad container %r' % container)
+    if container is None:
+        try: container = make_uid(sys.modules['__builtin__'])
+        except: pass
 
     # Is it the short name for a member of the containing class?
-    if container.is_class():
+    if container and container.is_class():
         if _is_variable_in(name, container, docmap):
             val = None # it may not be a real object
             return make_uid(val, container, name)
@@ -844,29 +870,33 @@ def findUID(name, container, docmap=None):
         else:
             container = container.module()
 
-    module = container.value()
-    components = name.split('.')
+    if container:
+        components = name.split('.')
+        module = container.value()
+    
+        # Is it a variable in the containing module?
+        if _is_variable_in(name, container, docmap):
+            val = None # it may not be a real object
+            return make_uid(val, container, name)
+    
+        # Is it an object in the containing module?
+        try:
+            obj = module
+            for component in components:
+                obj_parent = obj
+                obj_name = component
+                try: obj = obj.__dict__[component]
+                except: raise KeyError()
+            try: return make_uid(obj, make_uid(obj_parent), obj_name)
+            except: pass
+        except KeyError: pass
 
-    # Is it a variable in the containing module?
-    if _is_variable_in(name, container, docmap):
-        val = None # it may not be a real object
-        return make_uid(val, container, name)
-
-    # Is it an object in the containing module?
-    try:
-        obj = module
-        for component in components:
-            obj_parent = obj
-            obj_name = component
-            try: obj = obj.__dict__[component]
-            except: raise KeyError()
-        try: return make_uid(obj, make_uid(obj_parent), obj_name)
-        except: pass
-    except KeyError: pass
+    if container: container_name = container.name()
+    else: container_name = ''
 
     # Is it a module name?  The module name may be relative to the
     # containing module, or any of its ancestors.
-    modcomponents = container.name().split('.')
+    modcomponents = container_name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
@@ -875,7 +905,8 @@ def findUID(name, container, docmap=None):
         
     # Is it an object in a module?  The module part of the name may be
     # relative to the containing module, or any of its ancestors.
-    modcomponents = container.name().split('.')
+    modcomponents = container_name.split('.')
+    components = name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
         for j in range(len(components)-1, 0, -1):
             try:
@@ -887,6 +918,26 @@ def findUID(name, container, docmap=None):
                     return make_uid(val, container, name)
                 obj = getattr(import_module(modname), objname)
                 return make_uid(obj, make_uid(mod), objname)
+            except: pass
+
+    # Is it an field of a class in a module?  The module part of the
+    # name may be relative to the containing module, or any of its
+    # ancestors.
+    modcomponents = container_name.split('.')
+    components = name.split('.')
+    for i in range(len(modcomponents)-1, -1, -1):
+        for j in range(len(components)-1, 1, -1):
+            try:
+                modname = '.'.join(modcomponents[:i]+components[:j])
+                objname = '.'.join(components[j:-1])
+                fieldname = components[-1]
+                mod = import_module(modname)
+                if _is_variable_in(name, make_uid(mod), docmap):
+                    val = None # it may not be a real object
+                    return make_uid(val, container, name)
+                obj = getattr(import_module(modname), objname)
+                field = getattr(obj, fieldname)
+                return make_uid(field, make_uid(obj), fieldname)
             except: pass
 
     # We couldn't find it; return None.
@@ -917,4 +968,3 @@ def _is_variable_in(name, container, docmap):
         for var in container_doc.cvariables(): 
             if var.uid().shortname() == name: return 1
     return 0
-
