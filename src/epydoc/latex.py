@@ -885,14 +885,14 @@ class LatexFormatter:
         inh_items = inh_dict.items()
         inh_items.sort(lambda a,b: cmp(a[0], b[0]))
         for (base, obj_links) in inh_items:
-            str += '\\multicolumn{2}{|l|}{\n'
+            str += '\\multicolumn{2}{|p{\\textwidth}|}{\n'
             str += ('  \\textbf{Inherited from %s:}\n' %
                     self._text_to_latex(base.shortname()))
             for link in obj_links:
                 str += '    '
                 str += self._text_to_latex(link.name())
                 if self._crossref:
-                    str += (' \\textit{(p.~\\pageref{%s})}\n\n' %
+                    str += (' \\textit{(p.~\\pageref{%s})}' %
                             self._uid_to_label(cls))
                 str += ',\n'
             str = str[:-2] + '}\n    \\\\\n'
