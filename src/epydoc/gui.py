@@ -16,27 +16,15 @@ X{project files}, which store a set of related modules, and the
 options that should be used to generate the documentation for those
 modules.
 
-Note: I put this together in an afternoon, so it might not be as
-clean and reliable as the other epydoc modules.
-
-Any command line arguments ending in C{.prj} will be loaded as project
-files; any other command line arguments will be added as modules (if
-possible).  
+Usage::
+    epydocgui FILE.prj | MODULES... | -V | -h
 """
 
-import sys, os.path, re
-import glob
+import sys, os.path, re, glob
 from Tkinter import *
 from tkFileDialog import askopenfilename, asksaveasfilename
 from thread import start_new_thread, exit_thread
 from pickle import dump, load
-from StringIO import StringIO
-
-from epydoc.css import STYLESHEETS
-from epydoc.imports import import_module
-from epydoc.html import HTMLFormatter
-from epydoc.objdoc import DocMap
-from epydoc.uid import reset_uid_cache
 
 ##/////////////////////////////////////////////////////////////////////////
 ## CONSTANTS
@@ -190,6 +178,9 @@ def document(options, progress, cancel):
     @type progress: C{list}
     """
     progress[0] = 0.02
+    from epydoc.html import HTMLFormatter
+    from epydoc.objdoc import DocMap
+    from epydoc.imports import import_module
 
     try:
         # Import the modules.
@@ -593,6 +584,7 @@ class EpydocGUI:
                                    **BUTTON_CONFIG)
         self._help_browse.grid(row=row, col=3, sticky='ew', padx=2)
         
+        from epydoc.css import STYLESHEETS
         items = STYLESHEETS.items()
         def _css_sort(css1, css2):
             if css1[0] == 'default': return -1
@@ -734,6 +726,7 @@ class EpydocGUI:
         self._root = None
 
     def add_module(self, name, check=0):
+        from epydoc.imports import import_module
         # Check that it's a good module, if requested.
         if check:
             try:
@@ -808,6 +801,7 @@ class EpydocGUI:
 
         # Reset the uid cache (otherwise, we would get UID conflicts,
         # since we just re-loaded everything).
+        from epydoc.uid import reset_uid_cache
         reset_uid_cache()
     
         # Start documenting
@@ -906,6 +900,7 @@ class EpydocGUI:
         self.open(filename)
 
     def open(self, prjfile):
+        from epydoc.css import STYLESHEETS
         self._filename = prjfile
         try:
             opts = load(open(prjfile, 'r'))
@@ -977,16 +972,67 @@ class EpydocGUI:
         self._filename = filename
         self._save()
 
+def _version():
+    """
+    Display the version information, and exit.
+    @rtype: C{None}
+    """
+    import epydoc
+    print "Epydoc version %s" % epydoc.__version__
+    sys.exit(0)
+
+def _usage():
+    print
+    print 'Usage: epydocgui [OPTIONS] FILE.prj | MODULES...'
+    print
+    print '    FILE.prj                  An epydoc GUI project file.'
+    print '    MODULES...                A list of Python modules to document.'
+    print '    -V, --version             Print the version of epydoc.'
+    print '    -h, -?, --help, --usage   Display this usage message'
+    print '    --debug                   Do not suppress error messages'
+    print
+    sys.exit(0)
+
+def _error(str):
+    str = '%s; run "%s -h" for usage' % (str, os.path.basename(sys.argv[0]))
+    if len(str) > 80:
+        i = str.rfind(' ', 0, 80)
+        if i>0: str = str[:i]+'\n'+str[i+1:]
+    print >>sys.stderr, str
+    sys.exit(1)
+    
 def gui():
+    global DEBUG
     sys.stderr = sys.__stderr__
-    gui = EpydocGUI()
+    projects = []
+    modules = []
     for arg in sys.argv[1:]:
-        if arg[-4:] == '.prj':
-            gui.open(arg)
-        else:
-            try: gui.add_module(arg)
-            except: pass
-    gui.mainloop()
+        if arg[0] == '-':
+            arg = arg.lower()
+            if arg in ('-h', '--help', '-?', '--usage'): _usage()
+            elif arg in ('-V', '--version'): _version()
+            elif arg in ('--debug',): DEBUG = 1
+            else:
+                _error('Unknown parameter %r' % arg)
+        elif arg[-4:] == '.prj': projects.append(arg)
+        else: modules.append(arg)
+
+    if len(projects) > 1:
+        _error('Too many projects')
+    if len(projects) == 1:
+        if len(modules) > 0:
+            _error('You must specify either a project or a list of modules')
+        if not os.path.exists(projects[0]):
+            _error('Cannot open project file %s' % projects[0])
+        gui = EpydocGUI()
+        gui.open(projects[0])
+        gui.mainloop()
+    elif len(modules) > 0:
+        gui = EpydocGUI()
+        for module in modules: gui.add_module(module, check=1)
+        gui.mainloop()
+    else:
+        _error('No modules specified')
 
 if __name__ == '__main__': gui()
 
