@@ -320,6 +320,13 @@ class ObjectUID(UID):
     # construct the UID.
     def value(self): return self._obj
 
+    def id(self):
+        """
+        @return: the Python internal identifier for this UID's object.
+        @rtype: C{int}
+        """
+        return self._id
+
     # The following methods figure out the object type by examining
     # self._obj.  Docstrings are defined in UID.
     def is_module(self): return type(self._obj) is _ModuleType
@@ -533,8 +540,9 @@ class VariableUID(UID):
 ## UID Construction
 ##################################################
 
-_uids = {}
-_ids = {}
+_object_uids = {}
+_variable_uids = {}
+_name_to_uid = {}
 def make_uid(object, base_uid=None, shortname=None):
     """
     Create a globally unique identifier for the given object.
@@ -542,10 +550,43 @@ def make_uid(object, base_uid=None, shortname=None):
     if type(object) in (_ModuleType, _ClassType, _TypeType,
                         _BuiltinFunctionType, _BuiltinMethodType,
                         _FunctionType, _MethodType):
-        return ObjectUID(object)
+        # If we've already seen this object, return its UID.
+        if type(object) is _MethodType: key = id(object.im_func)
+        else: key = id(object)
+        try: return _object_uids[key]
+        except: pass
+
+        # We haven't seen this object before; create a new UID.
+        uid = ObjectUID(object)
+        _object_uids[key] = uid
+
+        # Make sure there's no naming conflict.
+        if _name_to_uid.has_key(uid.name()):
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, ('Warning: UID conflict '+
+                                 'detected: %s' % uid)
+        _name_to_uid[uid.name()] = uid
+
+        # Return the UID.
+        return uid
 
     elif base_uid is not None and shortname is not None:
-        return VariableUID(object, base_uid, shortname)
+        # If we've already seen this variable, return its UID
+        key = (base_uid.id(), shortname)
+        try: return _variable_uids[key]
+        except: pass
+        
+        # We haven't seen this variable before; create a new UID.
+        uid = VariableUID(object, base_uid, shortname)
+        _variable_uids[key] = uid
+            
+        # Make sure there's no naming conflict.
+        if _name_to_uid.has_key(uid.name()):
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, ('Warning: UID conflict '+
+                                 'detected: %s' % uid)
+        _name_to_uid[uid.name()] = uid
+        return uid 
     else:
         raise TypeError('Cannot create a UID for a '+
                         type(object).__name__+
@@ -755,7 +796,7 @@ def findUID(name, container, docmap=None):
     # Is it the short name for a member of the containing class?
     if container.is_class():
         if _is_variable_in(name, container, docmap):
-            val = None # HACK
+            val = None # it may not be a real object
             return make_uid(val, container, name)
         elif container.value().__dict__.has_key(name):
             cls = container.value()
@@ -772,7 +813,7 @@ def findUID(name, container, docmap=None):
 
     # Is it a variable in the containing module?
     if _is_variable_in(name, container, docmap):
-        val = None # HACK
+        val = None # it may not be a real object
         return make_uid(val, container, name)
 
     # Is it an object in the containing module?
@@ -803,7 +844,7 @@ def findUID(name, container, docmap=None):
                 objname = '.'.join(components[j:])
                 mod = import_module(modname)
                 if _is_variable_in(name, make_uid(mod), docmap):
-                    val = None # HACK
+                    val = None # it may not be a real object
                     return make_uid(val, container, name)
                 obj = getattr(import_module(modname), objname)
                 return make_uid(obj)
