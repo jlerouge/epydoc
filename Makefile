@@ -135,8 +135,12 @@ doc/epydocgui-man.html: man/epydocgui.1
 ##//////////////////////////////////////////////////////////////////////
 
 SLNAME = 'Python 2.2 Standard Library'
-SLLINK = '<font size="-2">Python 2.2<br>Standard Library</font>'
-SLURL = 'http://www.python.org/doc/2.2/lib/lib.html'
+SLURL = "http://www.python.org/doc/2.2/lib/lib.html"
+SLLINK = '<table border="0" cellpadding="0" cellspeacing="0"\
+    ><tr><th><a class="navbar" target="_top" href=${SLURL}\
+    ><font size="-2">Python 2.2</font></a></th></tr\
+    ><tr><th><a class="navbar" target="_top" href=${SLURL}\
+    ><font size="-2">Standard Library</font></a></th></th></table>'
 SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/python2.2/config/' \
 	      |grep -v '/python2.2/lib-old/' \
@@ -146,6 +150,6 @@ stdlib: .stdlib.up2date
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
 	python2.2 src/epydoc/cli.py -o ${STDLIB} -c white --show-imports \
-	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
+	       -n ${SLNAME} -u ${SLURL} --docformat plaintext --debug \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
 	touch .stdlib.up2date
