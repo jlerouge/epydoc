@@ -242,15 +242,13 @@ def _dom_to_html(tree, container, indent, seclevel, **kwargs):
     elif tree.tagName == 'code':
         return '<code>%s</code>' % childstr
     elif tree.tagName == 'uri':
-        if re.match('\w+:.+', childstr): uri = childstr
-        else: uri = 'http://'+childstr
-        return '<a href="%s">%s</a>' % (uri, childstr)
+        return '<a href="%s">%s</a>' % (children[1], children[0])
     elif tree.tagName == 'link':
-        childstr = re.sub('[^a-zA-Z0-9.]', '_', childstr)
-        uid = findUID(childstr, container)
+        target = re.sub('[^a-zA-Z0-9.]', '_', children[1])
+        uid = findUID(target, container)
         if uid is not None:
             return ('<a href="%s">' % _uid_to_uri(uid) +
-                    '<code class="link">%s</code></a>' % childstr)
+                    '<code class="link">%s</code></a>' % children[0])
         else:
             print ('Warning: could not find UID for %r in %r' %
                    (childstr, container))
@@ -280,10 +278,11 @@ def _dom_to_html(tree, container, indent, seclevel, **kwargs):
         return '<pre class="doctestblock">\n%s\n</pre>\n' % childstr
     elif tree.tagName == 'fieldlist':
         raise AssertionError("There should not be any field lists left")
-    elif tree.tagName in ('epytext', 'section', 'tag', 'arg'):
+    elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
+                          'name', 'target'):
         return childstr
     else:
-        raise NotImplementedError, tree.tagName
+        raise ValueError('Unknown DOM element %r' % tree.tagName)
 
 def _colorize_doctestblock(str):
     """
@@ -567,6 +566,10 @@ class HTML_Doc:
             str += self._start_of('Module Description')
             str += '<h2>Module '+uid.name()+'</h2>\n\n'
 
+        # Add any author links.
+        if doc.authors():
+            str += self._author(doc.authors(), uid)
+
         # Write the module's description.
         if doc.descr():
             str += dom_to_html(doc.descr(), uid) + '<hr/>\n'
@@ -612,6 +615,10 @@ class HTML_Doc:
         str = self._header(`uid`)
         str += self._navbar('class', uid)
         str += self._public_private_link(uid)
+
+        # Add any author links.
+        if doc.authors():
+            str += self._author(doc.authors(), uid)
 
         # Write the class's module and its name.
         str += self._start_of('Class Description')
@@ -1468,13 +1475,27 @@ class HTML_Doc:
 
     def _seealso(self, seealso, container):
         """
-        @return: The HTML code for a see-also field.
+        @return: The HTML code for the see-also fields.
         """
         if not seealso: return ''
         str = '<dl><dt><b>See also:</b>\n  </dt><dd>'
         for see in seealso:
-            str += dom_to_html(see, container)
+            str += dom_to_html(see, container) + ', '
         return str[:-2] + '</dd>\n</dl>\n\n'
+
+    def _author(self, authors, container):
+        """
+        @return: The HTML code for the author fields.
+        """
+        if not authors: return ''
+        if len(authors) == 1:
+            return ('<p class="author"><b>Author:</b> %s</p>\n\n' %
+                    dom_to_html(authors[0], container))
+        else:
+            str = '<p class="author"><b>Authors:</b>\n'
+            for author in authors:
+                str += '  %s,\n' % dom_to_html(author, container)
+            return str[:-2] + '\n</p>\n\n'
 
     def _summary(self, doc, container):
         """
