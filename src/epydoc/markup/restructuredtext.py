@@ -11,8 +11,8 @@ Epydoc parser for ReStructuredText strings.  ReStructuredText is the
 standard markup language used by the Docutils project.
 
 
-@todo: summary
-@todo: to_plaintext, etc?
+@todo: Implement to_plaintext.
+@todo: Add to_latex??
 @warning: Epydoc only supports HTML output for ReStructuredText
 docstrings.
 """
@@ -25,7 +25,8 @@ from xml.dom.minidom import *
 from docutils.core import publish_string
 from docutils.writers import Writer
 from docutils.writers.html4css1 import HTMLTranslator, Writer as HTMLWriter
-from docutils.nodes import NodeVisitor, TextElement, SkipChildren, SkipNode
+from docutils.nodes import NodeVisitor, Text, SkipChildren, SkipNode
+import docutils.nodes
 
 from epydoc.markup import *
 
@@ -109,10 +110,10 @@ class _SummaryExtractor(NodeVisitor):
         summary_pieces = []
         # Extract the first sentence.
         for child in node.children:
-            if isinstance(child, Text):
+            if isinstance(child, docutils.nodes.Text):
                 m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', child.data)
                 if m:
-                    summary_pieces.append(Text(m.group(1)))
+                    summary_pieces.append(docutils.nodes.Text(m.group(1)))
                     break
             summary_pieces.append(child)
             
@@ -137,25 +138,80 @@ class _SplitFieldsTranslator(NodeVisitor):
 
     def visit_document(self, node):
         self.fields = []
-        
-    def visit_field_list(self, node):
-        # Remove the field list from the tree.
+
+    def visit_field(self, node):
+        # Remove the field from the tree.
         node.parent.remove(node)
 
-        # Add each field to self.fields
-        for field in node.children:
-            # Extract the field name & optional argument
-            tag = field.children[0].astext().split(None, 1)
-            name = tag[0]
-            if len(tag)>1: arg = name[1]
-            else: arg = None
+        # Extract the field name & optional argument
+        tag = node.children[0].astext().split(None, 1)
+        tagname = tag[0]
+        if len(tag)>1: arg = tag[1]
+        else: arg = None
 
-            # Extract the field body.
-            body = self.document.copy()
-            body.children = field.children[1].children
-            body = ParsedRstDocstring(body)
+        # Handle special fields:
+        fbody = node.children[1].children
+        if tagname.lower() == 'parameters' and arg is None:
+            if self.handle_consolidated_field(fbody, 'param'):
+                return
+        if tagname.lower() == 'exceptions' and arg is None:
+            if self.handle_consolidated_field(fbody, 'except'):
+                return
 
-            self.fields.append(Field(name, arg, body))
+        self._add_field(tagname, arg, fbody)
+
+    def _add_field(self, tagname, arg, fbody):
+        field_doc = self.document.copy()
+        field_doc.children = fbody
+        field_pdoc = ParsedRstDocstring(field_doc)
+        self.fields.append(Field(tagname, arg, field_pdoc))
+            
+    def visit_field_list(self, node):
+        # Remove the field list from the tree.  The visitor will still walk
+        # over the node's children.
+        node.parent.remove(node)
+
+    def handle_consolidated_field(self, body, tagname):
+        """
+        Attempt to handle a consolidated :Parameters: section, which
+        should contain a single list.  Any standard format for it??
+        """
+        # Check that it contains a bulleted list.
+        if len(body) != 1 or body[0].tagname != 'bullet_list':
+            print 'a'
+            return 0
+
+        # Check that each list item begins with interpreted text
+        for item in body[0].children:
+            if item.tagname != 'list_item': return 0
+            if len(item.children) == 0: return 0
+            if item.children[0].tagname != 'paragraph': return 0
+            if len(item.children[0].children) == 0: return 0
+            if item.children[0].children[0].tagname != 'title_reference':
+                return 0
+
+        # Everything looks good; convert to multiple :param: fields.
+        for item in body[0].children:
+            # Extract the arg
+            arg = item.children[0].children[0].astext()
+
+            # Extract the field body, and remove the arg
+            fbody = item.children[:]
+            fbody[0] = fbody[0].copy()
+            fbody[0].children = item.children[0].children[1:]
+
+            # Remove the separating ":", if present
+            if (len(fbody[0].children) > 0 and
+                isinstance(fbody[0].children[0], docutils.nodes.Text)):
+                child = fbody[0].children[0]
+                if child.data[:1] in ':-':
+                    child.data = child.data[1:].lstrip()
+                elif child.data[:2] == ' -':
+                    child.data = child.data[2:].lstrip()
+
+            # Wrap the field body, and add a new field
+            self._add_field(tagname, arg, fbody)
+        return 1
         
     def unknown_visit(self, node):
         'Ignore all unknown nodes'
