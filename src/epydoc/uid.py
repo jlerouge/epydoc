@@ -1150,9 +1150,9 @@ def _find_object_in_module(name, module, docmap):
         if var is not None: return var
 
         # Is it an object in obj?
-        try: obj = getattr(obj, component)
+        try: obj = getattr(obj, components[-1])
         except:
-            try: obj = obj.__getattribute__(obj, component)
+            try: obj = obj.__getattribute__(obj, components[1])
             except: return None
         try: return make_uid(obj, obj_uid, components[-1])
         except: return None
