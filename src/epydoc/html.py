@@ -640,8 +640,10 @@ class HTML_Doc:
 
         # Write the class's module and its name.
         str += self._start_of('Class Description')
-        str += '<h2><font size="-1">\n'+uid.module().name()+'</font><br>\n' 
-        str += 'Class ' + uid.name()+'</h2>\n\n'
+        str += '<h2><font size="-1">\n'
+        str += self._uid_to_href(uid.module(), code=0)
+        str += '</font><br>\n' 
+        str += 'Class ' + uid.shortname()+'</h2>\n\n'
 
         # Write the base class tree
         if doc.bases():
@@ -1592,7 +1594,9 @@ class HTML_Doc:
             if not var.uid().is_variable():
                 str += ('<code>%s</code> = %s\n' %
                         (vname, self._uid_to_href(var.uid())))
-                hasval = vtyp = None
+                if self._documented(var.uid()):
+                    str += '</td></tr></table>\n'
+                    continue
 
             if var.descr():
                 str += self._dom_to_html(var.descr(), container)
@@ -1601,16 +1605,16 @@ class HTML_Doc:
                 str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
                 
             if vtyp:
-                str += '      <dt><b>Type:</b></dt>\n      <dd>' 
+                str += '      <dt><b>Type:</b></dt>\n      <dd>\n' 
                 str += self._dom_to_html(vtyp, container)
-                str += '</dd>\n'
+                str += '\n      </dd>\n'
 
             str += self._pprint_var_value(var)
 
             if vtyp is not None or hasval:
                 str += '    </dl>\n  </dd>\n</dl>'
                 
-            str += '</dl></td></tr></table>\n'
+            str += '</td></tr></table>\n'
 
         # If we didn't get any variables, don't print anything.
         if numvars == 0: return ''
@@ -2383,6 +2387,35 @@ class HTML_Doc:
             return '%s.html#%s' % (name[:dot], name[dot+1:])
         else:
             return '%s.html' % name
+
+    def _documented(self, uid):
+        """
+        @return: True if the given UID is documented by the
+            documentation map for this C{HTML_Doc}.  If C{uid} is the
+            UID for a private object, and C{_show_private=0}, then
+            this method will also return false.
+        @rtype: C{boolean}
+        """
+        # Does it have a UID?
+        if uid is None:
+            return 0
+
+        # Is it private, if we're not showing private?
+        if (not self._show_private) and uid.is_private():
+            return 0
+
+        # Is it a variable or routine whose parent is not documented?
+        if (uid.is_routine() or uid.is_variable() and not
+            self._docmap.has_key(uid.parent())):
+            return 0
+
+        # Is it a non-variable that's not documented? (variables are
+        # not included in the docmap)
+        if (not uid.is_variable() and not self._docmap.has_key(uid)):
+            return 0
+
+        # Otherwise, it must be documented.
+        return 1
     
     def _uid_to_href(self, uid, label=None, css_class=None, code=1):
         """
@@ -2405,12 +2438,7 @@ class HTML_Doc:
         # Find a default value for the label.
         if label is None: label = uid.name()
 
-        # If there's no UID, or it's an undocumented object, or it's
-        # private and we're not showing private, then don't link to
-        # it; just show the label.
-        if (uid is None or ((not self._show_private) and uid.is_private()) or
-            (not uid.is_variable() and not self._docmap.has_key(uid)) or
-            (uid.is_variable() and not self._docmap.has_key(uid.parent()))):
+        if not self._documented(uid):
             if code: return '<code>%s</code>' % label
             else: return '%s' % label
 
