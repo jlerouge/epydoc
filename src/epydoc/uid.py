@@ -9,10 +9,11 @@
 """
 Unique identifiers and crossreference links for Python objects.  Each
 Python object is identified by a globally unique identifier,
-implemented with the C{UID} class.  It is important that each object
+implemented with the L{UID} class.  It is important that each object
 have a single unique identifier, because one object may have more than
-one name.  These C{UID}s are used the C{Link} class to implement
-crossreferencing between C{ObjDoc}s.
+one name.  UIDs should be always created using the L{make_uid}
+function; do not create UIDs directly.  The L{Link} class uses UIDs to
+implement crossreferencing between C{ObjDoc}s.
 
 @see: L{epydoc.objdoc}
 """
@@ -28,142 +29,188 @@ from types import MethodType as _MethodType
 from types import StringType as _StringType
 from epydoc.imports import import_module
 
-__all__ = ['UID', 'Link']
+__epydoc_sort__ = ['make_uid', 'UID', 'Link']
+
+##################################################
+## Table of Contents
+##################################################
+## - UID Base Class
+## - UID Implementation Classes
+##    - ObjectUID
+##    - VariableUID
+## - UID construction (make_uid)
+## - Links
+## - Inspection Helpers
+## - UID Lookup (findUID)
+
+##################################################
+## Unique Identifier Base Class
+##################################################
 
 class UID:
     """
-    A globally unique identifier used to refer to a Python object.
-    UIDs are used by ObjDoc objects for the purpose of
-    cross-referencing.  It is important that each object have one
-    unique identifier, because one object may have more than one name.
-    The UIDs are constructed directly from the objects that they point
-    to, so they are guaranteed to be consistant.
+    A globally unique identifier.
 
-    @ivar _id: The Python identifier for the object
-    @type _id: C{int}
-    @ivar _name: The dotted name for the object
-    @type _name: C{string}
-    @ivar _obj: The object
-    @type _obj: any
+    UID is an abstract base class.  The base class defines
+    X{shortname}, X{__str__}, and X{__repr__}; all other methods must
+    be defined by derived classes.
+
+    @ivar __name: This UID's globally unique name.
+    @type __name: C{string}
+
+    @cvariable _ids: A dictionary mapping from names to Python
+        identifiers (as returned by C{id}).  This dictionary is used
+        to ensure that all UIDs are given globally unique names.
+    @type _ids: C{dictionary} from C{string} to C{int}
     """
-    def __init__(self, obj):
-        """
-        Create a globally unique identifier for C{obj}.
+    def __init__(self):
+        raise NotImplementedError("UID is an abstract base class")
 
-        @param obj: The object for which a unique identifier should be
-            created.
-        @type obj: any
-        """
-        # Special case: create a UID from just a name.
-        if type(obj) is _StringType:
-            self._obj = self._typ = self._id = None
-            self._name = obj
-            self._found_fullname = 1
-            return
-        
-        self._id = id(obj)
-        self._obj = obj
-        self._module = self._cls = self._name = None
-        
-        if type(obj) is _ModuleType:
-            self._name = obj.__name__
-            
-        elif type(obj) is _ClassType:
-            self._module = import_module(obj.__module__)
-            self._name = '%s.%s' % (self._module.__name__, obj.__name__)
-
-        elif type(obj) is _FunctionType:
-            try:
-                self._module = _find_function_module(obj)
-                self._name = '%s.%s' % (self._module.__name__, obj.__name__)
-            except ValueError, e:
-                print e
-                          
-        elif type(obj) is _MethodType:
-            self._module = import_module(obj.im_class.__module__)
-            self._cls = obj.im_class
-            self._name = '%s.%s.%s' % (self._module.__name__,
-                                       self._cls.__name__, obj.__name__)
-
-        elif type(obj) in (_BuiltinFunctionType, _BuiltinMethodType):
-            if obj.__self__ is None:
-                # obj is a builtin function.
-                self._module = _find_builtin_obj_module(obj)
-                if self._module is not None:
-                    name = _find_name_in(obj, self._module)
-                    self._name = '%s.%s' % (self._module.__name__, name)
-            else:
-                # obj is a builtin method.
-                self._cls = type(obj.__self__)
-                self._module = _find_builtin_obj_module(self._cls)
-                if self._module is not None:
-                    name = _find_name_in(self._cls, self._module)
-                    self._name = '%s.%s.%s' % (self._module.__name__,
-                                               name, obj.__name__)
-            
-        elif isinstance(obj, _TypeType):
-            if hasattr(obj, '__module__'):
-                # We're in Python 2.2+; just use the __module__ field.
-                self._module = import_module(obj.__module__)
-                self._name = '%s.%s' % (self._module.__name__, obj.__name__)
-            else:
-                # We're in Python 2.1 or earlier; look for the type's module.
-                self._module = _find_builtin_obj_module(obj)
-                if self._module is not None:
-                    name = _find_name_in(obj, self._module)
-                    self._name = '%s.%s' % (self._module.__name__, name)
-
-        if self._name is not None:
-            self._found_fullname = 1
-        else:
-            # If we couldn't find a name, then use the object's
-            # internal id as a last resort.
-            self._found_fullname = 0
-            try:
-                # gimpfu.pdb.__name__ causes an uncatchable abort.
-                if type(obj).__name__ == 'pdb': raise ValueError()
-                
-                self._name = '%s-%s' % (obj.__name__, id(obj))
-            except SystemExit:
-                self._name = 'unknown-%s' % id(obj)
-            except:
-                self._name = 'unknown-%s' % id(obj)
-
+    #//////////////////////////////////////////////////
+    # UID Name & Value
+    #//////////////////////////////////////////////////
     def name(self):
         """
-        @return: The complete name of this C{UID}.  This is typically
-            a fully qualified dotted name, such as
-            C{epydoc.epytext.UID}; but if the dotted name of an object
-            cannot be found, a name will be constructed based on the
-            object's Python identifier.            
         @rtype: C{string}
+        @return: The globally unique name for this identifier.  This
+            name consists of several pieces, joined by periods, which
+            indicate where the object is defined.  For example, the
+            UID for this class has the name C{'epydoc.uid.UID'}, since
+            it is named C{UID}, and defined in the C{uid} module of
+            the C{epydoc} package.
+            
         """
-        return self._name
-    
+        raise NotImplementedError()
+
     def shortname(self):
         """
-        @return: The "short name" for this C{UID}.  This is typically
-            the last part of the fully qualified dotted name, such as
-            C{UID}; but if the dotted name of an object cannot be
-            found, a name will be constructed based on the object's
-            Python identifier.
         @rtype: C{string}
+        @return: The short name for this UID.  A UID's short name is
+            the last piece of its globally unique name, as returned by
+            L{name}.  This is typically the name that was used when
+            definining the object.  For example, the UID for this
+            class has the name C{'UID'}.
         """
-        return self._name.split('.')[-1]
-    
-    def object(self):
+        return self.name().split('.')[-1]
+
+    def value(self):
         """
-        @return: The object identified by this C{UID}; or C{None} if
-            that object is not available.
+        @return: The value of the object or variable specified by this
+            UID.
         @rtype: any
         """
-        return self._obj
+        raise NotImplementedError()
     
-    def __repr__(self): return self._name
-    def __hash__(self): return hash(self._name)
-    def __cmp__(self, other):
-        if not isinstance(other, UID): return -1
-        return cmp(self._name, other._name)
+    #//////////////////////////////////////////////////
+    # Object type
+    #//////////////////////////////////////////////////
+    # Note: these types are *not* mutually exclusive.
+    
+    def is_module(self):
+        """
+        @return: True if this is the UID for a module or a package.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_package(self):
+        """
+        @return: True if this is the UID for a package.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_class(self):
+        """
+        @return: True if this is the UID for a class or a type.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_function(self):
+        """
+        @return: True if this is the UID for a function.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_builtin_function(self):
+        """
+        @return: True if this is the UID for a builtin function.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+    
+    def is_method(self):
+        """
+        @return: True if this is the UID for a method.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_builtin_method(self):
+        """
+        @return: True if this is the UID for a builtin method.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_routine(self):
+        """
+        @return: True if this is the UID for a function, a method, a
+            builtin function, or a builtin method.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+    
+    def is_variable(self):
+        """
+        @return: True if this is the UID for a variable.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    #//////////////////////////////////////////////////
+    # Ancestors & Descendants
+    #//////////////////////////////////////////////////
+    def cls(self):
+        """
+        @return: The UID of the class that contains the object
+            identified by this UID; or C{None} if the object
+            identified by this UID is not part of a class.
+        @rtype: L{UID} or C{None}
+        """
+        raise NotImplementedError()
+        
+    def module(self):
+        """
+        @return: The UID of the module that contains the object
+            identified by this UID; or C{None} if the object
+            identified by this UID is a module or a package.
+        @rtype: L{UID}
+        """
+        raise NotImplementedError()
+
+    def package(self):
+        """
+        @return: The UID of the package that contains the object
+            identified by this UID; or C{None} if the object
+            identified by this UID is not part of a package.
+        @rtype: L{UID}
+        """
+        raise NotImplementedError()
+
+    def parent(self):
+        """
+        @return: The UID of the object that contains the object
+            identified by this UID; or C{None} if the object
+            identified by this UID is not contained by any other
+            object.  For methods, class variables, and instance
+            variables, the parent is the containing class; for
+            functions and classes, it is the containing module; and
+            for modules, it is the containing package.
+        """
+        raise NotImplementedError()
 
     def descendant_of(self, ancestor):
         """
@@ -175,6 +222,173 @@ class UID:
         @param ancestor: The UID of the potential ancestor.
         @type ancestor: L{UID}
         """
+        raise NotImplementedError()
+
+    #//////////////////////////////////////////////////
+    # Misc
+    #//////////////////////////////////////////////////
+    def __str__(self):
+        """
+        @rtype: C{string}
+        @return: The globally unique name for this identifier.
+        @see: L{name}
+        """
+        return self.name()
+
+    def __repr__(self):
+        """
+        @rtype: C{string}
+        @return: A string representation of this UID.  String
+            representations of UIDs have the form::
+                <UID: epydoc.uid.UID>
+        """
+        return '<UID: %s>' % self.name()
+
+    def __cmp__(self, other):
+        """
+        Compare C{self} and C{other}, based on their globally unique
+        names.
+          - If they have the same name, then return 0.
+          - If C{self}'s name preceeds C{other}'s name alphabetically,
+            return -1.
+          - If C{self}'s name follows C{other}'s name alphabetically,
+            return +1.
+        @rtype: C{int}
+        @see: C{name}
+        """
+        if not isinstance(other, ObjectUID): return -1
+        return cmp(self.name(), other.name())
+
+    def __hash__(self): raise NotImplementedError()
+    def __eq__(self): raise NotImplementedError()
+
+##################################################
+## UID Implementation Classes
+##################################################
+
+class ObjectUID(UID):
+    """
+    A globally unique identifier used to refer to a Python object.
+
+    @ivar _id: The python identifier of the object (or of its
+        underlying function for methods).  This is used for hashing.
+    """
+    def __init__(self, object):
+        self._obj = object
+        if type(object) is _MethodType: self._id = id(object.im_func)
+        else: self._id = id(object)
+
+    # The value of an ObjectUID is the object that was used to
+    # construct the UID.
+    def value(self): return self._obj
+
+    # The following methods figure out the object type by examining
+    # self._obj.  Docstrings are defined in UID.
+    def is_module(self): return type(self._obj) is _ModuleType
+    def is_function(self): return type(self._obj) is _FunctionType
+    def is_method(self): return type(self._obj) is _MethodType
+    def is_package(self): return (type(self._obj) is _ModuleType and
+                                  hasattr(self._obj, '__path__'))
+    def is_class(self): return ((type(self._obj) is _ClassType) or
+                                isinstance(self._obj, _TypeType))
+    def is_routine(self):
+        return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
+                                   _MethodType, _BuiltinMethodType)
+    def is_builtin_function(self): 
+        return (type(self._obj) is _BuiltinFunctionType and
+                self._obj.__self__ is None)
+    def is_builtin_method(self):
+        return (type(self._obj) is _BuiltinMethodType and
+                self._obj.__self__ is not None)
+    def is_variable(self): return 0
+
+    def name(self):
+        if not hasattr(self, '_name'):
+            typ = type(self._obj)
+            if typ is _ModuleType:
+                self._name = self._obj.__name__
+            elif typ is _ClassType or typ is _FunctionType:
+                self._name = '%s.%s' % (self.module(), self._obj.__name__)
+            elif typ is _MethodType or (typ is _BuiltinMethodType and
+                                        self._obj.__self__ is not None):
+                self._name = '%s.%s' % (self.cls(), self._obj.__name__)
+            elif typ is _TypeType and hasattr(self._obj, '__module__'):
+                self._name = '%s.%s' % (self.module(), self._obj.__name__)
+            elif (typ is _TypeType or (typ is _BuiltinFunctionType and
+                                       self._obj.__self__ is None)):
+                module = self.module()
+                if module is None:
+                    self._name = '__unknown__.%s' % self._obj.__name__
+                else:
+                    name = _find_name_in(self._obj, self.module()._obj)
+                    self._name = '%s.%s' % (self.module(), name)
+            else:
+                raise ValueError("Can't find name for %r" % self._obj)
+        return self._name
+        
+    def cls(self):
+        if not hasattr(self, '_cls'):
+            obj = self._obj
+            if type(obj) is _MethodType:
+                self._cls = ObjectUID(obj.im_class)
+            elif (type(obj) is _BuiltinMethodType and
+                  obj.__self__ is not None):
+                self._cls = ObjectUID(type(obj.__self__))
+            else:
+                self._cls = None
+        return self._cls
+
+    def module(self):
+        if not hasattr(self, '_module'):
+            obj = self._obj
+            typ = type(obj)
+
+            if typ is _ModuleType:
+                return None
+            if typ is _ClassType:
+                self._module = ObjectUID(import_module(obj.__module__))
+            elif typ is _FunctionType:
+                self._module = ObjectUID(_find_function_module(obj))
+            elif typ is _MethodType:
+                module = import_module(obj.im_class.__module__)
+                self._module = ObjectUID(module)
+            elif typ is _BuiltinFunctionType and obj.__self__ is None:
+                module = _find_builtin_obj_module(obj)
+                if module is None: self._module = None
+                else: self._module = ObjectUID(module)
+            elif typ is _BuiltinMethodType and obj.__self__ is not None:
+                cls = type(obj.__self__)
+                module = _find_builtin_obj_module(cls)
+                if module is None: self._module = None
+                else: self._module = ObjectUID(module)
+            elif typ is _TypeType and hasattr(obj, '__module__'):
+                self._module = ObjectUID(import_module(obj.__module__))
+            elif typ is _TypeType:
+                module = _find_builtin_obj_module(obj)
+                if module is None: self._module = None
+                else: self._module = ObjectUID(module)
+            else:
+                raise ValueError("Cant find module for %r" % self._obj)
+        return self._module
+
+    def package(self):
+        if not hasattr(self, '_pkg'):
+            # Find the module.
+            if type(self._obj) is _ModuleType: mname = self._obj.__name__
+            else: mname = self.module()._obj.__name__
+
+            # Look up the package.
+            dot = mname.rfind('.')
+            if dot < 0: self._pkg = None
+            else: self._pkg = ObjectUID(import_module(mname[:dot]))
+                                  
+        return self._pkg
+
+    def parent(self):
+        return self.cls() or self.module() or self.package()
+
+    def descendant_of(self, ancestor):
+        if self == ancestor: return 1
         descendant = self
         
         if descendant.is_method():
@@ -196,112 +410,104 @@ class UID:
             else: descendant = descendant.package()
 
         return 0
+    def __hash__(self):
+        # This should be fast, since it's used for hashing; so use the
+        # Python internal id.
+        return self._id
 
+    def __eq__(self, other):
+        # This should be fast, since it's used for hashing; so use the
+        # Python internal id.
+        return isinstance(other, ObjectUID) and self._id == other._id
+
+class VariableUID(UID):
+    """
+
+    A globally unique identifier used to refer to a variable, relative
+    to a Python object.
+    
+    This is used for variables.  I guess it could also be used for
+    parameters to functions..
+    
+    """
+    def __init__(self, value, base_uid, shortname):
+        """
+        @param base_uid: The base ...
+        @param name: The name...
+        """
+        self._base = base_uid
+        self._shortname = shortname
+        self._value = value
+
+    def value(self): return self._value
+
+    # The following methods are used to check the type of the UID.
+    # Docstrings are defined in UID.
+    def is_variable(self): return 1
+    def is_module(self): return 0
+    def is_function(self): return 0
+    def is_method(self): return 0
+    def is_package(self): return 0
+    def is_class(self): return 0
+    def is_builtin_function(self): return 0
+    def is_builtin_method(self): return 0
+    def is_routine(self): return 0
+
+    def name(self):
+        return '%s.%s' % (self._base.name(), self._shortname)
+    def shortname(self):
+        return self._shortname
+
+    # The following methods report about the ancestors of the UID, 
+    # mainly by delegating to the base UID.
     def cls(self):
-        """
-        @return: The UID of the class that contains the object
-            identified by this UID.
-        @rtype: L{UID}
-        """
-        return UID(self._cls)
-        
+        if self._base.is_class(): return self._base
+        else: return self._base.cls()
     def module(self):
-        """
-        @return: The UID of the module that contains the object
-            identified by this UID.  If the module cannot be found
-            (e.g., if this is the UID for a builtin method), return
-            None. 
-        @rtype: L{UID} or C{None}
-        """
-        return UID(self._module)
-
+        if self._base.is_module(): return self._base
+        else: return self._base.module()
     def package(self):
-        """
-        @return: The UID of the package that contains the object
-            identified by this UID.
-        @rtype: L{UID}
-        """
-        if type(self._obj) is _ModuleType:
-            dot = self._name.rfind('.')
-            if dot < 0: return None
-            return UID(sys.modules[self._name[:dot]])
-        elif type(self._obj) in (_MethodType, _ClassType):
-            return self.module().package()
-        elif isinstance(self._obj, _TypeType) and self._module:
-            return self.module().package()
-        else:
-            raise TypeError()
+        return self._base.package()
+    def parent(self):
+        return self._base
 
-    def is_function(self):
-        """
-        @return: True if this is the UID for a function.
-        @rtype: C{boolean}
-        """
-        return type(self._obj) is _FunctionType
+    def descendant_of(self, ancestor):
+        if self == ancestor: return 1
+        return self._base.descendant_of(ancestor)
+        
+    def __hash__(self):
+        return hash( (self._base, self._shortname) )
 
-    def is_builtin_function(self):
-        """
-        @return: True if this is the UID for a builtin function.
-        @rtype: C{boolean}
-        """
-        return (type(self._obj) is _BuiltinFunctionType and
-                self._cls is None)
-    
-    def is_builtin_method(self):
-        """
-        @return: True if this is the UID for a builtin method.
-        @rtype: C{boolean}
-        """
-        return (type(self._obj) is _BuiltinMethodType and
-                self._cls is not None)
+    def __eq__(self):
+        return (isinstance(other, ValueUID) and
+                self._shortname == other._shortname and
+                self._base == other._base)
 
-    def is_routine(self):
-        """
-        @return: True if this is the UID for a function, a method, a
-            builtin function, or a builtin method.
-        @rtype: C{boolean}
-        """
-        return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
-                                   _MethodType, _BuiltinMethodType)
-    
-    def is_class(self):
-        """
-        @return: True if this is the UID for a class or a type.
-        @rtype: C{boolean}
-        """
-        return ((type(self._obj) is _ClassType) or
-                isinstance(self._obj, _TypeType))
+##################################################
+## UID Construction
+##################################################
 
-    def is_method(self):
-        """
-        @return: True if this is the UID for a method.
-        @rtype: C{boolean}
-        """
-        return type(self._obj) is _MethodType
+_uids = {}
+_ids = {}
+def make_uid(object, base_uid=None, shortname=None):
+    """
+    Create a globally unique identifier for the given object.
+    """
+    if type(object) in (_ModuleType, _ClassType, _TypeType,
+                        _BuiltinFunctionType, _BuiltinMethodType,
+                        _FunctionType, _MethodType):
+        return ObjectUID(object)
 
-    def is_module(self):
-        """
-        @return: True if this is the UID for a module or a package.
-        @rtype: C{boolean}
-        """
-        return type(self._obj) is _ModuleType
+    elif base_uid is not None and shortname is not None:
+        return VariableUID(object, base_uid, shortname)
+    else:
+        raise TypeError('Cannot create a UID for a '+
+                        type(object).__name__+
+                        ' without a base UID.')
 
-    def is_package(self):
-        """
-        @return: True if this is the UID for a package.
-        @rtype: C{boolean}
-        """
-        return (type(self._obj) is _ModuleType and
-                hasattr(self._obj, '__path__'))
-
-    def found_fullname(self):
-        """
-        @return: True if this UID encodes the absolute name for the
-            object.  If C{found_fullname} is false, then the UID's
-            name is based on the object's internal id.
-        @rtype: C{boolean}
-        """
-        return self._found_fullname
+##################################################
+## Links
+##################################################
 
 class Link:
     """
@@ -341,7 +547,9 @@ class Link:
         """
         self._name = name
         if isinstance(target, UID): self._target = target
-        else: self._target = UID(target)
+        else:
+            raise TypeError()
+            self._target = make_uid(target)
 
     def __repr__(self):
         """
@@ -369,6 +577,10 @@ class Link:
     def __cmp__(self, other):
         if not isinstance(other, Link): return -1
         return cmp(self._target, other._target)
+
+##################################################
+## Inspection Helper Functions
+##################################################
 
 _find_builtin_obj_module_cache = {}
 def _find_builtin_obj_module(obj, show_warnings=1):
@@ -450,44 +662,10 @@ def _find_function_module(func):
     raise ValueError("Couldn't the find module for the function %s" %
                      func.func_name)
 
-def _is_variable_in(name, container, docmap):
-    """
-    @return: True if C{name} is a variable documented by
-        C{container} in C{docmap}.
-    @rtype: C{boolean}
-    @param name: The name to check.
-    @type name: C{string}
-    @param container: The UID of the object which might contain a
-        variable named C{name}.
-    @type container: L{UID}
-    @param docmap: A documentation map containing the documentation
-        for the object identified by C{container}.
-    @type docmap: L{objdoc.DocMap}
-    """
-    if docmap is None or not docmap.has_key(container): return 0
-    container_doc = docmap.get(container)
-    if container.is_module():
-        for var in container_doc.variables():
-            if var.name() == name: return 1
-    elif container.is_class():
-        for var in container_doc.ivariables():
-            if var.name() == name: return 1
-        for var in container_doc.cvariables(): 
-            if var.name() == name: return 1
-    return 0
-
-def _makeuid(obj):
-    """
-    @return: A UID constructed from C{obj}, if C{obj} is a module,
-        class, function, or method.  Otherwise, return C{None}.
-    @rtype: L{UID} or C{None}
-    @param obj: The object whose UID should be returned.
-    @type obj: any
-    """
-    if type(obj) is _StringType: return None
-    uid = UID(obj)
-    if uid.found_fullname(): return uid
-    else: return None
+##################################################
+## UID Lookup
+##################################################
+# Clean this up a lot!
 
 def findUID(name, container, docmap=None):
     """
@@ -515,23 +693,25 @@ def findUID(name, container, docmap=None):
     # Is it the short name for a member of the containing class?
     if container.is_class():
         if _is_variable_in(name, container, docmap):
-            return UID('%s.%s' % (container, name))
-        elif container.object().__dict__.has_key(name):
-            cls = container.object()
+            val = None # HACK
+            return make_uid(val, container, name)
+        elif container.value().__dict__.has_key(name):
+            cls = container.value()
             obj = cls.__dict__[name]
             if type(obj) is _FunctionType:
-                return UID(new.instancemethod(obj, None, cls))
+                return make_uid(new.instancemethod(obj, None, cls))
             else:
-                return _makeuid(obj)
+                return make_uid(obj)
         else:
             container = container.module()
 
-    module = container.object()
+    module = container.value()
     components = name.split('.')
 
     # Is it a variable in the containing module?
     if _is_variable_in(name, container, docmap):
-        return UID('%s.%s' % (container, name))
+        val = None # HACK
+        return make_uid(val, container, name)
 
     # Is it an object in the containing module?
     try:
@@ -539,7 +719,7 @@ def findUID(name, container, docmap=None):
         for component in components:
             try: obj = obj.__dict__[component]
             except: raise KeyError()
-        return _makeuid(obj)
+        return make_uid(obj)
     except KeyError: pass
 
     # Is it a module name?  The module name may be relative to the
@@ -548,7 +728,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            return(_makeuid(import_module(modname)))
+            return(make_uid(import_module(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -560,12 +740,39 @@ def findUID(name, container, docmap=None):
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
                 mod = import_module(modname)
-                if _is_variable_in(name, UID(mod), docmap):
-                    return UID('%s.%s' % (container, name))
+                if _is_variable_in(name, make_uid(mod), docmap):
+                    val = None # HACK
+                    return make_uid(val, container, name)
                 obj = getattr(import_module(modname), objname)
-                return _makeuid(obj)
+                return make_uid(obj)
             except: pass
 
     # We couldn't find it; return None.
     return None
+
+def _is_variable_in(name, container, docmap):
+    """
+    @return: True if C{name} is a variable documented by
+        C{container} in C{docmap}.
+    @rtype: C{boolean}
+    @param name: The name to check.
+    @type name: C{string}
+    @param container: The UID of the object which might contain a
+        variable named C{name}.
+    @type container: L{UID}
+    @param docmap: A documentation map containing the documentation
+        for the object identified by C{container}.
+    @type docmap: L{objdoc.DocMap}
+    """
+    if docmap is None or not docmap.has_key(container): return 0
+    container_doc = docmap.get(container)
+    if container.is_module():
+        for var in container_doc.variables():
+            if var.uid().shortname() == name: return 1
+    elif container.is_class():
+        for var in container_doc.ivariables():
+            if var.uid().shortname() == name: return 1
+        for var in container_doc.cvariables(): 
+            if var.uid().shortname() == name: return 1
+    return 0
 
