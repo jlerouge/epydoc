@@ -7,7 +7,7 @@
 # Python source files
 PY_SRC = $(wildcard src/epydoc/*.py)
 EXAMPLES_SRC = $(wildcard doc/*.py)
-DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css)
+DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -43,17 +43,22 @@ xfer: refdocs examples
 	cp -r ${DOCS} ${WEBDIR}
 	cp -r ${API} ${WEBDIR}
 	cp -r ${EXAMPLES} ${WEBDIR}
-	rsync -arz --size-only -v -e ssh ${WEBDIR}/* $(HOST):$(DIR)
+	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
 
 examples: .up2date.examples
-.up2date.examples: ${EXAMPLES_SRC}
+.up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
 	mkdir -p ${EXAMPLES}
-	epydoc ${EXAMPLES_SRC} -o ${EXAMPLES} -n epydoc \
+	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
 	       -u http://epydoc.sf.net --css blue
 	touch .up2date.examples
 
-local: refdocs
-	rsync -arz -e ssh $(API)/* /var/www/epydoc
+local: refdocs examples
+	rm -rf ${WEBDIR}
+	mkdir -p ${WEBDIR}
+	cp -r ${DOCS} ${WEBDIR}
+	cp -r ${API} ${WEBDIR}
+	cp -r ${EXAMPLES} ${WEBDIR}
+	cp -r ${WEBDIR}/* /var/www/epydoc
 
 refdocs: .up2date.refdocs
 .up2date.refdocs: ${PY_SRC}
