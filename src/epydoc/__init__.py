@@ -57,10 +57,24 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
                     'Christian Reis <kiko@async.com.br>']
 
 # Sort order
-__epydoc_sort__ = ['cli', 'gui', 'imports', 
-                   'objdoc', 'epytext', 'uid',
-                   'html', 'css', 'help', 'colorize',
-                   'checker']
+__epydoc_sort__ = [
+    # interfaces
+    'cli', 'gui',
+
+    # Inspection
+    'imports', 'objdoc', 'epytext', 'uid',
+
+    # HTML Formatter
+    'html', 'css', 'help', 'colorize',
+
+    # LaTeX Formatter
+    'latex',
+
+    # Manpage Formatter
+    'man',
+
+    # Documentation completeness checker
+    'checker']
 
 # To do:
 #   - add escape characters to epytext? (e.g. E{->})
