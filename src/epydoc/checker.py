@@ -7,7 +7,9 @@
 #
 
 """
-Check for missing documentation field values.
+Documentation completeness checker.  This module defines a single
+class, C{DocChecker}, which can be used to check the that specified
+classes of objects are documented.
 """
 
 ##################################################
@@ -26,16 +28,130 @@ from types import StringType as _StringType
 
 import epydoc.epytext as epytext
 from epydoc.uid import UID, Link
-from epydoc.objdoc import Documentation, ModuleDoc, FuncDoc
+from epydoc.objdoc import ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 
+# The following functions never need descriptions, authors, or
+# versions:
+_NO_BASIC = ['__hash__', '__repr__', '__str__', '__cmp__']
+
+# The following functions never need return values:
+_NO_RETURN = ['__init__', '__hash__', '__repr__', '__str__',
+              '__cmp__']
+
+# These don't need parameters documented
+_NO_PARAM = ['__cmp__']
+
 def _is_private(str):
+    """
+    @return: True if C{str} is the name of a public object.
+    @rtype: C{boolean}
+    @param str: The name to check.
+    @type str: C{string}
+    """
     for piece in str.split('.'):
         if piece[0] == '_' and piece[-1] != '_':
             return 1
     return 0
 
 class DocChecker:
+    """
+    Documentation completeness checker.  C{DocChecker} can be used to
+    check that specified classes of objects are documented.  To check
+    the documentation for a group of objects, you should create a
+    C{DocChecker} from a L{DocMap<objdoc.DocMap>} that documents those
+    objects; and then use the L{check} method to run specified checks
+    on the objects' documentation.
+
+    What checks are run, and what objects they are run on, are
+    specified by the constants defined by C{DocChecker}.  These
+    constants are divided into three groups.  
+
+      - Type specifiers indicate what type of objects should be
+        checked: L{MODULE}; L{CLASS}; L{FUNC}; L{VAR}; L{IVAR};
+        L{CVAR}; L{PARAM}; and L{RETURN}.
+      - Public/private specifiers indicate whether public or private
+        objects should be checked: L{PUBLIC} and L{PRIVATE}.
+      - Check specifiers indicate what checks should be run on the
+        objects: L{TYPE}; L{DESCR}; L{DESCR_LAZY}; L{AUTHOR};
+        L{VERSION}; and L{SEE}.
+
+    The L{check} method is used to perform a check on the
+    documentation.  Its parameter is formed by or-ing together at
+    least one value from each specifier group:
+
+        >>> checker.check(DocChecker.MODULE | DocChecker.PUBLIC |
+        ...               DocChecker.DESCR)
+        
+    To specify multiple values from a single group, simply or their
+    values together:
+    
+        >>> checker.check(DocChecker.MODULE | DocChecker.CLASS |
+        ...               DocChecker.FUNC | DocChecker.DESCR_LAZY |
+        ...               DocChecker.PUBLIC)
+
+    @type MODULE: C{int}
+    @cvar MODULE: Type specifier that indicates that the documentation
+        of modules should be checked.
+    @type CLASS: C{int}
+    @cvar CLASS: Type specifier that indicates that the documentation
+        of classes should be checked.
+    @type FUNC: C{int}
+    @cvar FUNC: Type specifier that indicates that the documentation
+        of functions should be checked.
+    @type VAR: C{int}
+    @cvar VAR: Type specifier that indicates that the documentation
+        of module variables should be checked.
+    @type IVAR: C{int}
+    @cvar IVAR: Type specifier that indicates that the documentation
+        of instance variables should be checked.
+    @type CVAR: C{int}
+    @cvar CVAR: Type specifier that indicates that the documentation
+        of class variables should be checked.
+    @type PARAM: C{int}
+    @cvar PARAM: Type specifier that indicates that the documentation
+        of function and method parameters should be checked.
+    @type RETURN: C{int}
+    @cvar RETURN: Type specifier that indicates that the documentation
+        of return values should be checked.
+    @type ALL_T: C{int}
+    @cvar ALL_T: Type specifier that indicates that the documentation
+        of all objects should be checked.
+
+    @type TYPE: C{int}
+    @cvar TYPE: Check specifier that indicates that every variable and
+        parameter should have a C{@type} field.
+    @type SEE: C{int}
+    @cvar SEE: Check specifier that indicates that all C{@see}
+        fields should have valid targets.
+    @type AUTHOR: C{int}
+    @cvar AUTHOR: Check specifier that indicates that every object
+        should have an C{author} field.
+    @type VERSION: C{int}
+    @cvar VERSION: Check specifier that indicates that every object
+        should have a C{version} field.
+    @type DESCR_LAZY: C{int}
+    @cvar DESCR_LAZY: Check specifier that indicates that every object
+        should have a description.  However, it is permissible for
+        functions and methods that have a C{@return} field to not have
+        a description, since a description may be generated from the
+        C{@return} field.
+    @type DESCR: C{int}
+    @cvar DESCR: Check specifier that indicates that every object
+        should have a description.  
+    @type ALL_C: C{int}
+    @cvar ALL_C: Check specifier that all checks should be run.
+
+    @type PUBLIC: C{int}
+    @cvar PUBLIC: Specifier that indicates that public objects should
+        be checked.
+    @type PRIVATE: C{int}
+    @cvar PRIVATE: Specifier that indicates that private objects should
+        be checked.
+    @type ALL_P: C{int}
+    @cvar ALL_P: Specifier that indicates that both public and private
+        objects should be checked.
+    """
     # Types
     MODULE = 1
     CLASS  = 2
@@ -65,33 +181,51 @@ class DocChecker:
     ALL = ALL_T + ALL_C + ALL_P
 
     def __init__(self, docmap):
+        """
+        Create a new C{DocChecker} that can be used to run checks on
+        the documentation of the objects documented by C{docmap}
+
+        @param docmap: A documentation map containing the
+            documentation for the objects to be checked.
+        @type docmap: C{DocMap<objdoc.DocMap>}
+        """
         docs = []
         self._docs = docmap.values()
         self._docmap = docmap
-        """
-        self._docmap = docmap
-        for (uid, doc) in docmap.items():
-            if isinstance(doc, ModuleDoc) or isinstance(doc, ClassDoc):
-                docs.append(uid)
-        self._docs = []
-        self._add(docs)
-        """
         f = lambda d1,d2:cmp(`d1.uid()`, `d2.uid()`)
         self._docs.sort(f)
         self._checks = 0
+        self._last_warn = None
+        self._out = sys.stdout
 
     def check(self, checks = None):
+        """
+        Run the specified checks on the documentation of the objects
+        contained by this C{DocChecker}'s C{DocMap}.  Any errors found
+        are printed to standard out.
+
+        @param checks: The checks that should be run on the
+            documentation.  This value is constructed by or-ing
+            together the specifiers that indicate which objects should
+            be checked, and which checks should be run.  See the
+            L{module description<checker>} for more information.
+            If no checks are specified, then a default set of checks
+            will be run.
+        @type checks: C{int}
+        @return: True if no problems were found.
+        @rtype: C{boolean}
+        """
         if checks == None:
-            self.check(DocChecker.MODULE | DocChecker.CLASS |
-                       DocChecker.FUNC | DocChecker.DESCR_LAZY |
-                       DocChecker.PUBLIC)
-            self.check(DocChecker.PARAM | DocChecker.VAR |
-                       DocChecker.IVAR | DocChecker.CVAR |
-                       DocChecker.RETURN | DocChecker.DESCR |
-                       DocChecker.TYPE | DocChecker.PUBLIC)
-            return
+            return (self.check(DocChecker.MODULE | DocChecker.CLASS |
+                               DocChecker.FUNC | DocChecker.DESCR_LAZY |
+                               DocChecker.PUBLIC) and
+                    self.check(DocChecker.PARAM | DocChecker.VAR |
+                               DocChecker.IVAR | DocChecker.CVAR |
+                               DocChecker.RETURN | DocChecker.DESCR |
+                               DocChecker.TYPE | DocChecker.PUBLIC))
 
         self._checks = checks
+        self._last_warn = None
         for doc in self._docs:
             if isinstance(doc, ModuleDoc):
                 self._check_module(doc)
@@ -101,8 +235,36 @@ class DocChecker:
                 self._check_func(doc)
             else:
                 raise AssertionError(doc)
+        if self._last_warn is not None: print
+        return (self._last_warn is None)
+
+    def _warn(self, error, name):
+        """
+        Print a warning about the object named C{name}.
+
+        @param error: The error message to print.
+        @type error: C{String}
+        @param name: The name of the object that generated the
+            warning.
+        @type name: C{String}
+        @rtype: C{None}
+        """
+        name = str(name)
+        if name != self._last_warn:
+            if self._last_warn is not None: self._out.write('\n')
+            self._out.write(name + '.'*max(1,60-len(name)) + error)
+            self._last_warn = name
+        else:
+            self._out.write(', %s' % error)
 
     def _check_name_publicity(self, name):
+        """
+        @return: True if an object named C{name} should be checked,
+            given the public/private specifiers.
+        @rtype: C{boolean}
+        @param name: The name of the object to check.
+        @type name: C{string}
+        """
         if (_is_private(name) and
             not (self._checks & DocChecker.PRIVATE)): return 0
         if (not _is_private(name) and
@@ -110,21 +272,37 @@ class DocChecker:
         return 1
 
     def _check_basic(self, doc):
+        """
+        Check the description, author, version, and see-also fields of
+        C{doc}.  This is used as a helper function by L{_check_module},
+        L{_check_class}, and L{_check_func}.
+
+        @param doc: The documentation that should be checked.
+        @type doc: C{ObjDoc}
+        @rtype: C{None}
+        """
         if (self._checks & DocChecker.DESCR) and (not doc.descr()):
             if ((self._checks & DocChecker.DESCR_STRICT) or
                 (not isinstance(doc, FuncDoc)) or
                 (not doc.returns().descr())):
-                print 'Warning -- No descr    ', doc.uid()
-        if (self._checks & DocChecker.SEE):
-            for (elt, descr) in doc.seealsos():
-                if not self._docmap.has_key(elt):
-                    print 'Warning -- Broken see-also ', doc.uid(), elt
+                self._warn('No descr', `doc.uid()`)
+        #if (self._checks & DocChecker.SEE):
+        #    for link in doc.seealsos():
+        #        if not self._docmap.has_key(link.target()):
+        #            self._warn("Bad @see: %s" % link.target())
         if (self._checks & DocChecker.AUTHOR) and (not doc.authors()):
-            print 'Warning -- No authors  ', doc.uid()
+            self._warn('No authors', `doc.uid()`)
         if (self._checks & DocChecker.VERSION) and (not doc.version()):
-            print 'Warning -- No version  ', doc.uid()
+            self._warn('No version', `doc.uid()`)
             
     def _check_module(self, doc):
+        """
+        Run checks on the module whose UID is C{doc}.
+        
+        @param doc: The UID of the module to check.
+        @type doc: C{UID}
+        @rtype: C{None}
+        """
         if not self._check_name_publicity(`doc.uid()`): return
         if self._checks & DocChecker.MODULE:
             self._check_basic(doc)
@@ -133,6 +311,13 @@ class DocChecker:
                 self._check_var(v, `doc.uid()`)
         
     def _check_class(self, doc):
+        """
+        Run checks on the class whose UID is C{doc}.
+        
+        @param doc: The UID of the class to check.
+        @type doc: C{UID}
+        @rtype: C{None}
+        """
         if not self._check_name_publicity(`doc.uid()`): return
         if self._checks & DocChecker.CLASS:
             self._check_basic(doc)
@@ -144,18 +329,37 @@ class DocChecker:
                 self._check_var(v, `doc.uid()`)
 
     def _check_var(self, var, name):
+        """
+        Run checks on the variable whose documentation is C{var} and
+        whose name is C{name}.
+        
+        @param var: The documentation for the variable to check.
+        @type var: C{Var}
+        @param name: The name of the variable to check.
+        @type name: C{string}
+        @rtype: C{None}
+        """
         if not self._check_name_publicity(name): return
         if var == None: return
+        if not self._check_name_publicity(var.name()): return
         if var.name() == 'return':
             if (var.type() and
                 epytext.to_plaintext(var.type()).strip().lower() == 'none'):
                 return
         if (self._checks & DocChecker.DESCR) and (not var.descr()):
-            print 'Warning -- No descr    ', name+'.'+var.name()
+            self._warn('No descr', name+'.'+var.name())
         if (self._checks & DocChecker.TYPE) and (not var.type()):
-            print 'Warning -- No type     ', name+'.'+var.name()
+            self._warn('No type', name+'.'+var.name())
             
     def _documented_ancestor(self, doc):
+        """
+        @return: The closest documented ancestor of C{doc} (including
+            C{doc}).
+        @rtype: C{ObjDoc}
+        @param doc: The UID of the object whose documented ancestor
+            should be returned.
+        @type doc: C{UID}
+        """
         if isinstance(doc, FuncDoc):
             while (not doc.documented() and
                    doc.overrides() and
@@ -164,17 +368,23 @@ class DocChecker:
         return doc
             
     def _check_func(self, doc):
+        """
+        Run checks on the function whose UID is C{doc}.
+        
+        @param doc: The UID of the function to check.
+        @type doc: C{UID}
+        @rtype: C{None}
+        """
         if not self._check_name_publicity(`doc.uid()`): return
         doc = self._documented_ancestor(doc)
-        if self._checks & DocChecker.FUNC:
-            if ((`doc.uid()`.split('.'))[-1] not in
-                ('__hash__',)):
+        if (self._checks & DocChecker.FUNC and
+            doc.uid().shortname() not in _NO_BASIC):
                 self._check_basic(doc)
-        if (self._checks & DocChecker.RETURN):
-            if ((`doc.uid()`.split('.'))[-1] not in
-                ('__init__', '__hash__')):
+        if (self._checks & DocChecker.RETURN and
+            doc.uid().shortname() not in _NO_RETURN):
                 self._check_var(doc.returns(), `doc.uid()`)
-        if (self._checks & DocChecker.PARAM):
+        if (self._checks & DocChecker.PARAM and
+            doc.uid().shortname() not in _NO_PARAM):
             if doc.uid().is_method():
                 for v in doc.parameters()[1:]:
                     self._check_var(v, `doc.uid()`)
