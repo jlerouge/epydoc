@@ -287,8 +287,11 @@ def cli():
         else:
             _error("%r is not a directory" % param['target'])
 
+    # Construct the docmap.  Don't bother documenting base classes if
+    # we're just running checks.
+    d = DocMap(not param['check'])
+    
     # Build the documentation.
-    d = DocMap()
     for module in modules:
         if param['verbosity'] > 0: print 'Building docs for', module.__name__
         d.add(module)
