@@ -62,8 +62,11 @@ DVIPS_COMMAND = 'dvips -q %(dvi)s -o %(ps)s -G0 -Ppdf'
 PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
                   '-dSubsetFonts=true -dCompatibilityLevel=1.2 '+
                   '-dEmbedAllFonts=true %(ps)s %(pdf)s')
-PROFILE=0
 
+## This is a more verbose version of LATEX_COMMAND.
+#LATEX_COMMAND = r"echo x | latex %(tex)s"
+
+PROFILE=0
 ##################################################
 ## Command-Line Interface
 ##################################################
@@ -352,7 +355,8 @@ def _run(cmd, options):
         cmd_str = wordwrap(`cmd`, 10+len(name)).lstrip()
         print >>sys.stderr, 'Running %s' % cmd_str.rstrip()
 
-    if os.system(cmd) != 0:
+    exitcode = os.system(cmd)
+    if exitcode != 0:
         raise OSError('%s failed: %s' % (name, exitcode))
 
 def _latex(docmap, options, format):
