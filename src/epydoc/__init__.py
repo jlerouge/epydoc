@@ -53,7 +53,8 @@ __license__ = 'IBM Open Source License'
 # Contributors to epydoc (in alpha order by last name)
 __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
                     'Edward Loper <edloper@gradient.cis.upenn.edu>',
-                    'Bruce Mitchener <bruce@cubik.org>']
+                    'Bruce Mitchener <bruce@cubik.org>',
+                    'Christian Reis <kiko@async.com.br>']
 
 # Sort order
 __epydoc_sort__ = ['cli', 'gui', 'imports', 
