@@ -984,6 +984,11 @@ class ClassDoc(ObjDoc):
         - X{bases}: A list of the class's base classes
         - X{subclasses}: A list of the class's known subclasses
         - X{methods}: A list of the methods defined by the class
+        - X{staticmethods}: A list of static methods defined by
+          the class.
+        - X{classmethods}: A list of class methods defined by the
+          class.
+        - X{properties}: A list of properties defined by the class.
         - X{ivariables}: A list of the instance variables defined by the
           class
         - X{cvariables}: A list of the class variables defined by the
@@ -1019,6 +1024,7 @@ class ClassDoc(ObjDoc):
         self._ivariables = []
         self._staticmethods = []
         self._classmethods = []
+        self._properties = []
 
         try: items = cls.__dict__.items()
         except AttributeError: items = []
@@ -1039,6 +1045,8 @@ class ClassDoc(ObjDoc):
                     val = new.instancemethod(val, None, cls)
                     self._classmethods.append(Link(field, make_uid(val)))
                     continue
+                #elif isinstance(val, property):
+                #    self._properties.append(val)
             except NameError: pass
                 
             vuid = make_uid(val, self._uid, field)
@@ -1356,7 +1364,12 @@ class FuncDoc(ObjDoc):
         if self._uid.is_method():
             self._find_override(self._uid.cls().value())
             if self._overrides == self._uid:
-                raise ValueError('Circular override')
+                # Print a warning message, and set overrides=None
+                if sys.stderr.softspace: print >>sys.stderr
+                estr = 'Warning: %s appears to override itself' % self._uid
+                print >>sys.stderr, estr
+                self._overrides = None
+            #    raise ValueError('Circular override: %s' % self._uid)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
