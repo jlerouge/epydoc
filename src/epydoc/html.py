@@ -909,9 +909,7 @@ class HTML_Doc:
                 
             rval = fdoc.returns()
             if rval.type():
-                rtype = ('\n<font size="-1">'+
-                         self._dom_to_html(rval.type(), container, 8)+
-                         "</font>")
+                rtype = self._dom_to_html(rval.type(), container, 8)
             else:
                 rtype = '&nbsp;'
 
@@ -929,10 +927,13 @@ class HTML_Doc:
             if descrstr != '&nbsp;':
                 fsum = '<br>'+descrstr
             else:
-                fsum = ''
-            if inherit: fsum += '    <i>(inherited)</i>\n'
+                if inherit: fsum = '<br>\n'
+                else: fsum = ''
+            if inherit:
+                fsum += ('    <i>(inherited from %s)</i>\n' %
+                         self._uid_to_href(container, container.shortname()))
             str += '<tr><td align="right" valign="top" width="15%">'
-            str += rtype+'</td>\n  <td>'
+            str += '<font size="-1">'+rtype+'</font></td>\n  <td>'
             str += self._func_signature(fname, fdoc, 1, 'summary-sig')
             #str += self._uid_to_href(func, fname)
             #str += '</b>'+pstr+'</code>\n  '
@@ -969,14 +970,13 @@ class HTML_Doc:
             # class's file.
             if inherit: continue
             
-            str += ('\n<table width="100%" class="func-details"'+
-                    ' bgcolor="#e0e0e0">'+
-                    '<tr><td>\n')
+            str += '\n<a name="'+fname+'"></a>\n'
+            str += '<table width="100%" class="func-details"'
+            str += ' bgcolor="#e0e0e0"><tr><td>\n'
 
             if not self._docmap.has_key(func): continue
             fdoc = self._docmap[func]
 
-            str += '  <a name="'+fname+'"></a>\n'
             if SPECIAL_METHODS.has_key(fname):
                 str += '  <h3 class="func-details"><i>'
                 str += SPECIAL_METHODS[fname]+'</i></h3>\n'
@@ -1091,7 +1091,7 @@ class HTML_Doc:
         PARAM_JOIN = ',\n'+' '*15
         for param in fdoc.parameters():
             str += '<span class=%s-arg>%s</span>' % (cssclass, param.name())
-            if param.default():
+            if param.default() and not link:
                 default = param.default()
                 if len(default) > 60:
                     default = default[:57]+'...'
@@ -1512,11 +1512,11 @@ class HTML_Doc:
         @rtype: C{string}
         @param doc: The documentation for the object whose summary
             should be returned.
-        @type doc: C{objdoc.ObjDoc}
+        @type doc: L{objdoc.ObjDoc}
         @param container: The container object for C{doc}, or C{None}
             if there is none.  This container object is used to
             resolve links (E{L}{...}) in the epytext.
-        @type container: C{uid.UID}
+        @type container: L{uid.UID}
         """
         descr = doc.descr()
 
@@ -1640,7 +1640,7 @@ class HTML_Doc:
 
         @param doc: The documentation for the module whose classes
             should be split up.
-        @type doc: C{objdoc.ModuleDoc}
+        @type doc: L{objdoc.ModuleDoc}
         @return: A list C{(I{classes}, I{excepts})}, where
             C{I{classes}} is the list of non-exception classes, and
             C{I{excepts}} is the list of exception classes.
