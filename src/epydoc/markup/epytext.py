@@ -234,7 +234,7 @@ def parse(str, errors = None, warnings = None):
             encountered_field = 1
         elif encountered_field == 1:
             if len(stack) <= 3:
-                estr = ("Fields must be the final elements in a "+
+                estr = ("Fields must be the final elements in an "+
                         "epytext string.")
                 errors.append(StructuringError(estr, token))
 
