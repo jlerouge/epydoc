@@ -35,4 +35,4 @@ web: refdocs
 	ssh ${HOST} "cd ${DIR} && ln -s epydoc.html index.html || true"
 
 refdocs: 
-	epydoc ${PY_SRC} -o ${WEBDIR}
+	epydoc ${PY_SRC} -o ${WEBDIR} -n epydoc -u http://epydoc.sf.net -css2
