@@ -842,12 +842,12 @@ class HTML_Doc:
         str = self._start_of('Navbar')
         str += '<table class="navbar" border="0" width="100%"'
         str += ' cellpadding="0" bgcolor="#a0c0ff" cellspacing="0">\n'
-        str += '  <tr>\n'
-        str += '    <td width="100%">\n'
-        str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
-        str += '        <tr valign="top">\n'
+        str += '  <tr valign="center">\n'
+        #str += '    <td width="100%">\n'
+        #str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
+        #str += '        <tr valign="center">\n'
 
-        I = '          ' # indentation
+        I = ' '*4 # indentation
 
         # Make sure that "package" and "parent" take up the same
         # amount of room, so the navbar looks the same on different
@@ -938,11 +938,8 @@ class HTML_Doc:
             str += '<a class="navbar" href="epydoc-help.html">Help</a>'
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
 
-        str += '        </tr>\n      </table>\n    </td>\n'
-        str += '    <td>\n'
-        str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
-        str += '        <tr valign="top">\n'
-        str += '          <th class="navbar">'
+        str += I+'<td width="100%"></td>\n'
+        str += I+'<th class="navbar">'
         if self._prj_name:
             if self._prj_url:
                 str += ('<a class="navbar" href="%s">%s</a>' %
@@ -950,8 +947,7 @@ class HTML_Doc:
             else:
                 str += self._prj_name
 
-        str += '</th>\n        </tr>\n'
-        str += '      </table>\n    </td>\n  </tr>\n</table>\n'
+        str += '</th>\n  </tr>\n</table>\n'
 
         # Frames and public/private link
         if top and (self._create_private_docs or self._create_frames):
@@ -1192,7 +1188,7 @@ class HTML_Doc:
         functions = self._sort(functions, sortorder)
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'summary')
-        
+
         for link in functions:
             func = link.target()
             fname = link.name()
@@ -1434,8 +1430,12 @@ class HTML_Doc:
             else:
                 str += ('<span class=%s-arg>%s</span>' %
                         (cssclass, param.name()))
-                if param.default() and show_defaults:
-                    default = param.default()
+                if show_defaults and param.value() is not None:
+                    default = param.value()
+                    default = re.sub('&', '&amp;', default)
+                    default = re.sub('<', '&lt;', default)
+                    default = re.sub('>', '&gt;', default)
+                    default = re.sub(' ', '&nbsp;', default)
                     if len(default) > 60:
                         default = default[:57]+'...'
                     str += ('=<span class=%s-default>%s</span>' %
@@ -1489,7 +1489,8 @@ class HTML_Doc:
         numvars = 0
         for var in variables:
             # Don't bother if we don't know anything about it.
-            if not (var.descr() or var.type()): continue
+            if (var.descr() is None and var.type() is None and
+                var.value() is None): continue
             numvars += 1
             
             str += ('<table width="100%" class="var-details"'+
@@ -1497,20 +1498,52 @@ class HTML_Doc:
                     '<tr><td>\n')
             
             vname = var.name()
+            vval = var.value()
+            vtyp = var.type()
 
             str += '<a name="'+vname+'"></a>\n'
             str += '<h3>'+vname+'</h3>\n'
-            str += '<dl>\n'
+
+            # If it's a module, class, method, type, or func, then
+            # just link to it.
+            if (isinstance(vval, UID)):
+                str += ('<code>%s</code> = %s\n' %
+                        (vname, self._uid_to_href(vval)))
+                vval = vtyp = None
 
             if var.descr():
-                str += '  <dd>'
-                str += self._dom_to_html(var.descr(), container)+'<br>\n'
+                str += self._dom_to_html(var.descr(), container)
                 
-            if var.type():
-                str += '  <dl><dt><b>Type:</b>\n' 
-                str += '<code>'+self._dom_to_html(var.type(), container)
-                str += '</code>'+'</dt></dl>\n'
+            if vtyp is not None or vval is not None:
+                str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
+                
+            if vtyp:
+                str += '      <dt><b>Type:</b></dt>\n      <dd>' 
+                str += self._dom_to_html(vtyp, container)
+                str += '</dd>\n'
 
+            if isinstance(vval, UID):
+                try: vval = `vval.object()`
+                except: vval = None
+            
+            if vval is not None:
+                vval += ' '*(60-len(vval))
+                if len(vval) > 300:
+                    vval = vval[:297]+'...'
+                vval = re.sub('('+'.'*60+')', r'\1\n', vval)
+                vval = re.sub('&', '&amp;', vval)
+                vval = re.sub('<', '&lt;', vval)
+                vval = re.sub('>', '&gt;', vval)
+                vval = re.sub(' ', '&nbsp;', vval)
+                vval = re.sub(r'\n', '\n', vval)
+                str += '      <dt><b>Value:</b></dt>\n' 
+                str += '      <dd><table><tr><td>\n'
+                str += '<pre class="variable">%s</pre>\n' % vval
+                str += '        </td></tr></table></dd>\n'
+
+            if vtyp is not None or vval is not None:
+                str += '    </dl>\n  </dd>\n</dl>'
+                
             #if var.overrides():
             #    str += '  <dl><dt><b>Overrides:</b></dt>\n'
             #    for target in var.overrides():
@@ -1518,7 +1551,7 @@ class HTML_Doc:
                   #        self._link_to_html(target.data[0]) + '\n'
             #    str += '  </dl>\n'
             
-            str += '</dd></dl></td></tr></table>\n'
+            str += '</dl></td></tr></table>\n'
 
         # If we didn't get any variables, don't print anything.
         if numvars == 0: return ''
@@ -1837,7 +1870,7 @@ class HTML_Doc:
         """
         if str == '...': return 0
         for piece in str.split('.'):
-            if piece[0] == '_' and piece[-1] != '_': return 1
+            if piece[:1] == '_' and piece[-1:] != '_': return 1
         return 0
     
     def _find_toplevel(self):
@@ -2050,13 +2083,10 @@ class HTML_Doc:
         @param uid: A unique identifier for the object.
         @type uid: L{UID}
         """
-        if uid.is_function():
+        if uid.is_function() or uid.is_builtin_function():
             return '%s.html#%s' % (uid.module(), uid.shortname())
-        elif uid.is_method():
+        elif uid.is_method() or uid.is_builtin_method():
             return '%s.html#%s' % (uid.cls(), uid.shortname())
-        elif uid.is_builtin_function():
-            # FIX THIS:
-            return '#%s' % uid.shortname()
         else:
             return '%s.html' % uid
     
