@@ -12,78 +12,28 @@
 Command-line interface for epydoc.
 
 Usage::
-    epydoc [-o DIR] [-n NAME] [-p] [-c SHEET] [-v] MODULE...
-    epydoc --check [-p] [-v] MODULE...
-    epydoc --help
-    epydoc --version
+    epydoc [OPTIONS] MODULES...
 
-    MODULE...
-        List of filenames containing modules to process.  When
-        documenting packages, the filename must include the package
-        directory (i.e., you can't run epydoc within the package
-        directory, using relative filenames).
-        
-    --help, --usage, -h, -?
-        Display this usage message.
-
-    --version, -V
-        Print the version of epydoc.
-
-    -o DIR, --output=DIR
-        Output directory for HTML files
-        
-    -n NAME, --name=NAME
-        Project name (for HTML header/footer)
-
-    -u URL, --url=URL
-        Project URL (for HTML header/footer)
-
-    -f, --frames
-        Generate a frame-based table of contents.
-
-    -c=SHEET, --css=SHEET
-        CSS stylesheet for HTML files.  If SHEET is a file, then the
-        stylesheet is copied from that file; otherwise, SHEET is taken
-        to be the name of a built-in stylesheet.  For a list of the
-        built-in stylesheets, run "epydoc --help css".
-
-    --private-css=SHEET
-        CSS stylesheet for the HTML files containing private API
-        documentation.  If SHEET is a file, then the stylesheet is
-        copied from that file; otherwise, SHEET is taken to be the
-        name of a built-in stylesheet.  For a list of the built-in
-        stylesheets, run "epydoc --help css".
-
-    --help-file=FILE
-        A file containing the body of the help page for the HTML
-        output.  If no file is specified, then a default help file is
-        used.
-
-    --no-private
-        Do not produce documentation for private objects.
-
-    --show-imports
-        Include a list of the classes and functions that each module
-        imports on the module documentation pages.
-
-    --builtins
-        Add the builtin modules (as defined by sys.builtin_module_names)
-        to the list of modules to document.
-        
-    --check
-        Perform completeness checks on the documentation
-
-    -p
-        Check private objects (those that start with _)
-
-    -v, --verbose
-        Produce verbose output
-
-    -vv, -vvv, -vvvv
-        Produce successively more verbose output
-
-    -q, --quiet
-        Supress output of epytext warnings and errors.
+    MODULES...                 The Python modules to document.
+    -o DIR, --output DIR       The output directory for HTML files.
+    -n NAME, --name NAME       The documented project's name.
+    -u URL, --url URL          The documented project's url.
+    -f, --frames               Generate frames-based table of contents.
+    -c SHEET, --css SHEET      CSS stylesheet for HTML files.
+    --private-css SHEET        CSS stylesheet for private objects.
+    --help-file FILE           HTML body for the help page.
+    --no-private               Do not document private objects.
+    --show-imports             Include lists of importes.
+    --builtins                 Add all builtin modules to MODULES.
+    -v, --verbose              Display a progress bar.
+    -vv, -vvv, -vvvv           Produce sucessively more verbose output.
+    -q, --quiet                Supress epytext warnings and errors.
+    --check                    Run documentation completeness checks.
+    -p                         Run checks on private objects.
+    -V, --version              Print the version of epydoc.
+    -h, -?, --help, --usage    Display this usage message.
+    -h TOPIC, --help TOPIC     Display information about TOPIC
+                               (css, usage, or version).
 """
 
 import sys, os.path, re, getopt
@@ -94,7 +44,7 @@ PROFILE=0
 ## Command-Line Interface
 ##################################################
 
-def _usage(exit_code=-1):
+def _usage(exit_code=1):
     """
     Display a usage message.
 
@@ -107,8 +57,8 @@ def _usage(exit_code=-1):
     else: stream = sys.stderr
     NAME = os.path.split(sys.argv[0])[-1]
     if NAME == '(imported)': NAME = 'epydoc'
-    print >>stream, '\nUsage:'
-    print >>stream, __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
+    usage = __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
+    print >>stream, 'Usage:', usage.strip()
     sys.exit(exit_code)
 
 def _help(arg):
@@ -120,6 +70,7 @@ def _help(arg):
     @type arg: C{string}
     @rtype: C{None}
     """
+    arg = arg.strip().lower()
     if arg == 'css':
         from epydoc.css import STYLESHEETS
         print '\nThe following built-in stylesheets are available:'
@@ -131,6 +82,8 @@ def _help(arg):
             print format % (name, STYLESHEETS[name][1])
         print
         sys.exit(0)
+    elif arg == 'version':
+        _version()
     else:
         _usage(0)
     
@@ -143,18 +96,6 @@ def _version():
     import epydoc
     print "Epydoc version %s" % epydoc.__version__
     sys.exit(0)
-
-def _error(message):
-    """
-    Display a specified error string, and exit.
-
-    @param message: The error message to display
-    @type message: C{string}
-    @rtype: C{None}
-    """
-    print >>sys.stderr, ("%s error: %s" %
-                         (os.path.split(sys.argv[0])[-1], message))
-    sys.exit(-1)
 
 def _parse_args():
     """
@@ -188,7 +129,7 @@ def _parse_args():
         if e.opt in ('h', '?', 'help', 'usage'): _usage(0)
         print >>sys.stderr, ('%s; run "%s -h" for usage' %
                               (e,os.path.basename(sys.argv[0])))
-        sys.exit(-1)
+        sys.exit(1)
 
     # Parse the arguments.
     for (opt, val) in opts:
@@ -220,7 +161,7 @@ def _parse_args():
     if len(modules) == 0:
         print >>sys.stderr, ('no modules specified; run "%s -h" for usage' %
                              os.path.basename(sys.argv[0]))
-        sys.exit(-1)
+        sys.exit(1)
     options['modules'] = modules
 
     return options
