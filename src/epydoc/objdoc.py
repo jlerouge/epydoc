@@ -1277,8 +1277,11 @@ class ModuleDoc(ObjDoc):
             filename = filename[:-1]
     
         # Parse the module's source code.
-        try: ast = parser.suite(open(filename).read().replace('\r\n','\n'))
-        except: return # E.g., a .pyc with no corresponding .py
+        try:
+            source_code = open(filename).read()
+            ast = parser.suite(source_code.replace('\r\n','\n')+'\n')
+        except:
+            return # E.g., a .pyc with no corresponding .py
     
         # Construct a list of defined variables.  To do this, we search
         # the parse tree for statements of the form "a=b" or "a=b=c" or
