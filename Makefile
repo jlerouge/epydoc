@@ -23,6 +23,10 @@ usage:
 	@echo "  make web"
 	@echo "  make epydoc"
 	@echo "  make checkdoc"
+	@echo "  make distributions"
+
+distributions:
+	$(MAKE) -C src distributions
 
 web: refdocs
 	(cd ${WEBDIR} && tar -cvzf webpage.tgz *)
