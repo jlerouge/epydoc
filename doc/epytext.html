@@ -455,13 +455,13 @@ used: </p>
 <pre>
 <code class="keyword">def</code> <code class="function">example</code>():
     <code class="string">"""
-    @param x: This is a description of
+    <code class="field">@param x:</code> This is a description of
         the parameter x to a function.
         Note that the description is
         indented four spaces.
-    @type x: This is a description of
+    <code class="field">@type x:</code> This is a description of
         x's type.
-    @return: This is a description of
+    <code class="field">@return:</code> This is a description of
         the function's return value.
 
         It contains two paragraphs.
@@ -485,109 +485,8 @@ used: </p>
 </td></tr>
 </table>
 
-<p> Epydoc currently recognizes the following fields: </p>
-
-<table border="1" cellspacing="0" cellpadding="3" width="100%">
-
-  <tr><th width="10%" align="left"> <code>@<b>param</b>
-  <i>p</i>:</code>&nbsp;... </th><td> A description of parameter
-  <code><i>p</i></code> for a function or method. </td></tr>
-  
-  <tr><th width="10%" align="left">
-  <code>@<b>return</b>:</code>&nbsp;... </th><td> The
-  return value for a function or method. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>ivar</b>
-  <i>v</i>:</code>&nbsp;... </th><td> A description of the class
-  instance variable <code><i>v</i></code>. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>cvar</b>
-  <i>v</i>:</code>&nbsp;... </th><td> A description of the static
-  class variable <code><i>v</i></code>. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>var</b>
-  <i>v</i>:</code>&nbsp;... </th><td> A description of the module
-  variable <code><i>v</i></code>. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>type</b>
-  <i>x</i>:</code>&nbsp;... </th><td> The type of the
-  parameter or variable <code><i>x</i></code>. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>rtype</b>:</code>&nbsp;... </th><td>
-  The return value type for a function or method. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>raise</b>
-  <i>e</i>:</code>&nbsp;... </th><td> A description of the
-  circumstances under which a function or method raises exception
-  <code><i>e</i></code>. </td></tr>
-
-  <tr><th width="10%" align="left">
-  <code>@<b>author</b>:</code>&nbsp;... </th><td> The author(s) of a
-  module, class, function, or method.  Multiple <code>author</code>
-  fields may be used if an object has multiple authors.</td></tr>
-  
-  <tr><th width="10%" align="left">
-  <code>@<b>version</b>:</code>&nbsp;... </th><td> The version of a
-  module, class, function, or method. </td></tr>
-  
-  <tr><th width="10%" align="left"> <code>@<b>see</b>:</code>&nbsp;... </th><td>
-    A description of a related topic.  <code>see</code> fields
-    typically use documentation crossreference links or external
-    hyperlinks to link to the related topic. </td></tr>
-
-  <tr><th width="10%" align="left"> <code>@<b>requires</b>:</code>&nbsp;... </th><td> 
-    A requirement for using a module, class, function, or method.
-    Multiple <code>requires</code> fields may be used if an object has
-    multiple requirements.</td></tr>
-    
-  <tr><th width="10%" align="left"> <code>@<b>warning</b>:</code>&nbsp;... </th><td> 
-    A warning about a module, class, function, or method.  Multiple
-    <code>warning</code> fields may be used to report separate
-    warnings.</td></tr>
-
-</table>
-
-<p> Several fields have "synonyms," or alternate field names: </p>
-
-<table border="1" cellspacing="0" cellpadding="3" width="100%">
-  
-  <tr><th width="10%" align="left"> <b><code>@param&nbsp;<i>p</i>:</code>&nbsp;...</b> </th>
-  <td><code>@parameter&nbsp;<i>p</i>:</code>&nbsp;...</td>
-  <td><code>@arg&nbsp;<i>p</i>:</code>&nbsp;...</td>
-  <td><code>@argument&nbsp;<i>p</i>:</code>&nbsp;...</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@return:</code>&nbsp;...</b> </th><td>
-  <code>@returns:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@ivar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
-  <code>@ivariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@cvar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
-  <code>@cvariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@var&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
-  <code>@variable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@rtype:</code>&nbsp;...</b> </th><td>
-  <code>@returntype:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@raise&nbsp;<i>e</i>:</code>&nbsp;...</b> </th>
-  <td><code>@raises&nbsp;<i>e</i>:</code>&nbsp;...</td>
-  <td><code>@except&nbsp;<i>e</i>:</code>&nbsp;...</td>
-  <td><code>@exception&nbsp;<i>e</i>:</code>&nbsp;...</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@see:</code>&nbsp;...</b> </th><td>
-  <code>@seealso:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-
-  <tr><th width="10%" align="left"> <b><code>@requires:</code>&nbsp;...</b> </th><td>
-  <code>@require:</code>&nbsp;... </td>
-  <td><code>@requirement:</code>&nbsp;... </td><td>&nbsp;</td></tr>
-  
-  <tr><th width="10%" align="left"> <b><code>@warning:</code>&nbsp;...</b> </th><td>
-  <code>@warn:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-  
-  
-</table>
+<p> For a list of the fields that are supported by epydoc, see
+the <a href="fields.html">epydoc fields page</a>.
 
 <!-- =========== INLINE MARKUP ============= -->
 <a name="inline"/>
@@ -820,12 +719,53 @@ The following example illustrates how index terms can be used: </p>
 </td></tr>
 </table>
 
-<a name="escaping"/>
-<h3> 3.5. Escaping </h3>
+<a name="symbols"/>
+<h3> 3.5. Symbols </h3>
 
-<p> Escaping can be used to write text that would otherwise be
-interpreted as epytext markup.  Epytext was carefully constructed to
-minimize the need for escaping; but sometimes, it is unavoidable.
+<p> Symbols are used to insert special characters in your
+documentation.  A symbol has the form
+"<code>S{</code><i>code</i><code>}</code>", where <i>code</i> is a
+symbol code that specifies what character should be produced.  The
+following example illustrates how symbols can be used to generate
+special characters: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td rowspan="2">
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    Symbols can be used in equations:
+      - S{sum}S{alpha}/x S{<=} S{beta}
+
+    S{<-} and S{larr} both give left
+    arrows.  Some other arrows are
+    S{rarr}, S{uarr}, and S{darr}.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <p>Symbols can be used in equations:</p>
+  <ul><li>&sum;&alpha;/x &le; &beta;</li></ul>
+  <p>&larr; and &larr; both give left arrows.  Some other arrows are
+  &rarr;, &uarr;, and &darr;.</p>
+</td></tr>
+</table>
+
+<p> Although symbols can be quite useful, you should keep in mind that
+they can make it harder to read your docstring in plaintext.  In
+general, symbols should be used sparingly.  For a complete list of the
+symbols that are currently supported, see the reference documentation
+for <a href=
+"http://syse.local/~edloper/epydoc/public/epydoc.epytext-module.html#SYMBOLS"
+>epydoc.epytext.SYMBOLS</a>. </p>
+
+<a name="escaping"/>
+<h3> 3.6. Escaping </h3>
+
+<p> Escaping is used to write text that would otherwise be interpreted
+as epytext markup.  Epytext was carefully constructed to minimize the
+need for this type of escaping; but sometimes, it is unavoidable.
 Escaped text has the form "<code>E{</code><i>code</i><code>}</code>",
 where <i>code</i> is an escape code that specifies what character
 should be produced.  If the escape code is a single character (other
@@ -833,8 +773,8 @@ than "<code>{</code>" or "<code>}</code>"), then that character is
 produced.  For example, to begin a paragraph with a dash (which would
 normally signal a list item), write "<code>E{-}</code>".  In addition,
 two special escape codes are defined: "<code>E{lb}</code>" produces a
-left curly brace ("<code>{</code>"); and "<code>E{rb}</code>"
-produces a right curly brace ("<code>}</code>").  The following example
+left curly brace ("<code>{</code>"); and "<code>E{rb}</code>" produces
+a right curly brace ("<code>}</code>").  The following example
 illustrates how escaping can be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
@@ -862,11 +802,6 @@ illustrates how escaping can be used: </p>
   <p>Escapes can be used to write unmatched curly braces: }{</p>
 </td></tr>
 </table>
-
-<p> In the future, I may define escape sequences for special
-characters.  For example, "<code>E{->}</code>" could be used to
-produce a right arrow (&rarr;); and "<code>E{&nbsp;}</code>" could be
-used to produce a non-breaking space. </p>
 
 <!-- =========== CHARACTERS ============= -->
 <a name="characters"/>
@@ -1091,7 +1026,7 @@ string.</b> <br />
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Wed Oct 30 15:07:19 EST 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Fri Jul  4 01:55:54 EDT 2003 <!-- hhmts end -->
 </font>
 </body>
 </html>
