@@ -694,8 +694,7 @@ class HTMLFormatter:
         self._write_class_summary(public, private, doc, excepts, 'Exceptions')
         self._write_func_summary(public, private, doc, doc.functions(), 
                                  'Function Summary')
-        self._write_var_summary(public, private, doc.variables(), uid,
-                                doc.by_group(doc.variables()),
+        self._write_var_summary(public, private, doc, doc.variables(), 
                                 'Variable Summary')
         
         # Write a list of all imported objects.
@@ -704,7 +703,7 @@ class HTMLFormatter:
 
         # Write details for the functions and variables.
         self._write_func_details(public, private, doc, doc.functions())
-        self._write_var_details(public, private, doc.variables(), uid)
+        self._write_var_details(public, private, doc, doc.variables())
 
         # Write another navigation bar and the footer.
         self._write_navbar(public, private, uid)
@@ -765,11 +764,9 @@ class HTMLFormatter:
                                  'Method Summary')
         self._write_property_summary(public, private, doc, doc.properties(),
                                      'Property Summary')
-        self._write_var_summary(public, private, doc.ivariables(), uid,
-                                doc.by_group(doc.ivariables()),
+        self._write_var_summary(public, private, doc, doc.ivariables(), 
                                 'Instance Variable Summary')
-        self._write_var_summary(public, private, doc.cvariables(), uid,
-                                doc.by_group(doc.cvariables()),
+        self._write_var_summary(public, private, doc, doc.cvariables(),
                                 'Class Variable Summary')
 
         # Write details for methods
@@ -787,10 +784,10 @@ class HTMLFormatter:
         # Write details for variables.
         self._write_property_details(public, private, doc, doc.properties(),
                                      'Property Details')
-        self._write_var_details(public, private, doc.ivariables(),
-                                uid, 'Instance Variable Details')
-        self._write_var_details(public, private, doc.cvariables(),
-                                uid, 'Class Variable Details')
+        self._write_var_details(public, private, doc, doc.ivariables(),
+                                'Instance Variable Details')
+        self._write_var_details(public, private, doc, doc.cvariables(),
+                                'Class Variable Details')
 
         # Write another navigation bar and the footer.
         self._write_navbar(public, private, uid)
@@ -1703,8 +1700,8 @@ class HTMLFormatter:
         fdoc = self._docmap.get(fuid)
 
         # Is it an inherited function?
-        inherited = (container.uid().is_class() and
-                     fuid.cls() != container.uid())
+        cuid = container.uid()
+        inherited = (cuid.is_class() and fuid.cls() != cuid)
 
         # If it's inherited & we're listing inheritance, then don't
         # write a table row for it; it'll be included in the list.
@@ -1775,12 +1772,13 @@ class HTMLFormatter:
         # listed in the summary table.
         docmap = self._docmap
         functions = [f for f in functions if docmap.has_key(f.target())]
-        
-        if container.uid().is_class():
+
+        cuid = container.uid()
+        if cuid.is_class():
             # Filter out inherited methods (their details docs are
             # listed under the class that defines them):
             functions = [f for f in functions
-                         if f.target().cls() == container.uid()]
+                         if f.target().cls() == cuid]
 
             # Filter out methods that don't define or inherit docstrings;
             # they are just listed in the summary table.
@@ -2077,7 +2075,7 @@ class HTMLFormatter:
                                     property, container):
         """
         Write HTML code for a row in the property summary table.  Each
-        row gives a brief description of a single variable.
+        row gives a brief description of a single property.
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
         @param property: The property that should be described by this row.
@@ -2088,8 +2086,8 @@ class HTMLFormatter:
         pdoc = self._docmap.get(puid)
 
         # Is it an inherited property?
-        inherited = (container.uid().is_class() and
-                     puid.cls() != container.uid())
+        cuid = container.uid()
+        inherited = (cuid.is_class() and puid.cls() != cuid)
 
         # If it's inherited & we're listing inheritance, then don't
         # write a table row for it; it'll be included in the list.
@@ -2144,8 +2142,8 @@ class HTMLFormatter:
 
         # Filter out inherited properties (their details docs are
         # listed under the class that defines them):
-        properties = [p for p in properties
-                      if p.target().cls() == container.uid()]
+        cuid = container.uid()
+        properties = [p for p in properties if p.target().cls() == cuid]
 
         # If there are no properties left, then just return
         if len(properties) == 0: return ''
@@ -2212,51 +2210,100 @@ class HTMLFormatter:
     # Variable tables
     #////////////////////////////////////////////////////////////
     
-    def _write_var_summary(self, public, private, variables, container,
-                           groups, heading='Variable Summary'):
+    def _write_var_summary(self, public, private, container, variables, 
+                           heading='Variable Summary'):
         """
-        @return: The HTML code for a variable summary table.  This
-            is used by L{_module_to_html} to list the variables in a
-            module; and by L{_class_to_html} to list instance
-            variables and class variables.
-        @rtype: C{string}
+        Write HTML code for a variable summary table.  This is used by
+        L{_write_module} to list the variables in a module; and by
+        L{_write_class} to list the instance and class variables in a
+        class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module or class that contains the
+            variables.  C{container} is used to group the properties.
+        @param variables: The variables that should be included in
+            the list.
         """
         if len(variables) == 0: return
+
+        # Divide the variables into groups
+        groups = container.by_group(variables)
 
         # Write the table header
         header = self._table_header(heading, 'summary')
         _write_if_nonempty(public, private, variables, header)
 
+        # Write entries for each group.  Note that every group
+        # contains at least one variable or inherited variable.
         for name, group in groups:
-            # Print a group header
+            # Print a group header (except for the special group None,
+            # which is always the first group).
             if name is not None:
                 header = self._group_header(name)
                 _write_if_nonempty(public, private, group, header)
 
-            # Add lines for each class
+            # Write a table row for each property.  Skip inherited
+            # properties if _inheritance=='listed', since they'll be
+            # listed below.
             for var in group:
-                str = self._var_summary_row(var, container)
-                private.write(str)
-                if var.is_public(): public.write(str)
+                self._write_var_summary_row(public, private, var, container)
 
             # Add an inheritance list, if appropriate
-            if (self._inheritance == 'listed' and container is not None
-                and container.is_class()):
+            if (self._inheritance == 'listed' and
+                isinstance(container, ClassDoc)):
                 self._write_inheritance_list(public, private,
-                                             group, container)
+                                             group, container.uid())
                                              
-
         # Write the table footer
         _write_if_nonempty(public, private, variables, '</table><br />\n\n')
-        
-    def _var_summary_row(self, var, container):
-        inherit = (container.is_class() and container != var.uid().cls())
-        if inherit and self._inheritance == 'listed': return ''
-            
+
+    def _write_var_summary_row(self, public, private, var, container):
+        """
+        Write HTML code for a row in the variable summary table.  Each
+        row gives a brief description of a single variable.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param var: The variable that should be described by this row.
+        """
+        vuid = var.uid()
         vname = var.name()
+
+        # Is it an inherited variable?
+        cuid = container.uid()
+        inherited = (cuid.is_class() and vuid.cls() != cuid
+                     and vuid.is_variable())
+
+        # If it's inherited & we're listing inheritance, then don't
+        # write a table row for it; it'll be included in the list.
+        if inherited and self._inheritance == 'listed': return
+        
+        # Add the variable's type (if any)
         if var.type():
             vtype = self._docstring_to_html(var.type(), var.uid(), 10).strip()
         else: vtype = '&nbsp;'
+        str = '<tr><td align="right" valign="top" '
+        str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
+
+        # Special case: if it's a module, class, type, or func, then
+        # point to its real value.
+        if not vuid.is_variable():
+            str += ('  <td><a name="'+vname+ '"></a><b><code>'+vname+
+                   '</code></b> = '+self._uid_to_href(vuid)+'</td></tr>\n')
+            private.write(str)
+            if vuid.is_public(): public.write(str)
+            return
+
+        # Add the variable's name.  If we don't have any extra
+        # info about it, then just list it in the summary (not the
+        # details).
+        str += '<td><b>'
+        if not (var.descr() or var.type() or var.has_value()):
+            str += '<code><a name="%s">%s</a></code>' % (vname, vname)
+        else:
+            str += self._uid_to_href(var.uid(), vname)
+
+        # Add the variable's description
+        vname = var.name()
         if var.descr():
             vsum = ': ' +self._summary(var.descr(), var.uid())
         else:
@@ -2264,111 +2311,128 @@ class HTMLFormatter:
             linelen = self._variable_summary_linelen - len(vname) - 2
             val = self._pprint_var_value(var, 0, linelen)
             vsum = ' = <span title="%s">%s</span>' % (title, val)
-        str = '<tr><td align="right" valign="top" '
-        str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
-        str += '  <td><b>'
-
-        # If we don't have any info about it, then just list it in
-        # the summary (not the details).
-        if (var.descr() is None and var.type() is None and
-            not var.has_value()):
-            str += '<code><a name="%s">%s</a></code>' % (vname, vname)
-        else:
-            str += self._uid_to_href(var.uid(), vname)
-        str += '</b>' + vsum 
-        if (self._inheritance != 'grouped' and inherit):
+        str += '</b>' + vsum
+        if (self._inheritance != 'grouped' and inherited):
             str += ('    <i>(Inherited from %s)</i>\n' %
-                    self._uid_to_href(container, container.shortname()))
-        return str + '</td></tr>\n'
+                    self._uid_to_href(cuid, cuid.shortname()))
+            
+        str += '</td></tr>\n'
+        private.write(str)
+        if vuid.is_public(): public.write(str)
 
-    def _write_var_details(self, public, private, variables,
-                           container, heading='Variable Details'):
+    def _write_var_details(self, public, private, container, vars,
+                           heading='Variable Details'):
         """
-        @return: The HTML code for a variable details table.  This
-            is used by L{_module_to_html} to describe the variables in
-            a module; and by L{_class_to_html} to describe instance
-            variables and class variables.
-        @rtype: C{string}
+        Write HTML code for a variable details section.  This is used
+        by L{_write_module} to describe the variables in a module; and
+        by L{_write_class} to describe the instance and class
+        variables in a class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module or class that contains the
+            variables.  C{container} is used to group the properties.
+        @param vars: The variables that should be included in
+            the section.
         """
+        # Filter out variables that we have no extra info for; these
+        # are just listed in the summary table.  Also, filter out docs
+        # for modules/funcs/classes/properties (we point to these
+        # from the summary)
+        vars = [v for v in vars if v.uid().is_variable() and
+                (v.descr() or v.type() or v.has_value())]
+
+        # Filter out inherited variables (their details docs are
+        # listed under the class that defines them) and
+        cuid = container.uid()
+        if cuid.is_class():
+            vars = [v for v in vars if v.uid().cls() == cuid]
+        
         # Write the header
-        if len(variables) == 0: return ''
+        if len(vars) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
-        _write_if_nonempty(public, private, variables, str)
+        _write_if_nonempty(public, private, vars, str)
 
         # Add entries for each variable
-        for var in variables:
+        for var in vars:
             str = self._var_details_entry(var, container)
             if str:
                 private.write(str)
                 if var.uid().is_public(): public.write(str)
             
         # Write the footer
-        _write_if_nonempty(public, private, variables, '<br />\n\n')
+        _write_if_nonempty(public, private, vars, '<br />\n\n')
 
     def _var_details_entry(self, var, container):
+        """
+        @return: The HTML code for an entry in the variable details
+        section.  Each entry gives a complete description of a
+        documented variable.
+        @param var: The variable that should be described.
+        """
         vname = var.name()
-        vtyp = var.type()
-        hasval = var.has_value()
+        vuid = var.uid()
 
-        # Don't document inherited variables; instead, the
-        # property summary points to the details description in
-        # the parent class's file.
-        if container.is_class() and container != var.uid().cls():
-            return ''
-
-        # Don't bother if we don't know anything about it.
-        if (var.descr() is None and vtyp is None and not hasval):
-            return ''
-        
+        # Add a header with the variable name.
         str = ('<table width="100%" class="var-details"'+
                 ' bgcolor="#e0e0e0">'+
                 '<tr><td>\n')
         str += '<a name="'+vname+'"></a>\n'
         str += '<h3>'+vname+'</h3>\n'
 
-        # If it's a module, class, method, type, or func, then
-        # just link to it.
-        if not var.uid().is_variable():
-            str += ('<code>%s</code> = %s\n' %
-                    (vname, self._uid_to_href(var.uid())))
-            if self._documented(var.uid()):
-                str += '</td></tr></table>\n'
-                return ''
-
+        # Add the variable's description (if any)
         if var.descr():
-            str += self._docstring_to_html(var.descr(), var.uid())
-            
+            str += self._docstring_to_html(var.descr(), vuid)
+
+        # Add a header for the type and/or value
+        vtyp = var.type()
+        hasval = var.has_value()
         if vtyp is not None or hasval:
             str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
-            
-        if vtyp:
-            str += '      <dt><b>Type:</b></dt>\n      <dd>\n' 
-            str += self._docstring_to_html(vtyp, var.uid())
-            str += '\n      </dd>\n'
 
-        str += '<span title="%s">' % self._var_value_tooltip(var)
-        str += '      <dt><b>Value:</b></dt>\n' 
-        str += '      <dd><table><tr><td>\n<pre class="variable">\n'
-        str += self._pprint_var_value(var)
-        str += '</pre>\n        </td></tr></table></dd>\n'
-        str += '</span>'
+            # Add the variable's type (if any)
+            if vtyp:
+                str += '      <dt><b>Type:</b></dt>\n      <dd>\n' 
+                str += self._docstring_to_html(vtyp, vuid)
+                str += '\n      </dd>\n'
+    
+            # Add the variable's value (if any)
+            if hasval:
+                str += '<span title="%s">' % self._var_value_tooltip(var)
+                str += '      <dt><b>Value:</b></dt>\n' 
+                str += '      <dd><table><tr><td>\n<pre class="variable">\n'
+                str += self._pprint_var_value(var)
+                str += '</pre>\n        </td></tr></table></dd>\n'
+                str += '</span>'
 
-        if vtyp is not None or hasval:
+            # Add a footer for the type and/or value
             str += '    </dl>\n  </dd>\n</dl>'
-            
-        str += '</td></tr></table>\n'
-        return str
+
+        # Add the entry footer, and return the completed string.
+        return str + '</td></tr></table>\n'
 
     def _var_value_tooltip(self, var):
-        val = `var.uid().value()`
+        """
+        @return: A string representation of the value of the variable
+            C{var}, suitable for use in a tooltip.  In particular, use
+            C{repr} to convert the var to a string; truncate it to
+            L{_variable_tooltip_linelen}; and convert it to HTML.
+        @type var: L{Var}
+        """
+        try: val = repr(var.uid().value())
+        except: val = '...'
         if len(val) > self._variable_tooltip_linelen:
             val = val[:self._variable_tooltip_linelen-3]+'...'
         val = val.replace('&', '&amp;').replace('"', '&quot;')
         val = val.replace('<', '&lt;').replace('>', '&gt;')
         return val
 
-    def _pprint_var_value(self, var, multiline=1,
-                          summary_linelen=0):
+    def _pprint_var_value(self, var, multiline=1, summary_linelen=0):
+        """
+        @return: A string representation of the value of the variable
+            C{var}, suitable for use in a C{<pre>...</pre>} HTML
+            block.
+        @type var: L{Lar}
+        """
         if not var.has_value(): return ''
         val = var.uid().value()
 
@@ -2402,12 +2466,14 @@ class HTMLFormatter:
         # restrict the amount of stuff that pprint needs to look at,
         # since pprint is surprisingly slow.
         elif type(val) is types.TupleType or type(val) is types.ListType:
-            vstr = repr(val)
+            try: vstr = repr(val)
+            except: vstr = '...'
             if multiline and len(vstr) > self._variable_linelen:
                 vstr = pprint.pformat(val[:self._variable_maxlines+1])
             vstr = markup.plaintext_to_html(vstr)
         elif type(val) is type({}):
-            vstr = repr(val)
+            try: vstr = repr(val)
+            except: vstr = '...'
             if multiline and len(vstr) > self._variable_linelen:
                 if len(val) < self._variable_maxlines+50:
                     vstr = pprint.pformat(val)
@@ -3198,6 +3264,6 @@ class _DevNull:
     A file-like-object that ignores all input.  Used by L{HTMLFormatter}
     when not generating private docs, to throw away the private docs.
     """
-    def write(*args): pass
-    def close(*args): pass
+    def write(self, s): 'Do nothing.'
+    def close(self): 'Do nothing.'
     
