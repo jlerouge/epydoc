@@ -836,7 +836,6 @@ class ObjDoc:
         elif self._docformat == 'restructuredtext':
             already_imported = sys.modules.has_key('epydoc.rst')
             try:
-                raise ImportError
                 import rst
                 pdoc = rst.parse(docstring)
             except ImportError:
