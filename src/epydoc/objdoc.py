@@ -189,8 +189,20 @@ class Var:
         """
         return self._uid.is_private()
     
+    def is_public(self):
+        """
+        @return: True if this variable is a public object.  This is
+            equivalant to C{self.uid().is_public()}
+        """
+        return self._uid.is_public()
+    
     def __repr__(self):
         return '<Variable %s>' % self._uid
+
+    # In 3.0, Var will be replaced with an ObjDoc class, and Vars will
+    # be linked to with Links.  In the mean time, this lets Vars be
+    # treated like Links in some circumstances.
+    target = uid
 
 class Param:
     """
@@ -447,9 +459,6 @@ class ObjDoc:
 
         # Future Work
         DocField(['todo'], 'To Do'),
-
-        # This is sometimes used as a section in ReStructuredText.
-        DocField(['parameters'], 'Parameters', multivalue=0)
         ]
     def __init__(self, uid, verbosity=0, docstring=None):
         """
@@ -642,7 +651,7 @@ class ObjDoc:
 
         # Use the decorate-sort-undecorate pattern to make sorting
         # more efficient.
-        decorated = [(item.name()=='__init__', item.is_private(),
+        decorated = [(item.name()!='__init__', item.is_private(),
                       item.name().lower(), item) for item in items]
         decorated.sort()
         return so_items + [d[-1] for d in decorated]
@@ -776,7 +785,7 @@ class ObjDoc:
 
             # Print parse warnings.
             for warning in parse_warnings:
-                warning.linenum += startline
+                warning.set_linenum_offset(startline+1)
                 print >>stream, warning
 
             # Print field warnings
@@ -797,12 +806,13 @@ class ObjDoc:
     def __parse_docstring(self, docstring):
         errors = []
         parsed_docstring = markup.parse(docstring, self._docformat, errors)
+        descr, fields = parsed_docstring.split_fields(errors)
+        self._descr = descr
+
+        # Divide errors into fatal & non-fatal.
         self._parse_errors = [e for e in errors if e.is_fatal()]
         self._parse_warnings = [e for e in errors if not e.is_fatal()]
         
-        descr, fields = parsed_docstring.split_fields()
-        self._descr = descr
-
         for field in fields:
             self._process_field(field.tag(), field.arg(),
                                 field.body(), self._field_warnings)
@@ -848,10 +858,16 @@ class ModuleDoc(ObjDoc):
     """
     def __init__(self, uid, verbosity=0):
         mod = uid.value()
+
+        # Variables:
         self._tmp_var = {}
         self._tmp_type = {}
-        self._tmp_groups = {}
-        self._tmp_group_order = []
+
+        # Groups:
+        self._groupmembers = {}
+        self._anygroup = {}
+        self._groupnames = []
+        
         ObjDoc.__init__(self, uid, verbosity)
 
         # If mod is a package, then it will contain a __path__
@@ -925,10 +941,6 @@ class ModuleDoc(ObjDoc):
         del self._tmp_var
         del self._tmp_type
 
-        # Wait until later to handle groups (after all modules have
-        # been registered.)
-        self._groups = None
-
         # Put everything in sorted order.
         self._functions = self._sort(self._functions)
         self._variables = self._sort(self._variables)
@@ -950,8 +962,14 @@ class ModuleDoc(ObjDoc):
             except ValueError, e:
                 warnings.append('Bad group identifier list')
                 return
-            self._tmp_groups[arg] = idents
-            self._tmp_group_order.append(arg)
+            if not self._groupmembers.has_key(arg):
+                self._groupnames.append(arg)
+                self._groupmembers[arg] = {}
+            group = self._groupmembers[arg]
+            anygroup = self._anygroup
+            for ident in idents:
+                group[ident] = 1
+                anygroup[ident] = 1
         elif tag in ('variable', 'var'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
@@ -983,34 +1001,6 @@ class ModuleDoc(ObjDoc):
         if self._variables:
             str += `len(self._variables)`+' variables; '
         return str[:-2]+')>'
-
-    def _find_groups(self):
-        # Put together groups
-        self._groups = []
-        if self._tmp_groups:
-            elts = {}
-            if self.ispackage():
-                for m in self.modules(): elts[m.name()] = m.target()
-            for c in self.classes(): elts[c.name()] = c.target()
-            for f in self.functions(): elts[f.name()] = f.target()
-            for v in self.variables(): elts[v.name()] = v.uid()
-            for name in self._tmp_group_order:
-                members = self._tmp_groups[name]
-                group = []
-                for member in members:
-                    try:
-                        group.append(elts[member])
-                    except KeyError:
-                        estr = ('Group member not found: %s.%s' %
-                                (self.uid(), member))
-                        self._field_warnings.append(estr)
-                if group:
-                    self._groups.append((name, group))
-                else:
-                    estr = 'Empty group %r deleted' % name
-                    self._field_warnings.append(estr)
-        del self._tmp_groups
-        del self._tmp_group_order
 
     #////////////////////////////
     #// Import Discovery
@@ -1113,9 +1103,20 @@ class ModuleDoc(ObjDoc):
     #////////////////////////////
 
     def groups(self):
-        if self._groups is None: self._find_groups()
-        return self._groups
-        
+        return self._groupnames
+
+    def by_group(self, elts):
+        # This is O(len(elts)*len(groups)).  We could probably do
+        # better, if that's too slow.
+        ungrouped = [e for e in elts if not self._anygroup.has_key(e.name())]
+        grouped = [(g, [e for e in elts
+                        if self._groupmembers[g].has_key(e.name())])
+                   for g in self._groupnames]
+        if ungrouped:
+            return [(None,ungrouped)]+grouped
+        else:
+            return grouped
+
     def functions(self):
         """
         @return: A list of all functions defined by the
@@ -1287,12 +1288,18 @@ class ClassDoc(ObjDoc):
     """
     def __init__(self, uid, verbosity=0):
         cls = uid.value()
+
+        # Variables:
         self._tmp_ivar = {}
         self._tmp_cvar = {}
         self._tmp_type = {}
-        self._tmp_groups = {}
-        self._tmp_group_order = []
         self._property_type = {}
+
+        # Groups:
+        self._groupmembers = {}
+        self._anygroup = {}
+        self._groupnames = []
+        
         ObjDoc.__init__(self, uid, verbosity)
 
         # Handle methods & class variables
@@ -1304,7 +1311,8 @@ class ClassDoc(ObjDoc):
         self._properties = []
 
         # Find the order that bases are searched in.
-        self._base_order = _find_base_order(cls)
+        base_order = _find_base_order(cls)
+        self._base_order = [make_uid(b) for b in base_order]
 
         try: fields = dir(cls)
         except: fields = []
@@ -1318,7 +1326,7 @@ class ClassDoc(ObjDoc):
             # Find the class that defines the field; and get the value
             # directly from that class (so methods have the right uid).
             container = None
-            for base in self._base_order:
+            for base in base_order:
                 if base.__dict__.has_key(field):
                     container = make_uid(base)
                     val = getattr(base, field)
@@ -1455,9 +1463,6 @@ class ClassDoc(ObjDoc):
         self._allmethods = (self._methods + self._classmethods +
                             self._staticmethods)
 
-        # Put together the groups
-        self._find_groups()
-
         # Put everything in sorted order.
         self._methods = self._sort(self._methods)
         self._classmethods = self._sort(self._classmethods)
@@ -1476,14 +1481,20 @@ class ClassDoc(ObjDoc):
         if tag == 'group':
             if arg is None:
                 warnings.append(tag+' expected an argument (group name)')
-            else:
-                try:
-                    idents = _descr_to_identifiers(descr)
-                except ValueError, e:
-                    warnings.append('Bad group identifier list: %s' % e)
-                    return
-                self._tmp_groups[arg] = idents
-                self._tmp_group_order.append(arg)
+                return
+            try:
+                idents = _descr_to_identifiers(descr)
+            except ValueError, e:
+                warnings.append('Bad group identifier list: %s' % e)
+                return
+            if not self._groupmembers.has_key(arg):
+                self._groupnames.append(arg)
+                self._groupmembers[arg] = {}
+            group = self._groupmembers[arg]
+            anygroup = self._anygroup
+            for ident in idents:
+                group[ident] = 1
+                anygroup[ident] = 1
         elif tag in ('cvariable', 'cvar'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
@@ -1526,49 +1537,25 @@ class ClassDoc(ObjDoc):
             str += `len(self._subclasses)`+' subclasses; '
         return str[:-2]+')>'
 
-    def _find_groups(self):
-        # Put together groups
-        self._groups = []
-        
-        if self._tmp_groups:
-            elts = {}
-            processed = {} # For error messages.
-            for m in self.allmethods(): elts[m.name()] = m.target()
-            for p in self.properties(): elts[p.name()] = p.target()
-            for v in self.ivariables(): elts[v.name()] = v.uid()
-            for v in self.cvariables(): elts[v.name()] = v.uid()
-            for c in self.subclasses(): elts[c.name()] = c.uid()
-            for name in self._tmp_group_order:
-                members = self._tmp_groups[name]
-                group = []
-                for member in members:
-                    try:
-                        group.append(elts[member])
-                        processed[member] = name
-                        del elts[member]
-                    except KeyError:
-                        if processed.has_key(member):
-                            estr = ('%s.%s is already in group %s.' %
-                                    (self.uid(), member, processed[member]))
-                        else:
-                            estr = ('Group member not found: %s.%s' %
-                                    (self.uid(), member))
-                        self._field_warnings.append(estr)
-                if group:
-                    self._groups.append((name, group))
-                else:
-                    estr = 'Empty group %r deleted' % name
-                    self._field_warnings.append(estr)
-        del self._tmp_groups
-        del self._tmp_group_order
-
     #////////////////////////////
     #// Accessors
     #////////////////////////////
 
     def groups(self):
-        return self._groups
-        
+        return self._groupnames
+
+    def by_group(self, elts):
+        # This is O(len(elts)*len(groups)).  We could probably do
+        # better, if that's too slow.
+        ungrouped = [e for e in elts if not self._anygroup.has_key(e.name())]
+        grouped = [(g, [e for e in elts
+                        if self._groupmembers[g].has_key(e.name())])
+                   for g in self._groupnames]
+        if ungrouped:
+            return [(None,ungrouped)]+grouped
+        else:
+            return grouped
+
     def is_exception(self):
         """
         @return: True if this C{ClassDoc} documents an exception
@@ -1673,7 +1660,7 @@ class ClassDoc(ObjDoc):
             by this C{ClassDoc}.
         @rtype: C{list} of L{UID}
         """
-        return [make_uid(b) for b in self._base_order]
+        return self._base_order
 
     #////////////////////////////
     #// Modifiers
@@ -1829,47 +1816,26 @@ class ClassDoc(ObjDoc):
         @param base_docs: The documentation for the 
         @rtype: C{None}
         """
-        elts = None
-
         # Skip base_docs[0], since that's ourselves.
         for base_doc in base_docs[1:]:
             if base_doc is None: continue
-            for name, members in base_doc.groups():
-                # Initialize elts, if it's not already initialized.
-                if elts is None:
-                    elts = {}
-                    for m in self.allmethods(): elts[m.name()] = m.target()
-                    for p in self.properties(): elts[p.name()] = p.target()
-                    for c in self.subclasses(): elts[c.name()] = c.target()
-                    for v in self.ivariables(): elts[v.name()] = v.uid()
-                    for v in self.cvariables(): elts[v.name()] = v.uid()
-                    
-                # Find the corresponding group in our own group list;
-                # if it's not there, then create it.
-                for group in self._groups:
-                    if group[0] == name: break
-                else:
-                    group = (name, [])
-                    self._groups.append(group)
 
-                # Copy all members of the base class's group into our
-                # own group.  If something's been overridden, then add
-                # the overriding object's uid to the group, too.
-                for member in members:
-                    if member not in group[1]:
-                        if not elts.has_key(member.shortname()):
-                            # Add the member.
-                            group[1].append(member)
-                            elts[member.shortname()] = member
-                        else:
-                            # Add whatever overrides the member.
-                            overrider = elts[member.shortname()]
-                            if overrider not in group[1]:
-                                group[1].append(overrider)
+            # Copy the set of things that are in any group at all.
+            self._anygroup.update(base_doc._anygroup)
+
+            # Copy the individual groups.
+            for groupname in base_doc._groupnames:
+                # If we don't have this group, then add it.
+                if not self._groupmembers.has_key(groupname):
+                    self._groupmembers[groupname] = {}
+
+                # Copy the group.
+                basemembers = base_doc._groupmembers[groupname]
+                self._groupmembers[groupname].update(basemembers)
 
     def _add_inheritance_groups(self):
-        for (groupname, groupmembers) in self._groups:
-            if groupname.startswith('Inherited'):
+        for groupname in self._groupnames:
+            if groupname is not None and groupname.startswith('Inherited'):
                 estr = '"Inherited..." is a reserved group name.'
                 self._field_warnings.append(estr)
 
@@ -1880,24 +1846,37 @@ class ClassDoc(ObjDoc):
             uid = link.target()
             if uid.cls() is None: continue
             if uid.cls() != self._uid:
-                name = 'Inherited from %s' % uid.cls().shortname()
-                if not inh_groups.has_key(name): inh_groups[name] = []
-                inh_groups[name].append(uid)
+                groupname = 'Inherited from %s' % uid.cls().shortname()
+                if not self._groupmembers.has_key(groupname):
+                    inh_groups[uid.cls()] = 1
+                    self._groupmembers[groupname] = {}
+                self._groupmembers[groupname][link.name()] = 1
+                self._anygroup[link.name()] = 1
 
         # Mark inherited variables
         for var in self.ivariables()+self.cvariables():
             uid = var.uid()
             if uid.cls() is None: continue
             if uid.cls() != self._uid:
-                name = 'Inherited from %s' % uid.cls().shortname()
-                if not inh_groups.has_key(name): inh_groups[name] = []
-                inh_groups[name].append(uid)
+                groupname = 'Inherited from %s' % uid.cls().shortname()
+                if not self._groupmembers.has_key(groupname):
+                    inh_groups[uid.cls()] = 1
+                    self._groupmembers[groupname] = {}
+                self._groupmembers[groupname][var.name()] = 1
+                self._anygroup[var.name()] = 1
 
-        inh_groupnames = inh_groups.keys()
-        inh_groupnames.sort()
-        for groupname in inh_groupnames:
-            self._groups.append((groupname, inh_groups[groupname]))
-
+        # Add all the non-empty inheritance groups.  Include them in
+        # the order given by _base_order.
+        for base in self._base_order:
+            if inh_groups.has_key(base):
+                self._groupnames.append('Inherited from %s' %
+                                        base.shortname())
+                del inh_groups[base]
+        # There shouldn't be anything left, but just in case...
+        for base in inh_groups.keys():
+            self._groupnames.append('Inherited from %s' %
+                                    base.shortname())
+            
 #////////////////////////////////////////////////////////
 #// FuncDoc
 #////////////////////////////////////////////////////////
@@ -2063,9 +2042,8 @@ class FuncDoc(ObjDoc):
 
             # Extract the return type/value from the signature
             if rtype:
-                descr = markup.parse(rtype)
-                if selfparam: self._return.set_descr(descr)
-                else: self._return.set_type(descr)
+                if selfparam: self._return.set_descr(markup.parse(rtype))
+                else: self._return.set_type(markup.parse(rtype, verbatim=0))
 
             # Add the self parameter, if it was specified.
             if selfparam:
@@ -2852,16 +2830,8 @@ def _descr_to_identifiers(descr):
 
 def _descr_to_docfield(arg, descr):
     tags = [s.lower() for s in re.split('[ :;,]+', arg)]
-    
-    if len(descr.childNodes) != 1:
-        raise ValueError, 'Expected a single paragraph'
-    para = descr.childNodes[0]
-    if para.tagName != 'para':
-        raise ValueError, 'Expected a para; got a %s' % para.tagName
-    if len(para.childNodes) != 1:
-        raise ValueError, 'Colorization is not allowed'
-
-    args = re.split(' *[:;,]+ *', para.childNodes[0].data)
+    descr = descr.to_plaintext(None).strip()
+    args = re.split(' *[:;,]+ *', descr)
     if len(args) == 0 or len(args) > 3:
         raise ValueError, 'Wrong number of arguments'
     singular = args[0]
