@@ -3193,7 +3193,7 @@ def _dfs_bases(cls):
 
 def _find_base_order(cls):
     # Try using mro (method resolution operator), if available.
-    if hasattr(cls, 'mro'): return cls.mro()
+    if hasattr(cls, '__mro__'): return cls.__mro__
     
     # Use new or old inheritance rules?
     new_inheritance = (sys.hexversion >= 0x02020000)
