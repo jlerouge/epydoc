@@ -27,19 +27,19 @@ class ParseTestCase(unittest.TestCase):
     def setUp(self):
         pass
 
-    def failIfParseError(self, errors, warnings):
-        estr = ''
+    def failIfParseError(self, text, errors, warnings):
+        estr = '\n' + '~'*70 + '\n' + text
         if errors:
-            estr += '\n'+'~'*60+'\nERRORS:\n'
+            estr += '\n'+'_'*70+'\nERRORS:\n'
             for e in errors: estr += '%s\n' % e
         if warnings:
-            estr += '\n'+'~'*60+'\nWARNINGS:\n'
+            estr += '\n'+'_'*70+'\nWARNINGS:\n'
             for w in warnings: estr += '%s\n' % w
         if errors or warnings:
-            self.fail(estr+'~'*60)
+            self.fail(estr+'~'*70)
 
 
-    def checkParse(self, epytext, debug=None):
+    def checkParse(self, epytext, xml=None):
         """
         Parse C{epytext}, and check that it generates xml output
         X{xml}, with no warnings or errors.
@@ -47,9 +47,14 @@ class ParseTestCase(unittest.TestCase):
         errors = []
         warnings = []
         out = parse(epytext, errors, warnings)
-        self.failIfParseError(errors, warnings)
-        if debug:
-            self.failUnlessEqual(to_debug(out).strip(), debug.strip())
+        if out is None: out = ''
+        else: out = out.childNodes[0].toxml().strip()
+        if out[:9] == '<epytext>' and out[-10:] == '</epytext>':
+            out = out[9:-10]
+            
+        self.failIfParseError(epytext, errors, warnings)
+        if xml:
+            self.failUnlessEqual(`out`, `xml.strip()`)
 
     def checkParseError(self, epytext, errtype, linenum):
         errors = []
@@ -64,7 +69,7 @@ class ParseTestCase(unittest.TestCase):
             self.fail("No %s generated on line %s" %
                       (errtype.__name__, linenum))
 
-        self.failIfParseError(errors, warnings)
+        self.failIfParseError(epytext, errors, warnings)
 
     def testPara(self):
         self.checkParse("""
@@ -73,13 +78,10 @@ class ParseTestCase(unittest.TestCase):
         This is
         another.
 
-        This is a third.""", """
-   P>|this is one paragraph.
-     |
-   P>|This is another.
-     |
-   P>|This is a third.
-     |""")
+        This is a third.""",
+                        '<para>this is one paragraph.</para>'+
+                        '<para>This is another.</para><para>This is a '+
+                        'third.</para>')
 
     def testUnindentedFields(self):
         """
@@ -132,24 +134,28 @@ class ParseTestCase(unittest.TestCase):
              Hello.
              
              - Sublist item.""", StructuringError, 6)
-        self.checkParseError("""Paragraph\n- list item""",
-                             StructuringError, 2)
+        self.checkParseError("""\nParagraph\n- list item""",
+                             StructuringError, 3)
         self.checkParseError("""Paragraph\n\n- list item""",
                              StructuringError, 3)
         self.checkParseError("""\nParagraph\n- list item""",
                              StructuringError, 3)
 
+        # Special case if there's text on the same line as the opening
+        # quote..
+        self.checkParse("""Paragraph\n- list item""",
+                        "<para>Paragraph</para><ulist>"+
+                        "<li><para>list item</para></li></ulist>")
+
     def testIndentedList(self):
         """
         Make sure that indented lists are allowed.
         """
-        list1 = """
-   P>|This is a paragraph.
-     |
-LIST>|- This is a list item.
-     |
-   P>|This is a paragraph
-     |"""
+        list1 = ("<para>This is a paragraph.</para><ulist>"+
+                 "<li><para>This is a list item.</para></li>"+
+                 "</ulist><para>This is a paragraph</para>")
+        list2 = '<ulist><li><para>This is a list item.</para></li></ulist>'
+        
         self.checkParse('This is a paragraph.\n  - This is a list item.\n'+
                         'This is a paragraph', list1)
         self.checkParse('This is a paragraph.\n\n  - This is a list item.'+
@@ -165,113 +171,68 @@ LIST>|- This is a list item.
         
               - This is a list item.
         This is a paragraph""", list1)
-        list2 = """
-LIST>|- This is a list item.
-     |"""
         self.checkParse("""
         - This is a list item.""", list2)
         self.checkParse("""- This is a list item.""", list2)
         self.checkParse("""\n- This is a list item.""", list2)
 
     def testListBasic(self):
-        self.checkParse("""
-        This is a paragraph.
-          - This is a list item.
-          - This is a
-            list item.
-        This is a paragraph""", """
-   P>|This is a paragraph.
-     |
-LIST>|- This is a list item.
-     |
-  LI>|- This is a list item.
-     |
-   P>|This is a paragraph
-     |""")
-            
-        self.checkParse("""
-          - This is a list item.
-          - This is a
-            list item.""", """
-LIST>|- This is a list item.
-     |
-  LI>|- This is a list item.
-     |""")
-            
-        self.checkParse("""
-        This is a paragraph.
+        P1 = "This is a paragraph."
+        P2 = "This is a \nparagraph."
+        LI1 = "  - This is a list item."
+        LI2 = "\n  - This is a list item."
+        LI3 = "  - This is a list\n  item."
+        LI4 = "\n  - This is a list\n  item."
+        PARA = ('<para>This is a paragraph.</para>')
+        ONELIST = ('<ulist><li><para>This is a '+
+                   'list item.</para></li></ulist>')
+        TWOLIST = ('<ulist><li><para>This is a '+
+                   'list item.</para></li><li><para>This is a '+
+                   'list item.</para></li></ulist>')
 
-          - This is a list item.
-          - This is a
-            list item.
+        for p in (P1, P2):
+            for li1 in (LI1, LI2, LI3, LI4):
+                self.checkParse(li1, ONELIST)
+                self.checkParse('%s\n%s' % (p, li1), PARA+ONELIST)
+                self.checkParse('%s\n%s' % (li1, p), ONELIST+PARA)
+                self.checkParse('%s\n%s\n%s' % (p, li1, p),
+                                PARA+ONELIST+PARA)
             
-        This is a paragraph""", """
-   P>|This is a paragraph.
-     |
-LIST>|- This is a list item.
-     |
-  LI>|- This is a list item.
-     |
-   P>|This is a paragraph
-     |""")
-            
-        self.checkParse("""
-        This is a paragraph.
-          - This is a list item.
-          
-            It contains two paragraphs.
-        This is a paragraph""", """
-   P>|This is a paragraph.
-     |
-LIST>|- This is a list item.
-     |
-   P>|  It contains two paragraphs.
-     |
-   P>|This is a paragraph
-     |""")
-            
-        self.checkParse("""
-        This is a paragraph.
-          - This is a list item with a literal
-            block::
-              hello
-                there
-        This is a paragraph""", """
-   P>|This is a paragraph.
-     |
-LIST>|- This is a list item with a literal block::
-     |
- LIT>|    hello
-     |      there
-     |
-   P>|This is a paragraph
-     |""")
+                for li2 in (LI1, LI2, LI3, LI4):
+                    self.checkParse('%s\n%s' % (li1, li2), TWOLIST)
+                    self.checkParse('%s\n%s\n%s' % (p, li1, li2), PARA+TWOLIST)
+                    self.checkParse('%s\n%s\n%s' % (li1, li2, p), TWOLIST+PARA)
+                    self.checkParse('%s\n%s\n%s\n%s' % (p, li1, li2, p),
+                                    PARA+TWOLIST+PARA)
+
+        LI5 = "  - This is a list item.\n\n    It contains two paragraphs."
+        LI5LIST = ('<ulist><li><para>This is a list item.</para>'+
+                   '<para>It contains two paragraphs.</para></li></ulist>')
+        self.checkParse(LI5, LI5LIST)
+        self.checkParse('%s\n%s' % (P1, LI5), PARA+LI5LIST)
+        self.checkParse('%s\n%s\n%s' % (P2, LI5, P1), PARA+LI5LIST+PARA)
+
+        LI6 = ("  - This is a list item with a literal block::\n" +
+               "    hello\n      there")
+        LI6LIST = ('<ulist><li><para>This is a list item with a literal '+
+                   'block:</para><literalblock> hello\n   there'+
+                   '</literalblock></li></ulist>')
+        self.checkParse(LI6, LI6LIST)
+        self.checkParse('%s\n%s' % (P1, LI6), PARA+LI6LIST)
+        self.checkParse('%s\n%s\n%s' % (P2, LI6, P1), PARA+LI6LIST+PARA)
 
     def testListItemWrap(self):
-        self.checkParse("""
-          - This is a list
-            item.""", """
-LIST>|- This is a list item.
-     |""")
-
-        self.checkParse("""
-          - This is a list
-          item.""", """
-LIST>|- This is a list item.
-     |""")
-
-        self.checkParse("""
-          - This is a list
-          item.
-          - This is a list
-          item.""", """
-LIST>|- This is a list item.
-     |
-  LI>|- This is a list item.
-     |""")
-
-
-     
+        LI = "- This is a list\n  item."
+        ONELIST = ('<ulist><li><para>This is a '+
+                   'list item.</para></li></ulist>')
+        TWOLIST = ('<ulist><li><para>This is a '+
+                   'list item.</para></li><li><para>This is a '+
+                   'list item.</para></li></ulist>')
+        for indent in ('', '  '):
+            for nl1 in ('', '\n'):
+                self.checkParse(nl1+indent+LI, ONELIST)
+                for nl2 in ('\n', '\n\n'):
+                    self.checkParse(nl1+indent+LI+nl2+indent+LI, TWOLIST)
             
 
 ##//////////////////////////////////////////////////////
