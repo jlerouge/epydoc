@@ -1,4 +1,4 @@
-import token, symbol, re
+import tokenize, symbol, re
 from types import *
 
 ######################################################################
@@ -9,8 +9,8 @@ from types import *
 class ASTMatcher:
     DEBUG = 0
     
-    def __init__(self, sym=None, tok=None, children=None, varname=None,
-                 qmrk=0, star=0):
+    def __init__(self, sym=None, tok=None, children=None, 
+                 varname=None, qmrk=0, star=0):
         if (sym is None) == (tok is None):
             raise ValueError, 'must specify sym or tok'
         self.sym = sym
@@ -22,19 +22,20 @@ class ASTMatcher:
 
     def _debug(self, ast, indent):
         s = ' '*indent
-        if type(ast) is TupleType:
+        if type(ast) is StringType:
+            s += repr(ast)
+        else:
             if symbol.sym_name.has_key(ast[0]):
                 s += symbol.sym_name[ast[0]]
-            elif token.tok_name.has_key(ast[0]):
-                s += token.tok_name[ast[0]]
-        else:
-            s += repr(ast)
+            elif tokenize.tok_name.has_key(ast[0]):
+                s += tokenize.tok_name[ast[0]]
 
         s = '%-35s <=> ' % s + ' '*indent
         if self.sym is not None:
-            s += symbol.sym_name[self.sym]
+            if self.sym == -1: s += '*'
+            else: s += symbol.sym_name[self.sym]
         if self.tok is not None:
-            s += token.tok_name[self.tok]
+            s += tokenize.tok_name[self.tok]
         if self.qmrk:
             s += '?'
         if self.star:
@@ -55,14 +56,14 @@ class ASTMatcher:
 
         # Match tokens (ast leaves)
         if self.tok is not None:
-            if type(ast) is not TupleType or ast[0] != self.tok:
+            if type(ast) is StringType or ast[0] != self.tok:
                 match = 0
 
         # Match symbols (ast nodes).
         elif self.sym is not None:
             # Check that the AST is a node of the right type.
             if self.sym != -1: # = anything
-                if type(ast) is not TupleType or ast[0] != self.sym:
+                if type(ast) is StringType or ast[0] != self.sym:
                     match = 0
             
             # Check the children.
@@ -169,7 +170,7 @@ def compile_ast_matcher(pattern):
             
         elif match.group('tok') is not None:
             tok_name = match.group('tok')
-            try: tok = getattr(token, tok_name)
+            try: tok = getattr(tokenize, tok_name)
             except: raise ValueError, 'Bad token %r' % tok_name
             tokmatcher = ASTMatcher(tok=tok)
             stack[-1].children.append(tokmatcher)
@@ -185,7 +186,7 @@ def compile_ast_matcher(pattern):
         elif match.group('mod') == '?':
             lastchild = stack[-1].children[-1]
             lastchild.qmrk = 1
-            
+
         else:
             assert 0, 'error in _TOKEN_RE handling'
 
