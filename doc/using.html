@@ -15,9 +15,9 @@ documentation for a set of modules and packages: </p>
 
 <div class="box">
 <pre>
-<b>epydoc</b> [<b>--html</b> | <b>--pdf</b>] [<b>-o</b> <code class="user">DIR</code>] [<b>-n</b> <code class="user">NAME</code>] [<b>-u</b> <code class="user">URL</code>]
-<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>-t</b> <code class="user">PAGE</code>] [<b>-c</b> <code class="user">SHEET</code>] [<b>--private-css</b> <code class="user">SHEET</code>]
-<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>--no-private</b>] <code class="user">MODULES...</code>
+<b>epydoc</b> [<b>--html</b>|<b>--pdf</b>] [<b>-o</b> <code class="user">DIR</code>] [<b>-n</b> <code class="user">NAME</code>] [<b>-v</b>|<b>-q</b>] [<b>-u</b> <code class="user">URL</code>] [<b>-t</b> <code class="user">PAGE</code>] 
+<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>-c</b> <code class="user">SHEET</code>]  [<b>--private-css</b> <code class="user">SHEET</code>]   [<b>--private</b>|<b>--no-private</b>] 
+<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>--inheritance</b> <code class="user">STYLE</code>] <code class="user">MODULES...</code>
 </pre>
 
 <dl>
@@ -47,6 +47,10 @@ documentation for a set of modules and packages: </p>
   <dd>The documented project's name.
   </dd>
 
+  <dt><code><b>-v</b></code>, <code><b>-q</b></code></dt>
+  <dd>Increase (<code>-v</code>) or decrease (<code>-q</code>) the
+  verbosity of the output.</dd>
+  
   <dt><code><b>-u</b> <code class="user">URL</code></code>, <code><b>--url</b> <code class="user">URL</code></code></dt>
   <dd>The documented project's URL.
   </dd>
@@ -68,9 +72,33 @@ documentation for a set of modules and packages: </p>
   <dd>CSS stylesheet for HTML files containing private documentation.
   </dd>
 
-  <dt><code><b>--no-private</b></code></dt>
-  <dd>Do not include documentation for private objects.
+  <dt><code><b>--private</b></code>, <code><b>--no-private</b></code></dt>
+  <dd>Specify whether documentation should be generated for private
+  objects.  By default, documentation is generated for private objects
+  in the HTML output, but not in the PDF output.
   </dd>
+
+  <dt><code><b>--inheritance</b> <code class="user">STYLE</code></code></dt>
+  <dd>The format that should be used to display inherited methods,
+  variables, and properties.  Currently, three styles are supported.
+  To see an example of each style, click on it:
+    <ul>
+      <li> <a
+      href="examples/grouped/inh_example.Programmer-class.html"
+      target="epydoc_inh"><code>grouped</code></a>: Inherited objects are
+      gathered into groups, based on which class they are inherited
+      from.  (<i>default for HTML output</i>)</li> <li> <a
+      href="examples/listed/inh_example.Programmer-class.html"
+      target="epydoc_inh"><code>listed</code></a>: Inherited objects are
+      listed in a short list at the end of the summary
+      table. (<i>default for PDF output</i>)</li>
+      <li> <a
+      href="examples/included/inh_example.Programmer-class.html"
+      target="epydoc_inh"><code>included</code></a>: Inherited objects
+      are mixed in with non-inherited objects. </li>
+    </ul>
+  </dd>
+
 
 </dl>
 </div>
@@ -79,17 +107,15 @@ documentation for a set of modules and packages: </p>
 documentation for epydoc itself: </p>
 
 <div class="screen"><pre>
-<code class="prompt">[epydoc]$</code> epydoc -n epydoc -u http://epydoc.sourceforge.net \
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-o api --css blue --private-css green \
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src/epydoc/*.py 
-<code class="prompt">[epydoc]$</code> epydoc --pdf -n epydoc --no-private src/epydoc/*.py 
+<code class="prompt">[epydoc]$</code> epydoc -o api  --css blue  --private-css green -v \
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-n epydoc -u http://epydoc.sourceforge.net \
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--inheritance listed src/epydoc
+<code class="prompt">[epydoc]$</code> epydoc -o latex_api --pdf -n "Epydoc 2.0" src/epydoc
 </pre></div>
 
 <p> Note that all options must preceed the list of modules. The usage
-description above does not include all options; for a list of all of
-the command line options supported by epydoc, run
-"<code>epydoc&nbsp;--help"</code>.  For a complete description of the
-command line usage for epydoc, see the <a
+description above does not include all options; for a complete
+description of the command line usage for epydoc, see the <a
 href="epydoc-man.html"><code>epydoc(1)</code> man page</a>. </p>
 
 <a name="gui"><h2> Graphical Interface </h2></a>
@@ -286,7 +312,7 @@ page</a>. </p>
     </tr>
 </table>
 <font size="-1">
-<!-- hhmts start --> Last modified: Thu Nov  7 04:39:41 EST 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Sun Jul 20 14:13:56 XXX 2003 <!-- hhmts end -->
 </font>
 </body>
 </html>
