@@ -129,11 +129,13 @@ code.user {
     background: transparent; color: #204020;
     font-style: italic; font-weight: bold;
 }
-code.string { background: transparent; color: #006000; }
-code.keyword { background: transparent; color: #604000; }
+code.string   { background: transparent; color: #006000; }
+code.keyword  { background: transparent; color: #604000; }
 code.function { background: transparent; color: #000060; }
-code.output { background: transparent; color: #404040; }
-code.field { background: transparent; color: #006040; }
+code.output   { background: transparent; color: #404040; }
+code.field    { background: transparent; color: #006040; }
+code.comment  { background: transparent; color: #004060;
+                font-style: italic; }
 
 /*===================================================================*/
 /* Navigation box (used as a footer).  Implemented with a table. */
