@@ -61,6 +61,12 @@ PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
                   '-dSubsetFonts=true -dCompatibilityLevel=1.2 '+
                   '-dEmbedAllFonts=true %(ps)s %(pdf)s')
 
+# Testing (pdftex):
+#LATEX_COMMAND = r"echo x | pdftex '\batchmode\input %(tex)s'"
+#MAKEINDEX_COMMAND = 'makeindex -q %(idx)s'
+#DVIPS_COMMAND = 'true'
+#PS2PDF_COMMAND = 'true'
+
 ## This is a more verbose version of LATEX_COMMAND.
 DEBUG_LATEX_COMMAND = r"echo x | latex %(tex)s"
 
@@ -73,6 +79,10 @@ TESTS=('basic', 'types', 'vars', 'private', 'authors', 'versions', 'all')
 ## Command-Line Interface
 ##################################################
 import sys, os.path, re, getopt
+
+# Include support for Zope, if it's available.
+try: import ZODB
+except: pass
 
 def cli():
     """

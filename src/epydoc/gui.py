@@ -38,6 +38,10 @@ from pickle import dump, load
 try: from tkFileDialog import askdirectory
 except: askdirectory = None
 
+# Include support for Zope, if it's available.
+try: import ZODB
+except: pass
+
 ##/////////////////////////////////////////////////////////////////////////
 ## CONSTANTS
 ##/////////////////////////////////////////////////////////////////////////
