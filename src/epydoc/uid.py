@@ -34,9 +34,11 @@ from epydoc.imports import import_module
 try:
     _WrapperDescriptorType = type(list.__add__)
     _MethodDescriptorType = type(list.append)
+    _PropertyType = property
 except:
     _WrapperDescriptorType = None
     _MethodDescriptorType = None
+    _PropertyType = None
 
 __epydoc_sort__ = ['make_uid', 'UID', 'Link']
 
@@ -168,6 +170,13 @@ class UID:
         """
         @return: True if this is the UID for a function, a method, a
             builtin function, or a builtin method.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
+    def is_property(self):
+        """
+        @return: True if this is the UID for a property.
         @rtype: C{boolean}
         """
         raise NotImplementedError()
@@ -358,6 +367,7 @@ class ObjectUID(UID):
                  self._obj.__self__ is not None) or
                 type(self._obj) in (_WrapperDescriptorType,
                                     _MethodDescriptorType))
+    def is_property(self): return 0
     def is_variable(self): return 0
 
     def name(self):
@@ -520,7 +530,7 @@ class ObjectUID(UID):
         # Python internal id.
         return isinstance(other, ObjectUID) and self._id == other._id
 
-class VariableUID(UID):
+class RelativeUID(UID):
     """
     A globally unique identifier used to refer to a variable, relative
     to a Python object.
@@ -541,7 +551,7 @@ class VariableUID(UID):
 
     # The following methods are used to check the type of the UID.
     # Docstrings are defined in UID.
-    def is_variable(self): return 1
+    def is_variable(self): return 0
     def is_module(self): return 0
     def is_function(self): return 0
     def is_method(self): return 0
@@ -550,6 +560,7 @@ class VariableUID(UID):
     def is_builtin_function(self): return 0
     def is_builtin_method(self): return 0
     def is_routine(self): return 0
+    def is_property(self): return 0
 
     # Return the UID's full name and short name.
     def name(self): return '%s.%s' % (self._base.name(), self._shortname)
@@ -576,9 +587,14 @@ class VariableUID(UID):
         return hash( (self._base, self._shortname) )
 
     def __eq__(self, other):
-        return (isinstance(other, VariableUID) and
+        return (isinstance(other, self.__class__) and
                 self._shortname == other._shortname and
                 self._base == other._base)
+
+class VariableUID(RelativeUID):
+    def is_variable(self): return 1
+class PropertyUID(RelativeUID):
+    def is_property(self): return 1
 
 ##################################################
 ## UID Construction
@@ -618,14 +634,18 @@ def make_uid(object, base_uid=None, shortname=None):
         # Return the UID.
         return uid
 
-    elif base_uid is not None and shortname is not None:
+    elif (type(object) is _PropertyType or
+          (base_uid is not None and shortname is not None)):
         # If we've already seen this variable, return its UID
         key = (base_uid.id(), shortname)
         try: return _variable_uids[key]
         except: pass
         
         # We haven't seen this variable before; create a new UID.
-        uid = VariableUID(object, base_uid, shortname)
+        if type(object) is _PropertyType:
+            uid = PropertyUID(object, base_uid, shortname)
+        else:
+            uid = VariableUID(object, base_uid, shortname)
         _variable_uids[key] = uid
             
         # Make sure there's no naming conflict.
