@@ -1026,7 +1026,7 @@ class ClassDoc(ObjDoc):
             # Convert functions to methods.  (Since we're getting
             # values via __dict__)
             if type(val) is types.FunctionType:
-                val = new.instancemethod(val, None, cls)
+                val = getattr(cls, field)
 
             # Deal with static/class methods. (Python 2.2)
             try:
@@ -1165,7 +1165,7 @@ class ClassDoc(ObjDoc):
             # Convert functions to methods.  (Since we're getting
             # values via __dict__)
             if type(val) is types.FunctionType:
-                val = new.instancemethod(val, None, base)
+                val = getattr(base, field)
             if type(val) not in (types.MethodType, types.BuiltinMethodType,
                                  _WrapperDescriptorType,
                                  _MethodDescriptorType):
@@ -1540,7 +1540,7 @@ class FuncDoc(ObjDoc):
                 # We found a candidate for an overriden method.
                 base_method = base.__dict__[name]
                 if type(base_method) is types.FunctionType:
-                    base_method = new.instancemethod(base_method, None, base)
+                    base_method = getattr(base, name)
 
                 # Make sure it's some kind of method.
                 if type(base_method) not in (types.MethodType,
