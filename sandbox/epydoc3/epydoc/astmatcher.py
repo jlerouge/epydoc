@@ -127,7 +127,7 @@ class ASTMatcher:
                     vars.setdefault(self.varname, [])
 
 _TOKEN_RE = re.compile(r'\s*(%s)\s*' % '|'.join([
-    r'(\(\s*(?P<sym>[a-z_]+|[*]))',
+    r'(\(\s*(?P<sym>[a-z_]*))',
     r'(?P<dots>\.\.\.)',
     r'(?P<close>\))',
     r'(?P<tok>[A-Z_]+)',
@@ -151,7 +151,7 @@ def compile_ast_matcher(pattern):
 
         if match.group('sym') is not None:
             sym_name = match.group('sym')
-            if sym_name == '*':
+            if sym_name == '':
                 sym = -1
             else:
                 try: sym = getattr(symbol, sym_name)

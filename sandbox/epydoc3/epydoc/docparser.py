@@ -127,7 +127,7 @@ class DocParser:
             (stmt COMMENT*
              (simple_stmt
               (small_stmt
-               (import_stmt NAME:cmd (*...)*:names))
+               (import_stmt NAME:cmd (...)*:names))
               NEWLINE))""")),
         # Simple assignment: "x=y" or "x.y=z"
         ('parse_simple_assignment', compile_ast_matcher("""
@@ -137,18 +137,18 @@ class DocParser:
                (xor_expr (and_expr (shift_expr (arith_expr (term
                 (factor (power (atom NAME)
                                (trailer DOT NAME)*))))))))))))):lhs
-              EQUAL (*...):rhs)) NEWLINE:nl_comment))""")),
+              EQUAL (...):rhs)) NEWLINE:nl_comment))""")),
         # Tuple/list assignment: "(a,b)=c" or "[a,b]=c"
         ('parse_tuple_assignment', compile_ast_matcher("""
             (stmt COMMENT*
              (simple_stmt (small_stmt (expr_stmt
-              (testlist...):lhs EQUAL (*...):rhs)) NEWLINE))""")),
+              (testlist...):lhs EQUAL (...):rhs)) NEWLINE))""")),
         # Multi assignment: "a=b=c"
         ('parse_multi_assignment', compile_ast_matcher("""
             (stmt COMMENT*
              (simple_stmt (small_stmt (expr_stmt
               (testlist...):lhs EQUAL
-              (*...)*:rhs)) NEWLINE))""")),
+              (...)*:rhs)) NEWLINE))""")),
         # Function definition: "def f(x): ..."
         ('parse_funcdef', compile_ast_matcher("""
             (stmt COMMENT*:comments
@@ -172,7 +172,7 @@ class DocParser:
             (stmt COMMENT*
              (compound_stmt
               (try_stmt NAME COLON (suite ...):trysuite
-              (*...)*:rest)))""")),
+              (...)*:rest)))""")),
         # If-then statement
         ('parse_if', compile_ast_matcher("""
             (stmt COMMENT*
@@ -199,7 +199,7 @@ class DocParser:
              (simple_stmt
               (small_stmt ...):stmt1
               SEMI
-              (*...)*:rest))""")),
+              (...)*:rest))""")),
         ]
     """A table used by L{parse_suite} to find statements of interest,
     and delegate them to appropriate handlers.  Each table entry has
