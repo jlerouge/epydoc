@@ -45,9 +45,10 @@ __docformat__ = 'epytext en'
 ## Imports
 ##################################################
 
-import inspect, UserDict, epytext, string, new, re, sys, types
+import inspect, UserDict, string, new, re, sys, types
 import xml.dom.minidom
 
+import epytext, rst
 from epydoc.uid import UID, Link, make_uid
 
 # Python 2.2 types
@@ -247,6 +248,7 @@ def _find_base_order(cls):
 ## __docformat__
 ##################################################
 
+KNOWN_DOCFORMATS = ('plaintext', 'epytext', 'restructuredtext')
 DEFAULT_DOCFORMAT = 'epytext'
 def set_default_docformat(new_format):
     """
@@ -561,12 +563,12 @@ class ObjDoc:
         accepted by epydoc is defined by L{ObjDoc.FIELDS}.
     @type _fields: C{dictionary} from L{DocField} to C{list} of
                    L{xml.dom.minidom.Element}
-    @cvar FIELDS: The set of standard docstring fields that
+    @cvar FIELDS: The list of standard docstring fields that
         epydoc accepts.  The order of fields is significant:
         when the fields are rendered, they will be listed in
-        the order that they are given in here.  Note that this
-        list does X{not} include special fields, such as
-        \"group\"; it just includes \"standard\" fields, which
+        the order that they are given in this list.  Note that 
+        this list does X{not} include special fields, such as
+        \"group\"; it just includes \"simple\" fields, which
         contain a single textual description or a list of
         textual descriptions.
     @type FIELDS: C{List} of L{DocField}
@@ -578,13 +580,22 @@ class ObjDoc:
     @ivar _field_warnings: Warnings generated when processing the
         object's docstring's fields.
     """
+    # Note: order is significant.
     FIELDS = [
         # If it's depreciated, put that first.
         DocField(['depreciated'], 'Depreciated', multivalue=0),
 
-        # Then version & author
+        # Status info
         DocField(['version'], 'Version', multivalue=0),
+        DocField(['date'], 'Date', multivalue=0),
+        DocField(['status'], 'Status', multivalue=0),
+        
+        # Bibliographic Info
         DocField(['author', 'authors'], 'Author', 'Authors', short=1),
+        DocField(['contact'], 'Contact', 'Contacts', short=1),
+        DocField(['org', 'organization'], 'Organization', 'Organizations'),
+        DocField(['(c)', 'copyright'], 'Copyright', multivalue=0),
+        DocField(['license'], 'License', multivalue=0),
 
         # Various warnings etc.
         DocField(['bug'], 'Bug', 'Bugs'),
@@ -608,6 +619,9 @@ class ObjDoc:
 
         # Future Work
         DocField(['todo'], 'To Do'),
+
+        # This is sometimes used as a section in ReStructuredText.
+        DocField(['parameters'], 'Parameters', multivalue=0)
         ]
     def __init__(self, uid, verbosity=0):
         """
@@ -672,7 +686,7 @@ class ObjDoc:
         except: pass
 
         # Check that it's an acceptable format.
-        if (self._docformat not in ('epytext', 'plaintext') and
+        if (self._docformat not in KNOWN_DOCFORMATS and
             self._uid.is_module()):
             estr = ("Unknown __docformat__ value %s; " % self._docformat +
                     "treating as plaintext.")
@@ -684,7 +698,7 @@ class ObjDoc:
         if type(docstring) == type(''): docstring = docstring.strip()
         if docstring:
             self._documented = 1
-            if self._docformat == 'epytext':
+            if self._docformat in ('epytext', 'restructuredtext'):
                 self.__parse_docstring(docstring)
             else:
                 self._descr = epytext.parse_as_literal(docstring)
@@ -817,7 +831,11 @@ class ObjDoc:
         parse_warnings = self._parse_warnings
         parse_errors = self._parse_errors
         field_warnings = self._field_warnings
-        pdoc = epytext.parse(docstring, parse_errors, parse_warnings)
+
+        if self._docformat == 'epytext':
+            pdoc = epytext.parse(docstring, parse_errors, parse_warnings)
+        elif self._docformat == 'restructuredtext':
+            pdoc = rst.parse(docstring)
 
         # If there were any errors, handle them by simply treating
         # the docstring as a single literal block.
@@ -827,6 +845,7 @@ class ObjDoc:
 
         # Extract and process any fields
         if (pdoc.hasChildNodes() and pdoc.childNodes[0].hasChildNodes() and
+            pdoc.childNodes[0].childNodes[-1].hasChildNodes() and 
             pdoc.childNodes[0].childNodes[-1].tagName == 'fieldlist'):
             fields = pdoc.childNodes[0].childNodes[-1].childNodes
             pdoc.childNodes[0].removeChild(pdoc.childNodes[0].childNodes[-1])
@@ -1724,6 +1743,7 @@ class ClassDoc(ObjDoc):
             for base_ivar in base_doc.ivariables():
                 # Ignore ivars that the base inherited from higher up
                 if base_ivar.uid().cls() != base_doc.uid(): continue
+                if base_ivar.uid().cls() is None: continue
                 
                 name = base_ivar.uid().shortname()
                 if ivariables_map.has_key(name):
@@ -1748,6 +1768,7 @@ class ClassDoc(ObjDoc):
             for base_cvar in base_doc.cvariables():
                 # Ignore cvars that the base inherited from higher up
                 if base_cvar.uid().cls() != base_doc.uid(): continue
+                if base_cvar.uid().cls() is None: continue
                 
                 name = base_cvar.uid().shortname()
                 if ivariables_map.has_key(name):
@@ -1829,6 +1850,7 @@ class ClassDoc(ObjDoc):
         # Mark inherited methods & properties
         for link in self.allmethods()+self.properties():
             uid = link.target()
+            if uid.cls() is None: continue
             if uid.cls() != self._uid:
                 name = 'Inherited from %s' % uid.cls().shortname()
                 if not inh_groups.has_key(name): inh_groups[name] = []
@@ -1837,6 +1859,7 @@ class ClassDoc(ObjDoc):
         # Mark inherited variables
         for var in self.ivariables()+self.cvariables():
             uid = var.uid()
+            if uid.cls() is None: continue
             if uid.cls() != self._uid:
                 name = 'Inherited from %s' % uid.cls().shortname()
                 if not inh_groups.has_key(name): inh_groups[name] = []
