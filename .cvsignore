@@ -1,5 +1,4 @@
-.up2date.examples
-.up2date.refdocs
+.*.up2date
 api
 epydoc.notes
 etc
