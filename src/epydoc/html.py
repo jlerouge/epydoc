@@ -143,7 +143,7 @@ from epydoc.colorize import colorize_re, colorize_doctestblock
 ## Documentation -> HTML Conversion
 ##################################################
 
-class HTML_Doc:
+class HTMLFormatter:
     """
     Documentation to HTML converter.
 
@@ -297,7 +297,7 @@ class HTML_Doc:
 
     def num_files(self):
         """
-        @return: The number of files that this C{HTML_Doc} will
+        @return: The number of files that this C{HTMLFormatter} will
             generate.
         @rtype: C{int}
         """
@@ -2391,7 +2391,7 @@ class HTML_Doc:
     def _documented(self, uid):
         """
         @return: True if the given UID is documented by the
-            documentation map for this C{HTML_Doc}.  If C{uid} is the
+            documentation map for this C{HTMLFormatter}.  If C{uid} is the
             UID for a private object, and C{_show_private=0}, then
             this method will also return false.
         @rtype: C{boolean}

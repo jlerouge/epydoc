@@ -32,7 +32,7 @@ import sys
 
 from epydoc.css import STYLESHEETS
 from epydoc.cli import _find_modules
-from epydoc.html import HTML_Doc
+from epydoc.html import HTMLFormatter
 from epydoc.objdoc import DocMap
 
 ##/////////////////////////////////////////////////////////////////////////
@@ -132,7 +132,7 @@ def document(modules, options, progress, cancel):
 
     @param options: The options to use for generating documentation.
         This includes keyword options that can be given to
-        L{html.HTML_Doc}, as well as the option C{outdir}, which
+        L{html.HTMLFormatter}, as well as the option C{outdir}, which
         controls where the output is written to.
     @type options: C{dictionary}
     @param progress: This first element of this list will be modified
@@ -155,7 +155,7 @@ def document(modules, options, progress, cancel):
         d.add(module)
         progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
 
-    htmldoc = HTML_Doc(d, **options)
+    htmldoc = HTMLFormatter(d, **options)
     numfiles = htmldoc.num_files()
 
     # Set up the progress callback.

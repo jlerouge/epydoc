@@ -281,11 +281,11 @@ def _html(docmap, options):
     @param options: Options from the command-line arguments.
     @type options: C{dict}
     """
-    from epydoc.html import HTML_Doc
+    from epydoc.html import HTMLFormatter
 
     # Create the documenter, and figure out how many files it will
     # generate.
-    htmldoc = HTML_Doc(docmap, **options)
+    htmldoc = HTMLFormatter(docmap, **options)
     num_files = htmldoc.num_files()
         
     # Produce pretty trace output.
