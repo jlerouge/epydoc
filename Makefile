@@ -70,7 +70,7 @@ refdocs: .refdocs.up2date
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --css blue --private-css green -vv --debug \
+	       --css blue --private-css green -vv --debug --navlink 'epydoc'\
 	       --docformat plaintext ${PY_SRC} xml.dom.minidom
 	touch .refdocs.up2date
 
@@ -79,7 +79,8 @@ examples: .examples.up2date
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
 	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue ${EXAMPLES_SRC} sre
+	       --no-private --css blue -t example \
+	       --navlink 'epydoc examples' ${EXAMPLES_SRC} sre
 	touch .examples.up2date
 
 # Generate the HTML version of the man page.  Note: The
@@ -109,7 +110,8 @@ doc/epydocgui-man.html: man/epydocgui.1
 
 #//////////////////////////////////////////////////////////////////////
 # Build documentation for the Python Standard Library
-SLNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
+SLNAME = 'Python 2.1 Standard Library'
+SLLINK = '<font size="-2">Python 2.1<br>Standard Library</font>'
 SLURL = 'http://www.python.org/doc/2.1/lib/lib.html'
 SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/python2.1/config/' \
@@ -120,7 +122,7 @@ stdlib:
 	mkdir -p ${STDLIB}
 	epydoc -o ${STDLIB} -v -q -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
-	       --builtins ${SLFILES}
+	       --navlink ${SLLINK} --builtins ${SLFILES}
 
 ##//////////////////////////////////////////////////////////////////////
 ## Build documentation for everything installed on this system.
