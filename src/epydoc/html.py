@@ -514,8 +514,9 @@ class HTMLFormatter:
                 if len(uids)==1 and len(identifier)+len(uid.name())+14 < 70:
                     estr += ' (from %s)\n' % uids[0].name()
                 else:
+                    estr += '\n'
                     for uid in uids:
-                        estr += '\n      (from %s)\n' % uid.name()
+                        estr += '      (from %s)\n' % uid.name()
             if sys.stderr.softspace: print >>sys.stderr
             print >>sys.stderr, estr
 
