@@ -10,9 +10,10 @@
 from distutils.core import setup
 
 setup(name="epydoc",
-      version="0.2",
+      version="1.0",
       description="Edloper's Python Documentation Suite",
       author="Edward Loper",
       author_email="ed@loper.org",
+      scripts=['scripts/epydoc'],
       packages=['epydoc'])
 
