@@ -120,6 +120,7 @@ def _find_docstring(uid):
     if inspect.iscode(object):
         if not hasattr(object, 'co_firstlineno'): return (None, None)
         linenum = object.co_firstlineno - 1
+        if linenum >= len(lines): return (filename, linenum)
         pat = re.compile(r'^\s*def\s')
         while linenum > 0:
             if pat.match(lines[linenum]): break
@@ -611,8 +612,11 @@ class ObjDoc:
         # Print the errors and warnings.
         if (parse_warnings or parse_errors or field_warnings):
             # Figure out our file and line number, if possible.
-            (filename, startline) = _find_docstring(self._uid)
-            if startline is None: startline = 0
+            try:
+                (filename, startline) = _find_docstring(self._uid)
+                if startline is None: startline = 0
+            except:
+                (filename, startline) = (None, 0)
             
             if stream.softspace: print >>stream
             print >>stream, '='*75
