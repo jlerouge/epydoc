@@ -38,6 +38,9 @@ Usage::
     -n NAME, --name NAME
         Package name (for HTML header/footer)
 
+    --url, -u
+        Package URL (for HTML header/footer)
+
     -p
         Show private objects (those that start with _)
 
@@ -49,6 +52,9 @@ Usage::
 
     -vv, -vvv, -vvvv
         Produce successively more verbose output
+
+    -css2
+        Use alternate CSS file (for HTML)
 """
 
 import sys, os.path, re
@@ -94,6 +100,9 @@ def _parse_args():
             elif arg in ('-n', '--name'):
                 try: argvals['pkg_name'] = args.pop()
                 except: _usage()
+            elif arg in ('-u', '--url'):
+                try: argvals['pkg_url'] = args.pop()
+                except: _usage()
             elif arg in ('-V', '--version'):
                 _version()
             elif arg in ('-v', '--verbose'):
@@ -108,6 +117,8 @@ def _parse_args():
                 argvals['show_private'] = 1
             elif arg in ('-a', '-check_all'):
                 argvals['check_all'] = 1
+            elif arg in ('-css2',):
+                argvals['css'] = 2
             else:
                 _usage()
         else:
@@ -116,7 +127,7 @@ def _parse_args():
     if argvals['modules'] == []: _usage()
     return argvals
 
-def _find_module_from_filename(filename):
+def _find_module_from_filename(filename,verbosity):
     """
     Given a filename, import the corresponding module.
     """
@@ -142,6 +153,7 @@ def _find_module_from_filename(filename):
     # Import the module.
     try:
         try:
+            if verbosity == 1: print 'Importing', module
             if basedir: os.chdir(basedir)
             exec('import %s' % module)
             exec('rv = %s' % module)
@@ -161,14 +173,15 @@ def _find_modules(module_names, verbosity):
     """
     modules = []
     for name in module_names:
-        if verbosity > 0: print 'Importing', name
+        if verbosity > 1: print 'Importing', name
         if '/' in name or name[-3:] == '.py' or name[-4:-1] == '.py':
-            module = _find_module_from_filename(name)
+            module = _find_module_from_filename(name, verbosity)
             if module not in modules:
                 modules.append(module)
             elif verbosity > 3: print "  (duplicate)"
         else:
             try:
+                if verbosity == 1: print 'Importing', name
                 # Otherwise, try importing it.
                 exec('import %s' % name)
                 exec('module = %s' % name)
@@ -189,7 +202,7 @@ def cli():
     modules = _find_modules(param['modules'], param['verbosity'])
 
     # Wait to do imports, to make --usage faster.
-    from epydoc.html import HTML_Doc
+    from epydoc.html import HTML_Doc, CSS_FILE2
     from epydoc.objdoc import Documentation
     from epydoc.checker import DocChecker
 
@@ -209,7 +222,7 @@ def cli():
 
     if param['check']:
         # Run completeness checks.
-        if param['verbosity'] > 0: print 'Performing completenss checks'
+        if param['verbosity'] > 0: print 'Performing completeness checks'
         checker = DocChecker(d)
         if param['show_private']:
             checker.check(DocChecker.MODULE | DocChecker.CLASS |
@@ -231,7 +244,9 @@ def cli():
     else:
         # Write documentation.
         if param['verbosity'] > 0: print 'Writing docs to', param['target']
-        htmldoc = HTML_Doc(d, param['pkg_name'], param['show_private'])
+        if param.get('css', None) == 2: param['css'] = CSS_FILE2
+        else: css=None
+        htmldoc = HTML_Doc(d, **param)
         htmldoc.write(param['target'], param['verbosity']-1)
         if param['verbosity'] > 1: print
     
