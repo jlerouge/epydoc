@@ -1534,6 +1534,18 @@ def parse_as_para(str):
 #################################################################
 
 def parse_docstring(docstring, errors, **options):
+    """
+    Parse the given docstring, which is formatted using epytext; and
+    return a C{ParsedDocstring} representation of its contents.
+    @param docstring: The docstring to parse
+    @type docstring: C{string}
+    @param errors: A list where any errors generated during parsing
+        will be stored.
+    @type errors: C{list} of L{ParseError}
+    @param options: Extra options.  Unknown options are ignored.
+        Currently, no extra options are defined.
+    @rtype: L{ParsedDocstring}
+    """
     return ParsedEpytextDocstring(parse(docstring, errors))
     
 class ParsedEpytextDocstring(ParsedDocstring):
