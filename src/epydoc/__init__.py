@@ -46,19 +46,24 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Groups for function parameters (eg Input/Output)
+@todo 2.0: Add a '@kwarg' field for documenting **kwarg parameters?
+  - synonyms: @kwarg, @kwargument, @kwparam, @kwparameter,
+    @keywordarg, @keywordparam, etc.?  @keyword?
 @todo 2.0: Improve ModuleDoc._find_imported_variables (params?)
 @todo 2.0: Improve uid.findUID
 @todo 2.0: Fix _find_override (A defines x, B inherits, C inherits,
-  C overrides x?)
+    C overrides x?)
 @todo 2.0: Optimization
-  - how much does inheritance=listed speed it up?
-  - how much does epytext slow it down?
-  - Modify L{epydoc.html} to write directly to streams, rather than
-    building up strings.  Take two streams, public & private, and
-    do them concurrently.  For docstrings, only redo the to_html for
-    public if it contained any links to private objects (add to
-    HTMLDocstringLinker to check that).
+  - optimize epytext?
+@todo 2.0: check things like name of css file earlier (before
+    building all objdocs?)
+
+@todo 2.0?: regexps for @group and @sort? :)
+    - so you could say '@group accessors: get_*'
+    - or '@group accessors: get_.*' ??
+  How to do this??
+@todo 2.0?: Handle '@param a,b'?  (where should they be listed?)
+@todo 2.0?: Other @param or @extraparm type things?
     
 @todo 3.0: Create a better default top_page than trees.html.
 @todo 3.0: Add the man-page style outputter. (epyman)
@@ -72,10 +77,7 @@ produce API documentation using the following steps:
       using a links and a dictionary?  Are non-directed cycles a
       problem?  Interaction of the access hierarchy (a.b.c) and
       the base class hierarchy?  What does pydoc do?
-
-@bug: UIDs are not generated correctly for nested classes; and in
-    general, nested classes are not well supported.  (E.g., they
-    are listed under their module, not their containing class).
+@todo 3.0: Docstring inheritance for overridden properties.
 
 @var __license__: The license governing the use and distribution of
     epydoc.
@@ -117,4 +119,4 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
 #   - @summary
-
+#   - @type a,b,c: ...
