@@ -910,10 +910,11 @@ def _colorize(token, errors, warnings=None):
     @return: a DOM C{Element} encoding the given paragraph.
     @returntype: C{Element}
     """
-    m = re.search('</?\w+>', token.contents)
-    if m:
-        estr = "Warning: HTML-style colorization is obsolete"
-        warnings.append(ColorizingError(estr, token, m.start()))
+    ## I don't think we need this check anymore.
+    #m = re.search('</?\w+>', token.contents)
+    #if m:
+    #    estr = "Warning: HTML-style colorization is obsolete"
+    #    warnings.append(ColorizingError(estr, token, m.start()))
     
     return _colorize_brace(token, errors, warnings)
 
@@ -1081,7 +1082,7 @@ def to_html(tree, indent=0, seclevel=0):
     elif tree.tagName in ('italic', 'math'):
         return '<I>' + childstr + '</I>'
     elif tree.tagName == 'index':
-        return ('<A NAME="#'+index_to_anchor(childstr)+'">'+
+        return ('<A NAME="#'+index_to_anchor(childstr)+'"/>'+
                 '<I>' + childstr + '</I>')
     elif tree.tagName == 'bold':
         return '<B>' + childstr + '</B>'
