@@ -9,6 +9,7 @@
 """
 Documentation to HTML converter.
 """
+__docformat__ = 'epytext en'
 
 # To do:
 #   - Control over whether you link to non-documented objects
@@ -295,6 +296,19 @@ class HTMLFormatter:
         # Cache the HTML that we generate for each docstring.
         self._epytext_cache = {}
 
+        # What is the project's text name?
+        self._text_prj_name = self._prj_name or 'API Documentation'
+        if re.search('<.*>', self._text_prj_name):
+            self._text_prj_name = 'API Documentation'
+        
+        # Which page is the "main" page?
+        if isinstance(self._package, UID):
+            self._mainpage = self._uid_to_uri(self._package)
+        elif isinstance(self._module, UID):
+            self._mainpage = self._uid_to_uri(self._module)
+        else:
+            self._mainpage = 'epydoc-tree.html'
+
     def num_files(self):
         """
         @return: The number of files that this C{HTMLFormatter} will
@@ -310,6 +324,10 @@ class HTMLFormatter:
         # Private basic & TOC files.
         if self._create_private_docs: n *= 2
 
+        # index.html in the main directory.
+        if self._create_frames and self._create_private_docs:
+            n += 1
+            
         for uid in self._docmap.keys():
             # Module and class API files
             if not (uid.is_module() or uid.is_class()): continue
@@ -379,6 +397,15 @@ class HTMLFormatter:
             self._show_private = 1
             self._write(os.path.join(directory, 'private/'),
                         progress_callback)
+
+            # Create an extra frames file in the parent directory,
+            # pointing at the public docs.
+            if self._create_frames:
+                filename = os.path.join(directory, 'index.html')
+                frames = FRAMES % (self._text_prj_name, self._mainpage)
+                frames = re.sub('src="', 'src="public/', frames)
+                open(filename, 'w').write(frames)
+                if progress_callback: progress_callback(filename, None)
         else:
             self._show_private = 0
             self._write(directory, progress_callback)
@@ -453,16 +480,8 @@ class HTMLFormatter:
         filename = os.path.join(directory, 'epydoc-frames.html')
         if progress_callback: progress_callback(filename, None)
 
-        name = self._prj_name or 'API Documentation'
-        if re.search('<.*>', self._prj_name): name = 'API Documentation' 
-        if isinstance(self._package, UID):
-            mainpage = self._uid_to_uri(self._package)
-        elif isinstance(self._module, UID):
-            mainpage = self._uid_to_uri(self._module)
-        else:
-            mainpage = 'epydoc-tree.html'
-
-        open(filename, 'w').write(FRAMES % (name, mainpage))
+        open(filename, 'w').write(FRAMES % (self._text_prj_name,
+                                            self._mainpage))
 
         # Write the top-level table of contents.
         filename = os.path.join(directory, 'epydoc-toc.html')
@@ -501,11 +520,10 @@ class HTMLFormatter:
             else:
                 raise IOError("Can't find help file: %r" % self._helpfile)
         else:
-            if re.search('<.*>', self._prj_name): thisprj = 'this project'
-            else: thisprj = '<b>%s</b>' % self._prj_name
+            if self._text_prj_name == 'API Documentation':
+                thisprj = 'this project'
+            else: thisprj = '<b>%s</b>' % self._text_prj_name
             help = HTML_HELP % {'this_project':thisprj}
-            
-            
         
         # Write the help file.
         helpfile = open(filename, 'w')
@@ -2361,8 +2379,7 @@ class HTMLFormatter:
 
         # Try to find a documented ancestor.
         if isinstance(doc, FuncDoc):
-            while (not doc.documented() and
-                   doc.overrides() and
+            while (not doc.documented() and doc.overrides() and
                    self._docmap.has_key(doc.overrides())):
                 doc = self._docmap[doc.overrides()]
 
