@@ -46,13 +46,6 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Fix comments for javadoc & rst.
-@todo 2.0: Improve ModuleDoc._find_imported_variables?  (slow?)
-@todo 2.0: Improve uid.findUID any more?
-@todo 2.0: Optimization
-  - optimize epytext?
-@todo 2.0?: Handle '@param a,b'?  (where should they be listed?)
-    
 @todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}:
     - C{ObjDoc}s will contain info about objects, but not gather it.
     - An C{inspection} module will gather info via inspection.
@@ -66,6 +59,9 @@ produce API documentation using the following steps:
 @todo 3.0: Create a better default top_page than trees.html.
 @todo 3.0: Add the man-page style outputter. (epyman)
 @todo 3.0: Docstring inheritance for overridden properties.
+@todo 3.0: Optimize epytext
+    - Use classes instead of minidom nodes?
+@todo 3.0: Rewrite C{epydoc.uid.findUID} to be more robust.
 
 @license: IBM Open Source License
 @copyright: (C) 2003 Edward Loper
