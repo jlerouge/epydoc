@@ -129,6 +129,9 @@ a.navbar:link      { background: transparent; color: #0000ff;
                      text-decoration: none; }  
 a.navbar:visited   { background: transparent; color: #204080; 
                      text-decoration: none; }  
+
+/* Lists */
+ul { margin-top: 0; }
 """
 
 # Black on steel blue (old version)
@@ -232,6 +235,9 @@ a.navbar:link      { background: transparent; color: #b8d0d0;
                      text-decoration: none; }  
 a.navbar:visited   { background: transparent; color: #b8d0d0;
                      text-decoration: none; }
+
+/* Lists */
+ul { margin-top: 0; }
 """
 
 # Black on steel blue (new version: higher contrast)
@@ -335,6 +341,9 @@ a.navbar:link      { background: transparent; color: #d8f0f0;
                      text-decoration: none; }  
 a.navbar:visited   { background: transparent; color: #d8f0f0;
                      text-decoration: none; }
+
+/* Lists */
+ul { margin-top: 0; }
 """
 
 ############################################################
