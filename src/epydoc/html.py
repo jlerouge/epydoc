@@ -2144,15 +2144,28 @@ class HTMLFormatter:
             else: psum = ''
         else: psum = ''
 
+        # Check if we have extra info about the property.  If not,
+        # then don't list it in the details section; create an anchor
+        # for it instead of linking (unless we inherited it).
+        link_private = inherited or (pdoc and (pdoc.fget() or pdoc.fset() or
+                                               pdoc.fdel() or pdoc.descr()))
+        link_public = inherited or self._property_in_public_details(puid)
+
         # Write a row for the property
-        str = '<tr><td align="right" valign="top" '
-        str += 'width="15%"><font size="-1">'+ptype+'</font></td>\n  <td>'
-        if inherited or pdoc:
-            str += '<b>%s</b>' % self._link_to_html(property)
-        else:
-            str += ('<a name="%s"></a><b><code>%s</code></b>' %
-                    (puid.shortname(), pname))
-        str += psum
+        header = '<tr><td align="right" valign="top" '
+        header += 'width="15%"><font size="-1">'+ptype+'</font></td>\n  <td>'
+        private.write(header)
+        if puid.is_public(): public.write(header)
+
+        link = '<b>%s</b>' % self._link_to_html(property)
+        anchor = ('<a name="%s"></a><b><code>%s</code></b>' %
+                  (puid.shortname(), pname))
+        if link_private: private.write(link)
+        else: private.write(anchor)
+        if puid.is_public():
+            if link_public: public.write(link)
+            else: public.write(anchor)
+        str = psum
         if (self._inheritance != 'grouped' and inherit):
             cls = puid.cls()
             str += ('    <i>(Inherited from %s)</i>\n' %
@@ -2162,9 +2175,9 @@ class HTMLFormatter:
         if puid.is_public(): public.write(str)
 
     def _write_property_details(self, public, private, container, properties,
-                                heading='Variable Details'):
+                                heading='Property Details'):
         """
-        Write HTML code for a properties details dection.  This is
+        Write HTML code for a properties details section.  This is
         used by L{_write_class} to describe the properties in a class.
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
@@ -2183,6 +2196,18 @@ class HTMLFormatter:
         cuid = container.uid()
         properties = [p for p in properties if p.target().cls() == cuid]
 
+        # Filter out properties for which there's nothing more to say.
+        tmp = [(p, docmap[p.target()]) for p in properties]
+        properties = [p for (p,d) in tmp if
+                      d.fget() or d.fset() or d.fdel() or d.descr()]
+
+        # Check if any properties are listed on the public page.
+        show_public = 0
+        for p in properties:
+            if self._property_in_public_details(p.target()):
+                show_public = 1
+                break
+        
         # If there are no properties left, then just return
         if len(properties) == 0: return ''
 
@@ -2190,23 +2215,27 @@ class HTMLFormatter:
         groups = container.by_group(properties)
 
         # Write the table header.
-        str = self._table_header(heading, 'details')+'</table>\n'
-        _write_if_nonempty(public, private, properties, str)
+        header = self._table_header(heading, 'details')+'</table>\n'
+        private.write(header)
+        if show_public: public.write(header)
 
         # Write an entry for each property
         for property in properties:
-            str = self._property_details_entry(property, container)
-            private.write(str)
-            if property.target().is_public(): public.write(str)
+            self._write_property_details_entry(public, private,
+                                               property, container)
             
         # Write the footer
-        _write_if_nonempty(public, private, properties, '<br />\n\n')
+        footer = '<br />\n\n'
+        private.write(footer)
+        if show_public: public.write(footer)
 
-    def _property_details_entry(self, property, container):
+    def _write_property_details_entry(self, public, private,
+                                      property, container):
         """
-        @return: The HTML code for an entry in the property details
-        section.  Each entry gives a complete description of a
-        documented property.
+        Write HTML code for an individual property in the properties
+        details section.  This is used by L{_write_property_details}.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         @param property: The property that should be described by this entry.
         @type property: L{Link}
         """
@@ -2215,24 +2244,34 @@ class HTMLFormatter:
         # Note: by the time we get here, we know that docmap contains puid.
         pdoc = self._docmap[puid]
 
+        # Should we display this property in the details section for
+        # the public version of the page?
+        show_public = self._property_in_public_details(puid)
+        
         # Add the property's name
-        str = '<table width="100%" class="func-details"'
-        str += ' bgcolor="#e0e0e0"><tr><td>\n'
-        str += '\n<a name="%s"></a>\n' % pname
-        str += '<h3>'+pname+'</h3>\n'
+        header = '<table width="100%" class="func-details"'
+        header += ' bgcolor="#e0e0e0"><tr><td>\n'
+        header += '\n<a name="%s"></a>\n' % pname
+        header += '<h3>'+pname+'</h3>\n'
+        private.write(header)
+        if show_public: public.write(header)
 
         # Add the property's description (if any)
         if pdoc.descr():
-            str += self._docstring_to_html(pdoc.descr(), puid)
+            descr = self._docstring_to_html(pdoc.descr(), puid)
+            private.write(descr)
+            if show_public: public.write(descr)
 
         # Add the property's accessor methods
         if pdoc.fget() or pdoc.fset() or pdoc.fdel():
-            str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
+            header2 = '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
+            private.write(header2)
+            if show_public: public.write(header2)
             for (fuid,name) in [(pdoc.fget(), 'Get'),
                                 (pdoc.fset(), 'Set'),
                                 (pdoc.fdel(), 'Delete')]:
                 if fuid:
-                    str += '      <dt><b>%s Method:' % name
+                    str = '      <dt><b>%s Method:' % name
                     str += '</b></dt>\n      <dd>'
                     if fuid.is_routine():
                         fdoc = self._docmap.get(fuid)
@@ -2245,12 +2284,30 @@ class HTMLFormatter:
                         linelen = self._propfunc_linelen
                         str += self._pprint_var_value(var, 0, linelen)
                     str += '\n      </dd>\n'
-            str += '    </dl>\n  </dd>\n</dl>'
+                    private.write(str)
+                    if fuid.is_public(): public.write(str)
+            footer2 = '    </dl>\n  </dd>\n</dl>'
+            private.write(footer2)
+            if show_public: public.write(footer2)
 
         # Add the footer.
-        str += '</td></tr></table>'
-        return str
+        footer = '</td></tr></table>'
+        private.write(footer)
+        if show_public: public.write(footer)
     
+    def _property_in_public_details(self, puid):
+        """
+        @return: True if the given property should be shown in the
+        public version of the property details section.
+        """
+        if not (puid and puid.is_public()): return 0
+        pdoc = self._docmap.get(puid)
+        if not pdoc: return 0
+        return ((pdoc.fget() and pdoc.fget().is_public()) or
+                (pdoc.fset() and pdoc.fset().is_public()) or
+                (pdoc.fdel() and pdoc.fdel().is_public()) or
+                pdoc.descr())
+
     #////////////////////////////////////////////////////////////
     # Variable tables
     #////////////////////////////////////////////////////////////
