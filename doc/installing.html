@@ -7,11 +7,43 @@
 <body>
 <h1>Installing Epydoc</h1>
 
-<h2> RPM </h2>
+<h2> Source Install </h2>
 
-<h2> Windows Installer </h2>
+<pre class="screen">
+<code class="prompt">[user ~]$</code> <code class="user">wget http://epydoc.sf.net/epydoc-1.0.tgz</code>
+<code class="prompt">[user ~]$</code> <code class="user">tar -xvzf epydoc-1.0.tgz</code>
+<code class="prompt">[user ~]$</code> <code class="user">cd epydoc/src
+<code class="prompt">[user src]$</code> <code class="user">su</code>
+Password:
+<code class="prompt">[root src]#</code> <code class="user">python setup.py install</code>
+running install
+running build
+<i>[...]</i>
+copying build/scripts/epydoc -> /usr/bin
+changing mode of /usr/bin/epydoc to 100775
+<code class="prompt">[root src]#</code>
+</pre>
 
-<h2> Tarball </h2>
+
+
+<p> If you like, you can delete the source tar file: </p>
+
+<pre class="screen">
+<code class="prompt">[root src]#</code> <code class="user">cd ../..</code>
+<code class="prompt">[root src]#</code> <code class="user">rm -rf epydoc-1.0</code>
+<code class="prompt">[root src]#</code> <code class="user">rm -rf epydoc-1.0.tgz</code>
+</pre>
+
+<h2> Windows Install </h2>
+
+<ul>
+  <li> Download and run <code>epydoc-1.0.win32.exe</code>. </li>
+  <li> Follow the on-screen instructions. </li>
+  <li> (Optional) Delete <code>epydoc-1.0.win32.exe</code>. </li>
+  <li> Create a shortcut for the gui? </li>
+</ul>
+
+<h2> RPM Install </h2>
 
 <table width="100%" class="navbox" cellpadding="1" cellspacing="0">
   <tr>
