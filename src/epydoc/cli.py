@@ -571,6 +571,12 @@ def _latex(docmap, options, format):
                 print 'Running epydoc with the --debug option may',
                 print 'give more informative output.'
             sys.exit(1)
+        except Exception, e:
+            if options['debug']: raise
+            else: _internal_error(e)
+        except:   
+            if options['debug']: raise
+            else: _internal_error()
     finally:
         os.chdir(oldpath)
 
@@ -601,6 +607,12 @@ def _html(docmap, options):
         print >>sys.stderr, '\nError writing docs:\n%s\n' % e
     except IOError, e:
         print >>sys.stderr, '\nError writing docs:\n%s\n' % e
+    except Exception, e:
+        if options['debug']: raise
+        else: _internal_error(e)
+    except:   
+        if options['debug']: raise
+        else: _internal_error()
 
 def _check(docmap, options):
     """
