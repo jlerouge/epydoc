@@ -1896,21 +1896,21 @@ class ParsedEpytextDocstring(ParsedDocstring):
 
         return ParsedEpytextDocstring(doc)
 
-    def concatenate(self, other):
-        if not isinstance(other, ParsedEpytextDocstring):
-            try:
-                dom = parse_as_literal(other.to_plaintext(None))
-                other = ParsedEpytextDocstring(other)
-            except:
-                raise ValueError, 'Could not concatenate docstrings'
-        if self._tree is None: return other
-        if other._tree is None: return self
-        selfclone = self._tree.cloneNode(1)
-        otherclone = other._tree.cloneNode(1)
-        for child in otherclone.childNodes:
-            otherclone.removeChild(child)
-            selfclone.appendChild(child)
-        return ParsedEpytextDocstring(selfclone)
+#     def concatenate(self, other):
+#         if not isinstance(other, ParsedEpytextDocstring):
+#             try:
+#                 dom = parse_as_literal(other.to_plaintext(None))
+#                 other = ParsedEpytextDocstring(other)
+#             except:
+#                 raise ValueError, 'Could not concatenate docstrings'
+#         if self._tree is None: return other
+#         if other._tree is None: return self
+#         selfclone = self._tree.cloneNode(1)
+#         otherclone = other._tree.cloneNode(1)
+#         for child in otherclone.childNodes:
+#             otherclone.removeChild(child)
+#             selfclone.appendChild(child)
+#         return ParsedEpytextDocstring(selfclone)
 
     def split_fields(self, errors=None):
         if self._tree is None: return (self, ())
