@@ -74,6 +74,18 @@ _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
                  '\\subsection*{%s}', '\\subsubsection*{%s}',
                  '\\textbf{%s}']
 
+SYMBOL_TO_LATEX = {
+    r'<-': r'\gets', r'->': r'\to',
+    r'alpha': r'\alpha', r'beta': r'\beta', r'gamma': r'\gamma',
+    r'delta': r'\delta', r'epsilon': r'\epsilon', r'zeta': r'\zeta',  
+    r'eta': r'\eta', r'theta': r'\theta', r'iota': r'\iota', 
+    r'kappa': r'\kappa', r'lambda': r'\lambda', r'mu': r'\mu',  
+    r'nu': r'\nu', r'xi': r'\xi', r'omicon': r'\omicon',  
+    r'pi': r'\pi', r'rho': r'\rho', r'sigma': r'\sigma',  
+    r'tau': r'\tau', r'upsilon': r'\upsilon', r'phi': r'\phi',  
+    r'chi': r'\chi', r'psi': r'\psi', r'omega': r'\omega',  
+    }
+
 ##################################################
 ## Documentation -> Latex Conversion
 ##################################################
@@ -148,6 +160,7 @@ class LatexFormatter:
         self._list_classes_separately=kwargs.get('list_classes_separately',0)
         self._index_functions = 1
         self._hyperref = 1
+        self._inheritance = kwargs.get('inheritance', 'listed')
         
     def write(self, directory=None, progress_callback=None):
         """
@@ -351,15 +364,16 @@ class LatexFormatter:
                 str += '\\end{itemize}'
                 
         # Function List
-        str += self._func_list(doc.functions(), None)
+        str += self._func_list(doc.functions(), None, doc.groups())
 
         # Variable list.
         if doc.variables():
-            str += self._var_list(doc.variables())
+            str += self._var_list(doc.variables(), uid, doc.groups())
 
         # Class list.
         if not self._list_classes_separately:
-            for cls in doc.classes():
+            classes = self._filtersort_links(doc.classes(), doc.sortorder())
+            for cls in classes:
                 str += self._class_to_latex(cls.target())
         
         str += '    ' + self._indexterm(uid, 'end')
@@ -398,18 +412,21 @@ class LatexFormatter:
         str += self._standard_fields(doc)
 
         # Methods.
-        str += self._func_list(doc.methods(), doc,
+        str += self._func_list(doc.methods(), doc, doc.groups(),
                                'Methods', seclevel+1)
-        str += self._func_list(doc.staticmethods(), doc,
+        str += self._func_list(doc.staticmethods(), doc, doc.groups(),
                                'Static Methods', seclevel+1)
-        str += self._func_list(doc.classmethods(), doc,
+        str += self._func_list(doc.classmethods(), doc, doc.groups(),
                                'Class Methods', seclevel+1)
 
+        if doc.properties():
+            str += self._property_list(doc.properties(), uid, doc.groups(),
+                                       'Properties', seclevel+1)
         if doc.ivariables():
-            str += self._var_list(doc.ivariables(),
+            str += self._var_list(doc.ivariables(), uid, doc.groups(),
                                   'Instance Variables', seclevel+1)
         if doc.cvariables():
-            str += self._var_list(doc.cvariables(),
+            str += self._var_list(doc.cvariables(), uid, doc.groups(),
                                   'Class Variables', seclevel+1)
 
         # End mark for the class's index entry.
@@ -418,10 +435,86 @@ class LatexFormatter:
         return str
 
     #////////////////////////////////////////////////////////////
+    # Property List
+    #////////////////////////////////////////////////////////////
+    def _property_list(self, properties, container, groups,
+                       heading='Properties', seclevel=1):
+        properties = self._filtersort_links(properties)
+        if len(properties) == 0: return ''
+
+        str = self._start_of(heading)
+        str += '  '+self._section(heading, seclevel)
+
+        str += '\\begin{longtable}'
+        str += '{|p{.30\\textwidth}|'
+        str += 'p{.62\\textwidth}|l}\n'
+        str += '\\cline{1-2}\n'
+
+        # Set up the headers & footer (this makes the table span
+        # multiple pages in a happy way).
+        str += '\\cline{1-2} '
+        str += '\\centering \\textbf{Name} & '
+        str += '\\centering \\textbf{Description}& \\\\\n'
+        str += '\\cline{1-2}\n'
+        str += '\\endhead'
+        str += '\\cline{1-2}'
+        str += '\\multicolumn{3}{r}{\\small\\textit{'
+        str += 'continued on next page}}\\\\'
+        str += '\\endfoot'
+        str += '\\cline{1-2}\n'
+        str += '\\endlastfoot'
+
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # properties are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [p for p in properties if p.target() in groupmembers]
+            if not group: continue
+            properties = [p for p in properties if p not in group]
+            # Print a header within the table
+            groupstr += '\\multicolumn{2}{|l|}{'
+            groupstr += '\\textbf{%s}}\\\\\n' % groupname
+            groupstr += '\\cline{1-2}\n'
+            # Add the lines for each func
+            for property in group:
+                groupstr += self._property_list_line(property, container)
+                if self._inheritance == 'listed':
+                    groupstr += self._inheritance_list_line(group, container)
+                    
+        for link in properties:
+            str += self._property_list_line(link, container)
+        if self._inheritance == 'listed' and container.is_class():
+            str += self._inheritance_list_line(properties, container)
+        str += groupstr + '\\end{longtable}\n\n'
+        return str
+
+    def _property_list_line(self, link, container):
+        inherit = (container.is_class() and container != link.target().cls())
+        if inherit and self._inheritance == 'listed': return ''
+            
+        prop = link.target()
+        pdoc = self._docmap.get(prop)
+        if pdoc is None: return ''
+        str = '\\raggedright '
+        str += self._text_to_latex(prop.shortname(), 1, 1)
+        str += ' & '
+
+        if pdoc.descr():
+            str += '\\raggedright '
+            str += self._dom_to_latex(pdoc.descr(), 10).strip()
+        str += '&\\\\\n'
+        str += '\\cline{1-2}\n'
+        return str
+
+    #////////////////////////////////////////////////////////////
     # Variable List
     #////////////////////////////////////////////////////////////
 
-    def _var_list(self, variables, heading='Variables', seclevel=1):
+    def _var_list(self, variables, container, groups,
+                  heading='Variables', seclevel=1):
         variables = self._filtersort_vars(variables)
         if len(variables) == 0: return ''
         
@@ -447,27 +540,55 @@ class LatexFormatter:
         str += '\\cline{1-2}\n'
         str += '\\endlastfoot'
 
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # functions are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [v for v in variables if v.uid() in groupmembers]
+            if not group: continue
+            variables = [v for v in variables if v not in group]
+            # Print a header within the table
+            groupstr += '\\multicolumn{2}{|l|}{'
+            groupstr += '\\textbf{%s}}\\\\\n' % groupname
+            groupstr += '\\cline{1-2}\n'
+            # Add the lines for each func
+            for var in group:
+                groupstr += self._var_list_line(var, container)
+            if self._inheritance == 'listed' and container.is_class():
+                groupstr += self._inheritance_list_line(group, container)
+
         for var in variables:
-            str += '\\raggedright '
-            str += self._text_to_latex(var.name(), 1, 1) + ' & '
-
-            if var.descr() or var.has_value():
-                str += '\\raggedright '
-            if var.has_value():
-                str += '\\textbf{Value:} \n'
-                if var.descr():
-                    str += self._pprint_var_value(var, 40)
-                else:
-                    str += self._pprint_var_value(var, 90)
-                if var.descr(): str += '\n\n'
-            if var.descr():
-                str += self._dom_to_latex(var.descr(), 10).strip()
-            str += '&\\\\\n'
-            str += '\\cline{1-2}\n'
-
-        str += '\\end{longtable}\n\n'
+            str += self._var_list_line(var, container)
+        if self._inheritance == 'listed' and container.is_class():
+            str += self._inheritance_list_line(variables, container)
+        str += groupstr + '\\end{longtable}\n\n'
         return str
     
+    def _var_list_line(self, var, container):
+        inherit = (container.is_class() and container != var.uid().cls())
+        if inherit and self._inheritance == 'listed': return ''
+            
+        str = '\\raggedright '
+        str += self._text_to_latex(var.name(), 1, 1) + ' & '
+
+        if var.descr() or var.has_value():
+            str += '\\raggedright '
+        if var.has_value():
+            str += '\\textbf{Value:} \n'
+            if var.descr():
+                str += self._pprint_var_value(var, 40)
+            else:
+                str += self._pprint_var_value(var, 90)
+            if var.descr(): str += '\n\n'
+        if var.descr():
+            str += self._dom_to_latex(var.descr(), 10).strip()
+        str += '&\\\\\n'
+        str += '\\cline{1-2}\n'
+        return str
+
     def _pprint_var_value(self, var, maxwidth=100):
         val = var.uid().value()
         try: val = `val`
@@ -483,140 +604,167 @@ class LatexFormatter:
     # Function List
     #////////////////////////////////////////////////////////////
     
-    def _func_list(self, functions, cls, heading='Functions', seclevel=1):
+    def _func_list(self, functions, cls, groups,
+                   heading='Functions', seclevel=1):
         
         functions = self._filtersort_links(functions)
         if len(functions) == 0: return ''
 
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # functions are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [f for f in functions if f.target() in groupmembers]
+            if not group: continue
+            functions = [f for f in functions if f not in group]
+            # Print a header within the table
+            groupstr += self._sectionstar(groupname, seclevel+1)
+            # Add the lines for each func
+            for link in group:
+                groupstr += self._func_descr(link, cls)
+            if self._inheritance == 'listed' and cls is not None:
+                groupstr += self._inheritance_list(group, cls.uid())
+
         str = self._start_of(heading)
         str += '  '+self._section(heading, seclevel)
 
-        numfuncs = 0
+        funcstr = ''
         for link in functions:
-            fname = link.name()
-            func = link.target()
-            if func.is_method() or func.is_builtin_method():
-                container = func.cls()
-                # (If container==ClassType, it's (probably) a class method.)
-                inherit = (container != cls.uid() and
-                           container.value() is not types.ClassType)
-            else:
-                inherit = 0
-                try: container = func.module()
-                except TypeError: container = None
+            funcstr += self._func_descr(link, cls)
+        if self._inheritance == 'listed' and cls is not None:
+            funcstr += self._inheritance_list(functions, cls.uid())
+        funcstr += groupstr
+        if funcstr == '': return ''
+        else: return str+funcstr
 
-            # If we don't have documentation for the function, then we
-            # can't say anything about it.
-            if not self._docmap.has_key(func): continue
-            fdoc = self._docmap[func]
+    def _func_descr(self, link, cls):
+        str = ''
+        fname = link.name()
+        func = link.target()
+        if func.is_method() or func.is_builtin_method():
+            container = func.cls()
+            # (If container==ClassType, it's (probably) a class method.)
+            inherit = (container != cls.uid() and
+                       container.value() is not types.ClassType)
+        else:
+            inherit = 0
+            try: container = func.module()
+            except TypeError: container = None
 
-            # What does this method override?
-            foverrides = fdoc.overrides()
+        # If we don't have documentation for the function, then we
+        # can't say anything about it.
+        if not self._docmap.has_key(func): return ''
+        fdoc = self._docmap[func]
 
-            # Try to find a documented ancestor.
-            inhdoc = fdoc
-            inherit_docs = 0
-            while (not inhdoc.documented() and inhdoc.matches_override() and
-                   self._docmap.has_key(inhdoc.overrides())):
-                inherit_docs = 1
-                inhdoc = self._docmap[inhdoc.overrides()]
+        # What does this method override?
+        foverrides = fdoc.overrides()
 
-            # nb: this gives the containing section, not a reference
-            # directly to the function.
-            if not inherit:
-                str += '    \\label{%s}\n' % self._uid_to_label(func)
-            
-            numfuncs += 1
-            fsig = self._func_signature(fname, fdoc)
+        # Try to find a documented ancestor.
+        inhdoc = fdoc
+        inherit_docs = 0
+        while (not inhdoc.documented() and inhdoc.matches_override() and
+               self._docmap.has_key(inhdoc.overrides())):
+            inherit_docs = 1
+            inhdoc = self._docmap[inhdoc.overrides()]
+
+        if inherit and self._inheritance == 'listed': return ''
+
+        # nb: this gives the containing section, not a reference
+        # directly to the function.
+        if not inherit:
+            str += '    \\label{%s}\n' % self._uid_to_label(func)
+        
+        fsig = self._func_signature(fname, fdoc)
+        if not inherit:
             str += '    ' + self._indexterm(func)
-            str += '    \\vspace{0.5ex}\n\n'
-            str += '    \\begin{boxedminipage}{\\textwidth}\n\n'
-            str += '    %s\n\n' % fsig
+        str += '    \\vspace{0.5ex}\n\n'
+        str += '    \\begin{boxedminipage}{\\textwidth}\n\n'
+        str += '    %s\n\n' % fsig
 
-            # Use the inherited docs for everything but the signature.
-            fdoc = inhdoc
+        # Use the inherited docs for everything but the signature.
+        fdoc = inhdoc
 
-            if fdoc.documented():
-                str += '    \\vspace{-1.5ex}\n\n'
-                str += '    \\rule{\\textwidth}{0.5\\fboxrule}\n'
-            
-            fdescr=fdoc.descr()
-            fparam = fdoc.parameter_list()[:]
-            if fdoc.vararg(): fparam.append(fdoc.vararg())
-            if fdoc.kwarg(): fparam.append(fdoc.kwarg())
-            freturn = fdoc.returns()
-            fraises = fdoc.raises()
-            
-            # Don't list parameters that don't have any extra info.
-            f = lambda p:p.descr() or p.type()
-            fparam = filter(f, fparam)
+        if fdoc.documented():
+            str += '    \\vspace{-1.5ex}\n\n'
+            str += '    \\rule{\\textwidth}{0.5\\fboxrule}\n'
+        
+        fdescr=fdoc.descr()
+        fparam = fdoc.parameter_list()[:]
+        if fdoc.vararg(): fparam.append(fdoc.vararg())
+        if fdoc.kwarg(): fparam.append(fdoc.kwarg())
+        freturn = fdoc.returns()
+        fraises = fdoc.raises()
+        
+        # Don't list parameters that don't have any extra info.
+        f = lambda p:p.descr() or p.type()
+        fparam = filter(f, fparam)
 
-            # Description
-            if fdescr:
-                str += self._dom_to_latex(fdescr, 4)
-                str += '    \\vspace{1ex}\n\n'
+        # Description
+        if fdescr:
+            str += self._dom_to_latex(fdescr, 4)
+            str += '    \\vspace{1ex}\n\n'
 
-            # Parameters
-            if fparam:
-                longest = max([len(p.name()) for p in fparam])
-                str += ' '*6+'\\textbf{Parameters}\n'
-                str += ' '*6+'\\begin{quote}\n'
-                str += '        \\begin{Ventry}{%s}\n\n' % (longest*'x')
-                for param in fparam:
-                    pname = self._text_to_latex(param.name())
-                    str += (' '*10+'\\item[' + pname + ']\n\n')
-                    if param.descr():
-                        str += self._dom_to_latex(param.descr(), 10)
-                    if param.type():
-                        ptype = self._dom_to_latex(param.type(), 12).strip()
-                        str += ' '*12+'\\textit{(type=%s)}\n\n' % ptype
-                str += '        \\end{Ventry}\n\n'
-                str += ' '*6+'\\end{quote}\n\n'
-                str += '    \\vspace{1ex}\n\n'
+        # Parameters
+        if fparam:
+            longest = max([len(p.name()) for p in fparam])
+            str += ' '*6+'\\textbf{Parameters}\n'
+            str += ' '*6+'\\begin{quote}\n'
+            str += '        \\begin{Ventry}{%s}\n\n' % (longest*'x')
+            for param in fparam:
+                pname = self._text_to_latex(param.name())
+                str += (' '*10+'\\item[' + pname + ']\n\n')
+                if param.descr():
+                    str += self._dom_to_latex(param.descr(), 10)
+                if param.type():
+                    ptype = self._dom_to_latex(param.type(), 12).strip()
+                    str += ' '*12+'\\textit{(type=%s)}\n\n' % ptype
+            str += '        \\end{Ventry}\n\n'
+            str += ' '*6+'\\end{quote}\n\n'
+            str += '    \\vspace{1ex}\n\n'
 
-            # Returns
-            if freturn.descr() or freturn.type():
-                str += ' '*6+'\\textbf{Return Value}\n'
-                str += ' '*6+'\\begin{quote}\n'
-                if freturn.descr():
-                    str += self._dom_to_latex(freturn.descr(), 6)
-                    if freturn.type():
-                        rtype = self._dom_to_latex(freturn.type(), 6).strip()
-                        str += ' '*6+'\\textit{(type=%s)}\n\n' % rtype
-                elif freturn.type():
-                    str += self._dom_to_latex(freturn.type(), 6)
-                str += ' '*6+'\\end{quote}\n\n'
-                str += '    \\vspace{1ex}\n\n'
+        # Returns
+        if freturn.descr() or freturn.type():
+            str += ' '*6+'\\textbf{Return Value}\n'
+            str += ' '*6+'\\begin{quote}\n'
+            if freturn.descr():
+                str += self._dom_to_latex(freturn.descr(), 6)
+                if freturn.type():
+                    rtype = self._dom_to_latex(freturn.type(), 6).strip()
+                    str += ' '*6+'\\textit{(type=%s)}\n\n' % rtype
+            elif freturn.type():
+                str += self._dom_to_latex(freturn.type(), 6)
+            str += ' '*6+'\\end{quote}\n\n'
+            str += '    \\vspace{1ex}\n\n'
 
-            # Raises
-            if fraises:
-                str += ' '*6+'\\textbf{Raises}\n'
-                str += ' '*6+'\\begin{quote}\n'
-                str += '        \\begin{description}\n\n'
-                for fraise in fraises:
-                    str += '          '
-                    str += '\\item[\\texttt{'+fraise.name()+'}]\n\n'
-                    str += self._dom_to_latex(fraise.descr(), 10)
-                str += '        \\end{description}\n\n'
-                str += ' '*6+'\\end{quote}\n\n'
-                str += '    \\vspace{1ex}\n\n'
+        # Raises
+        if fraises:
+            str += ' '*6+'\\textbf{Raises}\n'
+            str += ' '*6+'\\begin{quote}\n'
+            str += '        \\begin{description}\n\n'
+            for fraise in fraises:
+                str += '          '
+                str += '\\item[\\texttt{'+fraise.name()+'}]\n\n'
+                str += self._dom_to_latex(fraise.descr(), 10)
+            str += '        \\end{description}\n\n'
+            str += ' '*6+'\\end{quote}\n\n'
+            str += '    \\vspace{1ex}\n\n'
 
-            ## Overrides
-            #if foverrides:
-            #    str += '      Overrides: %s' % foverrides
-            #    if inherit_docs:
-            #        str += ' \textit{(inherited documentation)}'
-            #    str += '\n\n'
+        ## Overrides
+        #if foverrides:
+        #    str += '      Overrides: %s' % foverrides
+        #    if inherit_docs:
+        #        str += ' \textit{(inherited documentation)}'
+        #    str += '\n\n'
 
-            # Add version, author, warnings, requirements, notes, etc.
-            str += self._standard_fields(fdoc)
+        # Add version, author, warnings, requirements, notes, etc.
+        str += self._standard_fields(fdoc)
 
-            str += '    \\end{boxedminipage}\n\n'
-
-        if numfuncs == 0: return ''
-
+        str += '    \\end{boxedminipage}\n\n'
         return str
-    
+
     def _func_signature(self, fname, fdoc, show_defaults=1):
         str = '\\raggedright '
         str += '\\textbf{%s}' % self._text_to_latex(fname)
@@ -652,6 +800,62 @@ class LatexFormatter:
                             self._text_to_latex(default, 1, 1))
                 str += ', '
         return str
+
+    def _inheritance_list(self, links, cls):
+        # Group the objects by defining class
+        inh_dict = {}
+        for link in links:
+            if isinstance(link, Link): key = link.target().cls()
+            else: key = link.uid().cls()
+            if key == cls: continue
+            if key is None: continue
+            if not inh_dict.has_key(key): inh_dict[key] = []
+            inh_dict[key].append(link)
+
+        if not inh_dict: return ''
+
+        str = '\\begin{boxedminipage}{\\textwidth}\n'
+        inh_items = inh_dict.items()
+        inh_items.sort(lambda a,b: cmp(a[0], b[0]))
+        for (base, obj_links) in inh_items:
+            str += ('  \\textbf{Inherited from %s:}\n' %
+                    self._text_to_latex(base.shortname()))
+            for link in obj_links:
+                str += '    '
+                str += self._text_to_latex(link.name())
+                str += ',\n'
+            str = str[:-2] + '\n    \\\\\n'
+        return str[:-7] + '\\end{boxedminipage}\n'
+
+    def _inheritance_list_line(self, links, cls):
+        # Group the objects by defining class
+        inh_dict = {}
+        for link in links:
+            if isinstance(link, Link): key = link.target().cls()
+            else: key = link.uid().cls()
+            if key == cls: continue
+            if key is None: continue
+            if not inh_dict.has_key(key): inh_dict[key] = []
+            inh_dict[key].append(link)
+
+        if not inh_dict: return ''
+
+        str = ''
+        inh_items = inh_dict.items()
+        inh_items.sort(lambda a,b: cmp(a[0], b[0]))
+        for (base, obj_links) in inh_items:
+            str += '\\multicolumn{2}{|l|}{\n'
+            str += ('  \\textbf{Inherited from %s:}\n' %
+                    self._text_to_latex(base.shortname()))
+            for link in obj_links:
+                str += '    '
+                str += self._text_to_latex(link.name())
+                if self._crossref:
+                    str += (' \\textit{(p.~\\pageref{%s})}\n\n' %
+                            self._uid_to_label(cls))
+                str += ',\n'
+            str = str[:-2] + '}\n    \\\\\n'
+        return str + '\\cline{1-2}\n'
 
     #////////////////////////////////////////////////////////////
     # Docstring -> LaTeX Conversion
@@ -734,6 +938,12 @@ class LatexFormatter:
                     ' '*indent + '\\setlength{\\parskip}{0.6ex}\n' +
                     childstr +
                     ' '*indent + '\\end{itemize}\n\n')
+        elif tree.tagName == 'symbol':
+            symbol = tree.childNodes[0].data
+            if SYMBOL_TO_LATEX.has_key(symbol):
+                return r'\(%s\)' % SYMBOL_TO_LATEX[symbol]
+            else:
+                return '[??]'
         else:
             # Assume that anything else can be passed through.
             return childstr
