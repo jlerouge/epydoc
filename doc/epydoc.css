@@ -139,6 +139,9 @@ code.comment  { background: transparent; color: #004060;
                 font-style: italic; }
 code.pycode   { background: transparent; color: #204020; }
 
+b.error { background: transparent; color: #600000; }
+b.error i { background: transparent; color: #503000; }
+
 /*===================================================================*/
 /* Navigation box (used as a footer).  Implemented with a table. */
 
