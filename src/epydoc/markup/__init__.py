@@ -210,6 +210,18 @@ class ParsedDocstring:
         # Default behavior:
         return self
 
+    def concatenate(self, other):
+        """
+        @return: A new parsed docstring containing the concatination
+            of this docstring and C{other}.
+        @raise ValueError: If the two parsed docstrings are
+            incompatible.
+        """
+        # Default behavior:
+        raise ValueError, 'Could not concatenate docstrings'
+
+    def __add__(self, other): return self.concatenate(other)
+
     def to_html(self, docstring_linker, **options):
         """
         Translate this docstring to HTML.

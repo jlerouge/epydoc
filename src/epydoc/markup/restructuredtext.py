@@ -73,7 +73,8 @@ from docutils.writers import Writer
 from docutils.writers.html4css1 import HTMLTranslator, Writer as HTMLWriter
 from docutils.readers.standalone import Reader as StandaloneReader
 from docutils.utils import new_document
-from docutils.nodes import NodeVisitor, Text, SkipChildren, SkipNode
+from docutils.nodes import NodeVisitor, Text, SkipChildren
+from docutils.nodes import SkipNode, TreeCopyVisitor
 import docutils.nodes
 
 from epydoc.markup import *
@@ -109,7 +110,7 @@ def parse_docstring(docstring, errors, **options):
     reader = _EpydocReader(errors) # Outputs errors to the list.
     publish_string(docstring, writer=writer, reader=reader)
     return ParsedRstDocstring(writer.document)
-    
+
 class ParsedRstDocstring(ParsedDocstring):
     """
     An encoded version of a ReStructuredText docstring.  The contents
@@ -138,6 +139,14 @@ class ParsedRstDocstring(ParsedDocstring):
         self._document.walk(visitor)
         return visitor.summary
 
+    def concatenate(self, other):
+        result = self._document.copy()
+        for child in self._document.children + other._document.children:
+            visitor = TreeCopyVisitor(self._document)
+            child.walkabout(visitor)
+            result.append(visitor.get_tree_copy())
+        return ParsedRstDocstring(result)
+        
     def to_html(self, docstring_linker, **options):
         # Inherit docs
         visitor = _EpydocHTMLTranslator(self._document, docstring_linker)
