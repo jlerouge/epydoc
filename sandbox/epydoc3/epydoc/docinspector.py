@@ -184,7 +184,7 @@ class DocInspector:
             elif container is None or moduledoc.dotted_name is None:
                 child_val_doc = self.inspect(child, context=moduledoc)
                 child_var_doc = VariableDoc(child_name, child_val_doc)
-                child_var_doc.is_imported = None # = unknown.
+                child_var_doc.is_imported = 'unknown'
             else:
                 child_val_doc = self.get_valuedoc(child)
                 child_var_doc = VariableDoc(child_name, child_val_doc)
