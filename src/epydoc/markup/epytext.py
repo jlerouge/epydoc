@@ -1898,7 +1898,11 @@ class ParsedEpytextDocstring(ParsedDocstring):
 
     def concatenate(self, other):
         if not isinstance(other, ParsedEpytextDocstring):
-            raise ValueError, 'Could not concatenate docstrings'
+            try:
+                dom = parse_as_literal(other.to_plaintext(None))
+                other = ParsedEpytextDocstring(other)
+            except:
+                raise ValueError, 'Could not concatenate docstrings'
         if self._tree is None: return other
         if other._tree is None: return self
         selfclone = self._tree.cloneNode(1)
