@@ -170,7 +170,7 @@ SPECIAL_METHODS ={
 ##################################################
 
 # system imports
-import re, sys, os.path, time, pprint, types
+import re, sys, os.path, posixpath, time, pprint, types
 import xml.dom.minidom
 
 try: from cStringIO import StringIO
@@ -3192,7 +3192,7 @@ class HTMLFormatter:
 
         # For private UIDs, explicitly link to the private docs.
         if uid.is_private() and self._create_private_docs:
-            uid._uri = os.path.join('..', 'private', uid._uri)
+            uid._uri = posixpath.join('..', 'private', uid._uri)
             
         return uid._uri
             
