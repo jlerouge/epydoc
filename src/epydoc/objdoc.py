@@ -1387,7 +1387,8 @@ class FuncDoc(ObjDoc):
 
                 # Check that the parameters match.
                 if (type(base_method) is types.MethodType and
-                    type(self._uid.value() is types.MethodType)):
+                    type(self._uid.value() is types.MethodType) and
+                    type(base_method.im_func) is types.FunctionType):
                     self_func = self._uid.value().im_func
                     base_func = base_method.im_func
                     self_argspec = inspect.getargspec(self_func)
