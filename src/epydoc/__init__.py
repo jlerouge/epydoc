@@ -34,7 +34,7 @@ produce API documentation using the following steps:
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
-@version: 1.1
+@version: 1.2
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
@@ -42,7 +42,7 @@ produce API documentation using the following steps:
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '1.1'
+__version__ = '1.2'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 
@@ -62,10 +62,8 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
                    'html', 'css', 'help', 'colorize',
                    'checker']
 
-# To do for release 1.1:
+# To do:
 #   - add escape characters to epytext? (e.g. E{->})
-
-# To do after release 1.1:
 #   - switch to turn on/off inherited methods in the method summary
 #     list. (like the [frames/noframes] and [show/hide private] 
 #     switches?)
