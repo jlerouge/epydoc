@@ -121,7 +121,7 @@ a:visited     { background: transparent; color: #082840; }
     background: #c8e0e8; color: #000000;                /* = .light */
     border: 2px solid #000000;
     margin: 1em 0em 1em 0em;
-    padding: 0.4em 1em 0.4em 1em;
+    padding: 0em 1em 0em 1em;
     font-family: monospace;
 }
 
