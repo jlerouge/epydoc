@@ -50,7 +50,7 @@ The returned DOM tree will confirm to the the following Document Type
 Description::
 
    <!ENTITY % colorized '(code | math | index | italic |
-                        bold | uri | link)*'>
+                          bold | uri | link)*'>
 
    <!ELEMENT epytext ((para | literalblock | doctestblock |
                       section | ulist | olist)*, fieldlist?)>
@@ -73,15 +73,16 @@ Description::
    <!ELEMENT li (para | literalblock | doctestblock | ulist | olist)+>
    <!ATTLIST li bullet NMTOKEN #IMPLIED>
 
+   <!ELEMENT uri    (name, target)>
+   <!ELEMENT link   (name, target)>
+   <!ELEMENT name   (#PCDATA | %colorized;)*>
+   <!ELEMENT target (#PCDATA)>
+   
    <!ELEMENT code   (#PCDATA | %colorized;)*>
    <!ELEMENT math   (#PCDATA | %colorized;)*>
    <!ELEMENT italic (#PCDATA | %colorized;)*>
    <!ELEMENT bold   (#PCDATA | %colorized;)*>
-
-   <!-- Need to fix these: -->
-   <!ELEMENT uri    (???)*>
-   <!ELEMENT link   (#PCDATA)*>
-   <!ELEMENT index  (#PCDATA)*>
+   <!ELEMENT index  (#PCDATA | %colorized;)>
 
 This package also contains a number of formatters, which can be used
 to convert the XML/DOM representations of Epytext strings to HTML,
@@ -94,9 +95,11 @@ Supported features:
   - I{colorizing}
   - sections
 
-  @var SCRWIDTH: The default width with which text will be wrapped
+@var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 """
+
+# Replace "index" entity with "indexed"?
 
 # Code organization..
 #   1. parse()
@@ -119,6 +122,9 @@ SCRWIDTH = 75
 # heading depth. 
 _HEADING_CHARS = "=-~"
 
+# Escape codes.  These should be needed very rarely.
+_ESCAPES = {'lb':'{', 'rb': '}'}
+
 # Tags for colorizing text.
 _COLORIZING_TAGS = {
     'C': 'code',
@@ -131,8 +137,12 @@ _COLORIZING_TAGS = {
     'E': 'escape',     # "escape" is a special tag.
     }
 
-# Escape codes.  These should be needed very rarely.
-_ESCAPES = {'lb':'{', 'rb': '}'}
+# Which tags can use "link syntax" (e.g., U{Python<www.python.org>})?
+_LINK_COLORIZING_TAGS = ['link', 'uri']
+
+# Should we use Bruce Mitchener's link syntax
+# (e.g., U{Python|www.python.org}) instead of standard link syntax?
+_VBAR_LINK_SYNTAX = 0
 
 ##################################################
 ## Helpers
@@ -898,6 +908,13 @@ def _tokenize(str, warnings):
 ## Inline markup ("colorizing")
 ##################################################
 
+# Assorted regular expressions used for colorizing.
+_BRACE_RE = re.compile('{|}')
+if _VBAR_LINK_SYNTAX:
+    _URI_RE = re.compile(r'^(.*?)\s*\|([^|]+)$')
+else:
+    _URI_RE = re.compile('^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
+
 def _colorize(token, errors, warnings=None):
     """
     Given a string containing the contents of a paragraph, produce a
@@ -917,19 +934,6 @@ def _colorize(token, errors, warnings=None):
     @return: a DOM C{Element} encoding the given paragraph.
     @returntype: C{Element}
     """
-    ## I don't think we need this check anymore.
-    #m = re.search('</?\w+>', token.contents)
-    #if m:
-    #    estr = "Warning: HTML-style colorization is obsolete"
-    #    warnings.append(ColorizingError(estr, token, m.start()))
-    
-    return _colorize_brace(token, errors, warnings)
-
-# Assorted regular expressions used for colorizing.
-_BRACE_RE = re.compile('{|}')
-    
-def _colorize_brace(token, errors, warnings):
-
     str = token.contents
     linenum = 0
     if warnings == None: warnings = []
@@ -1013,15 +1017,17 @@ def _colorize_brace(token, errors, warnings):
 
             # Special handling for literal braces elements:
             if stack[-1].tagName == 'litbrace':
-                #estr = "Used literal braces"
-                #warnings.append(ColorizingError(estr, token, end))
                 children = stack[-1].childNodes
                 stack[-2].removeChild(stack[-1])
                 stack[-2].appendChild(Text('{'))
                 for child in children:
                     stack[-2].appendChild(child)
                 stack[-2].appendChild(Text('}'))
-                        
+
+            # Special handling for link-type elements:
+            if stack[-1].tagName in _LINK_COLORIZING_TAGS:
+                link = _colorize_link(stack[-1], token, end, warnings, errors)
+
             # Pop the completed element.
             openbrace_stack.pop()
             stack.pop()
@@ -1038,6 +1044,47 @@ def _colorize_brace(token, errors, warnings):
 
     return stack[0]
 
+def _colorize_link(link, token, end, warnings, errors):
+    children = link.childNodes[:]
+
+    # If the last child isn't text, we know it's bad.
+    if not isinstance(children[-1], Text):
+        estr = "Bad %s URI" % link.tagName
+        errors.append(ColorizingError(estr, token, end))
+        return
+    
+    # Did they provide an explicit URL?
+    match2 = _URI_RE.match(children[-1].data)
+    if match2:
+        (text, uri) = match2.groups()
+        children[-1].data = text
+    # Can we extract an implicit URL?
+    elif len(children) == 1:
+        uri = children[0].data
+    else:
+        estr = "Bad %s URI" % link.tagName
+        errors.append(ColorizingError(estr, token, end))
+        return
+
+    # Construct the name element.
+    name = Element('name')
+    for child in children:
+        name.appendChild(link.removeChild(child))
+
+    # Clean up the target.  For URIs, assume http if they don't
+    # specify (no relative urls)
+    uri = re.sub(r'\s', '', uri)
+    if link.tagName=='uri' and not re.match(r'\w+:', uri):
+        uri = 'http://'+uri
+
+    # Construct the target element.
+    target = Element('target')
+    target.appendChild(Text(re.sub(r'\s', '', uri)))
+
+    # Add them to the link element.
+    link.appendChild(name)
+    link.appendChild(target)
+            
 ##################################################
 ## Formatters
 ##################################################
@@ -1077,18 +1124,13 @@ def to_epytext(tree, indent=0, seclevel=0, **kwargs):
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':(\s*)\0', '::\\1', childstr)
 
-    # Clean up after list items (remove unnecessary space)
-    # Is this safe?
-    childstr = re.sub('\n\n\1', '\n', childstr)
-    #childstr = re.sub('\1', '', childstr)
-
     if tree.tagName == 'para':
         return wordwrap(childstr, indent)+'\n'
     elif tree.tagName == 'li':
         bulletAttr = tree.getAttributeNode('bullet')
         if bulletAttr: bullet = bulletAttr.value
         else: bullet = '-'
-        return '\1'+indent*' '+ bullet + ' ' + childstr.lstrip()
+        return indent*' '+ bullet + ' ' + childstr.lstrip()
     elif tree.tagName == 'heading':
         uline = len(childstr)*_HEADING_CHARS[seclevel-1]
         return indent*' ' + childstr + '\n' + indent*' '+uline+'\n'
@@ -1106,14 +1148,16 @@ def to_epytext(tree, indent=0, seclevel=0, **kwargs):
         else:
             return (indent*' '+children[0]+':\n'+
                     ''.join(children[1:]))
+    elif tree.tagName == 'target':
+        return '<%s>' % childstr
     elif tree.tagName in ('fieldlist', 'tag', 'arg', 'epytext',
-                          'section', 'olist', 'ulist'):
+                          'section', 'olist', 'ulist', 'name'):
         return childstr
     else:
         for (tag, name) in _COLORIZING_TAGS.items():
             if name == tree.tagName:
                 return '%s{%s}' % (tag, childstr)
-    raise ValueError('Unknown DOM element %r' % tagName)
+    raise ValueError('Unknown DOM element %r' % tree.tagName)
 
 def to_plaintext(tree, indent=0, seclevel=0):
     """
@@ -1152,6 +1196,10 @@ def to_plaintext(tree, indent=0, seclevel=0):
         return childstr
     elif tree.tagName == 'fieldlist':
         return indent*' '+'{omitted fieldlist}\n'
+    elif tree.tagName in ('uri', 'link'):
+        if len(children) != 2: return 'XX'+childstr+'XX'
+        elif children[0] == children[1]: return '<%s>' % children[1]
+        else: return '%r<%s>' % (children[0], children[1])
     else:
         # Assume that anything else can be passed through.
         return childstr
@@ -1698,6 +1746,28 @@ types:
     z --- asfsf
 """
 
+test4 = """
+Standard syntax:
+
+- Basic uri U{hello}.
+- Basic uri U{http://hello}.
+- With a name/target: U{name<target>}
+- With a name/target: U{name<URI:target>}
+- With a name/target: U{name<URL:target>}
+- With a name/target: U{name  <URI:target>}
+- With a colorized name/target: L{I{italic} name<target>}
+"""
+
+test5="""
+Bruce's syntax:
+
+- Basic uri U{hello}.
+- Basic uri U{http://hello}.
+- With a name/target: U{name|target}
+- With a name/target: U{name|  target}
+- With a colorized name/target: L{I{italic} name|target}
+"""
+
 #def profile_parse():
 #    s=open("epytext.test")
 #    import profile
@@ -1713,10 +1783,11 @@ types:
 #print to_plaintext(pparse(open("epytext.test").read(),1,1))
 #print pparse(open("epytext.test").read(),1,1).getElementsByTagName('field')
 if __name__ == '__main__':
-    print '='*50
-    print to_plaintext(parse(test2))
-    print '='*50
-    #print to_epytext(parse(to_epytext(parse(test1))))
+    if _VBAR_LINK_SYNTAX:
+        print to_plaintext(pparse(test5))
+    else:
+        print to_plaintext(pparse(test5))
+    #print to_epytext(parse(test4))
     #print '='*50
     #print to_debug(parse(test1))
 #    print to_debug2(parse(test1))
