@@ -54,17 +54,18 @@ produce API documentation using the following steps:
 @todo 2.0: Groups for function parameters (eg Input/Output)
 @todo 2.0: Create a better default top_page than trees.html
 @todo 2.0: Improve ModuleDoc._find_imported_variables.
+@todo 2.0: Improve uid.findUID
 
 @todo 2.1: Modify L{epydoc.html} to write directly to streams,
            rather than building up strings.
     
 @todo 3.0: Add the man-page style outputter. (epyman)
-@todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}: ObjDoc will just
-           contain info about objects, but not gather it.  An
-           'inspection' module will be responsible for gathering the
-           info.
-@todo 3.0: Add an alternative 'parsing' module that can gather
-           info by parsing python files, instead of using inspection.
+@todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}:
+    - C{ObjDoc}s will contain info about objects, but not gather it.
+    - An C{inspection} module will gather info via inspection.
+    - A new C{parsing} module will provide an alternative, gathering
+      info by parsing python files.
+    - C{Var} will be replaced by C{VarDoc}, a subclass of C{ObjDoc}.
 
 @var __license__: The license governing the use and distribution of
     epydoc.
