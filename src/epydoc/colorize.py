@@ -88,7 +88,7 @@ def colorize_re(regexp):
     @return: The HTML code for a colorized version of the pattern for
         the given SRE regular expression.  If C{colorize_re} can't
         figure out how to colorize the regexp, then it will simply return
-        the (uncolofized) pattern, with C{'&'}, C{'<'}, and C{'>'}
+        the (uncolorized) pattern, with C{'&'}, C{'<'}, and C{'>'}
         escaped as HTML entities.  The colorized expression includes
         spans with the following css classes:
           - X{re}: The entire regular expression.
