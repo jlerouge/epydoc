@@ -11,11 +11,17 @@ Documentation to HTML converter.  This module defines a single class,
 L{HTMLFormatter}, which translates the API documentation encoded in a
 L{DocMap} into a set of HTML files.
 
-@todo: fix toc private/public links (?)
-@todo: don't print headers for empty sections. :-/
-@todo: use _DevNull for the public stream if it's a private object.
 @todo: either use StringIO more (if it's significantly faster), or
        don't use it at all.
+@todo: finish updating docstrings.
+
+@newfield question: Question
+@question: Should functions with no docstrings be listed in the
+    details section?  Currently, they are not, with the reasoning
+    being that there's nothing else to say about them.  But parameter
+    defaults are listed in details, and not in summary.
+    C.f. properties, where properties without docstrings are always
+    listed in details (since we want to list their accessor methods).
 
 @var HEADER: The header for standard documentation HTML pages.
 @var FOOTER: The footer for standard documentation HTML pages.
@@ -34,21 +40,27 @@ __docformat__ = 'epytext en'
 #     1. Constants
 #     2. Imports
 #     3. HTML Formatter
-#       - Constructor
-#       - Write
-#       - HTML page generation
-#       - Navigation bar
-#       - Base class trees
-#       - Class hierarchy trees
-#       - Module hierarchy trees
-#       - Class tables
-#       - Function tables
-#       - Variable tables
-#       - Term index generation
-#       - Identifier index generation
-#       - Table of contents (frames)
-#       - Docstring->HTML Conversion
-#       - Helper functions
+#        - Constructor
+#        - Output file count
+#        - Write
+#        - HTML page generation
+#        - Navigation bar
+#        - Trees
+#           - Base class trees
+#           - Class hierarchy trees
+#           - Module hierarchy trees
+#        - Tables
+#           - Class tables
+#           - Function tables
+#           - Variable tables
+#           - Property tables
+#        - Indices
+#           - Term index generation
+#           - Identifier index generation
+#        - Table of contents (frames)
+#        - Docstring->HTML Conversion
+#        - Helper functions
+#     4. Helper functions & classes
 #
 
 # I chose to implement the formatter as a class (rather than as a
@@ -225,21 +237,11 @@ class HTMLFormatter:
     @ivar _prj_name: A name for the documentation (for the navbar).
     @type _prj_url: C{string}
     @ivar _prj_url: A URL for the documentation (for the navpar).
-    @ivar _module: The UID of the top-level module, if there is one. 
-        If there is more than one top-level module, then C{_module} is
-        C{'multiple'}; if there is no top-level module, then
-        C{_module} is C{None}.
-    @ivar _package: The UID of the top-level package, if there is
-        one. If there is more than one top-level package, then
-        C{_package} is C{'multiple'}; if there is no top-level
-        package, then C{_package} is C{None}.
-    @ivar _show_private: Whether we are currently writing files that
-        show private objects.
+    @ivar _top_page: The URI of the top page.  This is the page shown
+        in the main frame by the frames index; and the page that is
+        used as the noframes index.
     @ivar _css: The name of a file containing a CSS stylesheet; or the
         name of a CSS stylesheet.
-    @ivar _cssfile: The name of the CSS stylesheet file.  This should
-        be C{'epydoc.css'} when C{_show_private==0} and
-        C{'../epydoc.css'} when C{_show_private==1}.
     @ivar _variable_linelen:  The maximum line length used for
         displaying the values of variables in the variable
         details sections.
@@ -255,81 +257,92 @@ class HTMLFormatter:
     def __init__(self, docmap, **kwargs):
         """
         Construct a new HTML formatter, using the given documentation map.
-        @param docmap: The documentation to output.
         @type docmap: L{DocMap}
-        @param kwargs: Keyword arguments:
-            - C{prj_name}: The name of the project.  Defaults to
-              none.  (type=C{string})
-            - C{prj_url}: The target for the project hopeage link on
+        @param docmap: The documentation to output.
+        
+        @type prj_name: C{string}
+        @keyword prj_name: The name of the project.  Defaults to
+              none.
+        @type prj_url: C{string}
+        @keyword prj_url: The target for the project hopeage link on
               the navigation bar.  If C{prj_url} is not specified,
-              then no hyperlink is created.  (type=C{string})
-            - C{prj_link}: The label for the project link on the
+              then no hyperlink is created.
+        @type prj_link: C{string}
+        @keyword prj_link: The label for the project link on the
               navigation bar.  This link can contain arbitrary HTML
               code (e.g. images).  By default, a label is constructed
-              from C{prj_name}.  (type=C{string})
-            - C{top}: The top page for the documentation.  This
+              from C{prj_name}.
+        @type top: C{string}
+        @keyword top: The top page for the documentation.  This
               is the default page shown main frame, when frames are
               enabled.  C{top} can be a URL, the name of a
               module, the name of a class, or one of the special
               strings C{"trees.html"}, C{"indices.html"}, or
               C{"help.html"}.  By default, the top-level package or
               module is used, if there is one; otherwise, C{"trees"}
-              is used.  (type=C{string})
-            - C{css}: The CSS stylesheet file.  If C{css} is a file
+              is used.
+        @type css: C{string}
+        @keyword css: The CSS stylesheet file.  If C{css} is a file
               name, then the specified file's conents will be used.
               Otherwise, if C{css} is the name of a CSS stylesheet in
               L{epydoc.css}, then that stylesheet will be used.
               Otherwise, an error is reported.  If no stylesheet is
               specified, then the default stylesheet is used.
-              (type=C{string})
-            - C{private_css}: The CSS stylesheet file for the private
+        @type private_css: C{string}
+        @keyword private_css: The CSS stylesheet file for the private
               API documentation.  If C{css} is a file name, then the
               specified file's conents will be used.  Otherwise, if
               C{css} is the name of a CSS stylesheet in L{epydoc.css},
               then that stylesheet will be used.  Otherwise, an error
               is reported.  If no stylesheet is specified, then the
               private API documentation will use the same stylesheet
-              as the public API documentation.  (type=C{string})
-            - C{help}: The name of the help file.  If no help file is
+              as the public API documentation.
+        @type help: C{string}
+        @keyword help: The name of the help file.  If no help file is
               specified, then the default help file will be used.
-              (type=C{string})
-            - C{private}: Whether to create documentation for private
+        @type private: C{boolean}
+        @keyword private: Whether to create documentation for private
               objects.  By default, private objects are documented.
-              (type=C{boolean})
-            - C{frames}: Whether to create a frames-based table of
+        @type frames: C{boolean})
+        @keyword frames: Whether to create a frames-based table of
               contents.  By default, it is produced.
-              (type=C{boolean}) 
-            - C{show_imports}: Whether or not to display lists of
+        @type show_imports: C{boolean}
+        @keyword show_imports: Whether or not to display lists of
               imported functions and classes.  By default, they are
-              not shown.  (type=C{boolean})
-            - C{index_parameters}: Whether or not to include function
+              not shown.
+        @type index_parameters: C{boolean}
+        @keyword index_parameters: Whether or not to include function
               parameters in the identifier index.  By default, they
-              are not included.  (type=C{boolean})
-            - C{variable_maxlines}: The maximum number of lines that
+              are not included.
+        @type variable_maxlines: C{int}
+        @keyword variable_maxlines: The maximum number of lines that
               should be displayed for the value of a variable in the
               variable details section.  By default, 8 lines are
-              displayed.  (type=C{int})
-            - C{variable_linelength}: The maximum line length used for
+              displayed.
+        @type variable_linelength: C{int}
+        @keyword variable_linelength: The maximum line length used for
               displaying the values of variables in the variable
               details sections.  If a line is longer than this length,
               then it will be wrapped to the next line.  The default
-              line length is 70 characters.  (type=C{int})
-            - C{variable_summary_linelength}: The maximum line length
+              line length is 70 characters.
+        @type variable_summary_linelength: C{int}
+        @keyword variable_summary_linelength: The maximum line length
               used for displaying the values of variables in the summary
               section.  If a line is longer than this length, then it
               will be truncated.  The default is 40 characters.
-              (type=C{int})
-            - C{variable_tooltip_linelength}: The maximum line length
+        @type variable_tooltip_linelength: C{int}
+        @keyword variable_tooltip_linelength: The maximum line length
               used for tooltips for the values of variables.  If a
               line is longer than this length, then it will be
-              truncated.  The default is 600 characters.  (type=C{int})
-            - C{inheritance}: How inherited objects should be displayed.
+              truncated.  The default is 600 characters.
+        @type inheritance: C{string}
+        @keyword inheritance: How inherited objects should be displayed.
               If C{inheritance='grouped'}, then inherited objects are
               gathered into groups; if C{inheritance='listed'}, then
               inherited objects are listed in a short list at the
               end of their group; if C{inheritance='included'}, then
               inherited objects are mixed in with non-inherited
-              objects.  The default is 'grouped'.  (type=C{string})
+              objects.  The default is 'grouped'.
         """
         self._docmap = docmap
 
@@ -337,18 +350,18 @@ class HTMLFormatter:
         self._prj_name = kwargs.get('prj_name', None)
         self._prj_url = kwargs.get('prj_url', None)
         self._prj_link = kwargs.get('prj_link', None)
+        self._create_private_docs = kwargs.get('private', 1)
         self._top_page = self._find_top_page(kwargs.get('top', None))
         self._css = kwargs.get('css')
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
-        self._create_private_docs = kwargs.get('private', 1)
         self._frames_index = kwargs.get('frames', 1)
         self._show_imports = kwargs.get('show_imports', 0)
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
         self._variable_linelen = kwargs.get('variable_linelength', 70)
         self._variable_summary_linelen = \
-                         kwargs.get('variable_summary_linelength', 40)
+                         kwargs.get('variable_summary_linelength', 55)
         self._variable_tooltip_linelen = \
                          kwargs.get('variable_tooltip_linelength', 600)
         self._inheritance = kwargs.get('inheritance', 'grouped')
@@ -369,6 +382,10 @@ class HTMLFormatter:
             self._prj_link = ('<a class="navbar" target="_top" href="'+
                               self._prj_url+'">'+self._prj_link+'</a>')
 
+    #////////////////////////////////////////////////////////////
+    # Output file count
+    #////////////////////////////////////////////////////////////
+    
     def num_files(self):
         """
         @return: The number of files that this C{HTMLFormatter} will
@@ -376,23 +393,19 @@ class HTMLFormatter:
         @rtype: C{int}
         """
         # Basic files (index.html, tree, indices, help, css, toc,
-        # toc-everything, frames, base directory index.html, base
-        # directory css)
-        if self._create_private_docs: n = 12
-        else: n = 8
+        # toc-everything, frames)
+        n = 8
 
         for uid in self._docmap.keys():
             # Module and class API files
-            if not (uid.is_module() or uid.is_class()): continue
-            n += 1
-            #if self._create_private_docs: n += 1
-            ##elif uid.is_public(): n += 1
+            if (uid.is_module() or uid.is_class()):
+                if self._create_private_docs: n += 1
+                elif uid.is_public(): n += 1
 
             # Module TOC files.
-            if not uid.is_module(): continue
-            n += 1
-            #if self._create_private_docs: n += 1
-            ##elif uid.is_public(): n += 1
+            if uid.is_module(): 
+                if self._create_private_docs: n += 1
+                elif uid.is_public(): n += 1
         return n
 
     #////////////////////////////////////////////////////////////
@@ -415,47 +428,28 @@ class HTMLFormatter:
         @rtype: C{None}
         @raise OSError: If C{directory} cannot be created,
         @raise OSError: If any file cannot be created or written to.
-        """
-        if not directory: directory = os.curdir
-        self._show_private = 0 # ELIM THIS
-        
-        public_directory = os.path.join(directory, 'public')
-        private_directory = os.path.join(directory, 'private')
-
+        """        
         # Keep track of failed xrefs, and report them at the end.
         self._failed_xrefs = {}
 
         # Create destination directories, if necessary
+        if not directory: directory = os.curdir
+        public_directory = os.path.join(directory, 'public')
+        private_directory = os.path.join(directory, 'private')
         self._mkdir(directory)
         if self._create_private_docs:
             self._mkdir(public_directory)
             self._mkdir(private_directory)
 
-        # Write the tree file (package & class hierarchies)
-        self._write(self._write_trees, directory,
-                     'trees.html', progress_callback)
-        
-        # Write the term & identifier indices
-        self._write(self._write_indices, directory,
-                     'indices.html', progress_callback)
-        
-        # Write the help file.
-        self._write(self._write_help, directory,
-                     'help.html', progress_callback)
-        
-        # Write the frames-based table of contents.
-        self._write(self._write_frames, directory, 'frames.html',
-                     progress_callback)
-        self._write(self._write_toc, directory, 'toc.html',
-                     progress_callback)
-        self._write(self._write_project_toc, directory,
-                     'toc-everything.html', progress_callback)
-        for (uid, doc) in self._docmap.items():
-            if uid.is_module():
-                filename = 'toc-%s' % self._uid_to_filename(uid)
-                self._write(self._write_module_toc, directory, filename,
-                             progress_callback, uid, doc)
-        
+        # Write the CSS files.
+        if progress_callback: progress_callback('epydoc.css')
+        if self._create_private_docs:
+            self._write_css(public_directory, self._css)
+            self._write_css(private_directory, self._private_css)
+            self._write_css(directory, self._css)
+        else:
+            self._write_css(directory, self._css)
+
         # Write the object documentation.
         for (uid, doc) in self._docmap.items():
             if not (isinstance(doc, ModuleDoc) or
@@ -463,84 +457,129 @@ class HTMLFormatter:
             filename = self._uid_to_filename(uid)
             if isinstance(doc, ModuleDoc):
                 self._write(self._write_module, directory, filename,
-                             progress_callback, uid, doc)
+                             progress_callback, uid.is_public(), uid, doc)
             else:
                 self._write(self._write_class, directory, filename,
-                             progress_callback, uid, doc)
+                             progress_callback, uid.is_public(), uid, doc)
         
-        # Write the CSS files.
-        if self._create_private_docs:
-            self._write_css(public_directory, progress_callback, self._css)
-            self._write_css(private_directory, progress_callback,
-                            self._private_css)
-            self._write_css(directory, progress_callback, self._css)
-        else:
-            self._write_css(directory, progress_callback, self._css)
-
+        # Write the term & identifier indices
+        self._write(self._write_indices, directory,
+                     'indices.html', progress_callback, 1)
+        
+        # Write the trees file (package & class hierarchies)
+        self._write(self._write_trees, directory,
+                     'trees.html', progress_callback, 1)
+        
+        # Write the help file.
+        self._write(self._write_help, directory,
+                     'help.html', progress_callback, 1)
+        
+        # Write the frames-based table of contents.
+        self._write(self._write_frames, directory, 'frames.html',
+                     progress_callback, 1)
+        self._write(self._write_toc, directory, 'toc.html',
+                     progress_callback, 1)
+        self._write(self._write_project_toc, directory,
+                    'toc-everything.html', progress_callback, 1)
+        for (uid, doc) in self._docmap.items():
+            if uid.is_module():
+                filename = 'toc-%s' % self._uid_to_filename(uid)
+                self._write(self._write_module_toc, directory, filename,
+                             progress_callback, uid.is_public(), uid, doc)
+        
         # Write the index.html files.
+        if progress_callback: progress_callback('index.html')
         if self._create_private_docs:
-            self._write_index(public_directory, progress_callback, 0)
-            self._write_index(private_directory, progress_callback, 0)
-            self._write_index(directory, progress_callback, 1)
+            self._write_index(public_directory, frombase=0)
+            self._write_index(private_directory, frombase=0)
+            self._write_index(directory, frombase=1)
         else:
-            self._write_index(directory, progress_callback, 0)
+            self._write_index(directory, frombase=0)
 
-    def _write(self, func, directory, filename, progress_callback, *args):
+    def _write(self, write_func, directory, filename,
+               progress_callback, is_public, *args):
         """
         A helper for L{write}, that creates new public and private
         streams for a given filename, and delegates writing to
-        C{func}.  If L{_create_private_docs} is true, then the streams
-        are created in the C{'public'} and C{'private'} subdirectories
-        of C{directory}.  If it's false, then the public stream is
-        created in C{directory}, and a L{_DevNull} is used for the
-        private stream.
+        C{write_func}.  If L{_create_private_docs} is true, then the
+        streams are created in the C{'public'} and C{'private'}
+        subdirectories of C{directory}.  If it's false, then the
+        public stream is created in C{directory}, and a L{_DevNull} is
+        used for the private stream.
 
-        @param func: The output function to delegate to.  It is called
-            with a public stream, a private stream, and any arguments
-            given in C{args}.
-        @param directory: The base directory of the output.
-        @param filename: The filename of the file(s) that C{func}
+        @param write_func: The output function to delegate to.  It is
+            called with a public stream, a private stream, and any
+            arguments given in C{args}.
+        @param directory: The base directory for the output files
+        @param filename: The filename of the file(s) that C{write_func}
             should write to.
         @param progress_callback: A progress callback function.  If it
             is not C{None}, then it is called with C{filename} before
-            C{func} is called.
-        @param args: Extra arguments for C{func}
+            C{write_func} is called.
+        @param is_public: Whether this is a public page.  If it is
+            not a public page, then a C{_DevNull} will be used for
+            the public stream.  (Or if it is not a public page and
+            C{_create_private_docs} is false, then immediately
+            return.)
+        @param args: Extra arguments for C{write_func}
+        @rtype: C{None}
         """
-        # IF IT'S A PRIVATE OBJECT, THEN PUBLIC SHOULD BE _DEVNULL
+        # If we're only writing public pages, then ignore private ones.
+        if not self._create_private_docs and not is_public:
+            return
+        
+        # Display our progress.
         if progress_callback: progress_callback(filename)
+        
         if self._create_private_docs:
-            public = open(os.path.join(directory, 'public', filename), 'w')
+            # If it's a public page, then write to both public &
+            # private; otherwise, just write to private.
             private = open(os.path.join(directory, 'private', filename), 'w')
+            if is_public:
+                public = open(os.path.join(directory, 'public', filename), 'w')
+            else:
+                public = _DevNull()
         else:
+            # Just write to public; ignore output to private.
             public = open(os.path.join(directory, filename), 'w')
             private = _DevNull()
-        func(public, private, *args)
+        write_func(public, private, *args)
         public.close()
         private.close()
 
     def _mkdir(self, directory):
+        """
+        If the given directory does not exist, then attempt to create it.
+        @rtype: C{None}
+        """
         if not os.path.isdir(directory):
             if os.path.exists(directory):
                 raise OSError('%r is not a directory' % directory)
             os.mkdir(directory)
         
-    def _write_frames(self, public, private):
-        prj_name = self._prj_name or "API Documentation"
-        str = FRAMES_INDEX % (prj_name, self._top_page)
-        public.write(str); private.write(str)
+    #////////////////////////////////////////////////////////////
+    # HTML page generation
+    #////////////////////////////////////////////////////////////
+    # Each of these functions creates a single HTML file, and returns
+    # it as a string.
 
-    def _write_index(self, directory, progress_callback, frombase):
+    def _write_index(self, directory, frombase):
         """
-        Write the C{index.html} file to the given file.
-        
+        Write an C{index.html} file in the given directory.  The
+        contents of this file are copied or linked from an existing
+        page.  The page used is determined by L{_frames_index} and
+        L{_top_page}:
+            - If L{_frames_index} is true, then C{frames.html} is
+              copied.
+            - Otherwise, the page specified by L{_top_page} is
+              copied.
         @param frombase: True if this is the index file for the base
             directory when we are generating both public and private
-            documentation.  In this case, all hyperlinks should be
-            changed to point into the C{public} subdirectory.
+            documentation.  In this case, all local hyperlinks should
+            be changed to point into the C{public} subdirectory.
         @type frombase: C{boolean}
         """
         filename = os.path.join(directory, 'index.html')
-        if progress_callback: progress_callback(filename)
         if self._frames_index: top = 'frames.html'
         else: top = self._top_page
 
@@ -577,45 +616,10 @@ class HTMLFormatter:
         name = self._prj_name or 'this project'
         open(filename, 'w').write(REDIRECT_INDEX % (top, top, name))
 
-    def _write_help(self, public, private):
+    def _write_css(self, directory, cssname):
         """
-        Write the help file to the given file.  If C{self._helpfile}
-        contains a help file, then use it; otherwise, use the default
-        helpfile.
-
-        @rtype: C{None}
-        """
-        # Get the contents of the help file.
-        if self._helpfile:
-            if os.path.exists(self._helpfile):
-                try: help = open(self._helpfile).read()
-                except: raise IOError("Can't open help file: %r" %
-                                      self._helpfile)
-            else:
-                raise IOError("Can't find help file: %r" % self._helpfile)
-        else:
-            if self._prj_name: thisprj = self._prj_name
-            else: thisprj = 'this project'
-            help = HTML_HELP % {'this_project':thisprj}
-
-        # Write the header & navbar
-        header = self._header('Help')
-        public.write(header); private.write(header)
-        self._write_navbar(public, private, 'help', top=1)
-        
-        # Write the help file.
-        public.write(help)
-        private.write(help)
-
-        # Write the footer
-        self._write_navbar(public, private, 'help', top=0)
-        footer = self._footer()
-        public.write(footer); private.write(footer)
-
-    def _write_css(self, directory, progress_callback, cssname):
-        """
-        Write the CSS stylesheet to the given file.  If
-        C{self._css} contains a stylesheet file or name (from
+        Write the CSS stylesheet in the given directory.  If
+        C{cssname} contains a stylesheet file or name (from
         L{epydoc.css}), then use that stylesheet; otherwise, if a
         stylesheet file already exists, use that stylesheet.
         Otherwise, use the default stylesheet.
@@ -623,7 +627,6 @@ class HTMLFormatter:
         @rtype: C{None}
         """
         filename = os.path.join(directory, 'epydoc.css')
-        if progress_callback: progress_callback(filename)
         
         # Get the contents for the stylesheet file.  If none was
         # specified, and a stylesheet is already present, then don't
@@ -646,101 +649,95 @@ class HTMLFormatter:
         cssfile.write(css)
         cssfile.close()
                        
-    #////////////////////////////////////////////////////////////
-    # HTML page generation
-    #////////////////////////////////////////////////////////////
-    # Each of these functions creates a single HTML file, and returns
-    # it as a string.
-
     def _write_module(self, public, private, uid, doc):
-        # Write the header, navbar, & module name
+        """
+        Write an HTML page describing the given module to the given
+        streams.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param uid: The UID of the module to document.
+        @param doc: The L{ModuleDoc} of the module to document.
+        """
+        # Write the header & navigation bar.
         str = self._header(uid.name())
-        private.write(str)
-        public.write(str)
+        public.write(str); private.write(str)
+        self._write_navbar(public, private, uid)
+        self._write_breadcrumbs(public, private, uid)
 
-        self._write_navbar(public, private, uid, top=1)
-
-        sio = StringIO()
-        if uid.is_package(): sio.write(self._start_of('Package Description'))
-        else: sio.write(self._start_of('Module Description'))
+        # Get the module name.
+        if uid.is_package(): str = self._start_of('Package Description')
+        else: str = self._start_of('Module Description')
         if uid.is_package():
-            sio.write('<h2 class="package">Package '+uid.name()+'</h2>\n\n')
+            str += '<h2 class="package">Package '+uid.name()+'</h2>\n\n'
         else:
-            sio.write('<h2 class="module">Module '+uid.name()+'</h2>\n\n')
+            str += '<h2 class="module">Module '+uid.name()+'</h2>\n\n'
 
-        # Write the module's description.
+        # Get the module's description.
         if doc.descr():
-            sio.write(self._docstring_to_html(doc.descr(), uid) + '<hr/>\n')
+            str += self._docstring_to_html(doc.descr(), uid) + '<hr/>\n'
 
-        # Add version, author, warnings, requirements, notes, etc.
-        sio.write(self._standard_fields(doc))
+        # Get the version, author, warnings, requirements, notes, etc.
+        str += self._standard_fields(doc)
 
-        public.write(sio.getvalue())
-        private.write(sio.getvalue())
-        sio = None
+        # Write the module name, descr, and standard fields to the
+        # output streams.
+        public.write(str); private.write(str)
 
-        # If it's a package, add a list of sub-modules.
+        # If it's a package, write a list of sub-modules.
         if doc.ispackage():
-            self._write_module_list(public, private, doc.modules(),
-                                    doc.by_group(doc.modules()))
+            self._write_module_list(public, private, doc, doc.modules())
 
-        # Show the summaries for classes, exceptions, functions, and
+        # Write the summaries for classes, exceptions, functions, and
         # variables contained in the module.
         (classes,excepts) = self._split_classes(doc.classes())
-        self._write_class_summary(public, private, classes,
-                                  doc.by_group(classes), 'Classes')
-        self._write_class_summary(public, private, excepts,
-                                  doc.by_group(excepts), 'Exceptions')
-        self._write_func_summary(public, private, doc.functions(), None,
-                                 doc.by_group(doc.functions()),
+        self._write_class_summary(public, private, doc, classes, 'Classes')
+        self._write_class_summary(public, private, doc, excepts, 'Exceptions')
+        self._write_func_summary(public, private, doc, doc.functions(), 
                                  'Function Summary')
         self._write_var_summary(public, private, doc.variables(), uid,
                                 doc.by_group(doc.variables()),
                                 'Variable Summary')
         
-        # Show a list of all imported objects.
-        (iclasses,iexcepts) = self._split_classes(doc.imported_classes())
-        self._write_imports(public, private, iclasses, iexcepts,
-                            doc.imported_functions(),
-                            doc.imported_variables())
+        # Write a list of all imported objects.
+        if self._show_imports:
+            self._write_imports(public, private, doc)
 
-        # Show details for the functions and variables.
-        self._write_func_details(public, private, doc.functions(), None)
+        # Write details for the functions and variables.
+        self._write_func_details(public, private, doc, doc.functions())
         self._write_var_details(public, private, doc.variables(), uid)
 
-        # Add another navigation bar and the footer.
-        self._write_navbar(public, private, uid, top=0)
+        # Write another navigation bar and the footer.
+        self._write_navbar(public, private, uid)
         footer = self._footer()
-        public.write(footer)
-        private.write(footer)
+        public.write(footer); private.write(footer)
 
     def _write_class(self, public, private, uid, doc):
         """
-        @return: An HTML page describing the class identified by
-            C{uid}.
-        @rtype: C{string}
-        @param uid: The unique identifier for the class that should
-            be documented.
-        @type uid: L{UID}
+        Write an HTML page describing the given module to the given
+        streams.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param uid: The UID of the module to document.
+        @param doc: The L{ModuleDoc} of the module to document.
         """
-        # Write the header, navigation bar, & class name.
+        # Write the header & navigation bar
         str = self._header(uid.name())
-        private.write(str)
-        public.write(str)
-
-        self._write_navbar(public, private, uid, top=1)
+        public.write(str); private.write(str)
+        self._write_navbar(public, private, uid)
+        self._write_breadcrumbs(public, private, uid)
         
+        # Get the class name.
         str = self._start_of('Class Description')
         str += '<h2 class="class">Class ' + uid.shortname()+'</h2>\n\n'
 
-        # Write the base class tree
+        # Get the base class tree
         if doc.bases():
             str += '<pre class="base-tree">\n' 
             str += self._base_tree(uid) 
             str += '</pre><br />\n\n'
 
-        private.write(str)
-        public.write(str)
+        # Write the class name & base class tree.
+        public.write(str); private.write(str)
 
         # Write the class's known subclasses
         subclasses = doc.subclasses()
@@ -755,25 +752,18 @@ class HTMLFormatter:
             footer = '</dd></dl>\n\n'
             _write_if_nonempty(public, private, subclasses, footer)
 
-        # Write the class's description
+        # Write the class's description and version, author, etc.
         str = '<hr/>\n\n'
         if doc.descr():
             str += '%s<hr/>\n\n' % self._docstring_to_html(doc.descr(), uid)
-        private.write(str)
-        public.write(str)
+        str += self._standard_fields(doc)
+        public.write(str); private.write(str)
 
-        # Add version, author, warnings, requirements, notes, etc.
-        str = self._standard_fields(doc)
-        private.write(str)
-        public.write(str)
-
-        # Show the summaries for methods, instance variables, and
+        # Write the summaries for methods, instance variables, and
         # class variables contained in the class.
-        self._write_func_summary(public, private, doc.allmethods(), doc,
-                                 doc.by_group(doc.allmethods()),
+        self._write_func_summary(public, private, doc, doc.allmethods(), 
                                  'Method Summary')
-        self._write_property_summary(public, private, doc.properties(),
-                                     uid, doc.by_group(doc.properties()),
+        self._write_property_summary(public, private, doc, doc.properties(),
                                      'Property Summary')
         self._write_var_summary(public, private, doc.ivariables(), uid,
                                 doc.by_group(doc.ivariables()),
@@ -782,51 +772,84 @@ class HTMLFormatter:
                                 doc.by_group(doc.cvariables()),
                                 'Class Variable Summary')
 
-        # Show details for methods
+        # Write details for methods
         if doc.staticmethods() or doc.classmethods():
-            self._write_func_details(public, private, doc.methods(),
-                                     doc, 'Instance Method Details')
-            self._write_func_details(public, private, doc.staticmethods(),
-                                     doc, 'Static Method Details')
-            self._write_func_details(public, private, doc.classmethods(),
-                                     doc, 'Class Method Details')
+            self._write_func_details(public, private, doc, doc.methods(),
+                                     'Instance Method Details')
+            self._write_func_details(public, private, doc, doc.staticmethods(),
+                                     'Static Method Details')
+            self._write_func_details(public, private, doc, doc.classmethods(),
+                                     'Class Method Details')
         else:
-            self._write_func_details(public, private, doc.methods(),
-                                     doc, 'Method Details')
+            self._write_func_details(public, private, doc, doc.methods(),
+                                     'Method Details')
 
-        # Show details for variables.
-        self._write_property_details(public, private, doc.properties(),
-                                     uid, 'Property Details')
+        # Write details for variables.
+        self._write_property_details(public, private, doc, doc.properties(),
+                                     'Property Details')
         self._write_var_details(public, private, doc.ivariables(),
                                 uid, 'Instance Variable Details')
         self._write_var_details(public, private, doc.cvariables(),
                                 uid, 'Class Variable Details')
 
-        # Add a navigation bar and the footer.
-        self._write_navbar(public, private, uid, top=0)
+        # Write another navigation bar and the footer.
+        self._write_navbar(public, private, uid)
         footer = self._footer()
-        public.write(footer)
-        private.write(footer)
+        public.write(footer); private.write(footer)
+
+    def _write_help(self, public, private):
+        """
+        Write an HTML help file to the given streams.  If
+        C{self._helpfile} contains a help file, then use it;
+        otherwise, use the default helpfile from L{epydoc.help}.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        """
+        # Get the contents of the help file.
+        if self._helpfile:
+            if os.path.exists(self._helpfile):
+                try: help = open(self._helpfile).read()
+                except: raise IOError("Can't open help file: %r" %
+                                      self._helpfile)
+            else:
+                raise IOError("Can't find help file: %r" % self._helpfile)
+        else:
+            if self._prj_name: thisprj = self._prj_name
+            else: thisprj = 'this project'
+            help = HTML_HELP % {'this_project':thisprj}
+
+        # Write the header & navbar
+        header = self._header('Help')
+        public.write(header); private.write(header)
+        self._write_navbar(public, private, 'help')
+        self._write_breadcrumbs(public, private, 'help')
+        
+        # Write the help file.
+        public.write(help)
+        private.write(help)
+
+        # Write the footer
+        self._write_navbar(public, private, 'help')
+        footer = self._footer()
+        public.write(footer); private.write(footer)
 
     def _write_trees(self, public, private):
         """
-        @return: An HTML page containing the module and class
-            hierarchies. 
-        @rtype: C{string}
+        Write an HTML page containing the module and class hierarchies
+        to the given streams.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
-        # Header and navigation bar
+        # Write the header and navigation bar
         header = self._header('Module and Class Hierarchies')
-        private.write(header)
-        public.write(header)
+        public.write(header); private.write(header)
+        self._write_navbar(public, private, 'trees')
+        self._write_breadcrumbs(public, private, 'trees')
 
-        self._write_navbar(public, private, 'trees', top=1)
-
-        # Module hierarchy
+        # Write the module hierarchy
         str = self._start_of('Module Hierarchy')
         str += '<h2>Module Hierarchy</h2>\n'
-        private.write(str)
-        public.write(str)
-        
+        public.write(str); private.write(str)
         self._write_module_tree(public, private)
 
         # Does the project define any classes?
@@ -834,65 +857,59 @@ class HTMLFormatter:
         for uid in self._docmap.keys():
             if uid.is_class(): defines_classes = 1; break
 
-        # Class hierarchy
-        if defines_classes:
-            str = self._start_of('Class Hierarchy')
-            str += '<h2>Class Hierarchy</h2>\n'
-            private.write(str)
-            public.write(str)
-            self._write_class_tree(public, private)
+        # Write the class hierarchy
+        classes = [u for u in self._docmap.keys() if u.is_class()]
+        str = self._start_of('Class Hierarchy')
+        str += '<h2>Class Hierarchy</h2>\n'
+        _write_if_nonempty(public, private, classes, str)
+        self._write_class_tree(public, private)
 
-        # Add a navigation bar and the footer.
-        self._write_navbar(public, private, uid, top=0)
+        # Write another navigation bar and the footer.
+        self._write_navbar(public, private, uid)
         footer = self._footer()
-        public.write(footer)
-        private.write(footer)
+        public.write(footer); private.write(footer)
 
     def _write_indices(self, public, private):
         """
-        Write the index to the given file-like object.  I write
-        directly to the file (unlike most other pages, which are
-        converted to strings, and then written) because the index page
-        can be quite large.  For example, for the Python standard
-        library, the index page is over 1.5mb.
-        @param out: The stream to which the index should be written.
-        @type out: C{stream}
-        @rtype: C{None}
+        Write an HTML page containing the term and identifier indices
+        to the given streams.
+        @bug: If there are private indexed terms, but no public
+            indexed terms, then this function will still write a
+            header for the Term Index to the public stream.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
-        # Header and navigation bar.
+        # Write the header and navigation bar.
         header = self._header('Index')
         public.write(header); private.write(header)
-        self._write_navbar(public, private, 'indices', top=1)
+        self._write_navbar(public, private, 'indices')
+        self._write_breadcrumbs(public, private, 'indices')
         public.write('<br />\n'); private.write('<br />\n')
 
-        # Term index
-        index_terms, index_links = self._extract_term_index()
-        if index_terms:
-            header = (self._start_of('Term Index') +
-                      self._table_header('Term Index', 'index'))
+        # Write the term index. 
+        index = self._extract_term_index()
+        if index:
+            header = self._table_header('Term Index', 'index')
             public.write(header); private.write(header)
-            terms = index_terms.keys()
-            terms.sort()
-            for term in terms:
-                termtext = index_terms[term].to_plaintext(None)
-                str = '  <tr><td width="15%">'+termtext
+            for (key, term, links) in index:
+                str = '  <tr><td width="15%">' + term.to_plaintext(None)
                 str += '</td>\n    <td>'
-                index_links[term].sort()
-                for link in index_links[term]:
-                    str += ('<i><a href="%s#%s">%s</a></i>, ' %
+                _write_if_nonempty(public, private, links, str)
+                for link in links:
+                    str = ('<i><a href="%s#%s">%s</a></i>, ' %
                             (self._uid_to_uri(link.target()),
                              term, link.name()))
+                    private.write(str)
+                    if link.is_public(): public.write(str)
                 str = str[:-2] + '</tr></td>\n'
-                # Should public link to private terms here??? !!!
-                public.write(str); private.write(str)
+                _write_if_nonempty(public, private, links, str)
             footer = '</table>\n<br />\n'
             public.write(footer); private.write(footer)
 
-        # Identifier index # !!! Check for empty public?
+        # Write the identifier index
         identifiers = self._extract_identifier_index()
         if identifiers:
-            header = (self._start_of('Identifier Index') +
-                      self._table_header('Identifier Index', 'index'))
+            header = self._table_header('Identifier Index', 'index')
             _write_if_nonempty(public, private, identifiers, header)
             for uid in identifiers:
                 href = self._uid_to_href(uid, uid.shortname())
@@ -924,85 +941,104 @@ class HTMLFormatter:
             _write_if_nonempty(public, private, identifiers, footer)
 
         # Navigation bar and footer.
-        self._write_navbar(public, private, 'indices', top=0)
+        self._write_navbar(public, private, 'indices')
         footer = self._footer()
         public.write(footer); private.write(footer)
 
-    def _write_toc(self, private, public):
+    def _write_frames(self, public, private):
         """
-        @return: An HTML page containing the top-level table of
-            contents page.  This page is used to select a module table
-            of contents page, or the "everything" table of contents
-            page. 
-        @rtype: C{string}
+        Write the frames index file for the frames-based table of
+        contents to the given streams.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
-        uids = self._docmap.keys()
+        prj_name = self._prj_name or "API Documentation"
+        str = FRAMES_INDEX % (prj_name, self._top_page)
+        public.write(str); private.write(str)
 
-        # Header
+    def _write_toc(self, public, private):
+        """
+        Write an HTML page containing the top-level table of contents.
+        This page is used to select a module table of contents page,
+        or the \"everything\" table of contents page.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        """
+        # Sort the list of uids by full name (case insensitive)
+        decorated = [(u.name().lower(), u) for u in self._docmap.keys()
+                     if u.is_module()]
+        decorated.sort()
+        uids = [d[-1] for d in decorated]
+
+        # Write the header.
         str = self._header('Table of Contents')
         str += ('<center><font size="+1"><b>Table&nbsp;of&nbsp;'
                  'Contents</b></font></center>\n<hr>\n')
         public.write(str); private.write(str)
 
-        # Class table of contents (all classes/exceptions)
+        # Write a pointer to the project table of contents ("everything")
         str = ('<a target="moduleFrame" href="%s">%s</a><br />\n' %
                 ('toc-everything.html', 'Everything'))
         public.write(str); private.write(str)
 
-        # Package table of contents (individual packages)
+        # Write pointers to the packages' tables of contents
         str = self._start_of('Packages')
         str += '<br /><font size="+1"><b>Packages</b></font><br />\n'
         public.write(str); private.write(str)
         for uid in uids:
             if uid.is_package():
                 str = ('<a target="moduleFrame" href="toc-%s">'+
-                       '%s</a><br />\n') % (self._uid_to_uri(uid), uid)
+                       '%s</a><br />\n') % (self._uid_to_filename(uid), uid)
                 private.write(str)
                 if uid.is_public(): public.write(str)
 
-        # Module table of contents (individual modules)
+        # Write pointers to the modules' tables of contents
         str = self._start_of('Modules')
         str += '<br /><font size="+1"><b>Modules</b></font><br />\n'
         public.write(str); private.write(str)
         for uid in uids:
             if uid.is_module() and not uid.is_package():
                 str = ('<a target="moduleFrame" href="toc-%s">'+
-                       '%s</a><br />\n') % (self._uid_to_uri(uid), uid)
+                       '%s</a><br />\n') % (self._uid_to_filename(uid), uid)
                 private.write(str)
                 if uid.is_public(): public.write(str)
                 
-        # The private/public link.
+        # Write the private/public link.
         if self._create_private_docs:
             str = '\n<br /><hr>\n'
             public.write(str); private.write(str)
-            public.write(self._public_private_link('toc', from_private=0))
-            private.write(self._public_private_link('toc', from_private=1))
-        
+            where = 'toc'
+            public.write(self._public_private_link(where, from_private=0))
+            private.write(self._public_private_link(where, from_private=1))
+
+        # Write the footer.
         str = '\n</body>\n</html>\n'
         public.write(str); private.write(str)
 
     def _write_project_toc(self, public, private):
         """
-        @return: An HTML page containing the table of contents page
-            for the whole project.  This page lists the classes,
-            exceptions, functions, and variables defined by any module
-            or package in the project.
-        @rtype: C{string}
+        Write an HTML page containing the table of contents page for
+        the whole project to the given streams.  This page lists the
+        classes, exceptions, functions, and variables defined by any
+        module or package in the project.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
-        # Header and name.
+        # Write the header.
         str = self._header('Everything')
         str += ('<center><font size="+1"><b>Everything</b>' +
                  '</font></center>\n<hr>\n')
         public.write(str); private.write(str)
 
         # Find classes & exceptions
-        classes = [Link(c.name(),c) for c in self._docmap.keys()
-                   if c.is_class()]
+        uids = self._docmap.keys()
+        classes = [Link(c.name(),c) for c in uids if c.is_class()]
         (classes,excepts) = self._split_classes(classes)
 
-        # Find functions & variables
+        # Find functions & variables (but not methods)
         funcs = []; vars = []
-        for (uid, doc) in self._docmap.items():
+        for uid in uids:
+            doc = self._docmap[uid]
             if isinstance(doc, ModuleDoc):
                 funcs += doc.functions()
                 vars += doc.variables()
@@ -1011,65 +1047,58 @@ class HTMLFormatter:
         # documented.  In particular, do not include base classes,
         # inherited methods, and imported objects from other modules
         # in the index.  But *do* include objects whose modules we
-        # can't determine (why?).
-        self._docmap[None] = None # <- something of a hack. :-/
+        # can't determine (when is this check important?).
+        documented = self._docmap.copy()
+        documented[None] = None # <- for module() == None
+        is_documented = documented.has_key
         classes = [c for c in classes
-                   if self._docmap.has_key(c.target().module())]
+                   if is_documented(c.target().module())]
         excepts = [e for e in excepts
-                   if self._docmap.has_key(e.target().module())]
+                   if is_documented(e.target().module())]
         funcs = [f for f in funcs
-                 if self._docmap.has_key(f.target().module())]
+                 if is_documented(f.target().module())]
         vars = [v for v in vars
-                if self._docmap.has_key(v.uid().module())]
-        del self._docmap[None] # <- eliminate hack (see above)
+                if is_documented(v.uid().module())]
 
-        # Class and excpetion lists.
-        str = self._start_of('All Classes')
-        public.write(str); private.write(str)
-        self._write_toc_section(public, private, 'All&nbsp;Classes', classes)
-        
-        str = self._start_of('All Exceptions')
-        public.write(str); private.write(str)
-        self._write_toc_section(public, private, 'All&nbsp;Exceptions',
-                                excepts)
-        
-        str = self._start_of('All Functions')
-        public.write(str); private.write(str)
-        self._write_toc_section(public, private, 'All&nbsp;Functions', funcs)
-        
-        str = self._start_of('All Variables')
-        public.write(str); private.write(str)
-        self._write_toc_section(public, private, 'All&nbsp;Variables', vars)
+        # Write the lists of objects.
+        self._write_toc_section(public, private, 'All Classes', classes)
+        self._write_toc_section(public, private, 'All Exceptions', excepts)
+        self._write_toc_section(public, private, 'All Functions', funcs)
+        self._write_toc_section(public, private, 'All Variables', vars)
 
-        # The private/public link.
+        # Write the private/public link.
         if self._create_private_docs:
             str = '\n<hr>\n'
             public.write(str); private.write(str)
-            public.write(self._public_private_link('toc', from_private=0))
-            private.write(self._public_private_link('toc', from_private=1))
+            where = 'toc-everything'
+            public.write(self._public_private_link(where, from_private=0))
+            private.write(self._public_private_link(where, from_private=1))
 
+        # Write the footer.
         str = '\n</body>\n</html>\n'
         public.write(str); private.write(str)
-
+        
     def _write_module_toc(self, public, private, uid, doc):
         """
-        @return: An HTML page containing the table of contents page
-            for the given module.  This page lists the modules,
-            classes, exceptions, functions, and variables defined by
-            the module. 
-        @rtype: C{string}
+        Write an HTML page containing the table of contents page for
+        the given module to the given streams.  This page lists the
+        modules, classes, exceptions, functions, and variables defined
+        by the module.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
+        # Split classes into classes & exceptions.
         doc = self._docmap[uid]
         (classes,excepts) = self._split_classes(doc.classes())
 
-        # Header and name.
+        # Write the header.
         str = self._header(uid.name())
         str += (('<center><font size="+1"><b><a target="mainFrame" '+
                 'href="%s">%s</a></b></font></center>\n<hr>\n')
                 % (self._uid_to_uri(uid), uid.shortname()))
         public.write(str); private.write(str)
         
-        # Lists of modules, classes, exceptions, functions, and variables.
+        # Write the lists of objects.
         if uid.is_package():
             self._write_toc_section(public, private, 'Modules', doc.modules())
         self._write_toc_section(public, private, 'Classes', classes)
@@ -1077,40 +1106,43 @@ class HTMLFormatter:
         self._write_toc_section(public, private, 'Functions', doc.functions())
         self._write_toc_section(public, private, 'Variables', doc.variables())
                                  
-        # The private/public link.
+        # Write the private/public link.
         if self._create_private_docs:
             str = '\n<hr>\n'
             public.write(str); private.write(str)
-            public.write(self._public_private_link('toc', from_private=0))
-            private.write(self._public_private_link('toc', from_private=1))
+            public.write(self._public_private_link(uid, toc=1,
+                                                   from_private=0))
+            private.write(self._public_private_link(uid, toc=1,
+                                                    from_private=1))
 
+        # Write the footer.
         str = '\n</body>\n</html>\n'
         public.write(str); private.write(str)
     
     #////////////////////////////////////////////////////////////
-    # Navigation bar
+    # Navigation bar & breadcrumbs
     #////////////////////////////////////////////////////////////
     # The navigation bar is placed at the top & bottom of every HTML
     # page.
 
-    def _navbar(self, *args): return ''
-    def _write_navbar(self, public, private, where=None, top=0):
+    def _write_navbar(self, public, private, where=None):
         """
-        @return: The HTML code for a navigation bar on the given type
-            of page.  The navigation bar typically looks like::
+        Write the HTML code for the navigation bar to the given
+        streams.  The navigation bar typically looks like::
             
-                [ Package Module Class Tree Index Help ]
+                [ Home Trees Index Help            Project ]
                 
-        @rtype: C{string}
         @param where: An identifier indicating what page we're
             creating a navigation bar for.  This is either a UID
             (for an object documentation page); or one of the strings
             C{'tree'}, C{'index'}, and C{'help'}.
         @type where: C{UID} or C{string}
-        @param top: Whether this is the navigation bar at the top of
-            the page.
-        @type top: C{boolean}
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
+        # Construct the navbar.  This is the same for both public &
+        # private, so put it together with a single StringIO object,
+        # and then write it to both streams.
         sio = StringIO()
         sio.write(self._start_of('Navbar'))
         sio.write('<table class="navbar" border="0" width="100%"')
@@ -1157,10 +1189,11 @@ class HTMLFormatter:
             sio.write('<a class="navbar" href="help.html">Help</a>')
             sio.write('&nbsp;&nbsp;&nbsp;</th>\n')
 
+        # The project homepage link.
         if self._prj_link:
             sio.write('    <th class="navbar" align="right" width="100%">\n')
-            sio.write('      <table border="0" cellpadding="0" cellspacing="0">\n')
-            sio.write('      <tr><th class="navbar" align="center">\n')
+            sio.write('      <table border="0" cellpadding="0" cellspacing=')
+            sio.write('"0">\n      <tr><th class="navbar" align="center">\n')
             sio.write('        <p class="nomargin">\n          ')
             sio.write(self._prj_link)
             sio.write('\n      </p></th></tr></table>\n')
@@ -1168,34 +1201,59 @@ class HTMLFormatter:
         else:
             sio.write('    <th class="navbar" width="100%"></th>\n')
         sio.write('  </tr>\n</table>\n')
-        str = sio.getvalue()
-        public.write(str)
-        private.write(str)
 
-        # Breadcrumb, frames, and private/public link
-        if top:
-            str = '<table width="100%" cellpadding="0" cellspacing="0">\n'
-            str += '  <tr valign="top">\n    <td width="100%">\n'
-            if isinstance(where, UID): str += self._breadcrumbs(where)
-            str += '    </td>\n    <td>'
-            str += '<table cellpadding="0" cellspacing="0">\n'
-            public.write(str)
-            private.write(str)
-            if self._create_private_docs:
-                link = self._public_private_link(where, from_private=0)
-                public.write('      <tr><td align="right">%s</td></tr>\n'
-                             % link)
-                link = self._public_private_link(where, from_private=1)
-                private.write('      <tr><td align="right">%s</td></tr>\n'
-                             % link)
-            str = ('      <tr><td align="right">%s</td></tr>\n' %
-                    self._frames_link(where))
-            str += '    </table></td>'
-            str += '</tr></table>\n'
-            public.write(str)
-            private.write(str)
+        # Write the navbar to both streams.
+        str = sio.getvalue()
+        public.write(str); private.write(str)
+
+    def _write_breadcrumbs(self, public, private, where=None):
+        """
+        Write the HTML code for the breadcrumbs line to the given
+        streams.  The breadcrumbs line is an invisible table with a
+        list of pointers to the current object's ancestors on the
+        left; and the show/hide private selector and the
+        frames/noframes selector on the right.
+        
+        @param where: An identifier indicating what page we're
+            creating a navigation bar for.  This is either a UID
+            (for an object documentation page); or a string.  If
+            it is a UID, then a list of pointers to its ancestors
+            is displayed.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        """
+        # Write the breadcrumbs (pointers to ancestors)
+        str = '<table width="100%" cellpadding="0" cellspacing="0">\n'
+        str += '  <tr valign="top">\n    <td width="100%">\n'
+        if isinstance(where, UID): str += self._breadcrumbs(where)
+        str += '    </td>\n    <td>'
+        str += '<table cellpadding="0" cellspacing="0">\n'
+        public.write(str); private.write(str)
+
+        # Write the public/private link
+        if self._create_private_docs:
+            link = self._public_private_link(where, from_private=0)
+            public.write('      <tr><td align="right">%s</td></tr>\n' % link)
+            link = self._public_private_link(where, from_private=1)
+            private.write('      <tr><td align="right">%s</td></tr>\n' % link)
+
+        # Write the frames/noframes link.
+        str = ('      <tr><td align="right">%s</td></tr>\n' %
+                self._frames_link(where))
+        str += '    </table></td>\n'
+        str += '</tr></table>\n'
+        public.write(str); private.write(str)
             
     def _frames_link(self, where):
+        """
+        @return: HTML code for the frames/noframes selector.  This
+            selector is used to turn the frames-based table of
+            contents on or off.
+        @rtype: C{string}
+        @param where: An identifier indiciating the page we're
+            creating a navigation bar for.  This is either a UID
+            or the name of a file without the ".html" extension.
+        """
         if isinstance(where, UID): uri = self._uid_to_uri(where)
         else: uri = where+'.html'
         return ('<font size="-2">[<a href="frames.html"'+
@@ -1204,16 +1262,20 @@ class HTMLFormatter:
     
     def _public_private_link(self, where, toc=0, from_private=0):
         """
-        @return: The HTML code for a link between the public & private
-            copies of the documentation.
+        @return: HTML code for the show/hide private selector.  This
+            selector is used to select whether private objects should
+            be displayed.
         @rtype: C{string}
+        @param where: An identifier indiciating the page we're
+            creating a navigation bar for.  This is either a UID
+            or the name of a file without the ".html" extension.
         """
-        # For private pages, there's no corresponding public page..
+        # For private pages, there's no corresponding public page.
         if isinstance(where, UID) and where.is_private():
             return ('<font size="-2">[<b>show&nbsp;private</b>' +
                     '&nbsp;|&nbsp;hide&nbsp;private]</font>')
 
-        if isinstance(where, UID): uri = self._uid_to_uri(where)
+        if isinstance(where, UID): uri = self._uid_to_filename(where)
         else: uri = where+'.html'
         if toc: uri = 'toc-'+uri
         
@@ -1228,14 +1290,21 @@ class HTMLFormatter:
     
     def _breadcrumbs(self, uid):
         """
-        @return: The HTML code for a series of links to the parents of
-            C{uid}.
+        @return: The HTML code for a series of links to the ancestors
+            of C{uid}.
         @rtype: C{string}
+        @param uid: The UID of the object whose ancestors should
+            be listed.
         """
-        #if not uid.parent(): return '</br>\n'
+        # Generate the crumbs as a list in reverse order (from child
+        # to parent), and then reverse them & combine them at the end.
+
+        # Generate the crumb for uid itself.
         if uid.is_package(): crumbs = ['Package&nbsp;%s' % uid.shortname()]
         elif uid.is_module(): crumbs = ['Module&nbsp;%s' % uid.shortname()]
         elif uid.is_class(): crumbs = ['Class&nbsp;%s' % uid.shortname()]
+
+        # Generate the crumbs for uid's ancestors.
         uid = uid.parent()
         while uid is not None:
             if uid.is_package(): label = 'Package&nbsp;%s' % uid.shortname()
@@ -1244,10 +1313,12 @@ class HTMLFormatter:
             else: raise ValueError('Bad uid type for breadcrumbs')
             crumbs.append(self._uid_to_href(uid, label, code=0))
             uid = uid.parent()
+
+        # Reverse, combine, and return the crumbs
         crumbs.reverse()
-        str = '<font size="-1"><b class="breadcrumbs">\n  '
-        str += ' ::\n  '.join(crumbs)
-        str += '</b></font></br>\n'
+        str = '      <font size="-1"><b class="breadcrumbs">\n        '
+        str += ' ::\n        '.join(crumbs)
+        str += '\n      </b></font></br>\n'
         return str
 
     #////////////////////////////////////////////////////////////
@@ -1256,6 +1327,7 @@ class HTMLFormatter:
     
     def _find_tree_width(self, uid):
         """
+        Helper function for L{_base_tree}.
         @return: The width of a base tree, when drawn
             right-justified.  This is used by L{_base_tree} to
             determine how far to indent lines of the base tree.
@@ -1303,93 +1375,159 @@ class HTMLFormatter:
     #////////////////////////////////////////////////////////////
     # Class hierarchy trees
     #////////////////////////////////////////////////////////////
-    
-    def _class_tree_item(self, uid, filter_private, depth=0):
-        """
-        Helper function for L{_write_class_tree}.
-        """
-        if uid is None: return
-        if filter_private and uid.is_private(): return ''
-        doc = self._docmap.get(uid, None)
-        str = ' '*depth + '<li> <b>' + self._uid_to_href(uid)+'</b>'
-        if doc and doc.descr():
-            str += ': <i>' + self._summary(doc, uid) + '</i>'
-        str += '\n'
-        
-        if doc and doc.subclasses():
-            str += ' '*depth + '  <ul>\n'
-            children = [l.target() for l in doc.subclasses()]
-            if filter_private:
-                children = [c for c in children if c.is_public()]
-            for child in children:
-                str += self._class_tree_item(child, filter_private, depth+4)
-            str += ' '*depth + '  </ul>\n'
-        return str
 
     def _write_class_tree(self, public, private):
         """
-        @return: The HTML code for the class hierarchy tree.  This is
-            used by L{_trees_to_html} to construct the hierarchy page.
-        @rtype: C{string}
+        Write HTML code for a nested list showing the base/subclass
+        relationships between all documented classes.  Each element of
+        the top-level list is a class with no (documented) bases; and
+        under each class is listed all of its subclasses.  Note that
+        in the case of multiple inheritance, a class may appear
+        multiple times.  This is used by L{_trees_to_html} to write
+        the class hierarchy.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @todo: For multiple inheritance, don't repeat subclasses the
+            second time a class is mentioned; instead, link to the
+            first mention.
+        @bug: This function does not list public subclasses of
+            private bases.
         """
-        str = '<ul>\n'
-        public.write(str); private.write(str)
+        # Get a list of all documented classes
+        uids = [uid for uid in self._docmap.keys() if uid.is_class()]
+        if not uids: return
+        uids.sort() # sort by full name.
+        
+        # Write the beginning-of-list tag
+        _write_if_nonempty(public, private, uids, '<ul>\n')
 
-        for uid in self._docmap.keys():
+        # Write entries for all top-level classes.
+        for uid in uids:
             doc = self._docmap[uid]
-            if not isinstance(doc, ClassDoc): continue
+
+            # Look for a documented base
             hasbase = 0
             for base in doc.bases():
                 if self._docmap.has_key(base.target()):
                     hasbase = 1
+                    break
+
+            # If there's no documented base, then write an entry
             if not hasbase:
-                public.write(self._class_tree_item(uid, filter_private=0))
-                private.write(self._class_tree_item(uid, filter_private=1))
+                self._write_class_tree_item(public, private, uid)
 
-        str = '</ul>\n'
-        public.write(str); private.write(str)
+        # Write the end-of-list tag.
+        _write_if_nonempty(public, private, uids, '</ul>\n')
 
+    def _write_class_tree_item(self, public, private, uid,
+                               depth=2, public_base=1):
+        """
+        Write HTML code for a list item describing a class and all of
+        its subclasses.  This is used by L{_write_class_tree} to
+        write the class hierarchy.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param uid: The C{UID} of the class tree to describe
+        @param depth: The indentation depth.
+        @param public_base: True if output should be generated for
+            the public stream.  This is prevents public classes
+            with private bases from being listed.
+        @bug: This doesn't generate </li> close tags.
+        """
+        doc = self._docmap.get(uid)
+        
+        # Write the class's name & description
+        str = ' '*depth + '<li> <b>' + self._uid_to_href(uid)+'</b>'
+        if doc and doc.descr():
+            str += ': <i>\n' + self._summary(doc, uid) + '</i>'
+        str += '\n'
+        private.write(str)
+        if uid.is_public() and public_base: public.write(str)
+
+        # If we have no docs, then that's all we can say.
+        if doc is None: return
+
+        # Find the list of subclasses.  If there are none, then we're done.
+        subclasses = [l.target() for l in doc.subclasses()]
+        if not subclasses: return
+
+        # Write the beginning-of-list tag.
+        str = ' '*depth + '  <ul>\n'
+        if not public_base: private.write(str)
+        else: _write_if_nonempty(public, private, subclasses, str)
+        
+        # Write the subclass list contents.
+        for subclass in subclasses:
+            self._write_class_tree_item(public, private, subclass, depth,
+                                        public_base and uid.is_public())
+
+        # Write the end-of-list tag.
+        str = ' '*depth + '  </ul>\n'
+        if not public_base: private.write(str)
+        else: _write_if_nonempty(public, private, subclasses, str)
+            
     #////////////////////////////////////////////////////////////
     # Module hierarchy trees
     #////////////////////////////////////////////////////////////
     
     def _write_module_tree(self, public, private):
         """
-        @return: The HTML code for the module hierarchy tree.  This is
-            used by L{_trees_to_html} to construct the hiearchy page.
-        @rtype: C{string}
+        Write HTML code for a nested list showing the submodule
+        relationships between all documented packages and modules.
+        This is used by L{_trees_to_html} to write the module
+        hierarchy.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
         """
-        str = '<ul>\n'
-        public.write(str); private.write(str)
-        # Find all top-level packages.
-        for (uid, doc) in self._docmap.items():
-            if not isinstance(doc, ModuleDoc): continue
+        # Get a list of all documented modules
+        uids = [uid for uid in self._docmap.keys() if uid.is_module()]
+        if not uids: return
+        uids.sort() # sort by full name.
+
+        # Write the beginning-of-list tag
+        _write_if_nonempty(public, private, uids, '<ul>\n')
+        
+        # Write entries for all top-level packages.
+        for uid in uids:
+            doc = self._docmap[uid]
+
+            # If it's a top-level package, then write an entry.
             pkg = doc.package()
             if pkg is None or not self._docmap.has_key(pkg):
                 self._write_module_tree_item(public, private, uid)
-        str = '</ul>\n'
-        public.write(str); private.write(str)
+                
+        # Write the end-of-list tag.
+        _write_if_nonempty(public, private, uids, '</ul>\n')
 
-    def _write_module_list(self, public, private, modules, groups):
+    def _write_module_list(self, public, private, container, modules):
         """
-        @return: The HTML code for the module hierarchy tree,
-            containing the given modules.  This is used by
-            L{_module_to_html} to list the submodules of a package.
-        @rtype: C{string}
+        Write HTML code for a list of the submodules to the given
+        streams.  This is used by L{_write_module} to list the
+        submodules in a package.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The package that contains the modules (as
+            submodules).  C{container} is used to group the modules.
+        @param modules: The modules that should be included in the list.
         """
         if len(modules) == 0: return
+
+        # Divide the modules into groups
+        groups = container.by_group(modules)
 
         # Write the table header.
         header = self._table_header('Submodules', 'details')
         _write_if_nonempty(public, private, modules, header)
 
+        # Write entries for each group.
         for name, group in groups:            
-            # Print a group header.
+            # Print a group header (except for the special group None,
+            # which is always the first group).
             if name is not None:
                 header = self._group_header(name)
                 _write_if_nonempty(public, private, group, header)
 
-            # Add lines for each submodule
+            # Write a table row for each submodule.
             _write_if_nonempty(public, private, group, '  <tr><td><ul>\n')
             for module in group:
                 self._write_module_tree_item(public, private, module.target())
@@ -1400,503 +1538,675 @@ class HTMLFormatter:
 
     def _write_module_tree_item(self, public, private, uid, depth=0):
         """
-        Helper function for L{_module_tree} and L{_module_list}.
-        
-        @rtype: C{string}
+        Write HTML for a list item describing a package/module and all
+        of its submodules.  This is used by both L{_write_module_tree}
+        and L{write_module_list} to write package hierarchies.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param uid: The C{UID} of the module to describe
+        @param depth: The indentation depth.
+        @bug: This doesn't generate </li> close tags.
         """
-        if uid is None: return
+        doc = self._docmap.get(uid)
 
-        # Write the module itself.
-        doc = self._docmap.get(uid, None)
-        name = uid.shortname()
-        str = ' '*depth + '<li> <b>'
-        str += self._uid_to_href(uid, name)+'</b>'
+        # Write the module's name & description
+        str = (' '*depth + '<li> <b>' +
+               self._uid_to_href(uid, uid.shortname())+'</b>')
         if doc and doc.descr():
             str += ': <i>' + self._summary(doc, uid) + '</i>'
         str += '\n'
         private.write(str)
         if uid.is_public(): public.write(str)
 
-        # Write the list of submodules.
-        if doc and doc.ispackage() and doc.modules():
-            modules = [l.target() for l in doc.modules()]
-            _write_if_nonempty(public, private, modules,
-                               ' '*depth + '  <ul>\n')
-            for module in modules:
-                self._write_module_tree_item(public, private, module, depth+4)
-            _write_if_nonempty(public, private, modules,
-                               ' '*depth + '  </ul>\n')
-        str = ' '*depth+'</li>\n'
-        private.write(str)
-        if uid.is_public(): public.write(str)
+        # If we have no docs, then that's all we can say.
+        if doc is None or not doc.ispackage(): return
 
+        # Find the list of submoules.  If there are none, then we're done.
+        submodules = [l.target() for l in doc.modules()]
+        if not submodules: return
+
+        # Write the beginning-of-list tag.
+        _write_if_nonempty(public, private, submodules, ' '*depth+'  <ul>\n')
+
+        # Write the submodule list contents.
+        for module in submodules:
+            self._write_module_tree_item(public, private, module, depth+4)
+
+        # Write the end-of-list tag.
+        _write_if_nonempty(public, private, submodules, ' '*depth+'  </ul>\n')
+    
     #////////////////////////////////////////////////////////////
     # Class tables
     #////////////////////////////////////////////////////////////
     
-    def _write_class_summary(self, public, private, classes,
-                             groups, heading='Class Summary'):
+    def _write_class_summary(self, public, private, container, classes,
+                             heading='Class Summary'):
         """
-        @return: The HTML code for the class summary table.  This is
-            used by L{_module_to_html} to list the classes in a
-            module.
-        @rtype: C{string}
+        Write HTML code for a class summary table.  This is used
+        by L{_write_module} to list the classes in a module.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module that contains the classes.
+            C{container} is used to group the classes.
+        @param classes: The classes that should be included in the list.
         """
         if len(classes) == 0: return
 
+        # Divide the classes into groups
+        groups = container.by_group(classes)
+        
         # Write the table header
         header = self._table_header(heading, 'summary')
         _write_if_nonempty(public, private, classes, header)
 
+        # Write entries for each group
         for name, group in groups:
-            # Print a group header
+            # Print a group header (except for the special group None,
+            # which is always the first group).
             if name is not None:
                 header = self._group_header(name)
                 _write_if_nonempty(public, private, group, header)
 
-            # Add lines for each class
+            # Write a table row for each class.
             for cls in group:
-                self._write_class_summary_line(public, private, cls)
+                self._write_class_summary_row(public, private, cls)
 
         # Write the table footer
         _write_if_nonempty(public, private, classes, '</table><br />\n\n')
 
-    def _write_class_summary_line(self, public, private, link):
+    def _write_class_summary_row(self, public, private, link):
+        """
+        Write HTML code for a row in the class summary table.
+        Each row gives the name and summary of a single class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param link: A link to the class that should be described
+            by this row.  
+        """
         cname = link.name()
-        cls = link.target()
-        if not self._docmap.has_key(cls): return ''
-        cdoc = self._docmap[cls]
-        csum = self._summary(cdoc, cls)
+        cuid = link.target()
+        cdoc = self._docmap.get(cuid)
+
+        # Get the summary of the class.
+        if cdoc and cdoc.descr(): csum = self._summary(cdoc, cuid)
+        else: csum = '&nbsp;'
+
+        # Write a row for the class.
         str = '<tr><td width="15%">\n'
         str += '  <b>'+self._link_to_html(link)
         str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
         private.write(str)
-        if link.is_public(): public.write(str)
+        if cuid.is_public(): public.write(str)
 
     #////////////////////////////////////////////////////////////
     # Function tables
     #////////////////////////////////////////////////////////////
     
-    def _func_summary(self, functions, cls, groups, 
-                      heading='Function Summary'):
-        return ''
-    
-    def _write_func_summary(self, public, private, functions, cls, groups, 
+    def _write_func_summary(self, public, private, container, functions, 
                             heading='Function Summary'):
         """
-        @return: The HTML code for a function summary table.  This
-            is used by L{_module_to_html} to list the functions in a
-            module; and by L{_class_to_html} to list member
-            functions. 
-        @rtype: C{string}
+        Write HTML code for a function summary table.  This is used
+        by L{_write_module} to list the functions in a module; and by
+        L{_write_class} to list the methods in a class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module or class that contains the
+            functions.  C{container} is used to group the functions.
+        @param functions: The functions that should be included in
+            the list.
         """
         if len(functions) == 0: return
+
+        # Divide the functions into groups
+        groups = container.by_group(functions)
 
         # Write the table header
         header = self._table_header(heading, 'summary')
         _write_if_nonempty(public, private, functions, header)
 
+        # Write entries for each group.  Note that every group
+        # contains at least one func or inherited func.
         for name, group in groups:
-            # Print a group header
+            # Print a group header (except for the special group None,
+            # which is always the first group).
             if name is not None:
                 header = self._group_header(name)
                 _write_if_nonempty(public, private, group, header)
 
-            # Add lines for each class
-            for func in group:
-                str = self._func_summary_line(func, cls)
-                if str:
-                    private.write(str)
-                    if func.is_public(): public.write(str)
+            # Write a table row for each class.  Skip inherited functions
+            # if _inheritance=='listed', since they'll be listed below.
+            for function in group:
+                self._write_func_summary_row(public, private, 
+                                             function, container)
 
             # Add an inheritance list, if appropriate
-            if self._inheritance == 'listed' and cls is not None:
-                self._write_inheritance_list(public, private, group, cls)
+            if (self._inheritance == 'listed' and
+                isinstance(container, ClassDoc)):
+                self._write_inheritance_list(public, private, group,
+                                             container.uid())
 
         # Write the table footer
         _write_if_nonempty(public, private, functions, '</table><br />\n\n')
 
-    def _func_summary_line(self, link, cls):
-        func = link.target()
-        fname = link.name()
+    def _write_func_summary_row(self, public, private,
+                                function, container):
+        """
+        Write HTML code for a row in the function summary table.  Each
+        row gives a breif description of a single function.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param function: The function that should be described by this row.
+        @type function: L{Link}
+        """
+        fuid = function.target()
+        fname = function.name()
+        fdoc = self._docmap.get(fuid)
 
-        if func.is_module() or func.is_class(): container = func
-        else: container = func.cls() or func.module()
-        inherit = ((func.is_method() or func.is_builtin_method())
-                   and container != cls.uid())
+        # Is it an inherited function?
+        inherited = (container.uid().is_class() and
+                     fuid.cls() != container.uid())
 
-        if inherit and self._inheritance == 'listed': return ''
+        # If it's inherited & we're listing inheritance, then don't
+        # write a table row for it; it'll be included in the list.
+        if inherited and self._inheritance == 'listed': return
 
-        # If we don't have documentation for the function, then we
-        # can't say anything about it.
-        if not self._docmap.has_key(func): return ''
-        fdoc = self._docmap[func]
-        
-        # Try to find a documented ancestor.
-        while (not fdoc.documented() and fdoc.matches_override() and
-               self._docmap.has_key(fdoc.overrides())):
-            fdoc = self._docmap[fdoc.overrides()]
-        inhfunc = fdoc.uid()
+        # If the method doesn't define a docstring, then try to find
+        # an overridden ancestor that does.  (This lets methods
+        # inherit docstrings from the methods they override.)
+        if (fdoc is not None and fuid.is_any_method() and
+            not fdoc.has_docstring()):
+            fdoc = self._docmap.documented_ancestor(fuid) or fdoc
 
-        rval = fdoc.returns()
-        if rval.type():
-            rtype = self._docstring_to_html(rval.type(), inhfunc, 8)
+        # Get the return type (if any)
+        if fdoc and fdoc.returns() and fdoc.returns().type():
+            rtype = self._docstring_to_html(fdoc.returns().type(),
+                                            fdoc.uid(), 8)
+        else: rtype = '&nbsp;'
+
+        # Get a summary of the description (if any)
+        if fdoc:
+            fsum = self._summary(fdoc, fdoc.uid())
+            if fsum == '&nbsp;': fsum = ''
         else:
-            rtype = '&nbsp;'
+            fsum = ''
 
-        descrstr = self._summary(fdoc, inhfunc)
-        if descrstr != '&nbsp;':
-            fsum = '<br />'+descrstr
-        else:
-            if inherit: fsum = '<br />\n'
-            else: fsum = ''
-
-        # Display any notable attributes.
+        # Add any notable attributes to the summary.
         attribs = []
-        if func.is_classmethod():
+        if fuid.is_classmethod():
             attribs.append('Class method')
-        if func.is_staticmethod():
+        if fuid.is_staticmethod():
             attribs.append('Static method')
-        if inherit and self._inheritance != 'grouped':
-            href = self._uid_to_href(container, container.shortname())
+        if inherited and self._inheritance != 'grouped':
+            href = self._uid_to_href(fuid.cls(), fuid.cls().shortname())
             attribs.append('Inherited from %s' % href)
         if attribs:
             fsum += '    <i>(' + '; '.join(attribs) + ')</i>\n'
-            
-        #if not fdoc.documented():
-        #    fsum = '    <br /><i>(undocumented)</i>\n'
+
+        # If we have any summary info, then put it on its own line
+        # (after the function signature)
+        if fsum: fsum = '<br />\n' + fsum
+
+        # Write a row for the function.
         str = '<tr><td align="right" valign="top" width="15%">'
         str += '<font size="-1">'+rtype+'</font></td>\n  <td><code>'
-        if fdoc.documented() or inherit:
-            str += self._func_signature(fname, fdoc, 1, 0, 'summary-sig')
+        if inherited or (fdoc and fdoc.has_docstring()):
+            str += self._func_signature(fname, fuid, fdoc, 1, 0, 'summary-sig')
         else:
-            str += '<a name="%s"></a>' % fname
-            str += self._func_signature(fname, fdoc, 0, 0, 'summary-sig')
+            str += '<a name="%s"></a>' % fuid.shortname()
+            str += self._func_signature(fname, fuid, fdoc, 0, 0, 'summary-sig')
         str += '</code>\n' + fsum + '</td></tr>\n'
-        return str
+        private.write(str)
+        if fuid.is_public(): public.write(str)
 
-    def _write_func_details(self, public, private, functions,
-                            cls, heading='Function Details'):
+    def _write_func_details(self, public, private, container, functions,
+                            heading='Function Details'):
         """
-        @return: The HTML code for a function details table.  This
-            is used by L{_module_to_html} to describe the functions in
-            a module; and by L{_class_to_html} to describe member
-            functions.
-        @rtype: C{string}
+        Write HTML code for a function details section.  This is used
+        by L{_write_module} to describe the functions in a module; and
+        by L{_write_class} to describe the methods in a class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module or class that contains the
+            functions.  C{container} is used to group the functions.
+        @param functions: The functions that should be included in
+            the section.
         """
-        # Filter out functions that we have no docs for.
-        functions = [f for f in functions
-                     if self._docmap.has_key(f.target())]
+        # Filter out functions that we have no docs for; these are just
+        # listed in the summary table.
+        docmap = self._docmap
+        functions = [f for f in functions if docmap.has_key(f.target())]
+        
+        if container.uid().is_class():
+            # Filter out inherited methods (their details docs are
+            # listed under the class that defines them):
+            functions = [f for f in functions
+                         if f.target().cls() == container.uid()]
 
-        # Make sure we have something left.
+            # Filter out methods that don't define or inherit docstrings;
+            # they are just listed in the summary table.
+            functions = [f for f in functions
+                         if docmap.documented_ancestor(f.target())]
+        else:
+            # Filter out functions that don't define docstrings; they
+            # are just listed in the summary table.
+            functions = [f for f in functions
+                         if docmap[f.target()].has_docstring()]
+
+        # If there are no functions left, then just return.
         if len(functions) == 0: return
+        
+        # Divide the functions into groups
+        groups = container.by_group(functions)
 
-        # Write the header
+        # Write the table header
         header = self._table_header(heading, 'details')+'</table>\n'
         _write_if_nonempty(public, private, functions, header)
 
-        # Add entries for each function
+        # Write an entry for each function.
         for function in functions:
-            str = self._func_details_entry(function, cls)
-            if str:
-                private.write(str)
-                if function.target().is_public(): public.write(str)
+            str = self._func_details_entry(function, container)
+            private.write(str)
+            if function.target().is_public(): public.write(str)
 
-        # Write the footer
+        # Write the table footer
         _write_if_nonempty(public, private, functions, '<br />\n\n')
 
-    def _func_details_entry(self, function, cls):
+    def _func_details_entry(self, function, container):
+        """
+        @return: The HTML code for an entry in the function details
+        section.  Each entry gives a complete description of a
+        documented function.
+        @param function: The function that should be described by this entry.
+        @type function: L{Link}
+        """
         fname = function.name()
-        func = function.target()
+        fuid = function.target()
+        # Note: by the time we get here, we know that docmap contains fuid.
+        fdoc = self._docmap[fuid]
 
-        if func.is_module() or func.is_class(): container = func
-        else: container = func.cls() or func.module()
-        inherit = ((func.is_method() or func.is_builtin_method())
-                   and container != cls.uid())
-            
-        # Don't document inherited methods; instead, the method
-        # summary points to the details description in the parent
-        # class's file.
-        if inherit: return ''
+        # Get the function's signature.  Note that this needs to be
+        # done before we look for an overridden ancestor.
+        signature = self._func_signature(fname, fuid, fdoc)
+
+        # Check if the function overrides anything.  Note that this
+        # needs to be done before we look for an overridden ancestor.
+        overrides = fdoc.overrides()
         
-        fdoc = self._docmap[func]
+        # If the method doesn't define a docstring, then try to find
+        # an overridden ancestor that does.  (This lets methods
+        # inherit docstrings from the methods they override.)
+        if fuid.is_any_method() and not fdoc.has_docstring():
+            fdoc = self._docmap.documented_ancestor(fuid) or fdoc
+            inherits_docs = (fdoc.uid() != fuid)
+            fuid = fdoc.uid()
+        else:
+            inherits_docs = 0
 
-        # What does this method override?
-        foverrides = fdoc.overrides()
-
-        # Try to find a documented ancestor.
-        inhdoc = self._docmap.documented_ancestor(func) or fdoc
-        inherit_docs = (inhdoc is not fdoc)
-
-        # If we couldn't find a documented ancestor, then we don't
-        # have anything else to say.
-        if not inhdoc.documented(): return ''
-
-        str = '\n<a name="'+fname+'"></a>\n'
+        # Add the function's name & signature.
+        str = '\n<a name="'+fuid.shortname()+'"></a>\n'
         str += '<table width="100%" class="func-details"'
         str += ' bgcolor="#e0e0e0"><tr><td>\n'
-
-        str += '  <h3>%s\n' % self._func_signature(fname, fdoc)
+        str += '  <h3>%s\n' % signature
         if SPECIAL_METHODS.has_key(fname):
             str += '    <br /><i>'
             str += '(%s)</i>\n' % SPECIAL_METHODS[fname]
         str += '  </h3>\n'
 
-        # Use the inherited docs for everything but the signature.
-        fdoc = inhdoc
-        func = inhdoc.uid()
-
-        fdescr=fdoc.descr()
-        fparam = fdoc.parameter_list()[:]
-        if fdoc.vararg(): fparam.append(fdoc.vararg())
-        if fdoc.kwarg(): fparam.append(fdoc.kwarg())
-        freturn = fdoc.returns()
-        fraises = fdoc.raises()
-        
-        # Don't list parameters that don't have any extra info.
-        f = lambda p:p.descr() or p.type()
-        fparam = filter(f, fparam)
-
-        # Description
+        # Add the function's description.
+        fdescr = fdoc.descr()
         if fdescr:
-            str += self._docstring_to_html(fdescr, func, 2)
+            str += self._docstring_to_html(fdescr, fuid, 2)
         str += '  <dl><dt></dt><dd>\n'
 
-        # Parameters
-        if fparam:
-            str += '    <dl><dt><b>Parameters:</b></dt>\n'
-            for param in fparam:
-                pname = param.name()
-                str += '      <dd><code><b>' + pname +'</b></code>'
-                if param.descr():
-                    pdescr = self._docstring_to_html(param.descr(),
-                                                     func, 8)
-                    str += ' -\n %s' % pdescr.rstrip()
-                str += '\n'
-                if param.type():
-                    ptype = self._docstring_to_html(param.type(),
-                                                    func, 14)
-                    str += '        <br /><i>'+('&nbsp;'*10)+'\n'
-                    str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
-                str += '      </dd>\n'
-            str += '    </dl>\n'
+        # Add the parameter descriptions.  Only list parameters that
+        # we have extra info for.
+        fparams = fdoc.parameter_list()[:]
+        if fdoc.vararg(): fparams.append(fdoc.vararg())
+        if fdoc.kwarg(): fparams.append(fdoc.kwarg())
+        str += self._parameter_list(fparams, fdoc)
 
-        # Returns
+        keywords = fdoc.keywords()
+        if keywords:
+            str += self._parameter_list(keywords, fdoc, 'Keyword Parameters')
+
+        # Add the return value description.
+        freturn = fdoc.returns()
         if freturn.descr() or freturn.type():
             str += '    <dl><dt><b>Returns:</b></dt>\n      <dd>\n'
             if freturn.descr():
-                str += self._docstring_to_html(freturn.descr(),
-                                               func, 8)
+                str += self._docstring_to_html(freturn.descr(), fuid, 8)
                 if freturn.type():
-                    rtype = self._docstring_to_html(freturn.type(),
-                                                    func,14)
+                    rtype = self._docstring_to_html(freturn.type(), fuid, 14)
                     str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                     str += ' '*8+'(type=%s)</i>\n' % rtype.strip()
             elif freturn.type():
-                str += self._docstring_to_html(freturn.type(),
-                                               func, 8)
+                str += self._docstring_to_html(freturn.type(), fuid, 8)
             str += '      </dd>\n    </dl>\n'
 
-        # Raises
+        # Add descriptions of exceptions that can be raised.
+        fraises = fdoc.raises()
         if fraises:
             str += '    <dl><dt><b>Raises:</b></dt>\n'
             for fraise in fraises:
                 str += '      '
                 str += '<dd><code><b>'+fraise.name()+'</b></code> -\n'
-                str += self._docstring_to_html(fraise.descr(),
-                                               func, 8)
+                str += self._docstring_to_html(fraise.descr(), fuid, 8)
                 str +'      </dd>\n'
             str += '    </dl>\n'
 
-        # Overrides
-        if foverrides:
+        # If the function is a method that overrides another method,
+        # then give a pointer to the overridden method.
+        if overrides:
             str += '    <dl><dt><b>Overrides:</b></dt>\n'
-            str += '      <dd>'+self._uid_to_href(foverrides)
-            if inherit_docs:
+            str += '      <dd>'+self._uid_to_href(overrides)
+            if inherits_docs:
                 str += ' <i>(inherited documentation)</i>\n'
             str += '</dd>\n    </dl>\n'
 
         # Add version, author, warnings, requirements, notes, etc.
         str += self._standard_fields(fdoc)
-
         str += '  </dd></dl>\n'
         str += '</td></tr></table>\n'
-
         return str
 
-    def _func_signature(self, fname, fdoc, link=0, show_defaults=1,
+    def _parameter_list(self, parameters, container, heading='Parameters'):
+        # Only describe parameters that we have something to say about.
+        if not container.defines_groups():
+            parameters = [p for p in parameters if p.descr() or p.type()]
+        if not parameters: return ''
+
+        # Get the UID of the function (for docstring output)
+        fuid = container.uid()
+
+        # Divide the parameters into groups
+        groups = container.by_group(parameters)
+
+        # Add the list header
+        str = '    <dl><dt><b>%s:</b></dt>\n' % heading
+
+        # Write entries for each group.
+        for name, group in groups:
+            # Add a group header (where applicable)
+            if name is not None:
+                str += '     <dd><dl><dt>%s</dt>\n' % name
+
+            # Add each parameter
+            for param in group:
+                str += '      <dd><code><b>%s</b></code>' % param.name()
+                if param.descr():
+                    pdescr = self._docstring_to_html(param.descr(), fuid, 8)
+                    str += ' -\n %s' % pdescr.rstrip()
+                str += '\n'
+                if param.type():
+                    ptype = self._docstring_to_html(param.type(), fuid, 14)
+                    str += ' '*8+'<br /><i>'+('&nbsp;'*10)+'\n'
+                    str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
+
+            # Add a group footer (where applicable)
+            if name is not None:
+                str += '     </dd></dl>\n'
+
+        # Add a list footer, and return.
+        return str + '      </dd>\n    </dl>\n'
+
+    def _func_signature(self, fname, fuid, fdoc, href=0, show_defaults=1,
                         css_class="sig"):
         """
         @return: The HTML code for the function signature of the
             function with the given name and documentation.
         @param fname: The short name of the function.
         @type fname: C{string}
+        @param fuid: The UID of the function (used to generate the
+            optional href link).
+        @type fuid: L{UID}
         @param fdoc: The documentation for the function.
         @type fdoc: L{objdoc.FuncDoc}
-        @param link: Whether to create a link from the function's name
-            to its details description.
+        @param href: Whether to create an href link from the
+            function's name to its details description.
+        @param show_defaults: Whether or not to show default values
+            for parameters.
+        @param css_class: The CSS class that should be used to mark
+            the signature.
         """
-        str = '<span class=%s>' % css_class
-        if link: str += self._uid_to_href(fdoc.uid(), fname, css_class+'-name')
-        else: str += '<span class=%s-name>%s</span>' % (css_class, fname)
-        
-        PARAM_JOIN = ',\n'+' '*15
-        str += '('
-        str += self._params_to_html(fdoc.parameters(), css_class,
-                                    show_defaults)
+        # This should never happen, but just in case:
+        if fdoc is None:
+            return (('<span class="%s"><span class="%s-name">%s</span>'+
+                     '(...)</span>') % (css_class, css_class, fname))
+
+        # Get the function's name.
+        if href: name = self._uid_to_href(fuid, fname, css_class+'-name')
+        else: name = '<span class="%s-name">%s</span>' % (css_class, fname)
+
+        # Convert the positional parameters to HTML
+        params = [self._param_to_html(p, show_defaults, css_class)
+                  for p in fdoc.parameters()]
+
+        # Convert the vararg parameter to HTML
         if fdoc.vararg():
             vararg_name = fdoc.vararg().name()
             if vararg_name != '...': vararg_name = '*%s' % vararg_name
-            str += ('<span class=%s-vararg>%s</span>%s' %
-                    (css_class, vararg_name, PARAM_JOIN))
+            params.append('<span class="%s-vararg">%s</span>' %
+                          (css_class, vararg_name))
+
+        # Convert the keyword parameter to HTML
         if fdoc.kwarg():
-            str += ('<span class=%s-kwarg>**%s</span>%s' %
-                    (css_class, fdoc.kwarg().name(), PARAM_JOIN))
-        if str[-1] != '(': str = str[:-len(PARAM_JOIN)]
+            params.append('<span class="%s-kwarg">**%s</span>' %
+                          (css_class, fdoc.kwarg().name()))
 
-        return str + ')</span>'
+        # Combine the name & the parameters.
+        return ('<span class="%s">%s(%s)</span>' %
+                (css_class, name, ',\n          '.join(params)))
 
-    def _params_to_html(self, parameters, css_class, show_defaults):
-        PARAM_JOIN = ',\n'+' '*15
-        str = ''
-        for param in parameters:
-            if type(param) in (types.ListType, types.TupleType):
-                sublist = self._params_to_html(param, css_class,
-                                               show_defaults)
-                str += '(%s), ' % sublist[:-len(PARAM_JOIN)]
-            else:
-                str += ('<span class=%s-arg>%s</span>' %
-                        (css_class, param.name()))
-                if show_defaults and param.default() is not None:
-                    default = param.default()
-                    default = re.sub('&', '&amp;', default)
-                    default = re.sub('<', '&lt;', default)
-                    default = re.sub('>', '&gt;', default)
-                    default = re.sub(' ', '&nbsp;', default)
-                    if len(default) > 60:
-                        default = default[:57]+'...'
-                    str += ('=<span class=%s-default>%s</span>' %
-                            (css_class, default))
-                str += PARAM_JOIN
-        return str
+    def _param_to_html(self, param, show_defaults, css_class):
+        """
+        @return: The HTML code for a single parameter.  Note that
+            a single parameter can consists of a sublist of
+            parameters (although this feature isn't often used).
+            This is a helper function for L{_func_signature}.
+        @param show_defaults: Whether or not to show default values
+            for parameters.
+        @param css_class: The CSS class that should be used to mark
+            the signature.
+        """
+        if type(param) in (types.ListType, types.TupleType):
+            # It's a sublist of parameters; recurse
+            sublist = [self._param_to_html(p, show_defaults, css_class)
+                       for p in param]
+            return '('+(',\n           '.join(sublist))+')'
+        else:
+            # It's a single parameter; write it.
+            str = ('<span class=%s-arg>%s</span>' %
+                    (css_class, param.name()))
+            if show_defaults and param.default() is not None:
+                default = param.default()
+                if len(default) > 60: default = default[:57]+'...'
+                default = markup.plaintext_to_html(default)
+                default = default.replace(' ', '&nbsp;')
+                str += ('=<span class=%s-default>%s</span>' %
+                        (css_class, default))
+            return str
 
     #////////////////////////////////////////////////////////////
     # Property tables
     #////////////////////////////////////////////////////////////
-    def _write_property_summary(self, public, private, properties, container,
-                                groups, heading='Property Summary'):
+    def _write_property_summary(self, public, private, container, properties, 
+                                heading='Property Summary'):
+        """
+        Write HTML code for a property summary table.  This is used by
+        L{_write_class} to list the properties in a class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The module or class that contains the
+            properties.  C{container} is used to group the properties.
+        @param properties: The properties that should be included in
+            the list.
+        """
         if len(properties) == 0: return
+
+        # Divide the properties into groups
+        groups = container.by_group(properties)
 
         # Write the table header
         header = self._table_header(heading, 'summary')
         _write_if_nonempty(public, private, properties, header)
 
+        # Write entries for each group.  Note that every group
+        # contains at least one property or inherited property.
         for name, group in groups:
-            # Print a group header
+            # Print a group header (except for the special group None,
+            # which is always the first group).
             if name is not None:
                 header = self._group_header(name)
                 _write_if_nonempty(public, private, group, header)
 
-            # Add lines for each class
-            for prop in group:
-                str = self._property_summary_line(prop, container)
-                if str:
-                    private.write(str)
-                    if prop.is_public(): public.write(str)
-
+            # Write a table row for each property.  Skip inherited
+            # properties if _inheritance=='listed', since they'll be
+            # listed below.
+            for property in group:
+                self._write_property_summary_row(public, private,
+                                                 property, container)
             # Add an inheritance list, if appropriate
             if self._inheritance == 'listed':
-                self._write_inheritance_list(public, private,
-                                             group, container)
+                self._write_inheritance_list(public, private, group,
+                                             container.uid())
 
         # Write the table footer
         _write_if_nonempty(public, private, properties, '</table><br />\n\n')
 
-    def _property_summary_line(self, link, container):
-        prop = link.target()
-        pname = link.name()
-        
-        inherit = (container.is_class() and container != prop.cls())
-        if inherit and self._inheritance == 'listed': return ''
-        
-        # If we don't have documentation for the properties, then we
-        # can't say anything about it.
-        if not self._docmap.has_key(prop): return ''
-        pdoc = self._docmap[prop]
+    def _write_property_summary_row(self, public, private,
+                                    property, container):
+        """
+        Write HTML code for a row in the property summary table.  Each
+        row gives a brief description of a single variable.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param property: The property that should be described by this row.
+        @type property: L{Link}
+        """
+        puid = property.target()
+        pname = property.name()
+        pdoc = self._docmap.get(puid)
 
-        # Get the property's type, if it has one.
-        if pdoc.type():
-            ptype = self._docstring_to_html(pdoc.type(), prop, 10).strip()
+        # Is it an inherited property?
+        inherited = (container.uid().is_class() and
+                     puid.cls() != container.uid())
+
+        # If it's inherited & we're listing inheritance, then don't
+        # write a table row for it; it'll be included in the list.
+        if inherited and self._inheritance == 'listed': return
+        
+        # Get the property's type (if any)
+        if pdoc and pdoc.type():
+            ptype = self._docstring_to_html(pdoc.type(), pdoc.uid(), 10)
+            ptype = ptype.strip()
         else: ptype = '&nbsp;'
 
-        # Get the summary of the description.
-        descrstr = self._summary(pdoc, prop)
-        if descrstr != '&nbsp;': psum = ': '+descrstr
+        # Get a summary of the description (if any)
+        if pdoc:
+            summary = self._summary(pdoc, puid)
+            if summary != '&nbsp;': psum = ': '+summary
+            else: psum = ''
         else: psum = ''
-        
+
+        # Write a row for the property
         str = '<tr><td align="right" valign="top" '
-        str += 'width="15%"><font size="-1">'+ptype+'</font></td>\n'
-        str += '  <td><b>%s</b>%s' % (self._link_to_html(link), psum)
+        str += 'width="15%"><font size="-1">'+ptype+'</font></td>\n  <td>'
+        if inherited or pdoc:
+            str += '<b>%s</b>' % self._link_to_html(property)
+        else:
+            str += ('<a name="%s"></a><b><code>%s</code></b>' %
+                    (puid.shortname(), pname))
+        str += psum
         if (self._inheritance != 'grouped' and inherit):
-            cls = prop.cls()
+            cls = puid.cls()
             str += ('    <i>(Inherited from %s)</i>\n' %
                     self._uid_to_href(cls, cls.shortname()))
         str += '</td></tr>'
-        return str
+        private.write(str)
+        if puid.is_public(): public.write(str)
 
-    def _write_property_details(self, *args): return
-    def _property_details(self, properties, container,
-                          heading='Property Details'):
+    def _write_property_details(self, public, private, container, properties,
+                                heading='Variable Details'):
+        """
+        Write HTML code for a properties details dection.  This is
+        used by L{_write_class} to describe the properties in a class.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        @param container: The or class that contains the properties.
+            C{container} is used to group the functions.
+        @param properties: The properties that should be included in
+            the section.
+        """
+        # Filter out properties that we have no docs for; these are
+        # just listed in the summary table.
+        docmap = self._docmap
+        properties = [p for p in properties if docmap.has_key(p.target())]
+
+        # Filter out inherited properties (their details docs are
+        # listed under the class that defines them):
+        properties = [p for p in properties
+                      if p.target().cls() == container.uid()]
+
+        # If there are no properties left, then just return
         if len(properties) == 0: return ''
+
+        # Divide the properties into groups
+        groups = container.by_group(properties)
+
+        # Write the table header.
         str = self._table_header(heading, 'details')+'</table>\n'
+        _write_if_nonempty(public, private, properties, str)
 
-        numprops = 0
-        for link in properties:
-
-            prop = link.target()
-            pname = link.name()
-
-            # Don't document inherited properties; instead, the
-            # property summary points to the details description in
-            # the parent class's file.
-            if container != prop.cls(): continue
+        # Write an entry for each property
+        for property in properties:
+            str = self._property_details_entry(property, container)
+            private.write(str)
+            if property.target().is_public(): public.write(str)
             
-            if not self._docmap.has_key(prop): continue
-            pdoc = self._docmap[prop]
-            numprops += 1
+        # Write the footer
+        _write_if_nonempty(public, private, properties, '<br />\n\n')
 
-            str += '<table width="100%" class="func-details"'
-            str += ' bgcolor="#e0e0e0"><tr><td>\n'
-            str += '\n<a name="%s"></a>\n' % pname
-            str += '<h3>'+pname+'</h3>\n'
+    def _property_details_entry(self, property, container):
+        """
+        @return: The HTML code for an entry in the property details
+        section.  Each entry gives a complete description of a
+        documented property.
+        @param property: The property that should be described by this entry.
+        @type property: L{Link}
+        """
+        puid = property.target()
+        pname = property.name()
+        # Note: by the time we get here, we know that docmap contains puid.
+        pdoc = self._docmap[puid]
 
-            if pdoc.descr():
-                str += self._docstring_to_html(pdoc.descr(), prop)
+        # Add the property's name
+        str = '<table width="100%" class="func-details"'
+        str += ' bgcolor="#e0e0e0"><tr><td>\n'
+        str += '\n<a name="%s"></a>\n' % pname
+        str += '<h3>'+pname+'</h3>\n'
 
-            # Print the accessors for the property (fget=get property
-            # value; fset=set value, and fdel=delete value).
-            if pdoc.fget() or pdoc.fset() or pdoc.fdel():
-                str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
-                for (func,name) in [(pdoc.fget(), 'Get'),
-                                    (pdoc.fset(), 'Set'),
-                                    (pdoc.fdel(), 'Delete')]:
-                    if func:
-                        str += '      <dt><b>%s Function:' % name
-                        str += '</b></dt>\n      <dd>'
-                        if self._docmap.has_key(func):
-                            fdoc = self._docmap[func]
-                            fname = func.name()
-                            str += self._func_signature(fname, fdoc, 1, 0,
-                                                    'summary-sig')
-                        else:
-                            str += self._uid_to_href(func)
-                        str += '\n      </dd>\n'
-                str += '    </dl>\n  </dd>\n</dl>'
+        # Add the property's description (if any)
+        if pdoc.descr():
+            str += self._docstring_to_html(pdoc.descr(), puid)
 
-            str += '</td></tr></table>'
+        # Add the property's accessor methods
+        if pdoc.fget() or pdoc.fset() or pdoc.fdel():
+            str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
+            for (fuid,name) in [(pdoc.fget(), 'Get'),
+                                (pdoc.fset(), 'Set'),
+                                (pdoc.fdel(), 'Delete')]:
+                if fuid:
+                    str += '      <dt><b>%s Method:' % name
+                    str += '</b></dt>\n      <dd>'
+                    fdoc = self._docmap.get(fuid)
+                    str += self._func_signature(fuid.shortname(), fuid,
+                                                fdoc, 1, 0, 'summary-sig')
+                    str += '\n      </dd>\n'
+            str += '    </dl>\n  </dd>\n</dl>'
 
-        if numprops == 0: return ''
-        return str+'<br />'
+        # Add the footer.
+        str += '</td></tr></table>'
+        return str
     
     #////////////////////////////////////////////////////////////
     # Variable tables
@@ -1925,7 +2235,7 @@ class HTMLFormatter:
 
             # Add lines for each class
             for var in group:
-                str = self._var_summary_line(var, container)
+                str = self._var_summary_row(var, container)
                 private.write(str)
                 if var.is_public(): public.write(str)
 
@@ -1939,7 +2249,7 @@ class HTMLFormatter:
         # Write the table footer
         _write_if_nonempty(public, private, variables, '</table><br />\n\n')
         
-    def _var_summary_line(self, var, container):
+    def _var_summary_row(self, var, container):
         inherit = (container.is_class() and container != var.uid().cls())
         if inherit and self._inheritance == 'listed': return ''
             
@@ -1951,7 +2261,8 @@ class HTMLFormatter:
             vsum = ': ' +self._summary(var.descr(), var.uid())
         else:
             title = self._var_value_tooltip(var)
-            val = self._pprint_var_value(var, multiline=0)
+            linelen = self._variable_summary_linelen - len(vname) - 2
+            val = self._pprint_var_value(var, 0, linelen)
             vsum = ' = <span title="%s">%s</span>' % (title, val)
         str = '<tr><td align="right" valign="top" '
         str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
@@ -2056,7 +2367,8 @@ class HTMLFormatter:
         val = val.replace('<', '&lt;').replace('>', '&gt;')
         return val
 
-    def _pprint_var_value(self, var, multiline=1):
+    def _pprint_var_value(self, var, multiline=1,
+                          summary_linelen=0):
         if not var.has_value(): return ''
         val = var.uid().value()
 
@@ -2093,6 +2405,7 @@ class HTMLFormatter:
             vstr = repr(val)
             if multiline and len(vstr) > self._variable_linelen:
                 vstr = pprint.pformat(val[:self._variable_maxlines+1])
+            vstr = markup.plaintext_to_html(vstr)
         elif type(val) is type({}):
             vstr = repr(val)
             if multiline and len(vstr) > self._variable_linelen:
@@ -2103,6 +2416,7 @@ class HTMLFormatter:
                     for (k,v) in val.items()[:self._variable_maxlines+1]:
                         shortval[k]=v
                     vstr = pprint.pformat(shortval)
+            vstr = markup.plaintext_to_html(vstr)
 
         # For regexps, use colorize_re.
         elif type(val).__name__ == 'SRE_Pattern':
@@ -2120,7 +2434,7 @@ class HTMLFormatter:
             # Change spaces to &nbsp; (except spaces in html tags)
             vstr = vstr.replace(' ', '&nbsp;')
             vstr = vstr.replace('<span&nbsp;', '<span ')
-            vstr = self._linewrap_html(vstr, self._variable_summary_linelen, 1)
+            vstr = self._linewrap_html(vstr, summary_linelen, 1)
             return '<code>%s</code>\n' % vstr
 
         # Do line-wrapping.
@@ -2187,6 +2501,14 @@ class HTMLFormatter:
     #////////////////////////////////////////////////////////////
     
     def _get_index_terms(self, parsed_docstring, link, terms, links):
+        """
+        A helper function for L{_extract_term_index}.
+        
+        For each index term M{t} with key M{k} in C{parsed_docstring},
+        modify C{terms} and C{links} as follows:
+          - Set C{terms[M{k}] = t} (if C{terms[M{k}]} doesn't exist).
+          - Append C{link} to C{links[M{k}]}.
+        """
         if parsed_docstring is None: return
         for term in parsed_docstring.index_terms():
             key = self._term_index_to_anchor(term)
@@ -2197,17 +2519,17 @@ class HTMLFormatter:
 
     def _extract_term_index(self):
         """
-        @return: Two dictionaries:
-          - the first maps keys to terms
-          - the second maks keys to lists of links
-        @rtype: C{dictionary}
+        Extract the set of terms that should be indexed from all
+        documented docstrings.  Return the extracted set as a
+        list of tuples of the form C{(key, term, [links])}.
+        This list is used by L{_write_indices} to construct the
+        term index.
+        @rtype: C{list} of C{(string, L{ParsedDocstring},
+                              list of Link)}
         """
         terms = {}
         links = {}
         for (uid, doc) in self._docmap.items():
-            if (not self._show_private) and uid.is_private():
-                continue
-            
             if uid.is_function():
                 link = Link(uid.name(), uid.module())
             elif uid.is_method():
@@ -2224,14 +2546,10 @@ class HTMLFormatter:
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
                 for var in doc.variables():
-                    if ((not self._show_private) and var.uid().is_private()):
-                        continue
                     self._get_index_terms(var.descr(), link, terms, links)
                     self._get_index_terms(var.type(), link, terms, links)
             elif isinstance(doc, ClassDoc):
                 for var in doc.ivariables() + doc.cvariables():
-                    if ((not self._show_private) and var.uid().is_private()):
-                        continue
                     self._get_index_terms(var.descr(), link, terms, links)
                     self._get_index_terms(var.type(), link, terms, links)
             elif isinstance(doc, FuncDoc):
@@ -2242,8 +2560,11 @@ class HTMLFormatter:
                     self._get_index_terms(param.type(), link, terms, links)
                 for fraise in doc.raises():
                     self._get_index_terms(fraise.descr(), link, terms, links)
-                    
-        return terms, links
+
+        # Combine terms & links into one list
+        keys = terms.keys()
+        keys.sort()
+        return  [(k, terms[k], links[k]) for k in keys]
 
     #////////////////////////////////////////////////////////////
     # Identifier index generation
@@ -2251,6 +2572,9 @@ class HTMLFormatter:
 
     def _extract_identifier_index(self):
         """
+        @return: A list of the C{UID}s of all objects and variables
+            documented by C{_docmap}.  This list is used by
+            L{_write_indices} to construct the identifier index.
         @rtype: C{list} of L{UID}
         """
         # List of (sort-key, UID), where sort-key is
@@ -2275,14 +2599,13 @@ class HTMLFormatter:
     # Table of contents (frames) generation
     #////////////////////////////////////////////////////////////
 
-    def _toc_section(self, section, links): return ''
-    
     def _write_toc_section(self, public, private, section, links):
         if not links: return
 
         # Write a header
         str = self._start_of(section)
-        str += '<font size="+1"><b>%s</b></font><br />\n' % section
+        str += ('<font size="+1"><b>%s</b></font><br />\n' %
+                section.replace(' ', '&nbsp;'))
         public.write(str); private.write(str)
 
         # Sort the links by name
@@ -2316,13 +2639,14 @@ class HTMLFormatter:
         s = re.sub(r'\s\s+', '-', term.to_plaintext(None))
         return "index-"+re.sub("[^a-zA-Z0-9]", "_", s)
 
-#    def _docstring_to_html(self, docstring, container=None, indent=0):
     def _docstring_to_html(self, docstring, uid, indent=0):
         """
         @return: A string containing the HTML encoding for the given
             C{ParsedDocstring}
         @rtype: L{markup.ParsedDocstring}
+        @type uid: C{None} or C{UID}
         """
+        assert uid is None or isinstance(uid, UID)
         if docstring is None: return ''
         linker = _HTMLDocstringLinker(self, uid)
         return docstring.to_html(linker, indent=indent)
@@ -2485,14 +2809,6 @@ class HTMLFormatter:
         # There is no top-level object.
         return None
 
-#    def _filter_private(self, items):
-#        """
-#        If L{_show_private} is true, then return C{items}; otherwise,
-#        return a copy of C{items} with all private items removed.
-#        """
-#        if self._show_private: return items
-#        else: return [i for i in items if i.is_public()]
-
     def _header(self, name):
         """
         @return: The HTML code for the header of a page with the given
@@ -2509,7 +2825,7 @@ class HTMLFormatter:
         timestamp = time.asctime(time.localtime(time.time()))
         return FOOTER % (epydoc.__version__, timestamp)
 
-    def _summary(self, doc, uid):
+    def _summary(self, doc, uid, indent=0):
         """
         @return: The HTML code for the summary description of the
             object documented by C{doc}.  A summary description is the
@@ -2523,13 +2839,7 @@ class HTMLFormatter:
         @type doc: L{objdoc.ObjDoc}
         @type uid: L{uid.UID}
         """
-        # Try to find a documented ancestor
-        if isinstance(doc, FuncDoc):
-            while (not doc.documented() and doc.matches_override() and
-                   self._docmap.has_key(doc.overrides())):
-                doc = self._docmap[doc.overrides()]
-                
-        summary = self._docstring_to_html(doc.summary(), uid).strip()
+        summary = self._docstring_to_html(doc.summary(), uid, indent).strip()
         if not summary:
             if (isinstance(doc, FuncDoc) and
                 doc.returns().descr() is not None):
@@ -2540,36 +2850,53 @@ class HTMLFormatter:
                 return '&nbsp;'
         return summary or '&nbsp;'
 
-    def _write_imports(self, public, private, classes, excepts,
-                       functions, variables):
-        if not self._show_imports: return
+    def _write_imports(self, public, private, doc):
+        modules = doc.imported_modules()
+        all_classes = doc.imported_classes()
+        functions = doc.imported_functions()
+        variables = doc.imported_variables()
+        (classes,excepts) = self._split_classes(all_classes)
 
         header = self._start_of('Imports')+'<dl>\n'
-        everything=classes+excepts+functions+variables
+        everything=modules+all_classes+functions+variables
         _write_if_nonempty(public, private, everything, header)
 
+        # Use full UID names for modules; and short (link) names for
+        # everything else.
+        if len(modules) > 0:
+            header = '  <dt><b>Imported modules:</b></dt>\n  <dd>\n    '
+            _write_if_nonempty(public, private, modules, header)
+            public_hrefs, private_hrefs = [], []
+            for m in modules:
+                str = self._uid_to_href(m.target())
+                if m.name() != m.target().shortname():
+                    str += ' (as <code>%s</code>)' % m.name()
+                private_hrefs.append(str)
+                if m.target().is_public(): public_hrefs.append(str)
+            private.write(',\n    '.join(private_hrefs) + '\n  </dd>\n')
+            public.write(',\n    '.join(public_hrefs) + '\n  </dd>\n')
         if len(classes) > 0:
             header = '  <dt><b>Imported classes:</b></dt>\n  <dd>\n    '
             _write_if_nonempty(public, private, classes, header)
-            private_hrefs = [self._link_to_html(c) for c in classes]
-            public_hrefs = [self._link_to_html(c) for c in classes
-                            if c.is_public()]
+            hrefs = [(c, self._link_to_html(c)) for c in classes]
+            private_hrefs = [href for (c, href) in hrefs]
+            public_hrefs = [href for (c, href) in hrefs if c.is_public()]
             private.write(',\n    '.join(private_hrefs) + '\n  </dd>\n')
             public.write(',\n    '.join(public_hrefs) + '\n  </dd>\n')
         if len(excepts) > 0:
             header = '  <dt><b>Imported exceptions:</b></dt>\n  <dd>\n    '
             _write_if_nonempty(public, private, excepts, header)
-            private_hrefs = [self._link_to_html(e) for e in excepts]
-            public_hrefs = [self._link_to_html(e) for e in excepts
-                            if e.is_public()]
+            hrefs = [(e, self._link_to_html(e)) for e in excepts]
+            private_hrefs = [href for (e, href) in hrefs]
+            public_hrefs = [href for (e, href) in hrefs if e.is_public()]
             private.write(',\n    '.join(private_hrefs) + '\n  </dd>\n')
             public.write(',\n    '.join(public_hrefs) + '\n  </dd>\n')
         if len(functions) > 0:
             header = '  <dt><b>Imported functions:</b></dt>\n  <dd>\n    '
             _write_if_nonempty(public, private, functions, header)
-            private_hrefs = [self._link_to_html(f) for f in functions]
-            public_hrefs = [self._link_to_html(f) for f in functions
-                            if f.is_public()]
+            hrefs = [(f, self._link_to_html(f)) for f in functions]
+            private_hrefs = [href for (f, href) in hrefs]
+            public_hrefs = [href for (f, href) in hrefs if f.is_public()]
             private.write(',\n    '.join(private_hrefs) + '\n  </dd>\n')
             public.write(',\n    '.join(public_hrefs) + '\n  </dd>\n')
         if len(variables) > 0:
@@ -2578,8 +2905,7 @@ class HTMLFormatter:
             private_names = ['<code>%s</code>' % v.name()
                              for v in variables]
             public_names = ['<code>%s</code>' % v.name()
-                            for v in variables
-                            if v.is_public()]
+                            for v in variables if v.is_public()]
             private.write(',\n    '.join(private_names) + '\n  </dd>\n')
             public.write(',\n    '.join(public_names) + '\n  </dd>\n')
             
@@ -2804,7 +3130,8 @@ class HTMLFormatter:
 
         for j in range(len(inh_items)):
             (base, obj_links) = inh_items[j]
-            header = '    <b>Inherited from %s:</b>' % base.shortname()
+            header = ('    <b>Inherited from %s:</b>' %
+                      self._uid_to_href(base, base.shortname()))
             _write_if_nonempty(public, private, obj_links, header)
 
             private_str = ''
@@ -2825,6 +3152,10 @@ class HTMLFormatter:
         footer = '\n    </td></tr>\n'
         _write_if_nonempty(public, private, links, footer)
 
+##################################################
+## Helper Functions & Classes
+##################################################
+        
 def _write_if_nonempty(public, private, links, str):
     """
     Write C{str} to C{public} and C{private}; but only write to
