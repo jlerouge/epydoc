@@ -33,173 +33,177 @@ import re
 # javadoc looks.
 _WHITE = """
 /* Body color */ 
-body              { background: #ffffff; color: #000000; } 
+body               { background: #ffffff; color: #000000; } 
  
 /* Tables */ 
 table.summary, table.details, table.index
-                  { background: #e8f0f8; color: #000000; } 
+                   { background: #e8f0f8; color: #000000; } 
 tr.summary, tr.details, tr.index 
-                  { background: #70b0f0; color: #000000;  
-                    text-align: left; font-size: 120%; } 
+                   { background: #70b0f0; color: #000000;  
+                     text-align: left; font-size: 120%; } 
  
 /* Headings */
-h1.heading        { font-size: +140%; font-style: italic;
-                    font-weight: bold; }
-h2.heading        { font-size: +125%; font-style: italic;
-                    font-weight: bold; }
-h3.heading        { font-size: +110%; font-style: italic;
-                    font-weight: normal; }
+h1.heading         { font-size: +140%; font-style: italic;
+                     font-weight: bold; }
+h2.heading         { font-size: +125%; font-style: italic;
+                     font-weight: bold; }
+h3.heading         { font-size: +110%; font-style: italic;
+                     font-weight: normal; }
                     
 /* Base tree */
-pre.base-tree     { font-size: 80%; }
+pre.base-tree      { font-size: 80%; }
 
 /* Details Sections */
-table.func-details {  background: #e8f0f8; color: #000000;
-                    border: 2px groove #c0d0d0;
-                    padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.func-detail    { background: transparent; color: #000000;
-                    margin: 0 0 1em 0; }
+table.func-details { background: #e8f0f8; color: #000000;
+                     border: 2px groove #c0d0d0;
+                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
+h3.func-detail     { background: transparent; color: #000000;
+                     margin: 0 0 1em 0; }
 
-table.var-details {  background: #e8f0f8; color: #000000;
-                    border: 2px groove #c0d0d0;
-                    padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.var-details    { background: transparent; color: #000000;
-                    margin: 0 0 1em 0; }
+table.var-details  { background: #e8f0f8; color: #000000;
+                     border: 2px groove #c0d0d0;
+                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
+h3.var-details     { background: transparent; color: #000000;
+                     margin: 0 0 1em 0; }
 
 /* Function signatures */
-.sig              { background: transparent; color: #000000;
-                    font-weight: bold; }  
-.sig-name         { background: transparent; color: #006080; }  
+.sig               { background: transparent; color: #000000;
+                     font-weight: bold; }  
+.sig-name          { background: transparent; color: #006080; }  
 .sig-arg, .sig-kwarg, .sig-vararg
-                  { background: transparent; color: #008060; }  
-.sig-default      { background: transparent; color: #602000; }  
-.summary-sig      { background: transparent; color: #000000; }  
-.summary-sig-name { background: transparent; font-weight: bold; }  
+                   { background: transparent; color: #008060; }  
+.sig-default       { background: transparent; color: #602000; }  
+.summary-sig       { background: transparent; color: #000000; }  
+.summary-sig-name  { background: transparent; font-weight: bold; }  
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
-                  { background: transparent; color: #008060; }  
+                   { background: transparent; color: #008060; }  
 
 /* Doctest blocks */
-.pysrc            { background: transparent; color: #000000; }
-.pyprompt         { background: transparent; color: #005050;
-                    font-weight: bold;}
-.pystring         { background: transparent; color: #006030; }
-.pycomment        { background: transparent; color: #003060; }
-.pykeyword        { background: transparent; color: #600000; }
-.pyoutput         { background: transparent; color: #404040; }
-pre.doctestblock  { background: #f4faff; color: #000000; 
-                    padding: .5em; margin: 1em;
-                    border: 1px solid #708890; }
+.pysrc             { background: transparent; color: #000000; }
+.pyprompt          { background: transparent; color: #005050;
+                     font-weight: bold;}
+.pystring          { background: transparent; color: #006030; }
+.pycomment         { background: transparent; color: #003060; }
+.pykeyword         { background: transparent; color: #600000; }
+.pyoutput          { background: transparent; color: #404040; }
+pre.doctestblock   { background: #f4faff; color: #000000; 
+                     padding: .5em; margin: 1em;
+                     border: 1px solid #708890; }
 table pre.doctestblock
-                  { background: #dce4ec; color: #000000; 
-                    padding: .5em; margin: 1em;
-                    border: 1px solid #708890; }
+                   { background: #dce4ec; color: #000000; 
+                     padding: .5em; margin: 1em;
+                     border: 1px solid #708890; }
 
 /* Variable values */
-pre.variable      { background: #dce4ec; color: #000000;
-                    padding: .5em; margin: 0;
-                    border: 1px solid #708890; }
- 
+pre.variable       { background: #dce4ec; color: #000000;
+                     padding: .5em; margin: 0;
+                     border: 1px solid #708890; }
+.variable-linewrap { background: transparent; color: #006080; }
+.variable-ellipsis { background: transparent; color: #006080; }
+
 /* Navigation bar */ 
-table.navbar      { background: #a0c0ff; color: #000000;
-                    border: 2px groove #c0d0d0; }
-th.navbar         { background: #a0c0ff; color: #6090d0; font-size: 110% } 
-th.navselect      { background: #70b0ff; color: #000000; font-size: 110% } 
+table.navbar       { background: #a0c0ff; color: #000000;
+                     border: 2px groove #c0d0d0; }
+th.navbar          { background: #a0c0ff; color: #6090d0; font-size: 110% } 
+th.navselect       { background: #70b0ff; color: #000000; font-size: 110% } 
 
 /* Links */ 
-a:link            { background: transparent; color: #0000ff; }  
-a:visited         { background: transparent; color: #204080; }  
-a.navbar:link     { background: transparent; color: #0000ff; 
-                    text-decoration: none; }  
-a.navbar:visited  { background: transparent; color: #204080; 
-                    text-decoration: none; }  
+a:link             { background: transparent; color: #0000ff; }  
+a:visited          { background: transparent; color: #204080; }  
+a.navbar:link      { background: transparent; color: #0000ff; 
+                     text-decoration: none; }  
+a.navbar:visited   { background: transparent; color: #204080; 
+                     text-decoration: none; }  
 """
 
 # Black on steel blue.
 _BLUE = """
 /* Body color */ 
-body              { background: #88a0a8; color: #000000; } 
+body               { background: #88a0a8; color: #000000; } 
  
 /* Tables */ 
 table.summary, table.details, table.index
-                  { background: #a8c0c8; color: #000000; } 
-tr.summary        { background: #c0e0e0; color: #000000;
-                    text-align: left; font-size: 120%; } 
+                   { background: #a8c0c8; color: #000000; } 
+tr.summary         { background: #c0e0e0; color: #000000;
+                     text-align: left; font-size: 120%; } 
 tr.details, tr.index
-                  { background: #c0e0e0; color: #000000;
-                    text-align: center; font-size: 120%; }
+                   { background: #c0e0e0; color: #000000;
+                     text-align: center; font-size: 120%; }
 
 /* Headings */
-h1.heading        { font-size: +140%; font-style: italic;
-                    font-weight: bold; color: #002040; }
-h2.heading        { font-size: +125%; font-style: italic;
-                    font-weight: bold; color: #002040; }
-h3.heading        { font-size: +110%; font-style: italic;
-                    font-weight: normal; color: #002040; }
+h1.heading         { font-size: +140%; font-style: italic;
+                     font-weight: bold; color: #002040; }
+h2.heading         { font-size: +125%; font-style: italic;
+                     font-weight: bold; color: #002040; }
+h3.heading         { font-size: +110%; font-style: italic;
+                     font-weight: normal; color: #002040; }
 
 /* Base tree */
-pre.base-tree     { font-size: 80%; }
+pre.base-tree      { font-size: 80%; }
 
 /* Details Sections */
 table.func-details { background: #a8c0c8; color: #000000;
-                    border: 2px groove #c0d0d0;
-                    padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.func-detail    { background: transparent; color: #000000;
-                    margin: 0 0 1em 0; }
+                     border: 2px groove #c0d0d0;
+                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
+h3.func-detail     { background: transparent; color: #000000;
+                     margin: 0 0 1em 0; }
 
-table.var-details { background: #a8c0c8; color: #000000;
-                    border: 2px groove #c0d0d0;
-                    padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.var-details    { background: transparent; color: #000000;
-                    margin: 0 0 1em 0; }
+table.var-details  { background: #a8c0c8; color: #000000;
+                     border: 2px groove #c0d0d0;
+                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
+h3.var-details     { background: transparent; color: #000000;
+                     margin: 0 0 1em 0; }
 
 /* Function signatures */
-.sig              { background: transparent; color: #000000;
-                    font-weight: bold; }  
-.sig-name         { background: transparent; color: #006080; }  
+.sig               { background: transparent; color: #000000;
+                     font-weight: bold; }  
+.sig-name          { background: transparent; color: #006080; }  
 .sig-arg, .sig-kwarg, .sig-vararg
-                  { background: transparent; color: #008060; }  
-.sig-default      { background: transparent; color: #602000; }  
-.summary-sig      { background: transparent; color: #000000; }  
-.summary-sig-name { background: transparent; font-weight: bold; }  
+                   { background: transparent; color: #008060; }  
+.sig-default       { background: transparent; color: #602000; }  
+.summary-sig       { background: transparent; color: #000000; }  
+.summary-sig-name  { background: transparent; font-weight: bold; }  
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
-                  { background: transparent; color: #008060; }  
+                   { background: transparent; color: #008060; }  
 
 /* Doctest blocks */
-.pysrc            { background: transparent; color: #000000; }
-.pyprompt         { background: transparent; color: #005050;
-                    font-weight: bold;}
-.pystring         { background: transparent; color: #006030; }
-.pycomment        { background: transparent; color: #003060; }
-.pykeyword        { background: transparent; color: #600000; }
-.pyoutput         { background: transparent; color: #404040; }
-pre.doctestblock  { background: #90a8b0; color: #000000; 
-                    padding: .5em; margin: 1em;
-                    border: 1px solid #708890; }
+.pysrc             { background: transparent; color: #000000; }
+.pyprompt          { background: transparent; color: #005050;
+                     font-weight: bold;}
+.pystring          { background: transparent; color: #006030; }
+.pycomment         { background: transparent; color: #003060; }
+.pykeyword         { background: transparent; color: #600000; }
+.pyoutput          { background: transparent; color: #404040; }
+pre.doctestblock   { background: #90a8b0; color: #000000; 
+                     padding: .5em; margin: 1em;
+                     border: 1px solid #708890; }
 table pre.doctestblock
-                  { background: #b0c8d0; color: #000000; 
-                    padding: .5em; margin: 1em;
-                    border: 1px solid #708890; }
+                   { background: #b0c8d0; color: #000000; 
+                     padding: .5em; margin: 1em;
+                     border: 1px solid #708890; }
  
 /* Variable values */
-pre.variable      { background: #b0c8d0; color: #000000; 
-                    padding: .5em; margin: 0;
-                    border: 1px solid #708890; }
+pre.variable       { background: #b0c8d0; color: #000000; 
+                     padding: .5em; margin: 0;
+                     border: 1px solid #708890; }
+.variable-linewrap { background: transparent; color: #006080; }
+.variable-ellipsis { background: transparent; color: #006080; }
  
 /* Navigation bar */ 
-table.navbar      { background: #607880; color: #b8d0d0;
-                    border: 2px groove #c0d0d0; }
-th.navbar         { background: #607880; color: #88a0a8;
-                    font-weight: normal; } 
-th.navselect      { background: #88a0a8; color: #000000;
-                    font-weight: normal; } 
+table.navbar       { background: #607880; color: #b8d0d0;
+                     border: 2px groove #c0d0d0; }
+th.navbar          { background: #607880; color: #88a0a8;
+                     font-weight: normal; } 
+th.navselect       { background: #88a0a8; color: #000000;
+                     font-weight: normal; } 
  
 /* Links */ 
-a:link            { background: transparent; color: #104060; }  
-a:visited         { background: transparent; color: #082840; }  
-a.navbar:link     { background: transparent; color: #b8d0d0;
-                    text-decoration: none; }  
-a.navbar:visited  { background: transparent; color: #b8d0d0;
-                    text-decoration: none; }
+a:link             { background: transparent; color: #104060; }  
+a:visited          { background: transparent; color: #082840; }  
+a.navbar:link      { background: transparent; color: #b8d0d0;
+                     text-decoration: none; }  
+a.navbar:visited   { background: transparent; color: #b8d0d0;
+                     text-decoration: none; }
 """
 
 ############################################################
