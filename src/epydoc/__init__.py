@@ -46,6 +46,10 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
+@todo: Consider other names for C{@undocumented}:
+    C{@bypass}, C{@nodoc}, C{@exclude}, C{@omit}?
+
+@todo 3.0: Support encodings.
 @todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}:
     - C{ObjDoc}s will contain info about objects, but not gather it.
     - An C{inspection} module will gather info via inspection.
