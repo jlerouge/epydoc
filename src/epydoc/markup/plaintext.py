@@ -1,5 +1,5 @@
 #
-# epytext.py: epydoc formatted docstring parsing
+# plaintext.py: plaintext docstring parsing
 # Edward Loper
 #
 # Created [04/10/01 12:00 AM]

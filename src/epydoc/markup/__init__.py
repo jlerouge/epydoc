@@ -1,6 +1,10 @@
 #
-# - warnings & errors?
-# - DocstringParser or just module.parse?
+# epydoc package file
+#
+# A python documentation Module
+# Edward Loper
+#
+# $Id$
 #
 
 """
