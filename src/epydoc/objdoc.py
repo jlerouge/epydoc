@@ -822,7 +822,9 @@ class ObjDoc:
                 return
             if self._sortorder is None: self._sortorder = []
             try: idents = _descr_to_identifiers(descr)
-            except ValueError: warnings.append('Bad sort order list')
+            except ValueError, e:
+                warnings.append('Bad sort order list')
+                return
             for ident in idents:
                 if '*' in ident:
                     regexp = '^%s$' % ident.replace('*', '(.*)')
@@ -2520,16 +2522,17 @@ def report_param_mismatches(docmap):
     # documented, anyway.
     mismatches = [m for m in mismatches if docmap.documented_ancestor(m[0])]
     
-    if not mismatches: return
+    if not mismatches: return 1
     mismatches.sort()
-    if sys.stderr.softspace: print >>sys.stderr
     estr = ("Warning: the following methods' parameters do not match "+
             "the parameters of the base class methods that they "+
             "override; so documentation was not inherited:")
-    print >>sys.stderr, markup.wordwrap(estr, indent=9).lstrip()
+    estr = markup.wordwrap(estr, indent=9).lstrip()
     for mismatch in mismatches:
-        estr = '    - %s\n      (base method=%s)' % mismatch
-        print >>sys.stderr, estr
+        estr += '    - %s\n      (base method=%s)\n' % mismatch
+    if sys.stderr.softspace: print >>sys.stderr
+    print >>sys.stderr, estr
+    return 0
 
 #////////////////////////////////////////////////////////
 #// PropertyDoc
