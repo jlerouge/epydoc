@@ -256,8 +256,11 @@ class APIDoc:
             else:
                 return '...'
         self._cyclecheck = True
-        
-        s = '%s 0x%x' % (self.__class__.__name__, id(self))
+
+        if 'pyid' in exclude:
+            s = self.__class__.__name__
+        else:
+            s = '%s 0x%x' % (self.__class__.__name__, id(self))
 
         # Only print non-empty fields:
         fields = [field for field in self._STR_FIELDS
@@ -272,7 +275,7 @@ class APIDoc:
                 s += self.__pp_list(fieldval, doublespace, depth,
                                     exclude, (field is fields[-1]))
             elif isinstance(fieldval, types.DictType):
-                s += self.__pp_dict(fieldval.items(), doublespace, 
+                s += self.__pp_dict(fieldval, doublespace, 
                                     depth, exclude, (field is fields[-1]))
             elif isinstance(fieldval, APIDoc):
                 s += self.__pp_apidoc(fieldval, doublespace, depth,
@@ -296,7 +299,9 @@ class APIDoc:
             s += joiner.join(valstr.split('\n'))
         return s
 
-    def __pp_dict(self, items, doublespace, depth, exclude, is_last):
+    def __pp_dict(self, dict, doublespace, depth, exclude, is_last):
+        items = dict.items()
+        items.sort()
         line1 = (is_last and ' ') or '|'
         s = ''
         for item in items:
@@ -532,12 +537,14 @@ def cm_doc_from_routine_doc(routine_doc):
     import copy
     cm_doc = copy.copy(routine_doc)
     cm_doc.__class__ = ClassMethodDoc
+    cm_doc.dotted_name = None
     return cm_doc
 
 def sm_doc_from_routine_doc(routine_doc):
     import copy
     sm_doc = copy.copy(routine_doc)
     sm_doc.__class__ = StaticMethodDoc
+    sm_doc.dotted_name = None
     return sm_doc
 
 class PropertyDoc(ValueDoc):
