@@ -426,6 +426,12 @@ class ObjectUID(UID):
                 else:
                     raise ValueError("Cant find module for %r" % self._obj)
             except ImportError, e:
+                # Error importing the module
+                if sys.stderr.softspace: print >>sys.stderr
+                print  >>sys.stderr, '\n  Warning: %s' % e
+                self._module = None
+            except ValueError, e:
+                # Can't find module for a function
                 if sys.stderr.softspace: print >>sys.stderr
                 print  >>sys.stderr, '\n  Warning: %s' % e
                 self._module = None
@@ -791,8 +797,7 @@ def _find_function_module(func):
         if module is None: continue
         if func.func_globals is module.__dict__:
             return module
-    raise ValueError("Couldn't the find module for the function %s" %
-                     func.func_name)
+    raise ValueError("Could not find a module for %s" % func.func_name)
 
 ##################################################
 ## UID Lookup
