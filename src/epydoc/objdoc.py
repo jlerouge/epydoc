@@ -66,7 +66,7 @@ _KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
                      'param', 'parameter', 'arg', 'argument',
                      'raise', 'raises', 'exception', 'except',
                      'summary', 'keyword', 'kwarg', 'kwparam',
-                     'undocumented')
+                     'undocumented', 'include')
 
 ##################################################
 ## __docformat__
@@ -811,7 +811,7 @@ class ObjDoc:
                 for regexp in self._undocumented:
                     if regexp.match(items[i].name()):
                         del items[i]
-                        continue
+                        break
 
         # If an explicit sort order was given (via @sort), then
         # use it to sort the objects.
