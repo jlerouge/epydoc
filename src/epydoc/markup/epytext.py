@@ -669,6 +669,7 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
     """
     linenum = start + 1
     para_indent = None
+    doublecolon = lines[start].rstrip()[-2:] == '::'
 
     # Get the contents of the bullet.
     para_start = _BULLET_RE.match(lines[start], bullet_indent).end()
@@ -678,6 +679,10 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
         # Find the indentation of this line.
         line = lines[linenum]
         indent = len(line) - len(line.lstrip())
+
+        # "::" markers end paragraphs.
+        if doublecolon: break
+        if line.rstrip()[-2:] == '::': doublecolon = 1
 
         # A blank line ends the token
         if indent == len(line): break
@@ -738,10 +743,15 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
     @rtype: C{int}
     """
     linenum = start + 1
+    doublecolon = 0
     while linenum < len(lines):
         # Find the indentation of this line.
         line = lines[linenum]
         indent = len(line) - len(line.lstrip())
+
+        # "::" markers end paragraphs.
+        if doublecolon: break
+        if line.rstrip()[-2:] == '::': doublecolon = 1
 
         # Blank lines end paragraphs
         if indent == len(line): break
