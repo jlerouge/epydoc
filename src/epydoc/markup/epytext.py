@@ -180,19 +180,30 @@ def summary(tree):
         else:
             children = children[1:]
 
+    # Special case: if the docstring contains a single literal block,
+    # then try extracting the summary from it.
+    if (len(children) == 0 and len(tree.childNodes) == 1 and
+        tree.childNodes[0].tagName == 'literalblock'):
+        str = re.split(r'\n\s*(\n|$).*',
+                       tree.childNodes[0].childNodes[0].data, 1)[0]
+        children = [Element('para')]
+        children[0].appendChild(Text(str))
+
     # If we didn't find a paragraph, return an empty epytext.
     if len(children) == 0: return Element('epytext')
 
     # Extract the first sentence.
     parachildren = children[0].childNodes
     summary = Element('epytext')
+    para = Element('para')
+    summary.appendChild(para)
     for parachild in parachildren:
-        if (isinstance(parachild, Text) and
-            re.search(r'\.(\s|$)', parachild.data)):
-            sumstr = re.match('(.*?\.)(\s|$)', parachild.data).group(1)
-            summary.appendChild(Text(sumstr))
-            return summary
-        summary.appendChild(parachild.cloneNode(1))
+        if isinstance(parachild, Text):
+            m = re.match(r'\s*([\w\W]*?\.)(\s|$)', parachild.data)
+            if m:
+                para.appendChild(Text(m.group(1)))
+                return summary
+        para.appendChild(parachild.cloneNode(1))
 
     return summary
 
@@ -341,14 +352,14 @@ def _add_para(para_token, stack, indent_stack, errors, warnings):
         para = _colorize(para_token, errors, warnings)
         stack[-1].appendChild(para)
     else:
-        if (len(stack[-1].childNodes)>0 and
-            stack[-1].childNodes[-1].tagName == 'para'):
-            estr = ("Improper paragraph indentation: "+
-                    "blockquotes are not supported")
-            errors.append(StructuringError(estr, para_token))
-        else:
-            estr = "Improper paragraph indentation"
-            errors.append(StructuringError(estr, para_token))
+        #if (len(stack[-1].childNodes)>0 and
+        #    stack[-1].childNodes[-1].tagName == 'para'):
+        #    estr = ("Improper paragraph indentation; "+
+        #            "blockquotes are not supported")
+        #    errors.append(StructuringError(estr, para_token))
+        #else:
+        estr = "Improper paragraph indentation"
+        errors.append(StructuringError(estr, para_token))
 
 def _add_section(heading_token, stack, indent_stack, errors, warnings):
     """Add a new section to the DOM tree, with the given heading."""
@@ -397,8 +408,7 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
     elif bullet_token.contents[-1] == ':':
         list_type = 'fieldlist'
     else:
-        print 'WARNING: Bad bullet', bullet_token.contents
-        list_type = 'ulist'
+        raise AssertionError('Bad Bullet: %r' % bullet_token.contents)
 
     # Is this a new list?
     newlist = 0
@@ -581,7 +591,7 @@ class Token:
 # Construct regular expressions for recognizing bullets.  These are
 # global so they don't have to be reconstructed each time we tokenize
 # a docstring.
-_ULIST_BULLET = '[-*]( +|$)'
+_ULIST_BULLET = '[-]( +|$)'
 _OLIST_BULLET = '(\d+[.])+( +|$)'
 _FIELD_BULLET = '@\w+( +[\w\.]+)?:( +|$)'
 _BULLET_RE = re.compile(_ULIST_BULLET + '|' +
