@@ -57,7 +57,7 @@ class ManFormatter:
     def _modulepage(self, uid, doc):
         str = self._name(uid)
         str += self._descr(uid, doc)
-        str += self._funclist(doc.methods(), doc, 'FUNCTIONS')
+        str += self._funclist(doc.functions(), doc, 'FUNCTIONS')
         return str
 
     def _classpage(self, uid, doc):
