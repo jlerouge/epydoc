@@ -33,9 +33,8 @@ the C{Link} class to implement crossreferencing between C{ObjDoc}s.
 ## Imports
 ##################################################
 
-import inspect, UserDict, epytext, string, new, re
+import inspect, UserDict, epytext, string, new, re, sys, types
 import xml.dom.minidom
-import types
 
 from epydoc.uid import UID, Link, make_uid
 
@@ -183,6 +182,13 @@ class Var:
         @rtype: L{UID}
         """
         return self._uid
+
+    def name(self):
+        """
+        @return: The short name of this variable.
+        @rtype: C{string}
+        """
+        return self._uid.shortname()
     
     def type(self):
         """
@@ -397,6 +403,10 @@ class ObjDoc:
         self._version = None
         self._seealsos = []
         self._descr = None
+        self.__verbosity = verbosity
+        self._parse_errors = []
+        self._parse_warnings = []
+        self._field_warnings = []
 
         # If there's an __epydoc_sort__ attribute, keep it.
         if hasattr(obj, '__epydoc_sort__'):
@@ -410,7 +420,7 @@ class ObjDoc:
         docstring = _getdoc(obj)
         if docstring:
             self._documented = 1
-            self.__parse_docstring(docstring, verbosity)
+            self.__parse_docstring(docstring)
         else:
             self._documented = 0
     
@@ -502,11 +512,11 @@ class ObjDoc:
     #// Private
     #////////////////////////////
 
-    def __parse_docstring(self, docstring, verbosity):
+    def __parse_docstring(self, docstring):
         # Parse the documentation, and store any errors or warnings.
-        parse_errors = []
-        parse_warnings = []
-        field_warnings=[]
+        parse_warnings = self._parse_warnings
+        parse_errors = self._parse_errors
+        field_warnings = self._field_warnings
         pdoc = epytext.parse(docstring, parse_errors, parse_warnings)
 
         # If there were any errors, handle them by simply treating
@@ -540,11 +550,24 @@ class ObjDoc:
             self._descr = pdoc
         else:
             self._descr = None
+
+    def _print_errors(self, stream=sys.stderr):
+        """
+        Print any errors that were encountered while constructing this
+        C{ObjDoc} to C{stream}.  This method should be called at the
+        end of the constructor of every class that is derived from
+        C{ObjDoc}.
+        
+        @rtype: C{None}
+        """
+        parse_warnings = self._parse_warnings
+        parse_errors = self._parse_errors
+        field_warnings = self._field_warnings
         
         # Supress warnings/errors, if requested
-        if verbosity <= -1: parse_warnings = []
-        if verbosity <= -2: field_warnings = []
-        if verbosity <= -3: parse_errors = []
+        if self.__verbosity <= -1: parse_warnings = []
+        if self.__verbosity <= -2: field_warnings = []
+        if self.__verbosity <= -3: parse_errors = []
         
         # Print the errors and warnings.
         if (parse_warnings or parse_errors or field_warnings):
@@ -552,25 +575,28 @@ class ObjDoc:
             (filename, startline) = _find_docstring(self._uid)
             if startline is None: startline = 0
             
-            print '='*75
+            if stream.softspace: print >>stream
+            print >>stream, '='*75
             if filename is not None:
-                print filename
-                print 'In %s docstring (line %s):' % (self._uid, startline+1)
+                print >>stream, filename
+                print >>stream, ('In %s docstring (line %s):' %
+                                 (self._uid, startline+1))
             else:
-                print 'In %s docstring:' % self._uid
-            print '-'*75
+                print >>stream, 'In %s docstring:' % self._uid
+            print >>stream, '-'*75
             for error in parse_errors:
                 error.linenum += startline
-                print error.as_error()
+                print >>stream, error.as_error()
             for warning in parse_warnings:
                 warning.linenum += startline
-                print warning.as_warning()
+                print >>stream, warning.as_warning()
             for warning in field_warnings:
                 if startline is None:
-                    print '       '+warning
+                    print >>stream, '       '+warning
                 else:
-                    print '%5s: Warning: %s' % ('L'+`startline+1`, warning)
-            print
+                    print >>stream, ('%5s: Warning: %s' %
+                                     ('L'+`startline+1`, warning))
+            print >>stream
         
 #////////////////////////////////////////////////////////
 #// ModuleDoc
@@ -669,10 +695,13 @@ class ModuleDoc(ObjDoc):
         # Make sure we used all the type fields.
         if self._tmp_type != {}:
             for key in self._tmp_type.keys():
-                print ('Warning: @type for unknown parameter: %s in %s' %
-                       (key, self._uid))
+                estr = '@type for unknown variable %s' % key
+                self._field_warnings.append(estr)
         del self._tmp_var
         del self._tmp_type
+
+        # Print out any errors/warnings that we encountered.
+        self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
         if tag in ('variable', 'var'):
@@ -903,8 +932,8 @@ class ClassDoc(ObjDoc):
         # Make sure we used all the type fields.
         if self._tmp_type:
             for key in self._tmp_type.keys():
-                print ('Warning: @type for unknown parameter: %s in %s' %
-                       (key, self._uid))
+                estr = '@type for unknown variable %s' % key
+                self._field_warnings.append(estr)
         del self._tmp_ivar
         del self._tmp_type
 
@@ -931,6 +960,9 @@ class ClassDoc(ObjDoc):
         # Inherited variables (added externally with inherit())
         self._inh_cvariables = []
         self._inh_ivariables = []
+
+        # Print out any errors/warnings that we encountered.
+        self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
         if tag in ('cvariable', 'cvar'):
@@ -1146,6 +1178,9 @@ class FuncDoc(ObjDoc):
         else:
             raise TypeError("Can't document %s" % func)
 
+        # Print out any errors/warnings that we encountered.
+        self._print_errors()
+
     # The regular expression that is used to check whether a builtin
     # function or method has a signature in its docstring.  Err on the
     # side of conservatism in detecting signatures.
@@ -1262,13 +1297,13 @@ class FuncDoc(ObjDoc):
                 arg.set_type(self._tmp_type[name])
                 del self._tmp_type[name]
         if self._tmp_param != {}:
-            for key in self._tmp_type.keys():
-                print ('Warning: @param for unknown parameter: %s in %s' %
-                       (key, self._uid))
+            for key in self._tmp_param.keys():
+                estr = '@param for unknown parameter %s' % key
+                self._field_warnings.append(estr)
         if self._tmp_type != {}:
             for key in self._tmp_type.keys():
-                print ('Warning: @type for unknown parameter: %s in %s' %
-                       (key, self._uid))
+                estr = '@type for unknown parameter %s' % key
+                self._field_warnings.append(estr)
         del self._tmp_param
         del self._tmp_type
 
@@ -1644,8 +1679,7 @@ class DocMap(UserDict.UserDict):
         if isinstance(key, UID):
             return self.data[key]
         else:
-            print 'warning: lookup by value is bad'
-            return self.data[make_uid(key)]
+            raise TypeError()
 
     def __repr__(self):
         return '<Documentation: '+`len(self.data)`+' objects>'
