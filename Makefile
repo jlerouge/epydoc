@@ -20,8 +20,8 @@ EXAMPLES = doc/examples
 
 ############################################################
 
-.PHONY: all usage distributions web webpage xfer
-.PHONY: refdocs verbose
+.PHONY: all usage clean distributions web webpage xfer local
+.PHONY: checkdocs refdocs examples stdlib
 
 all: usage
 
@@ -77,13 +77,35 @@ examples: .examples.up2date
 	       --no-private --css blue -v ${EXAMPLES_SRC} sre
 	touch .examples.up2date
 
+#//////////////////////////////////////////////////////////////////////
+# Build documentation for the Python Standard Library
+LNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
 LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
-	      |grep -v '/eric/' \
 	      |grep -v '/lib-old/' \
-	      |grep -v '/site-packages/') # for now (?)
+	      |grep -v '/site-packages/')
+stdlib:
+	mkdir -p stdlib
+	epydoc -o stdlib -f -vvvv -q -c white --show-imports \
+	       -n ${LNAME} -u http://www.python.org \
+	       --builtins ${LIBS}
 
-libdocs:
-	mkdir -p libs
-	epydoc -o libs -f -vv -q -n 'Python Standard Library' \
-	       -u http://www.python.org -c white ${LIBS} #\
-#	       >libs/libdocs.out 2>libs/libdocs.err
+##//////////////////////////////////////////////////////////////////////
+## Build documentation for everything installed on this system.
+## Exclude the following libraries:
+##   - lib-old/ni.py: Implements packages, but they're already standard
+##   - eric: it fails and dies in an un-catchable way
+##   - gnome/score.py: it forks a new process
+#LNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
+#LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
+#	      |grep -v '/gnome/score.py' \
+#	      |grep -v '/eric/' \
+#	      |grep -v '/lib-old/ni.py')
+##	      |grep -v '/site-packages/') # for now (?)
+#
+#libdocs:
+#	mkdir -p libs
+#	epydoc -o libs -f -vvvv -q -n ${LNAME} \
+#	       -u http://www.python.org -c white ${LIBS} -builtins- #\
+##	       >libs/libdocs.out 2>libs/libdocs.err
+#	rm -f TESTLispG* SQLTEST.mar sqlwhere.py 
+#
