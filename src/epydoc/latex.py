@@ -841,7 +841,8 @@ class LatexFormatter:
     def _module_tree(self, sortorder=None):
         """
         @return: The HTML code for the module hierarchy tree.  This is
-            used by L{_trees_to_latex} to construct the hiearchy page.
+            used by C{_trees_to_latex} to construct the hiearchy page.
+            (Well, actually, it's not used by anything at present.)
         @rtype: C{string}
         """
         str = '\\begin{itemize}\n'
@@ -1113,31 +1114,13 @@ class LatexFormatter:
         else: container = uid.cls() or uid.module()
         str = ''
 
-        # Version.
-        if doc.version():
-            items = [self._dom_to_latex(doc.version())]
-            str += self._descrlist(items, 'Version')
-
-        # Authors
-        items = [self._dom_to_latex(a) for a in doc.authors()]
-        str += self._descrlist(items, 'Author', 'Authors', short=1)
-
-        # Requirements
-        items = [self._dom_to_latex(r) for r in doc.requires()]
-        str += self._descrlist(items, 'Requires')
-
-        # Warnings
-        items = [self._dom_to_latex(w) for w in doc.warnings()]
-        str += self._descrlist(items, 'Warning', 'Warnings')
-        
-        # Warnings
-        items = [self._dom_to_latex(n) for n in doc.notes()]
-        str += self._descrlist(items, 'Note', 'Notes')
-        
-        # See also
-        items = [self._dom_to_latex(s) for s in doc.seealsos()]
-        str +=  self._descrlist(items, 'See also', short=1)
-
+        for field in doc.fields():
+            values = doc.field_value(field)
+            if not values: continue
+            items = [self._dom_to_latex(v) for v in values]
+            str += self._descrlist(items, field.singular,
+                                   field.plural, field.short)
+            
         return str
             
     def _descrlist(self, items, singular, plural=None, short=0):
