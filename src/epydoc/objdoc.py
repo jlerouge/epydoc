@@ -29,6 +29,10 @@ implemented with the L{UID} class.  These identifiers are also used by
 the C{Link} class to implement crossreferencing between C{ObjDoc}s.
 """
 
+# This can get changed by other modules (e.g., by epydoc.cli in
+# response to command-line arguments)
+DEFAULT_DOCFORMAT = 'epytext'
+
 ##################################################
 ## Imports
 ##################################################
@@ -429,6 +433,14 @@ class ObjDoc:
         else:
             self._sortorder = None
 
+        # Look up __docformat__
+        if self._uid.is_module(): module = self._uid
+        else: module = self._uid.module()
+        self._docformat = DEFAULT_DOCFORMAT
+        if module is not None:
+            try: self._docformat = module.value().__docformat__
+            except: pass
+
         # If there's a doc string, parse it.
         docstring = _getdoc(obj)
         if docstring:
@@ -588,7 +600,7 @@ class ObjDoc:
         else:
             self._descr = None
 
-    def _print_errors(self, stream=sys.stderr):
+    def _print_errors(self, stream=None):
         """
         Print any errors that were encountered while constructing this
         C{ObjDoc} to C{stream}.  This method should be called at the
@@ -600,6 +612,10 @@ class ObjDoc:
         parse_warnings = self._parse_warnings
         parse_errors = self._parse_errors
         field_warnings = self._field_warnings
+
+        # Set it every time, in case something changed sys.stderr
+        # (like epydoc.gui :) )
+        if stream is None: stream = sys.stderr
         
         # Supress warnings/errors, if requested
         if self.__verbosity <= -1: parse_warnings = []
@@ -634,9 +650,9 @@ class ObjDoc:
                 if startline is None:
                     print >>stream, '       '+warning
                 else:
-                    estr = '%5s: Warning: %s' % ('L'+`startline+1`, warning)
-                    estr = epytext.wordwrap(estr, 6, 75-6).strip()
-                    print >>stream, estr
+                    estr =' Warning: %s' % warning
+                    estr = epytext.wordwrap(estr, 7, 75-7).strip()
+                    print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
             print >>stream
         
 #////////////////////////////////////////////////////////
@@ -696,7 +712,8 @@ class ModuleDoc(ObjDoc):
                 
             # Don't do anything for these special variables:
             if field in ('__builtins__', '__doc__', '__all__', '__file__',
-                         '__path__', '__name__', '__epydoc_sort__'):
+                         '__path__', '__name__', '__epydoc_sort__',
+                         '__docformat__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
@@ -935,9 +952,9 @@ class ClassDoc(ObjDoc):
                 val = new.instancemethod(val, None, cls)
             vuid = make_uid(val, self._uid, field)
             
-            
             # Don't do anything for these special variables:
-            if field in ('__doc__', '__module__', '__epydoc_sort__'):
+            if field in ('__doc__', '__module__', '__epydoc_sort__',
+                         '__dict__', '__weakref__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
