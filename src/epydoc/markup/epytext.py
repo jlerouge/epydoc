@@ -74,28 +74,22 @@ Description::
    <!ATTLIST li bullet NMTOKEN #IMPLIED>
    <!ATTLIST olist start NMTOKEN #IMPLIED>
 
-   <!ELEMENT uri    (name, target)>
-   <!ELEMENT link   (name, target)>
-   <!ELEMENT name   (#PCDATA | %colorized;)*>
-   <!ELEMENT target (#PCDATA)>
+   <!ELEMENT uri     (name, target)>
+   <!ELEMENT link    (name, target)>
+   <!ELEMENT name    (#PCDATA | %colorized;)*>
+   <!ELEMENT target  (#PCDATA)>
    
-   <!ELEMENT code   (#PCDATA | %colorized;)*>
-   <!ELEMENT math   (#PCDATA | %colorized;)*>
-   <!ELEMENT italic (#PCDATA | %colorized;)*>
-   <!ELEMENT bold   (#PCDATA | %colorized;)*>
-   <!ELEMENT index  (#PCDATA | %colorized;)>
+   <!ELEMENT code    (#PCDATA | %colorized;)*>
+   <!ELEMENT math    (#PCDATA | %colorized;)*>
+   <!ELEMENT italic  (#PCDATA | %colorized;)*>
+   <!ELEMENT bold    (#PCDATA | %colorized;)*>
+   <!ELEMENT indexed (#PCDATA | %colorized;)>
 
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
 """
 __docformat__ = 'epytext en'
-
-# To do:
-#   - convert tabs to spaces
-#   - Replace \015\012 with \012
-
-# Replace "index" entity with "indexed"?
 
 # Code organization..
 #   1. parse()
@@ -125,7 +119,7 @@ _ESCAPES = {'lb':'{', 'rb': '}'}
 _COLORIZING_TAGS = {
     'C': 'code',
     'M': 'math',
-    'X': 'index',
+    'X': 'indexed',
     'I': 'italic', 
     'B': 'bold',
     'U': 'uri',
@@ -180,7 +174,7 @@ def parse(str, errors = None, warnings = None):
     str = string.expandtabs(str)
 
     # Tokenize the input string.
-    tokens = _tokenize(str, warnings)
+    tokens = _tokenize(str, warnings, errors)
 
     # Have we encountered a field yet?
     encountered_field = 0
@@ -202,6 +196,7 @@ def parse(str, errors = None, warnings = None):
     indent_stack = [-1, None]
 
     for token in tokens:
+        # Uncomment these for debugging:
         #print ''.join(['%11s' % (t and t.tagName) for t in stack]),':',token.tag
         #print ''.join(['%11s' % i for i in indent_stack]),':',token.indent
         
@@ -244,8 +239,7 @@ def parse(str, errors = None, warnings = None):
         if raise_on_error:
             raise errors[0]
         else:
-            pass # For debugging!
-            #return None
+            return None
         
     # Return the top-level epytext DOM element.
     doc.appendChild(stack[1])
@@ -268,14 +262,10 @@ def _pop_completed_blocks(token, stack, indent_stack):
             if indent_stack[-1]!=None and indent<indent_stack[-1]: pop=1
             elif indent_stack[-1]==None and indent<indent_stack[-2]: pop=1
 
-            # Dedent to a list item
-            elif indent==indent_stack[-2] and stack[-1].tagName=='li': pop=1
-
-            # Dedent to a field list item, if it is followed by
-            # another field list item.
-            elif (token.tag == 'bullet' and token.contents[-1] == ':' and
-                  indent==indent_stack[-2] and
-                  stack[-1].tagName in ('field', 'li')): pop=1
+            # Dedent to a list item, if it is follwed by another list
+            # item with the same indentation.
+            elif (token.tag == 'bullet' and indent==indent_stack[-2] and 
+                  stack[-1].tagName in ('li', 'field')): pop=1
 
             # End of a list (no more list items available)
             elif (stack[-1].tagName in ('ulist', 'olist') and
@@ -286,14 +276,6 @@ def _pop_completed_blocks(token, stack, indent_stack):
             if pop == 0: return
             stack.pop()
             indent_stack.pop()
-
-    ## If we dedent back to a field list, and there's another field
-    ## list bullet, then end this field list item.
-    #if token.tag == 'bullet' and token.contents[-1] == ':':
-    #    while (indent==indent_stack[-2] and
-    #           stack[-1].tagName in ('field', 'li')):
-    #        stack.pop()
-    #        indent_stack.pop()
 
 def _add_para(doc, para_token, stack, indent_stack, errors, warnings):
     """Colorize the given paragraph, and add it to the DOM tree."""
@@ -306,12 +288,6 @@ def _add_para(doc, para_token, stack, indent_stack, errors, warnings):
         para = _colorize(doc, para_token, errors, warnings)
         stack[-1].appendChild(para)
     else:
-        #if (len(stack[-1].childNodes)>0 and
-        #    stack[-1].childNodes[-1].tagName == 'para'):
-        #    estr = ("Improper paragraph indentation; "+
-        #            "blockquotes are not supported")
-        #    errors.append(StructuringError(estr, para_token))
-        #else:
         estr = "Improper paragraph indentation."
         errors.append(StructuringError(estr, para_token))
 
@@ -382,11 +358,20 @@ def _add_list(doc, bullet_token, stack, indent_stack, errors, warnings):
             stack.pop()
             indent_stack.pop()
 
+        if (list_type != 'fieldlist' and indent_stack[-1] is not None and
+            bullet_token.indent == indent_stack[-1]):
+            estr = "Lists must be indented."
+            if bullet_token.startline == 1 and bullet_token.indent == 0:
+                estr += (' (When you include text on the same line as '+
+                         'the comment-opening quote, epytext cannot '+
+                         'determine its indentation; so a blank line '+
+                         'must be used in this case.)')
+            errors.append(StructuringError(estr, bullet_token))
+
         if list_type == 'fieldlist':
             # Fieldlist should be at the top-level.
             for tok in stack[2:]:
                 if tok.tagName != "section":
-                    #print [s.tagName for s in stack[1:]]
                     estr = "Fields must be at the top level."
                     errors.append(StructuringError(estr, bullet_token))
                     break
@@ -555,7 +540,7 @@ _LIST_BULLET_RE = re.compile(_ULIST_BULLET + '|' + _OLIST_BULLET)
 _FIELD_BULLET_RE = re.compile(_FIELD_BULLET)
 del _ULIST_BULLET, _OLIST_BULLET, _FIELD_BULLET
 
-def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
+def _tokenize_doctest(lines, start, block_indent, tokens, errors):
     """
     Construct a L{Token} containing the doctest block starting at
     C{lines[start]}, and append it to C{tokens}.  C{block_indent}
@@ -568,9 +553,9 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
         doctest block to be tokenized.
     @param block_indent: The indentation of C{lines[start]}.  This is
         the indentation of the doctest block.
-    @param warnings: A list of the warnings generated by parsing.  Any
-        new warnings generated while will tokenizing this paragraph
-        will be appended to this list.
+    @param errors: A list where any errors generated during parsing
+        will be stored.  If no list is specified, then errors will 
+        generate exceptions.
     @return: The line number of the first line following the doctest
         block.
         
@@ -578,7 +563,7 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
     @type start: C{int}
     @type block_indent: C{int}
     @type tokens: C{list} of L{Token}
-    @type warnings: C{list} of L{ParseError}
+    @type errors: C{list} of L{ParseError}
     @rtype: C{int}
     """
     # If they dedent past block_indent, keep track of the minimum
@@ -599,7 +584,7 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
         if indent < block_indent:
             min_indent = min(min_indent, indent)
             estr = 'Improper doctest block indentation.'
-            warnings.append(TokenizationError(estr, linenum, line))
+            errors.append(TokenizationError(estr, linenum, line))
 
         # Go on to the next line.
         linenum += 1
@@ -685,8 +670,6 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
     """
     linenum = start + 1
     para_indent = None
-    brace_level = lines[start].count('{') - lines[start].count('}')
-    if brace_level < 0: brace_level = 0
 
     # Get the contents of the bullet.
     para_start = _BULLET_RE.match(lines[start], bullet_indent).end()
@@ -704,31 +687,8 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, warnings):
         if indent < bullet_indent: break
         
         # A line beginning with a bullet ends the token.
-        if brace_level == 0 and _LIST_BULLET_RE.match(line, indent):
-            if para_indent and indent == para_indent:
-                estr = ("Sublists should be indented or separated "+
-                        "by blank lines.")
-                warnings.append(TokenizationError(estr, linenum, line))
-            break
-        brace_level += line.count('{')        
-        brace_level -= line.count('}')
-        if brace_level < 0: brace_level = 0
-
-        if indent == bullet_indent:
-            # Next list item?
-            if _BULLET_RE.match(line, indent): break
-                
-            # Field item contents don't have to be indented.
-            elif _FIELD_BULLET_RE.match(bcontents): pass
-            
-            # List contents need to be indented.
-            else:
-                estr = ("List item contents should be indented; "+
-                        "Paragraphs should be separated from "+
-                        "lists by blank lines or indentation.")
-                warnings.append(TokenizationError(estr, linenum, line))
-                break
-
+        if _BULLET_RE.match(line, indent): break
+        
         # If this is the second line, set the paragraph indentation, or 
         # end the token, as appropriate.
         if para_indent == None: para_indent = indent
@@ -779,8 +739,6 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
     @rtype: C{int}
     """
     linenum = start + 1
-    brace_level = lines[start].count('{') - lines[start].count('}')
-    if brace_level < 0: brace_level = 0
     while linenum < len(lines):
         # Find the indentation of this line.
         line = lines[linenum]
@@ -793,20 +751,7 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
         if indent != para_indent: break
 
         # List bullets end paragraphs
-        if brace_level == 0 and _BULLET_RE.match(line, indent):
-            # Field lists don't need to be separated/indented.
-            if _LIST_BULLET_RE.match(line, indent):
-                estr = "Lists should be indented or separated by blank lines."
-                if linenum == 1 and indent == 0:
-                    estr += (' (When you include text on the same line as '+
-                             'the comment-opening quote, epytext cannot '+
-                             'determine its indentation; so a blank line '+
-                             'must be used in this case.)')
-                warnings.append(TokenizationError(estr, linenum, line))
-            break
-        brace_level += line.count('{')        
-        brace_level -= line.count('}')
-        if brace_level < 0: brace_level = 0
+        if _BULLET_RE.match(line, indent): break
 
         # Check for mal-formatted field items.
         if line[indent] == '@':
@@ -840,12 +785,6 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
             level = _HEADING_CHARS.index(contents[1][0])
             tokens.append(Token(Token.HEADING, start,
                                 contents[0], para_indent, level))
-            #if len(contents) > 2:
-            #    # On second thought, why not allow headings to be
-            #    # immediately followed by a paragraph? :)
-            #    estr = "Headings should be followed by blank lines"
-            #    err = TokenizationError(estr, linenum, line)
-            #    warnings.append(err)
             return start+2
                  
     # Add the paragraph token, and return the linenum after it ends.
@@ -853,7 +792,7 @@ def _tokenize_para(lines, start, para_indent, tokens, warnings):
     tokens.append(Token(Token.PARA, start, contents, para_indent))
     return linenum
         
-def _tokenize(str, warnings):
+def _tokenize(str, warnings, errors):
     """
     Split a given formatted docstring into an ordered list of
     C{Token}s, according to the epytext markup rules.
@@ -864,6 +803,10 @@ def _tokenize(str, warnings):
         new warnings generated while will tokenizing this paragraph
         will be appended to this list.
     @type warnings: C{list} of L{ParseError}
+    @param errors: A list where any errors generated during parsing
+        will be stored.  If no list is specified, then errors will 
+        generate exceptions.
+    @type errors: C{list} of L{ParseError}
     @return: a list of the C{Token}s that make up the given string.
     @rtype: C{list} of L{Token}
     """
@@ -885,7 +828,7 @@ def _tokenize(str, warnings):
         elif line[indent:indent+4] == '>>> ':
             # blocks starting with ">>> " are doctest block tokens.
             linenum = _tokenize_doctest(lines, linenum, indent,
-                                        tokens, warnings)
+                                        tokens, errors)
         elif _BULLET_RE.match(line, indent):
             # blocks starting with a bullet are LI start tokens.
             linenum = _tokenize_listart(lines, linenum, indent,
@@ -1291,7 +1234,6 @@ def to_debug(tree, indent=4, seclevel=0):
 
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':( *\n     \|\n)\2', '::\\1', childstr)
-    #childstr = re.sub(':( *\n     \|\n LIT>\|)', '::\\1', childstr)
 
     if tree.tagName == 'para':
         str = wordwrap(childstr, indent-6, 69)+'\n'
