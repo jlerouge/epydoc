@@ -13,6 +13,9 @@ PY_SRC = src/epydoc/
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 
+# What version of python to use?
+PYTHON = python2.2
+
 # The location of the webpage.
 HOST = shell.sf.net
 DIR = /home/groups/e/ep/epydoc/htdocs
@@ -21,8 +24,8 @@ DIR = /home/groups/e/ep/epydoc/htdocs
 VERSION = $(shell python -c 'import epydoc; print epydoc.__version__')
 
 # Output directories
-WEBDIR = html
-API = api
+WEBDIR = webpage
+API = html/api
 EXAMPLES = examples
 STDLIB = stdlib
 LATEX = latex/api
@@ -91,22 +94,23 @@ checkdocs:
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
-	cp -r ${API} ${WEBDIR}
-	cp -r ${EXAMPLES} ${WEBDIR}
+	cp -r ${API} ${WEBDIR}/api
+	cp -r ${EXAMPLES} ${WEBDIR}/examples
 	cp ${LATEX}/api.pdf ${WEBDIR}/epydoc.pdf
 	touch .html.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
 # __docformat__ strings in each epydoc module.  (So just
-# xml.dom.minidom gets plaintext docstrings).
+# xml.dom.minidom and a few Docutils modules get plaintext
+# docstrings).
 api-html: .api-html.up2date
 .api-html.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
-	python2.2 src/epydoc/cli.py \
+	${PYTHON} src/epydoc/cli.py \
 	       -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --inheritance=listed \
-	       --css blue --private-css green -v --debug --navlink 'epydoc'\
+	       --inheritance=listed --navlink "epydoc 2.0&alpha;"\
+	       --css blue --private-css green -v --debug \
 	       --docformat plaintext ${PY_SRC}
 	touch .api-html.up2date
 
@@ -114,18 +118,34 @@ api-pdf: .api-pdf.up2date
 .api-pdf.up2date: ${PY_SRC}
 	rm -rf ${LATEX}
 	mkdir -p ${LATEX}
-	python2.2 src/epydoc/cli.py \
-	       --pdf -o ${LATEX} -n "Epydoc ${VERSION}" --no-private ${PY_SRC}
+	${PYTHON} src/epydoc/cli.py --pdf -o ${LATEX} \
+	       -n "Epydoc ${VERSION}" ${PY_SRC}
 	touch .api-pdf.up2date
+
 
 examples: .examples.up2date
 .examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
-	python2.2 src/epydoc/cli.py \
+	${PYTHON} src/epydoc/cli.py \
 	       -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue -t example -q \
-	       --navlink 'epydoc examples' ${EXAMPLES_SRC} sre
+	       --no-private --css blue -t example --docformat=plaintext \
+	       --navlink 'epydoc examples' doc/epydoc_example.py sre
+	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/grouped \
+	       --inheritance=grouped \
+	       -n epydoc -u http://epydoc.sourceforge.net \
+	       --no-private --css blue --debug \
+	       --navlink 'epydoc examples' doc/inh_example.py
+	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/listed \
+	       --inheritance=listed \
+	       -n epydoc -u http://epydoc.sourceforge.net \
+	       --no-private --css blue --debug \
+	       --navlink 'epydoc examples' doc/inh_example.py
+	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/included \
+	       --inheritance=included \
+	       -n epydoc -u http://epydoc.sourceforge.net \
+	       --no-private --css blue --debug \
+	       --navlink 'epydoc examples' doc/inh_example.py
 	touch .examples.up2date
 
 # Generate the HTML version of the man page.  Note: The
@@ -170,9 +190,9 @@ stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: ${PY_SRC}
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
-	python2.2 src/epydoc/cli.py -o ${STDLIB} -c white --show-imports \
+	${PYTHON} src/epydoc/cli.py -o ${STDLIB} -c white \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext --debug \
-	       --navlink ${SLLINK} --builtins ${SLFILES}
+	       --show-imports --navlink ${SLLINK} --builtins ${SLFILES}
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
@@ -180,7 +200,7 @@ stdlib-pdf: .stdlib-pdf.up2date
 .stdlib-pdf.up2date: ${PY_SRC}
 	rm -rf ${STDLIB_LATEX}
 	mkdir -p ${STDLIB_LATEX}
-	time python2.2 src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
+	${PYTHON} src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
 		--no-private -n ${SLNAME} --docformat plaintext \
 		--debug --builtins ${SLFILES}
 ##//////////////////////////////////////////////////////////////////////
