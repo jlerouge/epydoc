@@ -2195,7 +2195,7 @@ class HTMLFormatter:
             if link_public: public.write(link)
             else: public.write(anchor)
         str = psum
-        if (self._inheritance != 'grouped' and inherit):
+        if (self._inheritance != 'grouped' and inherited):
             cls = puid.cls()
             str += ('    <i>(Inherited from %s)</i>\n' %
                     self._uid_to_href(cls, cls.shortname()))
