@@ -79,10 +79,17 @@ produce API documentation using the following steps:
       the base class hierarchy?  What does pydoc do?
 @todo 3.0: Docstring inheritance for overridden properties.
 
+@license: IBM Open Source License
+@copyright: (C) 2003 Edward Loper
+
+@newfield contributor: Contributor, Contributors (Alphabetical Order)
+@contributor: U{Glyph Lefkowitz <mailto:glyph@twistedmatrix.com>}
+@contributor: U{Edward Loper <mailto:edloper@gradient.cis.upenn.edu>}
+@contributor: U{Bruce Mitchener <mailto:bruce@cubik.org>}
+@contributor: U{Christian Reis <mailto:kiko@async.com.br>}
+
 @var __license__: The license governing the use and distribution of
     epydoc.
-@var __contributors__: Contributors to epydoc, in alphabetical
-    order by last name.
 """
 __docformat__ = 'epytext en'
 
@@ -90,16 +97,6 @@ __docformat__ = 'epytext en'
 __version__ = '2.0 alpha'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
-
-# Copyright/license info
-__copyright__ = '(C) 2003 Edward Loper'
-__license__ = 'IBM Open Source License'
-
-# Contributors to epydoc (in alpha order by last name)
-__contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
-                    'Edward Loper <edloper@gradient.cis.upenn.edu>',
-                    'Bruce Mitchener <bruce@cubik.org>',
-                    'Christian Reis <kiko@async.com.br>']
 
 # To do:
 #   - Change html to write directly to files, instead of building up strings
