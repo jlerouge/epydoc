@@ -98,7 +98,13 @@ def cli():
 
     # Record the order of the modules in options.
     from epydoc.uid import make_uid
-    options['modules'] = [make_uid(m) for m in modules]
+    options['modules'] = muids = []
+    for m in modules:
+        try:
+            muids.append(make_uid(*args))
+        except:
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, 'Failed to create a UID for %s' % m
 
     # Build their documentation
     docmap = _make_docmap(modules, options)
@@ -300,7 +306,9 @@ def _parse_args():
         elif opt in ('--command-line-order', '--command_line_order'):
             options['alphabetical'] = 0
         elif opt in ('--css', '-c'): options['css'] = val
-        elif opt in ('--debug',): options['debug']=1
+        elif opt in ('--debug',):
+            options['debug'] = 1
+            options['verbosity'] += 4
         elif opt in ('--dvi',): options['action'] = 'dvi'
         elif opt in ('--docformat', '--doc-format', '--doc_format'):
             from epydoc.objdoc import set_default_docformat
