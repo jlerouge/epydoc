@@ -6,6 +6,14 @@
 # $Id$
 #
 
+"""
+Predefined help file for the HTML outputter (L{epydoc.html}).
+
+@type HTML_HELP: C{string}
+@var HTML_HELP: The contents of the HTML body for the default
+   help page.
+"""
+
 HTML_HELP = """
 <center><h2> API Documentation </h2></center>
 
@@ -91,9 +99,9 @@ page, and an index page.  </p>
 
 <p> A navigation bar is located at the top and bottom of every page.
 It indicates what type of page you are currently viewing, and allows
-you to go to related pages.  The labels on the navigation bar are
-defined by the following table.  Note that not some labels are only
-displayed on appropriate pages. </p>
+you to go to related pages.  The following table describes the labels
+on the navigation bar.  Note that not some labels (such as
+[Parent]) are not displayed on all pages. </p>
 
 <table class="summary" border="1" cellspacing="0" cellpadding="3" width="100%">
 <tr class="summary">
