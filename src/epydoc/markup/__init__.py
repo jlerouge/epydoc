@@ -278,11 +278,16 @@ class Field:
       - The tag specifies the type of information that the field
         encodes.
       - The argument specifies the object that the field describes.
+        The argument may be C{None} or a C{string}.
       - The body contains the field's information.
+
+    Tags are automatically downcased and stripped; and arguments are
+    automatically stripped.
     """
     def __init__(self, tag, arg, body):
-        self._tag = tag.lower()
-        self._arg = arg
+        self._tag = tag.lower().strip()
+        if arg is None: self._arg = None
+        else: self._arg = arg.strip()
         self._body = body
 
     def tag(self):
@@ -296,7 +301,7 @@ class Field:
         """
         @return: This field's argument, or C{None} if this field has
             no argument.
-        @rtype: C{string}
+        @rtype: C{string} or C{None}
         """
         return self._arg
 
