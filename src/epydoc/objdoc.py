@@ -123,6 +123,14 @@ class ObjDoc:
         self._seealsos = []
         self._descr = None
 
+        # If there's an __epydoc_sort__ attribute, keep it.
+        if hasattr(obj, '__epydoc_sort__'):
+            self._sort_order = obj.__epydoc_sort__
+        elif hasattr(obj, '__all__'):
+            self._sort_order = obj.__all__
+        else:
+            self._sort_order = None
+
         # If there's a doc string, parse it.
         if hasattr(obj, '__doc__') and obj.__doc__ != None:
             self._documented = 1
@@ -176,6 +184,12 @@ class ObjDoc:
         @returntype: C{list} of C{Element}
         """
         return self._seealsos
+
+    def sort_order(self):
+        """
+        @return: the object's __epydoc_sort__ list.
+        """
+        return self._sort_order
 
     #////////////////////////////
     #// Protected
@@ -780,7 +794,7 @@ class FuncDoc(ObjDoc):
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_param.has_key(arg):
-                warnings.append('Redefinition of parameter')
+                warnings.append('Redefinition of parameter '+`arg`)
             self._tmp_param[arg] = descr
         elif tag == 'type':
             if arg == None:
@@ -788,7 +802,7 @@ class FuncDoc(ObjDoc):
                 arg = ''
             if self._tmp_type.has_key(arg):
                 warnings.append('Redefinition of variable '+\
-                                  'type: '+arg+' ('+descr+')')
+                                  'type: '+`arg`)
             self._tmp_type[arg] = descr
         elif tag in ('raise', 'raises', 'exception', 'except'):
             if arg == None:
