@@ -34,6 +34,12 @@ Usage::
     -h, -?, --help, --usage    Display this usage message.
     -h TOPIC, --help TOPIC     Display information about TOPIC
                                (css, usage, or version).
+
+@var PROFILE: Whether or not to run the profiler.
+
+@var _internal_error: A global variable recording whether any internal
+    errors have been detected.  If this variable is set to true, then
+    L{cli} will issue a warning once it completes running.
 """
 
 import sys, os.path, re, getopt
@@ -43,6 +49,40 @@ PROFILE=0
 ##################################################
 ## Command-Line Interface
 ##################################################
+
+# This function isn't used yet.
+_internal_error = 0
+def _catchall(func, debug, *args, **kwargs):
+    """
+    Call C{func} with the given arguments and keyword arguments.  If
+    C{debug} is false, then catch any exception that is raised by
+    debug, and issue an "internal error" message.  Also, set the
+    global L{_internal_error} to true.  If C{debug} is true, then
+    propagate any exceptions.
+
+    @return: The return value from calling C{func}
+    """
+    global _internal_error
+    try:
+        return func(*args, **kwargs)
+    
+    except Exception, e:
+        # If we're debugging, then propagate the error.
+        if debug: raise
+
+        # Otherwise, report it.
+        _internal_error = 1
+        if sys.stderr.softspace: print >>sys.stderr
+        print >>sys.stderr, "INTERNAL ERROR: %s" % e
+
+    except:
+        # If we're debugging, then propagate the error.
+        if debug: raise
+
+        # Otherwise, report it.
+        _internal_error = 1
+        if sys.stderr.softspace: print >>sys.stderr
+        print >>sys.stderr, "INTERNAL ERROR"
 
 def _usage(exit_code=1):
     """
@@ -58,6 +98,7 @@ def _usage(exit_code=1):
     NAME = os.path.split(sys.argv[0])[-1]
     if NAME == '(imported)': NAME = 'epydoc'
     usage = __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
+    usage = re.sub(r'\n\s*@[\s\S]*', '', usage)
     print >>stream, 'Usage:', usage.strip()
     sys.exit(exit_code)
 
@@ -230,6 +271,14 @@ def cli():
     # Perform the requested action.
     if options['check']: _check(docmap, options)
     else: _html(docmap, options)
+
+    # Report any internal errors.
+    if _internal_error:
+        estr = ("An internal error occured.  To see the exception "+
+                "that caused the\n error, use the '--debug' option.")
+        print >>sys.stderr, '\n'+'!'*70
+        print >>sys.stderr, estr
+        print >>sys.stderr, '\n'+'!'*70
 
 def _make_docmap(modules, options):
     """
