@@ -235,6 +235,7 @@ class Param:
         self._descr = descr
         self._type = type
         self._default = default
+        self._shared_descr_params = None
         
     def name(self):
         """
@@ -265,6 +266,35 @@ class Param:
         """
         return self._default
 
+    def shared_descr_params(self):
+        """
+        @rtype: C{None} or C{list} of L{Param}
+        @return: A list of C{Param}s that share the description given
+        by this parameter.  This is used in cases where multiple
+        parameters are descrubed in one C{@param} field, such as:
+
+            @param *varargs, **kwargs: extra args for f.
+
+        In this case, the description will be added to C{varargs}'s
+        C{Param}; and C{vararg}'s C{Param} will list C{kwargs} in its
+        C{shared_descr_params()} list.
+
+        For parameters described by normal (single-parameter)
+        C{@param} fields, C{shared_descr_params} will return C{None}.
+        """
+        return self._shared_descr_params
+
+    def set_shared_descr_params(self, shared_descr_params):
+        """
+        Register a list of C{Param}s that share the description given
+        by this parameter.
+        @type C{shared_descr_params}: C{list} of L{Param}
+        @param C{shared_descr_params}: The C{Param}s that share the
+            description given by this parameter
+        @rtype: C{None}
+        """
+        self._shared_descr_params = shared_descr_params
+    
     def set_type(self, type):
         """
         Set this parameter's type.
@@ -2034,7 +2064,7 @@ class FuncDoc(ObjDoc):
         overrides, matches_override, parameter_list
     @group Inheritance: find_override
     @group Error Reporting: _param_mismatches
-    @group Signature Parsing: _init_params, _init_signature,
+    @group Signature Parsing: _init_signature,
         _params_to_vars, _signature_match, _init_builtin_signature
 
     @type _params: C{list} of L{Var}
@@ -2062,8 +2092,8 @@ class FuncDoc(ObjDoc):
     def __init__(self, uid, verbosity=0):
         func = uid.value()
         
-        self._tmp_param = {}
-        self._tmp_type = {}
+        #self._tmp_param = {}
+        #self._tmp_type = {}
         self._keywords = []
         
         self._raises = []
@@ -2084,11 +2114,29 @@ class FuncDoc(ObjDoc):
         else:
             raise TypeError("Can't document %s" % func)
 
+        # These are used to keep track of params & keyword arguments
+        # while processing fields; we can delete them when we're done.
+        self._tmp_param = {}
+        self._tmp_keyword = {}
+        self._tmp_extra_type = {} # types for @keyword args
+        for param in self.parameter_list():
+            self._tmp_param[param.name()] = param
+
         # Parse the docstring.
         ObjDoc.__init__(self, uid, verbosity, docstring)
 
-        self._init_params()
-        
+        # Deal with any extra types for @keyword args
+        for (name, typ) in self._tmp_extra_type.items():
+            kwarg = self._tmp_keyword.get(name)
+            if kwarg is None:
+                estr = '@type for unknown parameter %s' % name
+                self._field_warnings.append(estr)
+            else:
+                kwarg.set_type(typ)
+
+        # We're done processing fields; we don't need these anymore.
+        del self._tmp_param, self._tmp_keyword, self._tmp_extra_type
+
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
@@ -2194,54 +2242,6 @@ class FuncDoc(ObjDoc):
         else: self._kwarg_param = None
         self._return = Param('return')
 
-    def _init_params(self):
-        tmp_param = self._tmp_param
-        tmp_type = self._tmp_type
-        
-        # Add descriptions/types to argument/return Variables.
-        vars = self.parameter_list()[:]
-        if self._return: vars.append(self._return)
-        for arg in vars:
-            name = arg.name()
-            if tmp_param.has_key(name):
-                descr = tmp_param[name]
-                if descr is None:
-                    estr = '@keyword used for explicit parameter %s' % name
-                    self._field_warnings.append(estr)
-                else:
-                    arg.set_descr(tmp_param[name])
-                del tmp_param[name]
-            if tmp_type.has_key(name):
-                arg.set_type(tmp_type[name])
-                del tmp_type[name]
-
-        # Deal with keyword params.
-        if self._keywords:
-            if not self._kwarg_param:
-                estr = '@keyword used without a keyword parameter'
-                self._field_warnings.append(estr)
-            else:
-                for param in self._keywords:
-                    if tmp_type.has_key(param.name()):
-                        param.set_type(tmp_type[param.name()])
-                        del tmp_type[param.name()]
-
-        # Delete _tmp_param entries that were added by keywords.
-        for (k,v) in tmp_param.items():
-            if v is None: del tmp_param[k]
-
-        # Flag warnings if we didn't use any @param or @types.
-        if tmp_param != {}:
-            for key in tmp_param.keys():
-                estr = '@param for unknown parameter %s' % key
-                self._field_warnings.append(estr)
-        if tmp_type != {}:
-            for key in tmp_type.keys():
-                estr = '@type for unknown parameter %s' % key
-                self._field_warnings.append(estr)
-        del self._tmp_param
-        del self._tmp_type
-
     def _params_to_vars(self, params, defaults):
         vars = []
         if defaults == None: defaults = []
@@ -2304,40 +2304,82 @@ class FuncDoc(ObjDoc):
             if arg is not None:
                 warnings.append(tag+' did not expect an argument')
                 return
-            if self._tmp_param.has_key('return'):
+            if self._return.descr() is not None:
                 warnings.append('Redefinition of @%s' % tag)
-            self._tmp_param['return'] = descr
+            self._return.set_descr(descr)
         elif tag in ('returntype', 'rtype'):
             if arg is not None:
                 warnings.append(tag+' did not expect an argument')
                 return
-            if self._tmp_type.has_key('return'):
+            if self._return.type() is not None:
                 warnings.append('Redefinition of @%s' % tag)
-            self._tmp_type['return'] = descr
+            self._return.set_type(descr)
         elif tag in ('param', 'parameter', 'arg', 'argument'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            if self._tmp_param.has_key(arg):
-                warnings.append('Redefinition of parameter %s' % arg)
-            self._tmp_param[arg] = descr
+            if not re.search('[:;, ]', arg):
+                # Normal case: descr for a single parameter
+                param = self._tmp_param.get(arg)
+                if param is None:
+                    warnings.append('@%s for unknown parameter %s' % (tag,arg))
+                else:
+                    if param.descr() is not None:
+                        warnings.append('Redefinition of parameter %s' % arg)
+                    param.set_descr(descr)
+            else:
+                # Special case: multiple parameters listed at once.
+                param_names = re.split('[:;, ]+ *', arg.strip())
+
+                # First, filter out any params that don't exist, and
+                # issue warnings accordingly.
+                params = [self._tmp_param.get(p) for p in param_names]
+                for (param, name) in zip(params, param_names):
+                    if param is None:
+                        warnings.append('@%s for unknown parameter %s' %
+                                        (tag, name))
+                    if param.descr() is not None:
+                        warnings.append('Redefinition of parameter %s' % name)
+                        param.set_descr(None)
+                params = [p for p in params if p is not None]
+                if not params: return
+                
+                # List the description & extra params under the param
+                # that occurs first.
+                for param1 in self.parameter_list():
+                    for param2 in params:
+                        if param1 == param2:
+                            param1.set_descr(descr)
+                            shared = [p for p in params if p != param1]
+                            param1.set_shared_descr_params(shared)
+                            return
+
         elif tag == 'type':
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
             args = re.split('[:;, ]+ *', arg.strip())
             for arg in args:
-                if self._tmp_type.has_key(arg):
-                    warnings.append('Redefinition of @%s %s' % (tag, arg))
-                self._tmp_type[arg] = descr
+                param = self._tmp_param.get(arg)
+                if param is None:
+                    if self._tmp_extra_type.has_key(arg):
+                        warnings.append('Redefinition of @%s %s' % (tag,arg))
+                    self._tmp_extra_type[arg] = descr
+                else:
+                    if param.type() is not None:
+                        warnings.append('Redefinition of @%s %s' % (tag,arg))
+                    param.set_type(descr)
         elif tag in ('keyword', 'kwarg', 'kwparam'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
             if self._tmp_param.has_key(arg):
+                warnings.append('@%s used for explitict parameter %s'
+                                % (tag, arg))
+            if self._tmp_keyword.has_key(arg):
                 warnings.append('Redefinition of parameter %s' % arg)
-            self._tmp_param[arg] = None # To check for redefinition.
             self._keywords.append(Param(arg, descr))
+            self._tmp_keyword[arg] = self._keywords[-1]
         elif tag in ('raise', 'raises', 'exception', 'except'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
