@@ -229,7 +229,7 @@ class HTML_Doc:
     # Write (and its helpers)
     #////////////////////////////////////////////////////////////
     
-    def write(self, directory=None, verbose=1):
+    def write(self, directory=None, progress_callback=None):
         """
         Write the documentation to the given directory.
 
@@ -238,70 +238,74 @@ class HTML_Doc:
             written.  If no directory is specified, output will be
             written to the current directory.  If the directory does
             not exist, it will be created.
-        @type verbose: C{int}
-        @param verbose: The level of verbosity for output when writing the
-            documentation.  A verbosity of zero will only generate
-            output on errors.  A verbosity of one will output a single
-            period for each file written.  Higher values give more
-            verbose output.
+        @type progress_callback: C{function}
+        @param progress_callback: A callback function that is called
+            before each file is written, with two arguments: the name
+            of the created file (C{string}); and the object documented
+            by the file, if any (L{ObjDoc}).
         @rtype: C{None}
         """
         if directory in ('', None): directory = './'
         if directory[-1] != '/': directory = directory + '/'
         self._show_private = 0
         
+        # Create dest directories, if necessary
+        if not os.path.isdir(directory):
+            if os.path.exists(directory):
+                raise ValueError('%r is not a directory' % directory)
+            os.mkdir(directory)
+        if not os.path.isdir(os.path.join(directory, 'private/')):
+            if os.path.exists(os.path.join(directory, 'private/')):
+                raise ValueError('%r is not a directory' %
+                                 os.path.join(directory, 'private/'))
+            os.mkdir(os.path.join(directory, 'private/'))
+
         # Write the private version of the docs.
         self._show_private = 1
         self._cssfile = '../epydoc.css'
-        self._write_docs(os.path.join(directory, 'private/'), verbose)
+        self._write_docs(os.path.join(directory, 'private/'),
+                         progress_callback)
 
         # Write the public version of the docs.
         self._show_private = 0
         self._cssfile = 'epydoc.css'
-        self._write_docs(directory, verbose)
+        self._write_docs(directory, progress_callback)
         
         # Write the tree file (package & class hierarchies)
+        progress_callback(os.path.join(directory, 'epydoc-tree.html'), None)
         str = self._tree_to_html()
         open(directory+'epydoc-tree.html', 'w').write(str)
 
         # Write the index file.
+        progress_callback(os.path.join(directory, 'epydoc-index.html'), None)
         str = self._index_to_html()
         open(directory+'epydoc-index.html', 'w').write(str)
 
         # Write the help file.
+        progress_callback(os.path.join(directory, 'epydoc-help.html'), None)
         self._write_help(directory)
 
         # Write the CSS file.
+        progress_callback(os.path.join(directory, self._cssfile), None)
         self._write_css(directory)
 
-    def _write_docs(self, directory, verbose):
+    def _write_docs(self, directory, progress_callback):
         """
         A helper for L{write} that does the work of writing the
         documentation to the given directory.
         
         @param directory: Testing L{_find_toplevel}.
         """
-        # Create dest directory, if necessary
-        if not os.path.isdir(directory):
-            if os.path.exists(directory):
-                raise ValueError('%r is not a directory' % directory)
-            os.mkdir(directory)
-
         for (n, d) in self._docmap.items():
+            filename = os.path.join(directory, `n`+'.html')
             if isinstance(d, ModuleDoc):
-                if verbose==1:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                elif verbose>1: print 'Writing docs for module: ', n
+                if progress_callback: progress_callback(filename, d)
                 str = self._module_to_html(n)
-                open(directory+`n`+'.html', 'w').write(str)
+                open(filename, 'w').write(str)
             elif isinstance(d, ClassDoc):
-                if verbose==1:
-                    sys.stdout.write('.')
-                    sys.stdout.flush()
-                elif verbose>1: print 'Writing docs for class:  ', n
+                if progress_callback: progress_callback(filename, d)
                 str = self._class_to_html(n)
-                open(directory+`n`+'.html', 'w').write(str)
+                open(filename, 'w').write(str)
 
     def _write_help(self, directory):
         """
@@ -660,7 +664,7 @@ class HTML_Doc:
                 str += ('<a class="navbar" href="%s">%s</a>' %
                           (self._pkg_url, self._pkg_name))
             else:
-                str += I+self._pkg_name
+                str += self._pkg_name
 
         str += '</th>\n        </tr>\n'
         str += '      </table>\n    </td>\n  </tr>\n</table>\n'
