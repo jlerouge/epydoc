@@ -752,7 +752,6 @@ class ObjDoc:
                         for item in items:
                             if name.match(item.name()):
                                 sortorder.append(item.name())
-                                print sortorder
 
             item_by_name = {}
             for item in items:
@@ -2196,8 +2195,6 @@ class FuncDoc(ObjDoc):
     def _init_params(self):
         # Add descriptions/types to argument/return Variables.
         vars = self.parameter_list()[:]
-        if self._vararg_param: vars.append(self._vararg_param)
-        if self._kwarg_param: vars.append(self._kwarg_param)
         if self._return: vars.append(self._return)
         for arg in vars:
             name = arg.name()
@@ -2438,12 +2435,18 @@ class FuncDoc(ObjDoc):
         @return: A (flat) list of all parameters for the
             function/method documented by this C{FuncDoc}.  If you are
             interested in the signature of the function/method, you
-            should use L{parameters} instead.
+            should use L{parameters} instead.  This list includes
+            vararg & keyword params, but does not include the return
+            value.
         @rtype: C{list} of L{Var}
         @see: L{parameters}
         """
         if not hasattr(self, '_param_list'):
             self._param_list = _flatten(self._params)
+            if self._vararg_param:
+                self._param_list.append(self._vararg_param)
+            if self._kwarg_param:
+                self._param_list.append(self._kwarg_param)
         return self._param_list
 
     #////////////////////////////
@@ -2467,8 +2470,16 @@ class FuncDoc(ObjDoc):
                                              _MethodDescriptorType):
                     return
 
-                # We've found a method that we override.
-                self._overrides = make_uid(base_method)
+                # We've found a method that we override.  But
+                # Make sure we don't override ourself.
+                overrides = make_uid(base_method)
+                if overrides == self._uid:
+                    if sys.stderr.softspace: print >>sys.stderr
+                    estr = ('Warning: %s appears to override itself' %
+                            self._uid)
+                    print >>sys.stderr, estr
+                    return
+                self._overrides = overrides
 
                 # Get the base & child argspecs.  If either fails,
                 # then one is probably a builtin of some sort, so
