@@ -113,10 +113,10 @@ pre.variable       { background: #dce4ec; color: #000000;
 .re-ref            { background: transparent; color: #404040; }
 
 /* Navigation bar */ 
-table.navbar       { background: #a0c0ff; color: #000000;
+table.navbar       { background: #a0c0ff; color: #0000ff;
                      border: 2px groove #c0d0d0; }
-th.navbar          { background: #a0c0ff; color: #6090d0; font-size: 110% } 
-th.navselect       { background: #70b0ff; color: #000000; font-size: 110% } 
+th.navbar          { background: #a0c0ff; color: #0000ff; } 
+th.navselect       { background: #70b0ff; color: #000000; } 
 
 /* Links */ 
 a:link             { background: transparent; color: #0000ff; }  
@@ -213,7 +213,7 @@ pre.variable       { background: #b0c8d0; color: #000000;
 /* Navigation bar */ 
 table.navbar       { background: #607880; color: #b8d0d0;
                      border: 2px groove #c0d0d0; }
-th.navbar          { background: #607880; color: #88a0a8;
+th.navbar          { background: #607880; color: #b8d0d0;
                      font-weight: normal; } 
 th.navselect       { background: #88a0a8; color: #000000;
                      font-weight: normal; } 
