@@ -33,18 +33,21 @@ STDLIB_LATEX = latex/stdlib
 ##//////////////////////////////////////////////////////////////////////
 
 .PHONY: all usage clean distributions web webpage xfer local
-.PHONY: checkdocs refdocs examples stdlib latex
+.PHONY: checkdocs api-html api-pdf examples stdlib-html stdlib-pdf
+.PHONY: test tests
 
 all: usage
 usage:
 	@echo "Usage:"
 	@echo "  make webpage -- build the webpage and copy it to sourceforge"
-	@echo "    make refdocs -- build the API docs for epydoc"
+	@echo "    make api-html -- build the HTML docs for epydoc"
+	@echo "    make api-pdf -- build the PDF docs for epydoc"
 	@echo "    make examples -- build example API docs for the webpage"
+	@echo "    make stdlib-html -- build HTML docs for the Python Standard Library"
 	@echo "  make checkdoc -- check the documentation completeness"
 	@echo "  make distributions -- build the distributions"
 	@echo "  make clean -- remove all built files"
-	@echo "  make stdlib -- build docs for the Python Standard Library"
+	@echo "  make test -- run unit tests"
 
 ##//////////////////////////////////////////////////////////////////////
 ## Clean
@@ -70,7 +73,7 @@ distributions: .distributions.up2date
 
 web: xfer
 webpage: xfer
-xfer: .html.up2date stdlib
+xfer: .html.up2date stdlib-html
 	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
 	rsync -arzv -e ssh ${STDLIB}/ $(HOST):$(DIR)/stdlib
 
@@ -80,7 +83,7 @@ local: .html.up2date
 checkdocs:
 	epydoc --check ${PY_SRC}
 
-.html.up2date: .refdocs.up2date .examples.up2date .pdf.up2date \
+.html.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
 		doc/epydoc-man.html doc/epydocgui-man.html ${DOCS}
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
@@ -93,21 +96,21 @@ checkdocs:
 # Use plaintext docformat by default.  But this is overridden by the
 # __docformat__ strings in each epydoc module.  (So just
 # xml.dom.minidom gets plaintext docstrings).
-refdocs: .refdocs.up2date
-.refdocs.up2date: ${PY_SRC}
+api-html: .api-html.up2date
+.api-html.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
 	       --css blue --private-css green -v --debug --navlink 'epydoc'\
 	       --docformat plaintext ${PY_SRC} xml.dom.minidom
-	touch .refdocs.up2date
+	touch .api-html.up2date
 
-pdf: .pdf.up2date
-.pdf.up2date: ${PY_SRC}
+api-pdf: .api-pdf.up2date
+.api-pdf.up2date: ${PY_SRC}
 	rm -rf ${LATEX}
 	mkdir -p ${LATEX}
 	epydoc --pdf -o ${LATEX} -n "Epydoc ${VERSION}" --no-private ${PY_SRC}
-	touch .pdf.up2date
+	touch .api-pdf.up2date
 
 examples: .examples.up2date
 .examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
@@ -154,15 +157,16 @@ SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/python2.2/config/' \
 	      |grep -v '/python2.2/lib-old/' \
 	      |grep -v '/python2.2/site-packages/')
-stdlib: .stdlib.up2date
-.stdlib.up2date: ${PY_SRC}
+stdlib-html: .stdlib-html.up2date
+.stdlib-html.up2date: ${PY_SRC}
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
 	python2.2 src/epydoc/cli.py -o ${STDLIB} -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext --debug \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
-	touch .stdlib.up2date
+	touch .stdlib-html.up2date
 
+# (this will typically cause latex to run out of resources)
 stdlib-pdf: .stdlib-pdf.up2date
 .stdlib-pdf.up2date: ${PY_SRC}
 	rm -rf ${STDLIB_LATEX}
@@ -170,3 +174,10 @@ stdlib-pdf: .stdlib-pdf.up2date
 	python2.2 src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
 		--no-private -n ${SLNAME} --docformat plaintext \
 		--debug --builtins ${SLFILES}
+##//////////////////////////////////////////////////////////////////////
+## Unit Testing
+##//////////////////////////////////////////////////////////////////////
+
+tests: test
+test:
+	python src/epydoc/test/__init__.py
