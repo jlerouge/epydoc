@@ -1,5 +1,5 @@
 #
-# rst.py: ReStructuredText support for epydoc
+# rst.py: ReStructuredText docstring parsing
 # Edward Loper
 #
 # Created [06/28/03 02:52 AM]
@@ -10,11 +10,20 @@
 Epydoc parser for ReStructuredText strings.  ReStructuredText is the
 standard markup language used by the Docutils project.
 
-
-@todo: Implement to_plaintext.
+@todo: Implement to_plaintext.  (It's required, as a fallback.)  How?
 @todo: Add to_latex??
 @warning: Epydoc only supports HTML output for ReStructuredText
-docstrings.
+docstrings right now.
+
+@var CONSOLIDATED_FIELDS: A dictionary encoding the set of
+'consolidated fields' that can be used.  Each consolidated field is
+marked by a single tag, and contains a single bulleted list, where
+each list item starts with an identifier, marked as interpreted text
+(C{`...`}).  This module automatically splits these consolidated
+fields into individual fields.  The keys of C{CONSOLIDATED_FIELDS} are
+the names of possible consolidated fields; and the values are the
+names of the field tags that should be used for individual entries in
+the list.
 """
 __docformat__ = 'epytext en'
 
@@ -29,6 +38,11 @@ from docutils.nodes import NodeVisitor, Text, SkipChildren, SkipNode
 import docutils.nodes
 
 from epydoc.markup import *
+
+CONSOLIDATED_FIELDS = {
+    'parameters': 'param',
+    'exception': 'except',
+    }
 
 def parse_docstring(docstring, errors):
     """
@@ -151,13 +165,11 @@ class _SplitFieldsTranslator(NodeVisitor):
 
         # Handle special fields:
         fbody = node.children[1].children
-        if tagname.lower() == 'parameters' and arg is None:
-            if self.handle_consolidated_field(fbody, 'param'):
-                return
-        if tagname.lower() == 'exceptions' and arg is None:
-            if self.handle_consolidated_field(fbody, 'except'):
-                return
-
+        if arg is None:
+            for (list_tag, entry_tag) in CONSOLIDATED_FIELDS.items():
+                if tagname.lower() == list_tag:
+                    if self.handle_consolidated_field(fbody, entry_tag):
+                        return
         self._add_field(tagname, arg, fbody)
 
     def _add_field(self, tagname, arg, fbody):
