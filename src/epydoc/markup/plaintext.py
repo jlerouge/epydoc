@@ -12,7 +12,7 @@ verbatim output, preserving all whitespace.
 """
 from epydoc.markup import *
 
-def parse_docstring(docstring, errors):
+def parse_docstring(docstring, errors, **options):
     """
     @return: A pair C{(M{d}, M{e})}, where C{M{d}} is a
         C{ParsedDocstring} that encodes the contents of the given
@@ -20,7 +20,7 @@ def parse_docstring(docstring, errors):
         generated while parsing the docstring.
     @rtype: C{L{ParsedPlaintextDocstring}, C{list} of L{ParseError}}
     """
-    return ParsedPlaintextDocstring(docstring)
+    return ParsedPlaintextDocstring(docstring, **options)
 
 class ParsedPlaintextDocstring(ParsedDocstring):
     def __init__(self, text, **options):

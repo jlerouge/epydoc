@@ -42,7 +42,7 @@ import re
 from xml.dom.minidom import *
 from epydoc.markup import *
 
-def parse_docstring(docstring, errors):
+def parse_docstring(docstring, errors, **options):
     return ParsedJavadocDocstring(docstring)
 
 class ParsedJavadocDocstring(ParsedDocstring):
@@ -55,7 +55,7 @@ class ParsedJavadocDocstring(ParsedDocstring):
                    'parameter arg argument raise raises exception '+
                    'except deffield newfield').split()
     _FIELD_RE = re.compile(r'(^\s*\@\w+[\s$])', re.MULTILINE)
-    def split_fields(self):
+    def split_fields(self, errors=None):
         descr = None
         fields = []
         

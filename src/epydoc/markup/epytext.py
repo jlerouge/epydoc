@@ -1533,7 +1533,7 @@ def parse_as_para(str):
 ##                    SUPPORT FOR EPYDOC
 #################################################################
 
-def parse_docstring(docstring, errors):
+def parse_docstring(docstring, errors, **options):
     return ParsedEpytextDocstring(parse(docstring, errors))
     
 class ParsedEpytextDocstring(ParsedDocstring):
@@ -1873,7 +1873,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
 
         return ParsedEpytextDocstring(doc)
 
-    def split_fields(self):
+    def split_fields(self, errors=None):
         if self._tree is None: return (self, ())
         tree = self._tree.cloneNode(1) # Hmm..
         fields = []
