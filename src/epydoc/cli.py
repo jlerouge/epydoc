@@ -76,7 +76,8 @@ def _usage(exit_code=-1):
     @rtype: C{None}
     """
     NAME = os.path.split(sys.argv[0])[-1]
-    print __doc__[36:].replace('epydoc', NAME)
+    print '\nUsage:'
+    print __doc__.split('Usage::\n')[-1].replace('epydoc', NAME)
     sys.exit(exit_code)
 
 def _help(arg):
@@ -198,6 +199,9 @@ def _find_module_from_filename(filename,verbosity):
     """
     old_cwd = os.getcwd()
 
+    # Normalize the filename
+    filename = os.path.normpath(os.path.abspath(filename))
+    
     # Extract the module name and the base directory.
     name = re.sub(r'/?__init__\.py.?$', '', filename)
     name = re.sub(r'\.py.?$', '', name)
@@ -218,7 +222,7 @@ def _find_module_from_filename(filename,verbosity):
     # Import the module.
     try:
         try:
-            if verbosity == 1: print 'Importing', module
+            if verbosity > 1: print 'Importing', module
             if basedir: os.chdir(basedir)
             exec('import %s as rv' % module)
             #exec('import %s' % module)
@@ -228,9 +232,9 @@ def _find_module_from_filename(filename,verbosity):
             os.chdir(old_cwd)
     except ImportError, e:
         if re.match(r'^.*__init__\.py?$', filename):
-            _error("Run epydoc from the parent directory (%r):\n%s" %
-                   (filename, e))
-        _error("Could not find module %r:\n%s" % (filename, e))
+            raise ImportError("Run epydoc from the parent directory "+
+                              "(%r):\n%s" % (filename, e))
+        raise ImportError("Could not find module %r:\n%s" % (filename, e))
 
 def _find_modules(module_names, verbosity):
     """
@@ -244,7 +248,6 @@ def _find_modules(module_names, verbosity):
     """
     modules = []
     for name in module_names:
-        if verbosity > 1: print 'Importing', name
         if '/' in name or name[-3:] == '.py' or name[-4:-1] == '.py':
             module = _find_module_from_filename(name, verbosity)
             if module not in modules:
@@ -252,7 +255,7 @@ def _find_modules(module_names, verbosity):
             elif verbosity > 3: print "  (duplicate)"
         else:
             try:
-                if verbosity == 1: print 'Importing', name
+                if verbosity > 1: print 'Importing', name
                 # Otherwise, try importing it.
                 exec('import %s' % name)
                 exec('module = %s' % name)
@@ -260,9 +263,10 @@ def _find_modules(module_names, verbosity):
                     modules.append(module)
                 elif verbosity > 3: print "  (duplicate)"
             except ImportError:
-                _error("Could not import %s" % name)
+                raise ImportError("Could not import %s" % name)
 
     return modules
+
 
 def cli():
     """
@@ -270,9 +274,14 @@ def cli():
     
     @rtype: C{None}
     """
+    sys.path.append('.')
     param = _parse_args()
 
-    modules = _find_modules(param['modules'], param['verbosity'])
+    try:
+        modules = _find_modules(param['modules'], param['verbosity'])
+    except ImportError, e:
+        if e.args: self._error(e.args[0])
+        else: raise
 
     # Wait to do imports, to make --usage faster.
     from epydoc.html import HTML_Doc
@@ -287,6 +296,18 @@ def cli():
         else:
             _error("%r is not a directory" % param['target'])
 
+    def progress_callback(file, doc, verbosity=param['verbosity']):
+        if verbosity==2:
+            sys.stdout.write('.')
+            sys.stdout.flush()
+        elif verbosity>2:
+            if doc and doc.uid().is_module():
+                print 'Writing docs for module:', `doc.uid()`
+            elif doc and doc.uid().is_class():
+                print 'Writing docs for class: ', `doc.uid()`
+            else:
+                print 'Writing docs for file:  ', file
+        
     # Construct the docmap.  Don't bother documenting base classes if
     # we're just running checks.
     d = DocMap(not param['check'])
@@ -313,12 +334,9 @@ def cli():
         elif param['verbosity'] > 0: print 'Writing docs to', param['target']
 
         htmldoc = HTML_Doc(d, **param)
-        htmldoc.write(param['target'], param['verbosity']-1)
+        htmldoc.write(param['target'], progress_callback)
         if param['verbosity'] > 1: print
     
 if __name__ == '__main__':
-    # This seems to help:
-    sys.path.append('.')
-    
     cli()
     
