@@ -13,7 +13,7 @@ Command-line interface for epydoc.
 
 Usage::
     epydoc [-o DIR] [-n NAME] [-p] [-c SHEET] [-v] MODULE...
-    epydoc --check [-p] [-a] [-v] MODULE...
+    epydoc --check [-p] [-v] MODULE...
     epydoc --help
     epydoc --version
 
@@ -33,10 +33,10 @@ Usage::
         Output directory for HTML files
         
     -n NAME, --name NAME
-        Package name (for HTML header/footer)
+        Project name (for HTML header/footer)
 
     -u URL, --url URL
-        Package URL (for HTML header/footer)
+        Project URL (for HTML header/footer)
 
     -c SHEET, --css SHEET
         CSS stylesheet for HTML files.  If SHEET is a file, then the
@@ -49,9 +49,6 @@ Usage::
 
     -p
         Check private objects (those that start with _)
-
-    -a
-        Run all checks.
 
     -v, --verbose
         Produce verbose output
@@ -135,13 +132,13 @@ def _parse_args():
         values.  If a parameter is specified on the command line, then
         that value is used; otherwise, a default value is used.
         Currently, the following configuration parameters are set:
-        C{target}; C{modules}; C{verbosity}; C{pkg_name}; C{check};
+        C{target}; C{modules}; C{verbosity}; C{prj_name}; C{check};
         C{show_private}; and C{check_all}.
     @rtype: C{None}
     """
     # Default values.
     argvals = {'target':'html', 'modules':[], 'verbosity':0,
-               'pkg_name':'', 'check':0, 'show_private':0,
+               'prj_name':'', 'check':0, 'show_private':0,
                'check_all':0}
     
     # Get the args (backwards, since we will pop them)
@@ -155,10 +152,10 @@ def _parse_args():
                 try: argvals['target'] = args.pop()
                 except: _usage()
             elif arg in ('-n', '--name'):
-                try: argvals['pkg_name'] = args.pop()
+                try: argvals['prj_name'] = args.pop()
                 except: _usage()
             elif arg in ('-u', '--url'):
-                try: argvals['pkg_url'] = args.pop()
+                try: argvals['prj_url'] = args.pop()
                 except: _usage()
             elif arg in ('-V', '--version'):
                 _version()
