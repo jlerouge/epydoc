@@ -893,7 +893,7 @@ class LatexFormatter:
                 str += self._text_to_latex(link.name())
                 if self._crossref:
                     str += (' \\textit{(p.~\\pageref{%s})}' %
-                            self._uid_to_label(cls))
+                            self._uid_to_label(base))
                 str += ',\n'
             str = str[:-2] + '}\n    \\\\\n'
         return str + '\\cline{1-2}\n'
