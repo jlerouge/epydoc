@@ -20,25 +20,29 @@ epydoc \- generate API documentation from Python docstrings
 .IR sheet ]
 .RB [ \-\-private\-css
 .IR sheet ]
-.RB [ \-\-no\-private ]
-.RB [ \-\-no\-frames ]
-.RB [ \-\-show\-imports ]
+.RB [ \-t
+.IR  page ]
+.RB [ \-\-navlink
+.IR html ]
 .RB [ \-\-help\-file
 .IR file ]
-.RB [ \-\-builtins ]
+.RB [ \-\-show\-imports ]
+.RB [ \-\-no\-private ]
+.RB [ \-\-no\-frames ]
 .RB [ \-\-docformat
 .IR format ]
+.RB [ \-\-builtins ]
 .IB modules ...
-.HP 7
+.PP
 .B epydoc \-\-check
 .RB [ \-p ]
 .RB [ \-q ]
 .RB [ \-v ]
 .IB modules ...
-.HP 7
+.PP
 .B epydoc \-h
 .RI [ topic ]
-.HP 7
+.PP
 .B epydoc \-V
 .\" ================== DESCRIPTION ====================
 .SH DESCRIPTION
@@ -54,10 +58,8 @@ The API documentation produced by
 consists of a set of HTML files.  Two subdirectories are created for
 the public and private documentation.  Within each subdirectories,
 every class and module is documented in its own file.  An index file,
-a trees file, and a help file are also created.  If the
-.B \-f
-option is used, then a frames\-based table of contents is also
-produced.
+a trees file, a help file, and a frames-based table of contents are
+also created.
 .PP
 .B epydoc
 can also be used to check the completeness of the API documentation.
@@ -116,7 +118,17 @@ Navigation bars will be added at the top and bottom of this help file.
 If no file is specified, then a default help file is used.
 .TP
 .BI "\-n " name ", \-\-name " name
-Project name (for HTML header/footer)
+The name of the project whose documentation is being generated.  This
+is used in the index page's title, and in the help page.  It is also
+used to create the homepage link on the navigation bar, if the
+.B \-\-navlink
+option is not used.
+.TP
+.BI "\-\-navlink " html
+HTML code for the homepage link on the navigation bar.
+.B html
+should only contain the label of the link; the link itself will be
+automatically created from the project URL.  
 .TP
 .B \-\-no\-frames
 Do not generate a frames\-based table of contents.
@@ -153,8 +165,20 @@ Supress the generation of epytext warnings and errors.
 Include a list of the classes and functions that each module imports
 on the module documentation pages.
 .TP
+.BI "\-t " page ", \-\-toppage " page
+The top page for the documentation. 
+.I page
+can be the name of a documented module or a class; the name of a file
+containing a documented module; an absolute URL (starting
+with "http:"); or one of the special names
+.BR trees.html ,
+.BR indices.html ", or"
+.BR help.html ,
+indicating the corresponding documentation pages.
+.TP
 .BI "\-u " url ", \-\-url " url
-Project URL (for HTML header/footer)
+The URL of the project's homepage.  This URL is used by the homepage
+link on the navigation bar.
 .TP
 .B \-v, \-\-verbose
 Produce verbose output.  In particular, this option displays progress
@@ -205,104 +229,6 @@ information is available about the following topics:
 .B \-V, \-\-version
 Print the version of Epydoc.
 .RE
-.\" ================== HTML FILES ====================
-.SH HTML FILES
-The API documentation produced by 
-.B epydoc
-consists of the following files:
-.RS 4
-.TP
-.IB module .html
-The API documentation for a module.  
-.I module
-is the complete dotted name of the module, such as 
-.B sys
-or
-.BR epydoc.epytext .
-.TP
-.IB class .html
-The API documentation for a class, exception, or type.
-.I class
-is the complete dotted name of the class, such as
-.B epydoc.epytext.Token
-or
-.BR array.ArrayType .
-.TP
-.B epydoc\-trees.html
-The module and class hierarchies for the project.
-.TP
-.B epydoc\-index.html
-The term index and identifier index for the project.
-.TP
-.B epydoc\-help.html
-The help page for the project.  This page explains how to use and
-navigate the webpage produced by epydoc.
-.TP
-.B epydoc\-frames.html
-The frames index file.  This file defines three frames: two frames on
-the left side of the window contain a table of contents, and the main
-frame on the right side of the window contains documentation pages.
-.B epydoc\-frames.html
-is not generated if the
-.B \-\-no\-frames
-option is used to create a frames\-based table of contents.
-.TP
-.B epydoc\-toc.html
-The top\-level table of contents page.  This page is displayed in the
-upper\-left frame of
-.BR epydoc\-frames.html ,
-and provides links to
-.B epydoc\-project\-toc.html
-and the
-.IB module \-mtoc.html
-files.
-.B epydoc\-toc.html
-is not generated if the
-.B \-\-no\-frames
-option is used to create a frames\-based table of contents.
-.TP
-.B epydoc\-project\-toc.html
-The table of contents for the entire project.  This page is displayed
-in the lower\-left frame of
-.BR epydoc\-frames.html ,
-and provides links to every class, type, exception, function, and
-variable defined by the project.
-.B epydoc\-project\-toc.html
-is not generated if the
-.B \-\-no\-frames
-option is used to create a frames\-based table of contents.
-.TP
-.IB module \-mtoc.html
-The table of contents for a module.  This page is displayed in the
-lower\-left frame of
-.BR epydoc\-frames.html ,
-and provides links to every class, type, exception, function, and
-variable defined by the module.
-.I module
-is the complete dotted name of the module, such as 
-.B sys
-or
-.BR epydoc.epytext .
-.IB module \-mtoc.html
-is not generated if the
-.B \-\-no\-frames
-option is used to create a frames\-based table of contents.
-.TP
-.B epydoc.css
-The CSS stylesheet used to display all HTML pages.
-.RE
-.PP
-By default,
-.B epydoc
-creates two subdirectories in the output directory:
-.B public
-and
-.BR private .
-Each directory contains all of the files specified above.
-But if the
-.B \-\-no\-private
-option is used, then no subdirectories are created, and the public
-documentation is written directly to the output directory.
 .\" ================== EXAMPLES ====================
 .SH EXAMPLES
 .TP
@@ -323,16 +249,113 @@ module, and write the output to the
 .B api
 directory.  Use different stylesheets for the public and private
 versions of the documentation.
+.\" ================== HTML FILES ====================
+.SH HTML FILES
+The API documentation produced by 
+.B epydoc
+consists of the following files:
+.RS 4
+.TP
+.B index.html
+The standard entry point for the documentation.  Normally,
+.B index.html
+is a frame index file, which defines three frames: two frames on
+the left side of the browser contain a table of contents, and the main
+frame on the right side of the window contains documentation pages.
+But if the 
+.B \-\-no\-frames
+option is used, then
+.B index.html
+will redirect the user to the project's top page.
+.TP
+.BI m- module .html
+The API documentation for a module.  
+.I module
+is the complete dotted name of the module, such as 
+.B sys
+or
+.BR epydoc.epytext .
+.TP
+.BI c- class .html
+The API documentation for a class, exception, or type.
+.I class
+is the complete dotted name of the class, such as
+.B epydoc.epytext.Token
+or
+.BR array.ArrayType .
+.TP
+.B trees.html
+The module and class hierarchies.
+.TP
+.B indices.html
+The term  and identifier indices.
+.TP
+.B help.html
+The help page for the project.  This page explains how to use and
+navigate the webpage produced by epydoc.
+.TP
+.B toc.html
+The top\-level table of contents page.  This page is displayed in the
+upper\-left frame, and provides links to
+.B toc\-everything.html
+and the
+.BI toc\-m\- module .html
+files.
+.B toc.html
+is not generated if the
+.B \-\-no\-frames
+option is used.
+.TP
+.B toc\-everything.html
+The table of contents for the entire project.  This page is displayed
+in the lower\-left frame, and provides links to every class, type,
+exception, function, and variable defined by the project.
+.B toc\-everything.html
+is not generated if the
+.B \-\-no\-frames
+option is used.
+.TP
+.BI toc\-m\- module .html
+The table of contents for a module.  This page is displayed in the
+lower\-left frame, and provides links to every class, type, exception,
+function, and variable defined by the module.
+.I module
+is the complete dotted name of the module, such as 
+.B sys
+or
+.BR epydoc.epytext .
+.BI toc\-m\- module .html
+is not generated if the
+.B \-\-no\-frames
+option is used.
+.TP
+.B epydoc.css
+The CSS stylesheet used to display all HTML pages.
+.RE
+.PP
+By default,
+.B epydoc
+creates two subdirectories in the output directory:
+.B public
+and
+.BR private .
+Each directory contains all of the files specified above.
+But if the
+.B \-\-no\-private
+option is used, then no subdirectories are created, and the public
+documentation is written directly to the output directory.
 .\" ================== DIAGNOSTICS ====================
 .SH DIAGNOSTICS
 Errors are divided into five categories: import errors; epytext
-errors; epytext warnings; field warnings; and documentation building
+errors; epytext warnings; field warnings; and documentation generation
 errors.  Whenver epydoc encounters an error, it issues a warning
 message that describes the error, and attempts to continue generating
-documentation.
+documentation. 
 .PP
-Import errors typically prevent one or more modules from getting
-documented.  Epydoc generates the following import errors:
+Import errors indicate that epydoc was unable to import a module.
+Import errors typically prevent epydoc from generating documentation
+for the module in question.  Epydoc can generate the following import
+errors:
 .RS 4
 .TP
 .BI "Bad module name " module
@@ -360,8 +383,10 @@ but
 does not exist.
 .RE
 .PP
-Epytext errors are caused when a docstring does not contain valid
-epytext
+Epytext errors are caused by epytext docstrings that contain invalid
+markup.  Whenever an epytext error is detected, the docstring in
+question is treated as a plaintext docstring.  Epydoc can generate the
+following epytext errors:
 .RS 4
 .TP
 .B Bad link target.
@@ -424,7 +449,11 @@ used to underline sections; "-" for subsections; and "~" for
 subsubsections.
 .RE
 .PP
-Epytext warnings:
+Epytext warnings are caused by epytext docstrings that contain
+questionable or suspicious markup.  Epytext warnings do
+.B not
+prevent the docstring in question from being parsed.  Epydoc can
+generate the following epytext warnings:
 .RS 4
 .TP
 .B Improper doctest block indentation.
@@ -452,7 +481,9 @@ in the heading.  The number of characters in these two lines must
 match exactly for them to be considered a heading.
 .RE
 .PP
-Field warnings:
+Field warnings are caused by epytext docstrings containing invalid
+fields.  The contents of the invalid field are generally ignored.  
+Epydoc can generate the following field warnings:
 .RS 4
 .TP
 .BI "@param for unknown parameter " param .
@@ -492,40 +523,71 @@ in the same docstring, but
 can only take a single value.
 .RE
 .PP
-Documentation building errors:
+Documentation generation errors are caused by..
+
 .RS 4
 .TP
 .BI "The parameters of " inhmethod " do not match " basemethod .
-Blah balh blah.   Blah balh blah.   Blah balh blah.   Blah balh blah.
-Blah balh blah.   Blah balh blah.   Blah balh blah.   Blah balh blah.   
+The parameters of the undocumented method
+.I inhmethod 
+do not match the parameters of the base class method
+.I basemethod
+that it overrides.  As a result,
+.I inhmethod
+does not inherit documentation from
+.IR basemethod .
+If the difference in parameters is intentional, then you can eliminate
+the warning by adding a (possibly empty) docstring to
+.IR inhmethod .
 .TP
 .BI "Docmap cannot add a " type
- ...
+Epydoc attempted to document an object with an unknown type.  This
+error is typically generated by packages and modules that manipulate
+the import mechanism, such that importing a module produces some other
+type of object.
 .TP
 .BI "UID conflict detected: " uid
- ...
+Two different objects were assigned the same unique identifier by
+epydoc.  This can cause epydoc to substitute the documentation of one
+object with the documentation of another object that is assigned the
+same unique identifier.  However, this will usually only cause
+problems if the two objects with the same unique identifiers are both
+modules or classes, in which case the API documentation page for one
+object will overwrite the API documentation page for the other object.
 .TP
 .IB object " appears in multiple builtin modules"
- ...
+While attempting to determine which module defines the builtin object
+.IR object ,
+epydoc encountered multiple candidates, and was unable to decide which
+candidate was correct.  In this case, epydoc arbitrarily chooses the
+first candidate that it finds.
 .TP
 .IB object " appears in multiple .py modules"
- ...
+While attempting to determine which module defines the builtin object
+.IR object ,
+epydoc encountered multiple candidates, and was unable to decide which
+candidate was correct.  In this case, epydoc arbitrarily chooses the
+first candidate that it finds.
 .TP
 .IB object " appears in multiple .so modules"
- ...
+While attempting to determine which module defines the builtin object
+.IR object ,
+epydoc encountered multiple candidates, and was unable to decide which
+candidate was correct.  In this case, epydoc arbitrarily chooses the
+first candidate that it finds.
 .TP
-.BI "Could not find a module for " module
- ...
-.RE
-.PP
-Other errors:
-.RS 4
-.TP
-.BI "INTERNAL ERROR: " message
-Epydoc caught an unexpected exception, and attempted to resume
-processing.  Use the
-.B \-\-debug
-option to view the exception.
+.BI "Could not find a module for " object
+Epydoc was unable to determine which module defines 
+.IR object .
+If
+.I object
+is a function, then this will prevent epydoc from generating any
+documentation for
+.IR object ,
+since it does not know what page to put the documentation on.
+Otherwise, this will prevent the documentation for
+.I object
+from including a link to its containing module.
 .RE
 .\" ================== EXIT STATUS ====================
 .SH EXIT STATUS
