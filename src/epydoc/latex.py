@@ -331,6 +331,8 @@ class LatexFormatter:
         # If we're listing classes separately, put them after all the
         # modules.
         if self._list_classes_separately:
+            uids = self._filter(self._docmap.keys())
+            uids.sort()
             for uid in uids:
                 if uid.is_class():
                     if self._excluded(uid): continue
