@@ -90,6 +90,18 @@ _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
                  '\\textbf{%s}']
 
 ##################################################
+## Docstring Linking (Crossreferences)
+##################################################
+
+class _LatexDocstringLinker(markup.DocstringLinker):
+    def translate_indexterm(self, indexterm):
+        indexstr = re.sub(r'["!|@]', r'"\1', indexterm.to_latex(self))
+        return ('\\index{%s}\\textit{%s}' % (indexstr, indexstr))
+    def translate_identifier_xref(self, identifier, label=None):
+        if label is None: label = markup.plaintext_to_latex(identifier)
+        return '\\texttt{%s}' % label
+
+##################################################
 ## Documentation -> Latex Conversion
 ##################################################
 
@@ -905,15 +917,7 @@ class LatexFormatter:
     # Docstring -> LaTeX Conversion
     #////////////////////////////////////////////////////////////
 
-    class LatexDocstringLinker(markup.DocstringLinker):
-        def translate_indexterm(self, indexterm):
-            indexstr = re.sub(r'["!|@]', r'"\1', indexterm.to_latex(self))
-            return ('\\index{%s}\\textit{%s}' % (indexstr, indexstr))
-        def translate_identifier_xref(self, identifier, label=None):
-            if label is None: label = markup.plaintext_to_latex(identifier)
-            return '\\texttt{%s}' % label
-    _docstring_linker = LatexDocstringLinker()
-
+    _docstring_linker = _LatexDocstringLinker()
     def _docstring_to_latex(self, docstring, indent=0, breakany=0):
         if docstring is None: return ''
         return docstring.to_latex(self._docstring_linker, indent=indent,
