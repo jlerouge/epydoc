@@ -74,6 +74,7 @@ produce API documentation using the following steps:
 @contributor: U{Glyph Lefkowitz <mailto:glyph@twistedmatrix.com>}
 @contributor: U{Edward Loper <mailto:edloper@gradient.cis.upenn.edu>}
 @contributor: U{Bruce Mitchener <mailto:bruce@cubik.org>}
+@contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
 @contributor: U{Christian Reis <mailto:kiko@async.com.br>}
 
 @var __license__: The license governing the use and distribution of
@@ -103,3 +104,4 @@ __license__ = 'IBM Open Source License'
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
 #   - @type a,b,c: ...
+#   - new command line option: --command-line-order
