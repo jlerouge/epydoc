@@ -1941,7 +1941,12 @@ class HTMLFormatter:
             str += '    <dl><dt><b>Raises:</b></dt>\n'
             for fraise in fraises:
                 str += '      '
-                str += '<dd><code><b>'+fraise.name()+'</b></code> -\n'
+                str += '<dd>'
+                if fraise.uid():
+                    str += self._uid_to_href(fraise.uid(), fraise.name())
+                else:
+                    str += '<code><b>'+fraise.name()+'</b></code>'
+                str += ' -\n'
                 str += self._docstring_to_html(fraise.descr(), fuid, 8)
                 str +'      </dd>\n'
             str += '    </dl>\n'

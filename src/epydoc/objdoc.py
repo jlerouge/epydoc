@@ -363,7 +363,7 @@ class Raise:
     of the exception's name and its description.  Exceptions are used
     by L{FuncDoc}.
     """
-    def __init__(self, name, descr):
+    def __init__(self, name, descr, container=None):
         """
         Construct the documentation for the raising of an exception.
 
@@ -372,9 +372,12 @@ class Raise:
         @param descr: A description of the circumstances under which
             this exception is raised.
         @type descr: L{markup.ParsedDocstring}
+        @param uid: The UID of the exception, or None.
+        @type uid: C{None} or L{UID}
         """
         self._name = name
         self._descr = descr
+        self._uid = findUID(name, container)
         
     def name(self):
         """
@@ -390,6 +393,13 @@ class Raise:
         @rtype: L{markup.ParsedDocstring}
         """
         return self._descr
+
+    def uid(self):
+        """
+        @return: The UID of the exception.
+        @rtype: L{UID} or C{None}
+        """
+        return self._uid
         
     def __repr__(self):
         return '<Raise '+self._name+'>'
@@ -2490,7 +2500,7 @@ class FuncDoc(ObjDoc):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            self._raises.append(Raise(arg, descr))
+            self._raises.append(Raise(arg, descr, self._uid))
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
 
