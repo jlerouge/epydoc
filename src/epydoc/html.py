@@ -247,6 +247,7 @@ class HTML_Doc:
             output on errors.  A verbosity of one will output a single
             period for each file written.  Higher values give more
             verbose output.
+        @rtype: C{None}
         """
         if directory in ('', None): directory = './'
         if directory[-1] != '/': directory = directory + '/'
@@ -452,9 +453,9 @@ class HTML_Doc:
             str += '</pre><br>\n\n'
 
         # Write the class's known subclasses
-        if doc.children():
+        if doc.subclasses():
             str += '<dl><dt><b>Known Subclasses:</b></dt>\n<dd>'
-            for cls in doc.children():
+            for cls in doc.subclasses():
                 str += '    '+self._link_to_html(cls) + ',\n'
             str = str[:-2] + '</dd></dl>\n\n'
 
@@ -752,10 +753,10 @@ class HTML_Doc:
             if doc and doc.descr():
                 str += ': <i>' + self._summary(doc, uid.module()) + '</i>'
             str += '\n'
-            if doc and doc.children():
+            if doc and doc.subclasses():
                 str += ' '*depth + '  <ul>\n'
                 children = [l.target() for l
-                            in self._sort(doc.children())]
+                            in self._sort(doc.subclasses())]
                 for child in children:
                     str += self._class_tree_item(child, depth+4)
                 str += ' '*depth + '  </ul>\n'
@@ -1192,13 +1193,13 @@ class HTML_Doc:
     # Index generation
     #////////////////////////////////////////////////////////////
     
-    def get_index_items(self, tree, base, dict=None):
+    def _get_index_items(self, tree, base, dict=None):
         if dict == None: dict = {}
     
         if isinstance(tree, _Text): return dict
         elif tree.tagName != 'index':
             for child in tree.childNodes:
-                self.get_index_items(child, base, dict)
+                self._get_index_items(child, base, dict)
         else:
             children = [self._dom_to_html(c) for c in tree.childNodes]
             key = ''.join(children).lower().strip()
@@ -1220,7 +1221,7 @@ class HTML_Doc:
             base = `uid`
             descr = doc.descr()
             if descr:
-                self.get_index_items(descr, base, index)
+                self._get_index_items(descr, base, index)
         return index
 
     #////////////////////////////////////////////////////////////
@@ -1337,7 +1338,7 @@ class HTML_Doc:
                               'name', 'target'):
             return childstr
         else:
-            raise ValueError('Unknown DOM element %r' % tree.tagName)
+            print 'Warning: unknown epytext DOM element %r' % tree.tagName
     
     def _colorize_doctestblock(self, str):
         """
