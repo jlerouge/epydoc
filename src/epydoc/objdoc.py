@@ -1517,7 +1517,7 @@ class FuncDoc(ObjDoc):
     def _find_override(self, cls):
         """
         Find the method that this method overrides.
-        @return: True if we haven't found an overridden method yet.
+        @return: True if we should keep looking for an overridden method.
         @rtype: C{boolean}
         """
         name = self.uid().shortname()
@@ -1543,7 +1543,9 @@ class FuncDoc(ObjDoc):
                     base_func = base_method.im_func
                     self_argspec = inspect.getargspec(self_func)
                     base_argspec = inspect.getargspec(base_func)
-                    
+
+                    # If the parameters don't match, then leave
+                    # _overrides as None, and issue a warning message.
                     if self_argspec[:3] != base_argspec[:3]:
                         if name == '__init__': return 0
                         estr =(('The parameters of %s do not match the '+
@@ -1557,6 +1559,7 @@ class FuncDoc(ObjDoc):
                 self._overrides = make_uid(base_method)
                 return 0
             else:
+                # It's not in this base; try its ancestors.
                 if not self._find_override(base): return 0
         return 1
 
