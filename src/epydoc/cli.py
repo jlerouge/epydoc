@@ -220,7 +220,8 @@ def _parse_args():
                'prj_name':'', 'action':'html', 'tests':{},
                'show_imports':0, 'frames':1, 'private':None,
                'list_classes_separately': 0, 'debug':0,
-               'docformat':None, 'top':None, 'inheritance': None}
+               'docformat':None, 'top':None, 'inheritance': None,
+               'ignore_param_mismatch': 0}
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:t:u:Vvq?:'
@@ -233,6 +234,7 @@ def _parse_args():
                 'nav_link= nav-link= latex html dvi ps pdf '+
                 'separate-classes separate_classes '+
                 'inheritance= inheritence= '+
+                'ignore_param_mismatch ignore-param-mismatch '+
                 'test= tests= checks= private').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
@@ -258,6 +260,8 @@ def _parse_args():
         elif opt in ('--helpfile', '--help-file', '--help_file'):
             options['help'] = val
         elif opt in ('--html',): options['action'] = 'html'
+        elif opt in ('--ignore_param_mismatch', '--ignore-param-mismatch'):
+            options['ignore_param_mismatch'] = 1
         elif opt in ('--inheritance', '--inheritence'):
             options['inheritance']=val.lower()
         elif opt in ('--latex',): options['action']='latex'
@@ -430,7 +434,8 @@ def _make_docmap(modules, options):
             if options['debug']: raise
             else: _internal_error()
 
-    report_param_mismatches(d)
+    if not options['ignore_param_mismatch']:
+        report_param_mismatches(d)
 
     return d
 
