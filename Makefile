@@ -9,7 +9,7 @@
 ##//////////////////////////////////////////////////////////////////////
 
 # Python source files (don't include src/epydoc/test)
-PY_SRC = $(wildcard src/epydoc/*.py)
+PY_SRC = src/epydoc/
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 
@@ -28,6 +28,8 @@ STDLIB = stdlib
 LATEX = latex/api
 STDLIB_LATEX = latex/stdlib
 
+export PYTHONPATH=src/
+
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
 ##//////////////////////////////////////////////////////////////////////
@@ -44,7 +46,7 @@ usage:
 	@echo "    make api-pdf -- build the PDF docs for epydoc"
 	@echo "    make examples -- build example API docs for the webpage"
 	@echo "    make stdlib-html -- build HTML docs for the Python Standard Library"
-	@echo "  make checkdoc -- check the documentation completeness"
+	@echo "  make checkdocs -- check the documentation completeness"
 	@echo "  make distributions -- build the distributions"
 	@echo "  make clean -- remove all built files"
 	@echo "  make test -- run unit tests"
@@ -80,8 +82,9 @@ xfer: test .html.up2date stdlib-html
 local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
 
+checkdoc: checkdocs
 checkdocs:
-	epydoc --check ${PY_SRC}
+	epydoc --check --tests=vars,types ${PY_SRC}
 
 .html.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
 		doc/epydoc-man.html doc/epydocgui-man.html ${DOCS}
@@ -100,23 +103,27 @@ api-html: .api-html.up2date
 .api-html.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
-	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
+	python2.2 src/epydoc/cli.py \
+	       -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
+	       --inheritance=listed \
 	       --css blue --private-css green -v --debug --navlink 'epydoc'\
-	       --docformat plaintext ${PY_SRC} xml.dom.minidom
+	       --docformat plaintext ${PY_SRC}
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
 .api-pdf.up2date: ${PY_SRC}
 	rm -rf ${LATEX}
 	mkdir -p ${LATEX}
-	epydoc --pdf -o ${LATEX} -n "Epydoc ${VERSION}" --no-private ${PY_SRC}
+	python2.2 src/epydoc/cli.py \
+	       --pdf -o ${LATEX} -n "Epydoc ${VERSION}" --no-private ${PY_SRC}
 	touch .api-pdf.up2date
 
 examples: .examples.up2date
 .examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
-	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
+	python2.2 src/epydoc/cli.py \
+	       -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue -t example -q \
 	       --navlink 'epydoc examples' ${EXAMPLES_SRC} sre
 	touch .examples.up2date
@@ -156,7 +163,9 @@ SLLINK = '<font size="-2">Python 2.2<br />Standard Library</font>'
 SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/python2.2/config/' \
 	      |grep -v '/python2.2/lib-old/' \
-	      |grep -v '/python2.2/site-packages/')
+	      |grep -v '/python2.2/site-packages/' \
+              |grep -v '/__')
+export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die?
 stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: ${PY_SRC}
 	rm -rf ${STDLIB}
@@ -171,7 +180,7 @@ stdlib-pdf: .stdlib-pdf.up2date
 .stdlib-pdf.up2date: ${PY_SRC}
 	rm -rf ${STDLIB_LATEX}
 	mkdir -p ${STDLIB_LATEX}
-	python2.2 src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
+	time python2.2 src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
 		--no-private -n ${SLNAME} --docformat plaintext \
 		--debug --builtins ${SLFILES}
 ##//////////////////////////////////////////////////////////////////////
