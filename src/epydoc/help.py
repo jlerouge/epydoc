@@ -13,6 +13,7 @@ Default help file for the HTML outputter (L{epydoc.html}).
 @var HTML_HELP: The contents of the HTML body for the default
 help page.
 """
+__docformat__ = 'epytext en'
 
 # Expects: {'this_project': name}
 HTML_HELP = '''

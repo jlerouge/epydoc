@@ -12,6 +12,7 @@ Module import support for epydoc.  C{imports} defines a single public
 function, C{import_module}, which finds and imports a module, given
 its module name or its file name.
 """
+__docformat__ = 'epytext en'
 
 import sys, re, types, os.path
 

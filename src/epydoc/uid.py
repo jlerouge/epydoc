@@ -17,6 +17,7 @@ implement crossreferencing between C{ObjDoc}s.
 
 @see: L{epydoc.objdoc}
 """
+__docformat__ = 'epytext en'
 
 import inspect, sys, os.path, new, re, types
 from types import ModuleType as _ModuleType

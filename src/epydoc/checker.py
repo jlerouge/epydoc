@@ -11,6 +11,7 @@ Documentation completeness checker.  This module defines a single
 class, C{DocChecker}, which can be used to check the that specified
 classes of objects are documented.
 """
+__docformat__ = 'epytext en'
 
 ##################################################
 ## Imports

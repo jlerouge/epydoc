@@ -58,6 +58,7 @@ C{r"\1"}) in regular expressions.
 @var _DOCTEST_RE: The regular expression used by L{_doctest_sub} to
 colorize doctest blocks.
 """
+__docformat__ = 'epytext en'
 
 import sys, sre_parse, sre, re
 import sre_constants
