@@ -103,7 +103,7 @@ Description::
 #   4. helpers
 #   5. testing
 
-import re, epydoc.uid, string, types
+import re, epydoc.uid, string, types, sys
 from xml.dom.minidom import Document, Text
 
 ##################################################
@@ -1380,7 +1380,7 @@ def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
 ## Top-Level Wrapper function
 ##################################################
 
-def pparse(str, show_warnings=1, show_errors=1):
+def pparse(str, show_warnings=1, show_errors=1, stream=sys.stderr):
     """
     Pretty-parse the string.  This parses the string, and catches any
     warnings or errors produced.  Any warnings and errors are
@@ -1394,6 +1394,9 @@ def pparse(str, show_warnings=1, show_errors=1):
     @param show_errors: Whether or not to display errors generated
         by parsing C{str}.
     @type show_errors: C{boolean}
+    @param stream: The stream that warnings and errors should be
+        written to.
+    @type stream: C{stream}
     @return: a DOM document encoding the contents of C{str}.
     @rtype: L{xml.dom.minidom.Document}
     @raise SyntaxError: If any fatal errors were encountered.
@@ -1410,19 +1413,19 @@ def pparse(str, show_warnings=1, show_errors=1):
     warnings.sort()
     errors.sort()
     if warnings:
-        print '='*SCRWIDTH
-        print "WARNINGS"
-        print '-'*SCRWIDTH
+        print >>stream, '='*SCRWIDTH
+        print >>stream, "WARNINGS"
+        print >>stream, '-'*SCRWIDTH
         for warning in warnings:
-            print warning.as_warning()
-        print '='*SCRWIDTH
+            print >>stream, warning.as_warning()
+        print >>stream, '='*SCRWIDTH
     if errors and show_errors:
-        if not warnings: print '='*SCRWIDTH
-        print "ERRORS"
-        print '-'*SCRWIDTH
+        if not warnings: print >>stream, '='*SCRWIDTH
+        print >>stream, "ERRORS"
+        print >>stream, '-'*SCRWIDTH
         for error in errors:
-            print error
-        print '='*SCRWIDTH
+            print >>stream, error
+        print >>stream, '='*SCRWIDTH
 
     if confused: raise
     elif errors: raise SyntaxError('Encountered Errors')
