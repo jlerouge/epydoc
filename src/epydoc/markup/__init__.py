@@ -507,11 +507,9 @@ def plaintext_to_html(str):
     are escaped.
     @rtype: C{string}
     """
-    str = str.replace('&', '&amp;')
-    str = str.replace('<', '&lt;')
-    str = str.replace('>', '&gt;')
-    str = str.replace('"', '&quot;')
-    return str
+    str = str.replace('&', '&amp;').replace('"', '&quot;')
+    str = str.replace('<', '&lt;').replace('>', '&gt;')
+    return str.replace('@', '&#64;')
 
 def plaintext_to_latex(str, nbsp=0, breakany=0):
     """
