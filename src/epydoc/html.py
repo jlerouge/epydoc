@@ -2398,6 +2398,10 @@ class HTML_Doc:
         @param code: Whether or not to include C{<code>...</code>}
             tags around the label.
         """
+        # We shouldn't need this, but include it just in case.
+        if uid is None and label is None:
+            return '<code>??</code>'
+        
         # Find a default value for the label.
         if label is None: label = uid.name()
 
