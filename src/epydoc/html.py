@@ -137,6 +137,7 @@ from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 from epydoc.css import STYLESHEETS
 from epydoc.help import HTML_HELP
+from epydoc.colorize import colorize_re, colorize_doctestblock
 
 ##################################################
 ## Documentation -> HTML Conversion
@@ -185,21 +186,27 @@ class HTML_Doc:
     @type _prj_url: C{string}
     @ivar _prj_url: A URL for the documentation (for the navpar).
     
-    @ivar _module: The UID of the top-level module, if there is one.
+    @ivar _module: The UID of the top-level module, if there is one. 
         If there is more than one top-level module, then C{_module} is
         C{'multiple'}; if there is no top-level module, then
         C{_module} is C{None}.
-    @ivar _package: The UID of the top-level package, if there is one.
-        If there is more than one top-level package, then C{_package} is
-        C{'multiple'}; if there is no top-level package, then
-        C{_package} is C{None}.
+    @ivar _package: The UID of the top-level package, if there is
+        one. If there is more than one top-level package, then
+        C{_package} is C{'multiple'}; if there is no top-level
+        package, then C{_package} is C{None}.
     @ivar _show_private: Whether we are currently writing files that
         show private objects.
     @ivar _css: The name of a file containing a CSS stylesheet; or the
         name of a CSS stylesheet.
-    @ivar _cssfile: The name of the CSS stylesheet file.  This should be
-        C{'epydoc.css'} when C{_show_private==0} and C{'../epydoc.css'}
-        when C{_show_private==1}.
+    @ivar _cssfile: The name of the CSS stylesheet file.  This should
+        be C{'epydoc.css'} when C{_show_private==0} and
+        C{'../epydoc.css'} when C{_show_private==1}.
+    @ivar _variable_linelen:  The maximum line length used for
+        displaying the values of variables in the variable
+        details sections.
+    @ivar _variable_maxlines: The maximum number of lines that
+         should be displayed for the value of a variable in the
+         variable details section.
     """
 
     #////////////////////////////////////////////////////////////
@@ -219,39 +226,60 @@ class HTML_Doc:
               (e.g., images or tables).  (type=C{string})
             - C{prj_url}: A URL for the documentation (for the
               navbar).  (type=C{string})
-            - C{css}: The CSS stylesheet file.  If C{css} is a file,
-              then its conents will be used.  Otherwise, if C{css} is
-              the name of a CSS stylesheet in L{epydoc.css}, then that
-              stylesheet will be used.  Otherwise, an error is
-              reported.  If no stylesheet is specified, then the
-              default stylesheet is used.  (type=C{string})
+            - C{css}: The CSS stylesheet file.  If C{css} is a file
+              name, then the specified file's conents will be used.
+              Otherwise, if C{css} is the name of a CSS stylesheet in
+              L{epydoc.css}, then that stylesheet will be used.
+              Otherwise, an error is reported.  If no stylesheet is
+              specified, then the default stylesheet is used.
+              (type=C{string})
             - C{private_css}: The CSS stylesheet file for the private
-              API documentation.  If C{css} is a file, then its
-              conents will be used.  Otherwise, if C{css} is the name
-              of a CSS stylesheet in L{epydoc.css}, then that
-              stylesheet will be used.  Otherwise, an error is
-              reported.  If no stylesheet is specified, then the
+              API documentation.  If C{css} is a file name, then the
+              specified file's conents will be used.  Otherwise, if
+              C{css} is the name of a CSS stylesheet in L{epydoc.css},
+              then that stylesheet will be used.  Otherwise, an error
+              is reported.  If no stylesheet is specified, then the
               private API documentation will use the same stylesheet
               as the public API documentation.  (type=C{string})
-            - C{help}: The help file.  If no help file is specified,
-              then the default help file will be used.
+            - C{help}: The name of the help file.  If no help file is
+              specified, then the default help file will be used.
               (type=C{string})
             - C{private}: Whether to create documentation for private
               objects.  By default, private objects are documented.
               (type=C{boolean})
+            - C{frames}: Whether to create a frames-based table of
+              contents.  By default, it is not produced.
+              (type=C{boolean}) 
+            - C{show_imports}: Whether or not to display lists of
+              imported functions and classes.  By default, they are
+              not shown.  (type=C{boolean})
+            - C{index_parameters}: Whether or not to include function
+              parameters in the identifier index.  By default, they
+              are not included.  (type=C{boolean})
+            - C{variable_maxlines}: The maximum number of lines that
+              should be displayed for the value of a variable in the
+              variable details section.  By default, 8 lines are
+              displayed.  (type=C{int})
+            - C{variable_linelength}: The maximum line length used for
+              displaying the values of variables in the variable
+              details sections.  If a line is longer than this length,
+              then it will be wrapped to the next line.  The default
+              line length is 70 characters.  (type=C{int})
         """
         self._docmap = docmap
 
         # Process keyword arguments.
+        self._prj_name = kwargs.get('prj_name', '')
+        self._prj_url = kwargs.get('prj_url', None)
         self._css = kwargs.get('css')
         self._private_css = kwargs.get('private_css') or self._css
-        self._show_imports = kwargs.get('show_imports', 0)
-        self._prj_url = kwargs.get('prj_url', None)
-        self._prj_name = kwargs.get('prj_name', '')
         self._helpfile = kwargs.get('help', None)
         self._create_private_docs = kwargs.get('private', 1)
         self._create_frames = kwargs.get('frames', 0)
+        self._show_imports = kwargs.get('show_imports', 0)
         self._index_parameters = kwargs.get('index_parameters', 0)
+        self._variable_maxlines = kwargs.get('variable_maxlines', 8)
+        self._variable_linelen = kwargs.get('variable_linelength', 70)
 
         # If the name doesn't include any html tags, then assume it's
         # plaintext, and munge it appropriately.
@@ -1313,11 +1341,12 @@ class HTML_Doc:
                     kwarg_name != ikwarg_name or
                     vararg_name != ivararg_name):
                     if fname != '__init__':
-                        estr =(('\nWarning: The parameters of %s do not '+
+                        estr =(('Warning: The parameters of %s do not '+
                                 'match the parameters of the base class '+
                                 'method %s; not inheriting documentation.')
                                % (fdoc.uid(), inh_fdoc.uid()))
                         estr = epytext.wordwrap(estr, 9, 75-9).strip()
+                        if sys.stderr.softspace: print >>sys.stderr
                         print >>sys.stderr, estr
                     break
 
@@ -1391,6 +1420,10 @@ class HTML_Doc:
                 if inheritdoc:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
+
+            # See also
+            if fdoc.seealsos():
+                str += self._seealso(fdoc.seealsos(), func.parent())
 
             str += '  </dd></dl>\n'
             str += '</td></tr></table>\n'
@@ -1545,52 +1578,50 @@ class HTML_Doc:
     def _pprint_var_value(self, var):
         if not var.has_value(): return ''
         val = var.uid().value()
-
-        # These should be defined somewhere higher, and maybe
-        # customizable.
-        MAXLINES = 8 # Max total lines
-        LINELEN = 60 # Length of lines (for wrapping), in chars.
-        LINEWRAP_MARKER = r'<span class="variable-linewrap">\</span>'
-        ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
-
-        # For regexps, display the regexp pattern.
+        linelen = self._variable_linelen
+        do_quoting = 1
+        
+        # For regexps, use colorize_re.
         if type(val).__name__ == 'SRE_Pattern':
-            try:
-                pat = `val.pattern`
-                if len(pat) < (MAXLINES*LINELEN): val = pat
-            except: pass
-
-        # For lists, tuples, and dicts, use pprint??
-        if type(val) in (type(()), type([]), type({})):
-            val = pprint.pformat(val)
+            val = colorize_re(val)
+            do_quoting = 0
             
-        # For other non-strings, use repr to generate a representation.
-        if type(val) is not type(''):
+        # For strings, use repr.  Use tripple-quoted-strings where
+        # appropriate.
+        elif type(val) is type(''):
+            val = `val`
+            val = re.sub('&', '&amp;', val)
+            val = re.sub('<', '&lt;', val)
+            val = re.sub('>', '&gt;', val)
+            do_quoting = 0
+            if val.find(r'\n') >= 0:
+                val = ('<span class="variable-quote">'+val[0]*3+'</span>'+
+                        val[1:-1].replace(r'\n', '\n') +
+                       '<span class="variable-quote">'+val[0]*3+'</span>')
+                       
+            else:
+                val = ('<span class="variable-quote">'+val[0]+'</span>'+
+                       val[1:-1]+
+                       '<span class="variable-quote">'+val[0]+'</span>')
+
+        # For lists, tuples, and dicts, use pprint.
+        elif type(val) in (type(()), type([]), type({})):
+            val = pprint.pformat(val)
+
+        # For other objects, use repr to generate a representation.
+        else:
             try: val = `val`
             except: val = '...'
 
-        # Get rid of any null characters.
-        val = val.replace('\0', '')
+        # Quote characters, where appropriate.
+        if do_quoting:
+            val = re.sub('&', '&amp;', val)
+            val = re.sub('<', '&lt;', val)
+            val = re.sub('>', '&gt;', val)
 
-        # Add line wrapping.  The "\0" will be turned into
-        # LINEWRAP_MARK below.
-        if len(val) > LINELEN:
-            val = re.sub('(%s)(?=.)' % ('.'*LINELEN), '\\1\0\n', val)
+        # Do line-wrapping.
+        val = self._linewrap_html(val)
 
-        # Pad the last line, so all value regions will have equal width.
-        val += ' '*(LINELEN-len(val)+val.rfind('\n')+1)
-
-        # Quote characters.
-        val = re.sub('&', '&amp;', val)
-        val = re.sub('<', '&lt;', val)
-        val = re.sub('>', '&gt;', val)
-        val = re.sub('\0', LINEWRAP_MARKER, val)
-
-        # Truncate at MAXLINES.
-        if val.count('\n') >= MAXLINES:
-            val = ('\n'.join(val.split('\n')[:MAXLINES]) + '\n' +
-                   ELLIPSIS_MARKER+ ' '*(LINELEN-3))
-        
         # Construct the value box.
         str = '      <dt><b>Value:</b></dt>\n' 
         str += '      <dd><table><tr><td>\n'
@@ -1598,7 +1629,62 @@ class HTML_Doc:
         str += '        </td></tr></table></dd>\n'
         return str
 
+    def _linewrap_html(self, str):
+        """
+        Add line-wrapping to the HTML string C{str}.  Line length is
+        determined by L{_variable_linelen}; and the maximum number of
+        lines to display is determined by L{_variable_maxlines}.  This
+        function treats HTML entities (e.g., C{&amp;}) as single
+        characters; and ignores HTML tags (e.g., C{<p>}).
+        """
+        LINEWRAP_MARKER = r'<span class="variable-linewrap">\</span>'
+        ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
+        
+        maxlines = self._variable_maxlines
+        linelen = self._variable_linelen
+        
+        lines = []
+        start = end = cnum = 0
+        while len(lines) <= maxlines and end < len(str):
+            # Skip over HTML tags.
+            if str[end] == '<':
+                while end<len(str) and str[end] != '>': end += 1
+                cnum -= 1
 
+            # HTML entities just count as 1 char.
+            elif str[end] == '&':
+                while end<len(str) and str[end] != ';': end += 1
+
+            # Go on to the next character.
+            cnum += 1
+            end += 1
+
+            # Check for end-of-line.
+            if str[end-1] == '\n':
+                lines.append(str[start:end-1])
+                cnum = 0
+                start = end
+
+            # Check for line-wrap
+            if cnum == linelen and end<len(str) and str[end] != '\n':
+                lines.append(str[start:end]+LINEWRAP_MARKER)
+                cnum = 0
+                start = end
+
+        # Add on anything that's left.
+        if end == len(str):
+            lines.append(str[start:end])
+
+        # Use the ellipsis marker if the string is too long.
+        if len(lines) > maxlines:
+            lines[-1] = ELLIPSIS_MARKER
+            cnum = 3
+
+        # Pad the last line to linelen.
+        lines[-1] += ' '*(linelen-cnum+1)
+
+        return ('\n').join(lines)
+            
     #////////////////////////////////////////////////////////////
     # Term index generation
     #////////////////////////////////////////////////////////////
@@ -1913,7 +1999,7 @@ class HTML_Doc:
         elif tree.tagName == 'literalblock':
             return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
         elif tree.tagName == 'doctestblock':
-            dtb = self._colorize_doctestblock(childstr.strip())
+            dtb = colorize_doctestblock(childstr.strip())
             return '<pre class="doctestblock">\n%s</pre>\n' % dtb
         elif tree.tagName == 'fieldlist':
             raise AssertionError("There should not be any field lists left")
@@ -1923,86 +2009,11 @@ class HTML_Doc:
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
     
-    # Construct two regular expressions that are useful for colorizing
-    # doctest blocks: _PROMPT_RE and _COLORIZE_RE.
-    _KEYWORDS = ["del", "from", "lambda", "return", "and", "or", "is", 
-                 "global", "not", "try", "break", "else", "if", "elif", 
-                 "while", "class", "except", "import", "pass", "raise",
-                 "continue", "finally", "in", "print", "def", "for"]
-    _KEYWORD = '|'.join([r'(\b%s\b)' % kw for kw in _KEYWORDS])
-    _STRING = '|'.join([r'("""("""|.*?((?!").)"""))', r'("("|.*?((?!").)"))',
-                        r"('''('''|.*?[^\\']'''))", r"('('|.*?[^\\']'))"])
-    _STRING = _STRING.replace('"', '&quot;') # Careful with this!
-    _COMMENT = '(#.*?$)'
-    _PROMPT = r'(^\s*(&gt;&gt;&gt;|\.\.\.)(\s|$))'
-    _PROMPT_RE = re.compile(_PROMPT, re.MULTILINE | re.DOTALL)
-    _COLORIZE_RE = re.compile('|'.join([_STRING, _COMMENT, _KEYWORD]),
-                              re.MULTILINE | re.DOTALL)
-    del _KEYWORDS, _KEYWORD, _STRING, _COMMENT
-    def _colorize_doctestblock(self, str):
-        """
-        Do some colorization for a doctest block.  In particular, this
-        identifies spans with the following css classes:
-          - pysrc: The Python source code
-          - pyprompt: The ">>>" and "..." prompts
-          - pystring: Strings in the Python source code
-          - pycomment: Comments in the Python source code
-          - pykeyword: Keywords in the Python source code
-          - pyoutput: Python's output (lines without a prompt)
-        
-        @type str: C{string}
-        @param str: The contents of the doctest block to be colorized.
-        @rtype: C{string}
-        @return: The colorized doctest block.
-        """
-        PROMPT_RE = HTML_Doc._PROMPT_RE
-        COLORIZE_RE = HTML_Doc._COLORIZE_RE
-        pysrc = pyout = ''
-        outstr = ''
-        for line in str.split('\n')+['\n']:
-            if PROMPT_RE.match(line):
-                if pyout:
-                    outstr += ('<span class="pyoutput">%s</span>\n\n' %
-                               pyout.strip())
-                    pyout = ''
-                pysrc += line+'\n'
-            else:
-                if pysrc:
-                    # Prompt over-rides other colors (incl string)
-                    pysrc = COLORIZE_RE.sub(self._colorize_match, pysrc)
-                    pysrc = PROMPT_RE.sub(r'<span class="pyprompt">'+
-                                          r'\1</span>', pysrc)
-                    outstr += ('<span class="pysrc">%s</span>\n'
-                               % pysrc.strip())
-                    pysrc = ''
-                pyout += line+'\n'
-        if pyout.strip():
-            outstr += ('<span class="pyoutput">%s</span>\n' %
-                       pyout.strip())
-        return outstr.strip()
-        
-    def _colorize_match(self, match):
-        """
-        This helper function is used by L{_colorize_doctestblock} to
-        add colorization to matching expressions.  It is called by
-        C{_COLORIZE_RE.sub} with an expression that matches
-        C{_COLORIZE_RE}.
-
-        @return: The HTML code for the colorized expression.
-        @rtype: C{string}
-        """
-        str = match.group()
-        if str[:1] == "'" or str[:6] == '&quot;':
-            return '<span class="pystring">%s</span>' % str
-        elif str[:1] in '#':
-            return '<span class="pycomment">%s</span>' % str
-        else:
-            return '<span class="pykeyword">%s</span>' % str
-        
     def _dom_link_to_html(self, target, name, container):
         uid = findUID(target, container, self._docmap)
         if uid is None:
-            print >>sys.stderr, ('\nWarning: could not find UID for '+
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, ('Warning: could not find UID for '+
                                  'L{%s} in %s' % (target, container))
         return self._uid_to_href(uid, name, 'link')
     
@@ -2318,11 +2329,11 @@ class HTML_Doc:
         # If there's no UID, or it's an undocumented object, or it's
         # private and we're not showing private, then don't link to
         # it; just show the label.
-        if (uid is None or (not self._docmap.has_key(uid)) or
-            (not self._show_private) and uid.is_private()):
+        if (uid is None or ((not self._show_private) and uid.is_private()) or
+            (not uid.is_variable() and not self._docmap.has_key(uid)) or
+            (uid.is_variable() and not self._docmap.has_key(uid.parent()))):
             if code: return '<code>%s</code>' % label
             else: return '%s' % label
-                
 
         # Construct an href, using uid_to_uri.
         if css_class and code:
