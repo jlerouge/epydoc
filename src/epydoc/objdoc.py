@@ -67,7 +67,7 @@ _KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
                      'return', 'returns', 'rtype', 'returntype',
                      'param', 'parameter', 'arg', 'argument',
                      'raise', 'raises', 'exception', 'except',
-                     'summary')
+                     'summary', 'keyword', 'kwarg')
 
 ##################################################
 ## __docformat__
@@ -341,7 +341,25 @@ class Raise:
 
 class DocField:
     """
-    A documentation field for the object.
+    A generic docstring field.  Docstring field are used to describe
+    specific information about an object, such as its author or its
+    version.  Generic docstring fields are fields that take no
+    arguments, and are displayed as simple sections.
+
+    @ivar tags: The set of tags that can be used to identify this
+        field.
+    @ivar singular: The label that should be used to identify this
+        field in the output, if the field contains one value.
+    @ivar plural: The label that should be used to identify this
+        field in the output, if the field contains multiple values.
+    @ivar short: If true, then multiple values should be combined
+        into a single comma-delimited list.  If false, then
+        multiple values should be listed separately in a bulleted
+        list.
+    @ivar multivalue: If true, then multiple values may be given
+        for this field; if false, then this field can only take a
+        single value, and a warning should be issued if it is
+        redefined.
     """
     def __init__(self, tags, label, plural=None,
                  short=0, multivalue=1):
@@ -373,23 +391,29 @@ class ObjDoc:
     """
     A base class for encoding the information about a Python object
     that is necessary to create its documentation.  This base class
-    defines the following documentation fields:
+    defines the following pieces of documentation:
 
-        - X{uid}: The object's unique identifier
-        - X{descr}: A description of the object
-        - X{fields}: A dictionary containing standard fields,
-          such as authors, version, and notes.  The complete
-          list of fields is defined by the variable
-          L{ObjDoc.FIELDS}.
+        - X{uid}: The object's unique identifier.
+        - X{descr}: A full description of the object.
+        - X{summary}: A summary description of the object.
+        - X{fields}: A list of generic docstring fields, such
+          as authors, version, and notes.  The list of standard
+          generic docstring fields is defined by the variable
+          L{ObjDoc.STANDARD_FIELDS}; but the user may also add new
+          generic docstring fields (via C{@newfield} or
+          C{__extra_epydoc_fields__}).
         - X{sortorder}: The object's sort order, as defined by the
           C{@sort} field.
+        - X{groups}: Groupings for contained objects (or
+          parameters).
 
     @group Accessors: documented, uid, descr, fields, field_values,
-        sortorder
+        sortorder, groups, by_group, has_docstring, summary,
+        defines_groups
     @group Error Handling: _print_errors, _parse_warnings,
         _parse_errors, _field_warnings, _misc_warnings
     @group Docstring Parsing: __parse_docstring, _process_field,
-        _descr, _fields, FIELDS
+        _descr, _fields, STANDARD_FIELDS
 
     @ivar _uid: The object's unique identifier
     @type _uid: L{UID}
@@ -398,18 +422,17 @@ class ObjDoc:
 
     @ivar _fields: Documentation fields that were extracted from
         the object's docstring.  The list of fields that are
-        accepted by epydoc is defined by L{ObjDoc.FIELDS}.
+        accepted by epydoc is defined by L{STANDARD_FIELDS}.
     @type _fields: C{dictionary} from L{DocField} to C{list} of
                    L{markup.ParsedDocstring}
-    @cvar FIELDS: The list of standard docstring fields that
-        epydoc accepts.  The order of fields is significant:
-        when the fields are rendered, they will be listed in
-        the order that they are given in this list.  Note that 
-        this list does X{not} include special fields, such as
-        \"group\"; it just includes \"simple\" fields, which
-        contain a single textual description or a list of
-        textual descriptions.
-    @type FIELDS: C{List} of L{DocField}
+    @cvar STANDARD_FIELDS: The list of standard docstring fields that
+        epydoc accepts.  The order of fields is significant: when the
+        fields are rendered, they will be listed in the order that
+        they are given in this list.  Note that this list does X{not}
+        include special fields, such as \"group\"; it just includes
+        \"simple\" fields, which contain a single textual description
+        or a list of textual descriptions.
+    @type STANDARD_FIELDS: C{List} of L{DocField}
 
     @ivar _misc_warnings: Warnings that are not related to the
         object's docstring.
@@ -421,7 +444,7 @@ class ObjDoc:
         object's docstring's fields.
     """
     # Note: order is significant.
-    FIELDS = [
+    STANDARD_FIELDS = [
         # If it's depreciated, put that first.
         DocField(['depreciated'], 'Depreciated', multivalue=0),
 
@@ -482,6 +505,11 @@ class ObjDoc:
         # Default: no sort order
         self._sortorder = None
 
+        # Groups:
+        self._groupnames = [None]
+        self._name2groupnum = {}
+        self._group2groupnum = {None: 0} # used to merge groups.
+
         # Initialize errors/warnings, and remember verbosity.
         self.__verbosity = verbosity
         self._parse_errors = []
@@ -500,7 +528,7 @@ class ObjDoc:
             self._misc_warnings.append(estr)
         
         # Initialize fields.  Add any extra fields.
-        self._fieldtypes = self.FIELDS[:]
+        self._fieldtypes = self.STANDARD_FIELDS[:]
         if module is not None:
             try: extra_fields = module.value().__extra_epydoc_fields__
             except: extra_fields = []
@@ -550,12 +578,12 @@ class ObjDoc:
         # Sort the fields in the order specified by _fieldtypes.
         self._fields = [f for f in self._fieldtypes
                         if self._fields_map.has_key(f)]
-    
+
     #////////////////////////////
     #// Accessors
     #////////////////////////////
 
-    def documented(self):
+    def has_docstring(self):
         """
         @return: True if the object documented by this C{ObjDoc} has a
         docstring.
@@ -619,6 +647,61 @@ class ObjDoc:
         """
         return self._sortorder
 
+    def defines_groups(self):
+        """
+        @return: True if the object documented by this C{ObjDoc}
+            defines any groups.
+        @rtype: C{boolean}
+        """
+        return len(self._groupnames) != 1
+
+    def groups(self):
+        """
+        @return: A list of the names of the groups that are defined
+            for the object documented by this C{ObjDoc}.  To divide
+            a set of children into groups, use L{by_group}.
+        @rtype: C{list} of C{string}
+        """
+        return self._groupnames[1:]
+
+    def by_group(self, elts):
+        """
+        Divide a set of elements into groups.  Typical usage:
+
+            >>> grouped_funcs = fdoc.by_group(fdoc.functions())
+            >>> for (group, members) in grouped_funcs:
+            ...     print group, members
+
+        @param elts: The set of elements that should be divided into
+            groups.  These elements should be C{Link}s, C{Var}s, or
+            C{Param}s specifying child objects of the object documented
+            by this C{ObjDoc}.
+        @type elts: C{list} of (L{Link} or L{Var} or L{ObjDoc})
+        @return: A list of tuples of the form C{(name, members)},
+            where C{name} is the name of a group; and C{members} is a
+            list of the elements in C{elts} that are in the group.
+            Group membership is tested with the C{elt.name()} method,
+            so every element in C{elts} must define that method.
+        @rtype: C{list} of C{(string, elt)}
+        """
+        # Check for the special case of no groups: (for speed)
+        if len(self._groupnames) == 1: return [(None, elts)]
+
+        # Divide into groups.  Do this in O(len(elts)+len(groups)),
+        # instead of the more intuitive algorithm which gives
+        # O(len(elts)*len(groups)).
+        name2groupnum = self._name2groupnum
+        grouped = [(g, []) for g in self._groupnames]
+        for elt in elts:
+            groupnum = name2groupnum.get(elt.name(), 0)
+            grouped[groupnum][1].append(elt)
+
+        # Is it worth-while to eliminate empty groups here?  Or should
+        # we just leave them in?
+        grouped = [pair for pair in grouped if len(pair[1]) != 0]
+
+        return grouped
+
     #////////////////////////////
     #// Protected
     #////////////////////////////
@@ -658,9 +741,36 @@ class ObjDoc:
 
     def _process_field(self, tag, arg, descr, warnings):
         """
-        This method should be overridden, and called as the default
-        case.
+        Process a field from this object's docstring.
+        C{ObjDoc._process_field} be overridden by child classes of
+        C{ObjDoc}, and called as the default case.
+        @type tag: C{string}
+        @param tag: The field's tag name
+        @type arg: C{string}
+        @param arg: The field's optional argument (or C{None} if no
+            argument was specified).
+        @type descr: L{markup.ParsedDocstring}
+        @param descr: The field's body.
+        @param warnings: A list of warnings that have been encountered.
+            If any new warnings are encountered, then they should be
+            appended to this list.
         """
+        if tag == 'group':
+            if arg is None:
+                warnings.append(tag+' expected an argument (group name)')
+                return
+            try:
+                idents = _descr_to_identifiers(descr)
+            except ValueError, e:
+                warnings.append('Bad group identifier list')
+                return
+            if not self._group2groupnum.has_key(arg):
+                self._groupnames.append(arg)
+                self._group2groupnum[arg] = len(self._groupnames)-1
+            for ident in idents:
+                self._name2groupnum[ident] = self._group2groupnum[arg]
+            return
+        
         if tag in ('deffield', 'newfield'):
             try:
                 field = _descr_to_docfield(arg, descr)
@@ -823,25 +933,27 @@ class ObjDoc:
 class ModuleDoc(ObjDoc):
     """
     The documentation for a module or package.  This documentation
-    consists of standard documentation fields (descr, author, etc.)
-    and the following module-specific fields:
+    consists of standard pieces of documentation (as defined in
+    L{ObjDoc}), and the following module-specific pieces of
+    documentation:
     
         - X{classes}: A list of all classes contained in the
-          module/package 
+          module/package.
         - X{functions}: A list of all functions contained in the
-          module/package
+          module/package.
         - X{variables}: A list of all variables contained in the
-          module/package
+          module/package.
         - X{modules}: A list of all modules contained in the
-          package (packages only)
+          package (packages only).
+        - X{imported objects}: Lists of imported objects, sorted
+          by type.
 
-    For more information on the standard documentation fields, see
-    L{ObjDoc}.
-
-    @group Accessors: groups, functions, classes, variables,
+    @group Accessors: functions, classes, variables,
         imported_functions, imported_classes, package, ispackage,
-        ismodule, modules
+        ismodule, modules, imported_variables, imported_modules
     @group Modifiers: remove_autogenerated_variables, add_modules
+    @group Import Detection: _find_defined_vars,
+        _find_imported_variables
 
     @type _classes: C{list} of L{Link}
     @ivar _classes: A list of all classes contained in the
@@ -863,11 +975,6 @@ class ModuleDoc(ObjDoc):
         self._tmp_var = {}
         self._tmp_type = {}
 
-        # Groups:
-        self._groupmembers = {}
-        self._anygroup = {}
-        self._groupnames = []
-        
         ObjDoc.__init__(self, uid, verbosity)
 
         # If mod is a package, then it will contain a __path__
@@ -881,6 +988,7 @@ class ModuleDoc(ObjDoc):
         self._imported_classes = []
         self._imported_functions = []
         self._imported_variables = []
+        self._imported_modules = []
         for (field, val) in mod.__dict__.items():
             vuid = make_uid(val, self._uid, field)
                 
@@ -889,13 +997,15 @@ class ModuleDoc(ObjDoc):
                          '__path__', '__name__', 
                          '__extra_epydoc_fields__', '__docformat__'):
                 continue
-            # Don't do anything if it doesn't have a full-path UID.
+            # Don't do anything if we can't get a UID.
             if vuid is None: continue
-            # Don't do anything for modules.
-            if vuid.is_module(): continue
+            
+            # Record imported modules.
+            if vuid.is_module():
+                self._imported_modules.append(Link(field, vuid))
 
             # Is it a function?
-            if vuid.is_function() or vuid.is_builtin_function():
+            elif vuid.is_function() or vuid.is_builtin_function():
                 if vuid.module() == self._uid:
                     self._functions.append(Link(field, vuid))
                 else:
@@ -947,30 +1057,14 @@ class ModuleDoc(ObjDoc):
         self._imported_functions = self._sort(self._imported_functions)
         self._imported_classes = self._sort(self._imported_classes)
         self._imported_variables = self._sort(self._imported_variables)
+        self._imported_modules = self._sort(self._imported_modules)
         self._modules = self._sort(self._modules)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
-        if tag == 'group':
-            if arg is None:
-                warnings.append(tag+' expected an argument (group name)')
-                return
-            try:
-                idents = _descr_to_identifiers(descr)
-            except ValueError, e:
-                warnings.append('Bad group identifier list')
-                return
-            if not self._groupmembers.has_key(arg):
-                self._groupnames.append(arg)
-                self._groupmembers[arg] = {}
-            group = self._groupmembers[arg]
-            anygroup = self._anygroup
-            for ident in idents:
-                group[ident] = 1
-                anygroup[ident] = 1
-        elif tag in ('variable', 'var'):
+        if tag in ('variable', 'var'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
@@ -981,9 +1075,11 @@ class ModuleDoc(ObjDoc):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of @%s %s' % (tag, arg))
-            self._tmp_type[arg] = descr
+            args = re.split('[:;, ] *', arg.strip())
+            for arg in args:
+                if self._tmp_type.has_key(arg):
+                    warnings.append('Redefinition of @%s %s' % (tag, arg))
+                self._tmp_type[arg] = descr
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
 
@@ -1035,6 +1131,12 @@ class ModuleDoc(ObjDoc):
         effective.  E.g., if someone uses C{global}, uses a
         C{try}/C{except} block, or directly modifies their modules'
         C{__dict__}, then we'll be fooled.
+
+        @bug: If you define class C with method g, and then at the
+            top level you say 'h=C.g', then this method will think
+            that is an imported variable (since the var's name
+            is derived from its uid, and the uid will be C.g, not
+            h).
         """
         # Don't bother if there aren't any variables, anyway.
         if len(self._variables) == 0: return
@@ -1102,21 +1204,6 @@ class ModuleDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
 
-    def groups(self):
-        return self._groupnames
-
-    def by_group(self, elts):
-        # This is O(len(elts)*len(groups)).  We could probably do
-        # better, if that's too slow.
-        ungrouped = [e for e in elts if not self._anygroup.has_key(e.name())]
-        grouped = [(g, [e for e in elts
-                        if self._groupmembers[g].has_key(e.name())])
-                   for g in self._groupnames]
-        if ungrouped:
-            return [(None,ungrouped)]+grouped
-        else:
-            return grouped
-
     def functions(self):
         """
         @return: A list of all functions defined by the
@@ -1143,6 +1230,15 @@ class ModuleDoc(ObjDoc):
         """
         return self._variables
 
+    def imported_modules(self):
+        """
+        @return: A list of all modules that are imported by the
+            module/package documented by this C{ModuleDoc},
+            sorted by name.
+        @rtype: C{list} of L{Link}
+        """
+        return self._imported_modules
+    
     def imported_functions(self):
         """
         @return: A list of all functions contained in the
@@ -1246,31 +1342,28 @@ class ModuleDoc(ObjDoc):
 class ClassDoc(ObjDoc):
     """
     The documentation for a class.  This documentation consists of
-    standard documentation fields (descr, author, etc.)  and the
-    following class-specific fields:
+    standard pieces of documentation (as defined in L{ObjDoc}), and
+    the following class-specific pieces of documentation:
     
-        - X{bases}: A list of the class's base classes
-        - X{subclasses}: A list of the class's known subclasses
-        - X{methods}: A list of the methods defined by the class
+        - X{bases}: A list of the class's base classes.
+        - X{subclasses}: A list of the class's known subclasses.
+        - X{methods}: A list of the methods defined by the class.
         - X{staticmethods}: A list of static methods defined by
           the class.
         - X{classmethods}: A list of class methods defined by the
           class.
         - X{properties}: A list of properties defined by the class.
         - X{ivariables}: A list of the instance variables defined by the
-          class
+          class.
         - X{cvariables}: A list of the class variables defined by the
-          class
-        - X{module}: The module that defines the class
+          class.
+        - X{module}: The module that defines the class.
 
-    For more information on the standard documentation fields, see
-    L{ObjDoc}.
-
-    @group Accessors: groups, is_exception, methods, classmethods,
+    @group Accessors: is_exception, methods, classmethods,
         staticmethods, properties, allmethods, cvariables,
         ivariables, bases, subclasses, property_type, base_order
     @group Inheritance: add_subclasses, inherit, _inherit_vars,
-        _inherit_groups
+        _inherit_groups, _add_inheritance_groups
 
     @type _methods: C{list} of L{Link}
     @ivar _methods: A list of all methods contained in this class. 
@@ -1295,11 +1388,6 @@ class ClassDoc(ObjDoc):
         self._tmp_type = {}
         self._property_type = {}
 
-        # Groups:
-        self._groupmembers = {}
-        self._anygroup = {}
-        self._groupnames = []
-        
         ObjDoc.__init__(self, uid, verbosity)
 
         # Handle methods & class variables
@@ -1324,7 +1412,8 @@ class ClassDoc(ObjDoc):
                 continue
 
             # Find the class that defines the field; and get the value
-            # directly from that class (so methods have the right uid).
+            # directly from that class (so methods & variables have
+            # the right uids).
             container = None
             for base in base_order:
                 if base.__dict__.has_key(field):
@@ -1371,8 +1460,6 @@ class ClassDoc(ObjDoc):
             vuid = make_uid(val, container, linkname)
             vlink = Link(linkname, vuid)
 
-            #print uid, field, container, vuid
-            
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
             # Don't do anything for modules.
@@ -1478,24 +1565,7 @@ class ClassDoc(ObjDoc):
         self._print_errors()
 
     def _process_field(self, tag, arg, descr, warnings):
-        if tag == 'group':
-            if arg is None:
-                warnings.append(tag+' expected an argument (group name)')
-                return
-            try:
-                idents = _descr_to_identifiers(descr)
-            except ValueError, e:
-                warnings.append('Bad group identifier list: %s' % e)
-                return
-            if not self._groupmembers.has_key(arg):
-                self._groupnames.append(arg)
-                self._groupmembers[arg] = {}
-            group = self._groupmembers[arg]
-            anygroup = self._anygroup
-            for ident in idents:
-                group[ident] = 1
-                anygroup[ident] = 1
-        elif tag in ('cvariable', 'cvar'):
+        if tag in ('cvariable', 'cvar'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
@@ -1513,8 +1583,11 @@ class ClassDoc(ObjDoc):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of @%s %s' % (tag, arg))
+            args = re.split('[:;, ]+ *', arg.strip())
+            for arg in args:
+                if self._tmp_type.has_key(arg):
+                    warnings.append('Redefinition of @%s %s' % (tag, arg))
+                self._tmp_type[arg] = descr
             self._tmp_type[arg] = descr
         else:
             ObjDoc._process_field(self, tag, arg, descr, warnings)
@@ -1540,21 +1613,6 @@ class ClassDoc(ObjDoc):
     #////////////////////////////
     #// Accessors
     #////////////////////////////
-
-    def groups(self):
-        return self._groupnames
-
-    def by_group(self, elts):
-        # This is O(len(elts)*len(groups)).  We could probably do
-        # better, if that's too slow.
-        ungrouped = [e for e in elts if not self._anygroup.has_key(e.name())]
-        grouped = [(g, [e for e in elts
-                        if self._groupmembers[g].has_key(e.name())])
-                   for g in self._groupnames]
-        if ungrouped:
-            return [(None,ungrouped)]+grouped
-        else:
-            return grouped
 
     def is_exception(self):
         """
@@ -1742,9 +1800,9 @@ class ClassDoc(ObjDoc):
         ivariables_map = {}
         cvariables_map = {}
         for ivar in self._ivariables:
-            ivariables_map[ivar.uid().shortname()] = ivar
+            ivariables_map[ivar.name()] = ivar
         for cvar in self._cvariables:
-            cvariables_map[cvar.uid().shortname()] = cvar
+            cvariables_map[cvar.name()] = cvar
 
         # Skip base_docs[0], since that's ourselves.
         for base_doc in base_docs[1:]:
@@ -1756,7 +1814,7 @@ class ClassDoc(ObjDoc):
                 if base_ivar.uid().cls() != base_doc.uid(): continue
                 if base_ivar.uid().cls() is None: continue
                 
-                name = base_ivar.uid().shortname()
+                name = base_ivar.name()
                 if ivariables_map.has_key(name):
                     # We already have this ivariable.
                     pass
@@ -1766,9 +1824,9 @@ class ClassDoc(ObjDoc):
                     # and list it under ivariables; otherwise, leave
                     # it as is.
                     cvar = cvariables_map[name]
-                    if cvar.autogenerated() and not base_ivar.autogenerated():
+                    if cvar.autogenerated():
                         ivar = Var(cvar.uid(), base_ivar.descr(), 
-                                  base_ivar.type(), cvar.has_value, 0)
+                                   base_ivar.type(), cvar.has_value(), 0)
                         ivariables_map[name] = ivar
                         del cvariables_map[name]
                 else:
@@ -1781,7 +1839,7 @@ class ClassDoc(ObjDoc):
                 if base_cvar.uid().cls() != base_doc.uid(): continue
                 if base_cvar.uid().cls() is None: continue
                 
-                name = base_cvar.uid().shortname()
+                name = base_cvar.name()
                 if ivariables_map.has_key(name):
                     # We already have this listed as an ivariable.
                     pass
@@ -1816,91 +1874,113 @@ class ClassDoc(ObjDoc):
         @param base_docs: The documentation for the 
         @rtype: C{None}
         """
+        groupnames = self._groupnames
+        name2groupnum = self._name2groupnum
+        group2groupnum = self._group2groupnum
+        
         # Skip base_docs[0], since that's ourselves.
         for base_doc in base_docs[1:]:
             if base_doc is None: continue
+            base_groupnames = base_doc._groupnames
 
-            # Copy the set of things that are in any group at all.
-            self._anygroup.update(base_doc._anygroup)
+            # Add any new groupnames.
+            for groupname in base_groupnames:
+                if not group2groupnum.has_key(groupname):
+                    groupnames.append(groupname)
+                    group2groupnum[groupname] = len(groupnames)-1
 
-            # Copy the individual groups.
-            for groupname in base_doc._groupnames:
-                # If we don't have this group, then add it.
-                if not self._groupmembers.has_key(groupname):
-                    self._groupmembers[groupname] = {}
-
-                # Copy the group.
-                basemembers = base_doc._groupmembers[groupname]
-                self._groupmembers[groupname].update(basemembers)
-
+            # Copy group membership information from the base class.
+            for (name, num) in base_doc._name2groupnum.items():
+                name2groupnum[name] = group2groupnum[base_groupnames[num]]
+                
     def _add_inheritance_groups(self):
-        for groupname in self._groupnames:
-            if groupname is not None and groupname.startswith('Inherited'):
-                estr = '"Inherited..." is a reserved group name.'
-                self._field_warnings.append(estr)
+        """
+        For each base class that this class inherits from, create a
+        group that includes all methods, properties, and variables
+        that were inherited from that base.
+        """
+        inherit_from = {}  # which bases did we inherit something from?
+        name2base = {}     # what base does each name come from?
+        base2groupnum = {} # what groupnum is used for each base?
 
-        inh_groups = {}
+        # Check to make sure we're not klobbering any groups.
+        groupnames = self._groupnames
+        if len(groupnames) > 1:
+            for groupname in groupnames[1:]:
+                if groupname.startswith('Inherited'):
+                    estr = '"Inherited..." is a reserved group name.'
+                    self._field_warnings.append(estr)
 
-        # Mark inherited methods & properties
+        # Find the base that each method & property inherits from.
         for link in self.allmethods()+self.properties():
             uid = link.target()
-            if uid.cls() is None: continue
-            if uid.cls() != self._uid:
-                groupname = 'Inherited from %s' % uid.cls().shortname()
-                if not self._groupmembers.has_key(groupname):
-                    inh_groups[uid.cls()] = 1
-                    self._groupmembers[groupname] = {}
-                self._groupmembers[groupname][link.name()] = 1
-                self._anygroup[link.name()] = 1
+            cls = uid.cls()
+            if cls is None: continue
+            if cls != self._uid:
+                name2base[link.name()] = cls
+                inherit_from[cls] = 1
 
-        # Mark inherited variables
+        # Find the base that each variable inherits from.
         for var in self.ivariables()+self.cvariables():
             uid = var.uid()
-            if uid.cls() is None: continue
-            if uid.cls() != self._uid:
-                groupname = 'Inherited from %s' % uid.cls().shortname()
-                if not self._groupmembers.has_key(groupname):
-                    inh_groups[uid.cls()] = 1
-                    self._groupmembers[groupname] = {}
-                self._groupmembers[groupname][var.name()] = 1
-                self._anygroup[var.name()] = 1
+            cls = uid.cls()
+            if cls is None: continue
+            if cls != self._uid:
+                name2base[var.name()] = cls
+                inherit_from[cls] = 1
 
-        # Add all the non-empty inheritance groups.  Include them in
-        # the order given by _base_order.
+        # If we didn't inherit anything, then we're done.
+        if len(inherit_from) == 0: return
+
+        # Add an inheritance group for every base class that we
+        # inherited something from.  Include them in the order given
+        # by _base_order.
+        group2groupnum = self._group2groupnum
         for base in self._base_order:
-            if inh_groups.has_key(base):
-                self._groupnames.append('Inherited from %s' %
-                                        base.shortname())
-                del inh_groups[base]
+            if inherit_from.has_key(base):
+                groupname = 'Inherited from %s' % base.shortname()
+                groupnames.append(groupname)
+                groupnum = len(groupnames)-1
+                base2groupnum[base] = groupnum
+                group2groupnum[groupname] = groupnum
+                del inherit_from[base]
+                
         # There shouldn't be anything left, but just in case...
-        for base in inh_groups.keys():
-            self._groupnames.append('Inherited from %s' %
-                                    base.shortname())
-            
+        for base in inherit_from.keys():
+            groupnames.append('Inherited from %s' % base.shortname())
+            base2groupnum[base] = len(groupnames)-1
+
+        # Now that we have groupnums for each base, we can add all the
+        # names to _name2groupnum.
+        name2groupnum = self._name2groupnum
+        for (name, group) in name2base.items():
+            name2groupnum[name] = base2groupnum[name2base[name]]
+
 #////////////////////////////////////////////////////////
 #// FuncDoc
 #////////////////////////////////////////////////////////
 class FuncDoc(ObjDoc):
     """
-    The documentation for a function or method.  This documentation
-    consists of the standard documentation fields (descr, author,
-    etc.) and the following class-specific fields:
+    The documentation for a function.  This documentation consists of
+    standard pieces of documentation (as defined in L{ObjDoc}), and
+    the following function-specific pieces of documentation:
 
-        - X{parameters}: A list of the function's parameters
-        - X{vararg}: The function's vararg parameter, or C{None}
-        - X{kwarg}: The function's keyword parameter, or C{None}
-        - X{returns}: The function's return value
+        - X{parameters}: A list of the function's positional
+          parameters.
+        - X{vararg}: The function's vararg parameter, or C{None}.
+        - X{kwarg}: The function's keyword parameter, or C{None}.
+        - X{returns}: The function's return value.
         - X{raises}: A list of exceptions that may be raised by the
-          function. 
+          function.
         - X{overrides}: The method that this method overrides.
-
-    For more information on the standard documentation fields, see
-    L{ObjDoc}.
 
     @group Accessors: parameters, vararg, kwarg, returns, raises,
         overrides, matches_override, parameter_list
     @group Error Reporting: _COLLECT_PARAM_MISMATCHES, 
         _param_mismatches
+    @group Signature Parsing: _init_params, _init_signature,
+        _params_to_vars, _signature_match, _init_builtin_signature
+    @group Inheritance: _find_override
 
     @type _params: C{list} of L{Var}
     @ivar _params: A list of this function's normal parameters.
@@ -1930,8 +2010,11 @@ class FuncDoc(ObjDoc):
 
     def __init__(self, uid, verbosity=0):
         func = uid.value()
+        
         self._tmp_param = {}
         self._tmp_type = {}
+        self._keywords = []
+        
         self._raises = []
         self._overrides = None
         self._matches_override = 0
@@ -2083,6 +2166,19 @@ class FuncDoc(ObjDoc):
             if self._tmp_type.has_key(name):
                 arg.set_type(self._tmp_type[name])
                 del self._tmp_type[name]
+
+        # Deal with keyword params.
+        if self._keywords:
+            if not self._kwarg_param:
+                estr = '@keyword used without a keyword parameter'
+                self._field_warnings.append(estr)
+            else:
+                for param in self._keywords:
+                    if self._tmp_type.has_key(param.name()):
+                        param.set_type(self._tmp_type[param.name()])
+                        del self._tmp_type[param.name()]
+
+        # Flag warnings if we didn't use any @param or @types.
         if self._tmp_param != {}:
             for key in self._tmp_param.keys():
                 estr = '@param for unknown parameter %s' % key
@@ -2231,9 +2327,18 @@ class FuncDoc(ObjDoc):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
                 return
-            if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of @%s %s' % (tag, arg))
-            self._tmp_type[arg] = descr
+            args = re.split('[:;, ]+ *', arg.strip())
+            for arg in args:
+                if self._tmp_type.has_key(arg):
+                    warnings.append('Redefinition of @%s %s' % (tag, arg))
+                self._tmp_type[arg] = descr
+        elif tag in ('keyword', 'kwarg'):
+            if arg is None:
+                warnings.append(tag+' expected a single argument')
+                return
+            #if self._keywords.has_key(arg):
+            #    warnings.append('Redefinition of @%s %s' % (tag, arg))
+            self._keywords.append(Param(arg, descr))
         elif tag in ('raise', 'raises', 'exception', 'except'):
             if arg is None:
                 warnings.append(tag+' expected a single argument')
@@ -2262,16 +2367,17 @@ class FuncDoc(ObjDoc):
     def parameters(self):
         """
         @rtype: C{list} of L{Var}
-        @return: The parameters for the function/method documented by
-            this C{FuncDoc}.  This is typically a list of parameters,
-            but it can contain sublists if the function/method's
-            signature contains sublists.  For example, for the function:
+        @return: The positional parameters for the function/method
+            documented by this C{FuncDoc}.  This is typically a list
+            of parameters, but it can contain sublists if the
+            function/method's signature contains sublists.  For
+            example, for the function:
 
                 >>> def f(a, (b, c), d): pass
 
-            C{parameters} will return a three-element list, whose
-            second element is a sublist containing C{Var}s for C{b}
-            and C{c}.
+            For this function, C{parameters} will return a
+            three-element list, whose second element is a sublist
+            containing C{Var}s for C{b} and C{c}.
 
             If you just want a list of all parameters used by the
             function/method, use L{parameter_list} instead. 
@@ -2304,6 +2410,14 @@ class FuncDoc(ObjDoc):
         @rtype: L{Var} or C{None}
         """
         return self._return
+
+    def keywords(self):
+        """
+        @return: The keyword parameters for the function/method
+            documented by this C{FuncDoc}.
+        @rtype: C{list} of L{Var}
+        """
+        return self._keywords
     
     def raises(self):
         """
@@ -2345,9 +2459,6 @@ class FuncDoc(ObjDoc):
             self._param_list = _flatten(self._params)
         return self._param_list
 
-    def set_matches_override(self, value):
-        self._matches_override = value
-
 def report_param_mismatches(docmap):
     mismatches = FuncDoc._param_mismatches
     
@@ -2371,17 +2482,14 @@ def report_param_mismatches(docmap):
 #////////////////////////////////////////////////////////
 class PropertyDoc(ObjDoc):
     """
-    The documentation for a class property.  This documentation
-    consists of the standard documentation fields (descr, author,
-    etc.) and the following class-specific fields:
+    The documentation for a property.  This documentation consists of
+    standard pieces of documentation (as defined in L{ObjDoc}), and
+    the following property-specific pieces of documentation:
 
       - X{fget}: The property's get function
       - X{fset}: The property's set function
       - X{fdel}: The property's delete function
       - X{type}: The property's type
-
-    For more information on the standard documentation fields, see
-    L{ObjDoc}.
 
     @group Accessors: type, fget, fset, fdel
     """
@@ -2521,6 +2629,10 @@ class DocMap(UserDict.UserDict):
 
         # If we couldn't find a UID, don't do anything.
         if objID is None: return
+
+        # If we're being very verbose, then report that we're adding it.
+        if self._verbosity > 2:
+            print >>sys.stdout, '    Building docs for %s' % objID
         
         if objID.is_module():
             self.data[objID] = ModuleDoc(objID, self._verbosity)
@@ -2680,20 +2792,44 @@ class DocMap(UserDict.UserDict):
         else:
             raise TypeError()
 
-    def documented_ancestor(self, uid):
+    # RENAME THIS?
+    def documented_ancestor(self, method_uid):
         """
-        @return: The documentation for the closest ancestor of
-            the object with UID C{uid} (including C{uid}); or
-            C{None} if none of C{uid}'s ancestors are documented.
-        @rtype: L{UID}
+        Returns the documentation for the closest ancestor of
+        C{method_uid} that defines a docstring.  In particular, search
+        through the set of methods that C{method_uid} overrides
+        (starting with C{method_uid} itself), and return the first
+        method that:
+          - defines a docstring
+          - matches the signature of C{method_uid}
+
+        If no such method is found, or if C{method_uid} itself is not
+        documented by this docmap, then this function returns C{None}.
+        
+        @type method_uid: L{UID}
+        @rtype: L{ObjDoc} or C{None}
+        @raise ValueError: If C{method_uid} is not the UID for a method.
         """
-        doc = self[uid]
+        # Check that it's the UID for a method
+        if not (method_uid.is_method() or method_uid.is_builtin_method()):
+            raise ValueError, '%s is not the UID for a method' % method_uid
+        
+        # Get the documentation for method_uid
+        doc = self.data.get(method_uid)
         if doc is None: return None
-        if not isinstance(doc, FuncDoc): return doc
-        while (not doc.documented() and doc.matches_override()
-               and self.has_key(doc.overrides())):
-            doc = self[doc.overrides()]
-        if doc.documented(): return doc
+        if doc.has_docstring(): return doc
+
+        # Search through the overridden methods until we find a
+        # documented ancestor.
+        ancestor = doc
+        while (not ancestor.has_docstring() and ancestor.matches_override()
+               and self.data.has_key(ancestor.overrides())):
+            ancestor = self.data[ancestor.overrides()]
+
+        # If we found a documented ancestor, then return it.
+        if ancestor.has_docstring(): return ancestor
+
+        # If we didn't, then return None
         else: return None
 
     def sorted_keys(self):
@@ -2803,7 +2939,7 @@ def _find_docstring(uid):
     # We couldn't find a docstring line number.
     return (None, None)
 
-_IDENTIFIER_LIST_REGEXP = re.compile(r'^([\w.]+[\s,:;]?\s*)*[\w.]+\s*$')
+_IDENTIFIER_LIST_REGEXP = re.compile(r'^[\w.]+([\s,:;]\s*[\w.]+)*$')
 def _descr_to_identifiers(descr):
     """
     Given a C{ParsedDocstring} that contains a list of identifiers,
@@ -2826,12 +2962,13 @@ def _descr_to_identifiers(descr):
     idents = re.sub(r'\s+', ' ', idents)
     if not _IDENTIFIER_LIST_REGEXP.match(idents):
         raise ValueError, 'Bad Identifier list: %r' % idents
-    return re.split('[ :;,]+', idents)
+    rval = re.split('[:;, ] *', idents)
+    return rval
 
 def _descr_to_docfield(arg, descr):
-    tags = [s.lower() for s in re.split('[ :;,]+', arg)]
+    tags = [s.lower() for s in re.split('[:;, ] *', arg)]
     descr = descr.to_plaintext(None).strip()
-    args = re.split(' *[:;,]+ *', descr)
+    args = re.split('[:;, ] *', descr)
     if len(args) == 0 or len(args) > 3:
         raise ValueError, 'Wrong number of arguments'
     singular = args[0]
