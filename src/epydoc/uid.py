@@ -174,20 +174,20 @@ class UID:
         
         if descendant.is_method():
             if ancestor.is_class():
-                if descendant.cls() is ancestor: return 1
+                if descendant.cls() == ancestor: return 1
                 else: return 0
             else: descendant = descendant.cls()
 
         if descendant.is_class() or descendant.is_function():
             if ancestor.is_module():
-                if descendant.module() is ancestor: return 1
+                if descendant.module() == ancestor: return 1
                 else: return 0
             else: descendant = descendant.module()
 
         if not ancestor.is_package(): return 0
 
         while descendant is not None and descendant.is_module():
-            if descendant.package() is ancestor: return 1
+            if descendant.package() == ancestor: return 1
             else: descendant = descendant.package()
 
         return 0
