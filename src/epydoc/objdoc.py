@@ -1295,7 +1295,7 @@ class ModuleDoc(ObjDoc):
                          (symbol.simple_stmt,
                           (symbol.small_stmt,
                            ['expr_stmt']),
-                          (token.NEWLINE, '')))
+                          (token.NEWLINE, ['optional_comment'])))
     _LHS_PATTERN = (symbol.test,
              (symbol.and_test,
               (symbol.not_test,
