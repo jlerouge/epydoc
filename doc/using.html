@@ -15,9 +15,9 @@ documentation for a set of modules and packages: </p>
 
 <div class="box">
 <pre>
-epydoc [-o <code class="user">DIR</code>] [-n <code class="user">NAME</code>] [-u <code class="user">URL</code>] [-t <code class="user">PAGE</code>] [-c <code class="user">SHEET</code>] 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[--private-css <code class="user">SHEET</code>] [--navlink <code class="user">HTML</code>] [-v]
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<code class="user">MODULES...</code>
+<b>epydoc</b> [<b>--html</b> | <b>--pdf</b>] [<b>-o</b> <code class="user">DIR</code>] [<b>-n</b> <code class="user">NAME</code>] [<b>-u</b> <code class="user">URL</code>]
+<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>-t</b> <code class="user">PAGE</code>] [<b>-c</b> <code class="user">SHEET</code>] [<b>--private-css</b> <code class="user">SHEET</code>]
+<b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b>[<b>--no-private</b>] <code class="user">MODULES...</code>
 </pre>
 
 <dl>
@@ -30,45 +30,58 @@ epydoc [-o <code class="user">DIR</code>] [-n <code class="user">NAME</code>] [-
     "<code>__init__.py</code>" file.
   </dd>
   
-  <dt><code>-o <code class="user">DIR</code></code>, <code>--output <code class="user">DIR</code></code>, <code>--target <code class="user">DIR</code></code></dt>
-  <dd>Output directory for HTML files.
+  <dt><code><b>--html</b></code></dt>
+  <dd>Generate HTML output. (default)
   </dd>
 
-  <dt><code>-n <code class="user">NAME</code></code>, <code>--name <code class="user">NAME</code></code></dt>
-  <dd>Project name (for the HTML header/footer).
+  <dt><code><b>--pdf</b></code></dt>
+  <dd>Generate Adobe Acrobat (PDF) output, using LaTeX.
   </dd>
 
-  <dt><code>-u <code class="user">URL</code></code>, <code>--url <code class="user">URL</code></code></dt>
-  <dd>Project URL (for the HTML header/footer).
+  <dt><code><b>-o</b> <code class="user">DIR</code></code>, <code><b>--output</b> <code class="user">DIR</code></code>, <code><b>--target</b> <code class="user">DIR</code></code></dt>
+  <dd>The output directory.
   </dd>
 
-  <dt><code>-t <code class="user">PAGE</code></code>, <code>--top <code class="user">PAGE</code></code></dt>
-  <dd> The "top page" for the documentation.  <code
+  <dt><code><b>-n</b> <code class="user">NAME</code></code>, <code><b>--name</b> <code class="user">NAME</code></code></dt>
+  <dd>The documented project's name.
+  </dd>
+
+  <dt><code><b>-u</b> <code class="user">URL</code></code>, <code><b>--url</b> <code class="user">URL</code></code></dt>
+  <dd>The documented project's URL.
+  </dd>
+
+  <dt><code><b>-t</b> <code class="user">PAGE</code></code>, <code><b>--top</b> <code class="user">PAGE</code></code></dt>
+  <dd> The "top page" for the HTML documentation.  <code
   class="USER">PAGE</code> can be the name of a module or class; a URL;
   <code>"trees.html"</code>; <code>"indices.html"</code>; or
   <code>"help.html"</code>. </dd>
 
-  <dt><code>-c <code class="user">SHEET</code></code>, <code>--css <code class="user">SHEET</code></code></dt>
+  <dt><code><b>-c</b> <code class="user">SHEET</code></code>, <code><b>--css</b> <code class="user">SHEET</code></code></dt>
   <dd>CSS stylesheet for HTML files containing public documentation.
     <code class="user">SHEET</code> can be a filename, or the name of a
     built-in stylesheet.  For a list of the built-in stylesheets, run
     "<code>epydoc --help css</code>".
   </dd>
 
-  <dt><code>--private-css <code class="user">SHEET</code></code></dt>
+  <dt><code><b>--private-css</b> <code class="user">SHEET</code></code></dt>
   <dd>CSS stylesheet for HTML files containing private documentation.
+  </dd>
+
+  <dt><code><b>--no-private</b></code></dt>
+  <dd>Do not include documentation for private objects.
   </dd>
 
 </dl>
 </div>
 
-<p> For example, the following command is used to produce the API
+<p> For example, the following commands are used to produce the API
 documentation for epydoc itself: </p>
 
 <div class="screen"><pre>
 <code class="prompt">[epydoc]$</code> epydoc -n epydoc -u http://epydoc.sourceforge.net \
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-o api --css blue --private-css green \
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;src/epydoc/*.py 
+<code class="prompt">[epydoc]$</code> epydoc --pdf -n epydoc --no-private src/epydoc/*.py 
 </pre></div>
 
 <p> Note that all options must preceed the list of modules. The usage
@@ -128,7 +141,7 @@ otherwise, the checks are only run on public objects. </p>
 
 <div class="box">
 <pre>
-epydoc --check [-p] <code class="user">MODULES...</code>
+<b>epydoc</b> <b>--check</b> [<b>-p</b>] <code class="user">MODULES...</code>
 </pre>
 
 <dl>
@@ -141,7 +154,7 @@ epydoc --check [-p] <code class="user">MODULES...</code>
     "<code>__init__.py</code>" file.
   </dd>
   
-  <dt><code>-p</code></dt>
+  <dt><code><b>-p</b></code></dt>
   <dd>Run documentation completeness checks on private objects.
   </dd>
 </dl>
@@ -272,7 +285,7 @@ page</a>. </p>
     </tr>
 </table>
 <font size="-1">
-<!-- hhmts start --> Last modified: Wed Oct 30 21:36:35 EST 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Nov  6 07:22:50 EST 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
