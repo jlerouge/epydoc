@@ -1018,12 +1018,13 @@ class ClassDoc(ObjDoc):
             # Deal with static/class methods. (Python 2.2)
             try:
                 if isinstance(val, staticmethod):
-                    vuid = make_uid(getattr(cls, field))
-                    self._staticmethods.append(Link(field, vuid))
+                    val = new.instancemethod(getattr(cls, field), None, cls)
+                    self._staticmethods.append(Link(field, make_uid(val)))
                     continue
                 elif isinstance(val, classmethod):
-                    vuid = make_uid(getattr(cls, field))
-                    self._classmethods.append(Link(field, vuid))
+                    val = getattr(cls, field).im_func
+                    val = new.instancemethod(val, None, cls)
+                    self._classmethods.append(Link(field, make_uid(val)))
                     continue
             except NameError: pass
                 
@@ -1086,7 +1087,7 @@ class ClassDoc(ObjDoc):
 
         # How do I want to handle inheritance?
         self._methodbyname = {}
-        for m in self._methods:
+        for m in self._methods + self._classmethods + self._staticmethods:
             self._methodbyname[m.target().shortname()] = 1
         for base in bases:
             self._inherit_methods(base)
