@@ -110,11 +110,12 @@ def cli():
 
     # Report any internal errors.
     if _encountered_internal_error:
-        estr = ("An internal error occured.  To see the exception "+
-                "that caused the\n error, use the '--debug' option.")
+        estr = ("!! An internal error occured.  To see the exception "+
+                "that caused the !!\n!! error, use the '--debug' "+
+                "option.                                 !!")
         print >>sys.stderr, '\n'+'!'*70
         print >>sys.stderr, estr
-        print >>sys.stderr, '\n'+'!'*70
+        print >>sys.stderr, '!'*70+'\n'
 
 _encountered_internal_error = 0
 def _internal_error(e=None):
@@ -123,6 +124,7 @@ def _internal_error(e=None):
     @return: The return value from calling C{func}
     """
     if isinstance(e, KeyboardInterrupt): raise
+    global _encountered_internal_error
     _encountered_internal_error = 1
     if sys.stderr.softspace: print >>sys.stderr
     if e: print >>sys.stderr, "INTERNAL ERROR: %s" % e
