@@ -1366,7 +1366,9 @@ class HTMLFormatter:
             fname = link.name()
             if func.is_method() or func.is_builtin_method():
                 container = func.cls()
-                inherit = (container != cls.uid())
+                # (If container==ClassType, it's (probably) a class method.)
+                inherit = (container != cls.uid() and
+                           container.value() is not types.ClassType)
             else:
                 inherit = 0
                 try: container = func.module()
@@ -1427,7 +1429,9 @@ class HTMLFormatter:
             func = link.target()
             if func.is_method() or func.is_builtin_method():
                 container = func.cls()
-                inherit = (container != cls.uid())
+                # (If container==ClassType, it's (probably) a class method.)
+                inherit = (container != cls.uid() and
+                           container.value() is not types.ClassType)
             else:
                 inherit = 0
                 try: container = func.module()
