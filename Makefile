@@ -63,13 +63,16 @@ checkdocs:
 	cp -r ${EXAMPLES} ${WEBDIR}
 #	cp -r src/dist/epydoc* ${WEBDIR}
 
+# Use plaintext docformat by default.  But this is overridden by the
+# __docformat__ strings in each epydoc module.  (So just
+# xml.dom.minidom gets plaintext docstrings).
 refdocs: .refdocs.up2date
 .refdocs.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --css blue --private-css green -v --debug \
-	       ${PY_SRC} xml.dom.minidom
+	       --css blue --private-css green -vv --debug \
+	       --docformat plaintext ${PY_SRC} xml.dom.minidom
 	touch .refdocs.up2date
 
 examples: .examples.up2date
@@ -83,7 +86,7 @@ examples: .examples.up2date
 #//////////////////////////////////////////////////////////////////////
 # Build documentation for the Python Standard Library
 SLNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
-SLURL = 'http://www.python.org/doc/current/lib/lib.html'
+SLURL = 'http://www.python.org/doc/2.1/lib/lib.html'
 SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/python2.1/config/' \
 	      |grep -v '/python2.1/lib-old/' \
@@ -92,7 +95,8 @@ stdlib:
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
 	epydoc -o ${STDLIB} -v -q -c white --show-imports \
-	       -n ${SLNAME} -u ${SLURL} --builtins ${SLFILES}
+	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
+	       --builtins ${SLFILES}
 
 ##//////////////////////////////////////////////////////////////////////
 ## Build documentation for everything installed on this system.
