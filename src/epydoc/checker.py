@@ -28,7 +28,7 @@ from types import StringType as _StringType
 
 import epydoc.epytext as epytext
 from epydoc.uid import UID, Link
-from epydoc.objdoc import ModuleDoc, FuncDoc
+from epydoc.objdoc import ModuleDoc, FuncDoc, PropertyDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 
 # The following methods may be undocumented:
@@ -78,7 +78,7 @@ class DocChecker:
         objects should be checked: L{PUBLIC} and L{PRIVATE}.
       - Check specifiers indicate what checks should be run on the
         objects: L{TYPE}; L{DESCR}; L{DESCR_LAZY}; L{AUTHOR};
-        L{VERSION}; and L{SEE}.
+        and L{VERSION}.
 
     The L{check} method is used to perform a check on the
     documentation.  Its parameter is formed by or-ing together at
@@ -94,6 +94,8 @@ class DocChecker:
         ...               DocChecker.FUNC | DocChecker.DESCR_LAZY |
         ...               DocChecker.PUBLIC)
 
+    @group Types: MODULE, CLASS, FUNC, VAR, IVAR, CVAR, PARAM,
+        RETURN, ALL_T
     @type MODULE: C{int}
     @cvar MODULE: Type specifier that indicates that the documentation
         of modules should be checked.
@@ -122,12 +124,10 @@ class DocChecker:
     @cvar ALL_T: Type specifier that indicates that the documentation
         of all objects should be checked.
 
+    @group Checks: TYPE, AUTHOR, VERSION, DESCR_LAZY, DESCR, ALL_C
     @type TYPE: C{int}
     @cvar TYPE: Check specifier that indicates that every variable and
         parameter should have a C{@type} field.
-    @type SEE: C{int}
-    @cvar SEE: Check specifier that indicates that all C{@see}
-        fields should have valid targets.
     @type AUTHOR: C{int}
     @cvar AUTHOR: Check specifier that indicates that every object
         should have an C{author} field.
@@ -147,6 +147,7 @@ class DocChecker:
     @cvar ALL_C: Check specifier that indicates that  all checks
         should be run.
 
+    @group Publicity: PUBLIC, PRIVATE, ALL_P
     @type PUBLIC: C{int}
     @cvar PUBLIC: Specifier that indicates that public objects should
         be checked.
@@ -166,16 +167,16 @@ class DocChecker:
     CVAR   = 32
     PARAM  = 64
     RETURN = 128
-    ALL_T  = 1+2+4+8+16+32+64+128
+    PROPERTY = 256
+    ALL_T  = 1+2+4+8+16+32+64+128+256
 
     # Checks
     TYPE = 256
-    SEE = 512
     AUTHOR = 1024
     VERSION = 2048
     DESCR_LAZY = 4096
-    DESCR_STRICT = 8192
-    DESCR = DESCR_LAZY + DESCR_STRICT
+    _DESCR_STRICT = 8192
+    DESCR = DESCR_LAZY + _DESCR_STRICT
     ALL_C = 256+512+1024+2048+4096+8192
 
     # Private/public
@@ -202,6 +203,7 @@ class DocChecker:
         self._checks = 0
         self._last_warn = None
         self._out = sys.stdout
+        self._num_warnings = 0
 
     def check(self, checks = None):
         """
@@ -232,14 +234,17 @@ class DocChecker:
         self._checks = checks
         self._last_warn = None
         for doc in self._docs:
+            uid = doc.uid()
             if isinstance(doc, ModuleDoc):
                 self._check_module(doc)
             elif isinstance(doc, ClassDoc):
                 self._check_class(doc)
             elif isinstance(doc, FuncDoc):
                 self._check_func(doc)
+            elif isinstance(doc, PropertyDoc):
+                self._check_property(doc)
             else:
-                raise AssertionError(doc)
+                raise AssertionError("Don't know how to check%r" % doc)
         if self._last_warn is not None: print
         return (self._last_warn is None)
 
@@ -256,6 +261,7 @@ class DocChecker:
         """
         name = str(name)
         if name != self._last_warn:
+            self._num_warnings += 1
             if self._last_warn is not None: self._out.write('\n')
             self._out.write(name + '.'*max(1,60-len(name)) + error)
             self._last_warn = name
@@ -287,18 +293,20 @@ class DocChecker:
         @rtype: C{None}
         """
         if (self._checks & DocChecker.DESCR) and (not doc.descr()):
-            if ((self._checks & DocChecker.DESCR_STRICT) or
+            if ((self._checks & DocChecker._DESCR_STRICT) or
                 (not isinstance(doc, FuncDoc)) or
                 (not doc.returns().descr())):
                 self._warn('No descr', doc.uid().name())
-        #if (self._checks & DocChecker.SEE):
-        #    for link in doc.seealsos():
-        #        if not self._docmap.has_key(link.target()):
-        #            self._warn("Bad @see: %s" % link.target())
-        if (self._checks & DocChecker.AUTHOR) and (not doc.authors()):
-            self._warn('No authors', doc.uid().name())
-        if (self._checks & DocChecker.VERSION) and (not doc.version()):
-            self._warn('No version', doc.uid().name())
+        if self._checks & DocChecker.AUTHOR:
+            for field in doc.fields():
+                if 'author' in field.tags: continue
+            else:
+                self._warn('No authors', doc.uid().name())
+        if self._checks & DocChecker.VERSION:
+            for field in doc.fields():
+                if 'version' in field.tags: continue
+            else:
+                self._warn('No version', doc.uid().name())
             
     def _check_module(self, doc):
         """
@@ -332,6 +340,11 @@ class DocChecker:
         if self._checks & DocChecker.CVAR:
             for v in doc.cvariables():
                 self._check_var(v, doc.uid().name())
+
+    def _check_property(self, doc):
+        if not self._check_name_publicity(doc.uid().name()): return
+        if self._checks & DocChecker.PROPERTY:
+            self._check_basic(doc)
 
     def _check_var(self, var, name, check_type=1):
         """
