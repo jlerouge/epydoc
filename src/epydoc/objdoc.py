@@ -524,6 +524,9 @@ class ClassDoc(ObjDoc):
             self._methodbyname[m.target().shortname()] = 1
         for base in cls.__bases__:
             self._inherit(base)
+
+        # Is it an exception?
+        self._is_exception = issubclass(cls, Exception)
         
         # Inherited values (added externally with inherit())
         self._inh_methods = []
@@ -618,6 +621,8 @@ class ClassDoc(ObjDoc):
     def inherited_methods(self): return self._inh_methods
     def inherited_cvariables(self): return self._inh_cvariables 
     def inherited_ivariables(self): return self._inh_ivariables
+
+    def is_exception(self): return self._is_exception
 
     def overrides(self, method):
         return self._overrides.get(method, [])
