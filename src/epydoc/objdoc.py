@@ -216,6 +216,9 @@ class Param:
         - X{default}: The parameter's default value
 
     C{Param}s are used by L{FuncDoc} to document parameters.
+
+    @group Shared Parameter Lists: shared_descr_params, listed_under,
+        set_shared_descr_params, remove_shared_descr_param
     """
     def __init__(self, name, descr=None, type=None, default=None):
         """
@@ -236,6 +239,7 @@ class Param:
         self._type = type
         self._default = default
         self._shared_descr_params = None
+        self._listed_under = None
         
     def name(self):
         """
@@ -284,6 +288,16 @@ class Param:
         """
         return self._shared_descr_params
 
+    def listed_under(self):
+        """
+        @rtype: C{None} or L{Param}
+        @return: The parameter that this C{Param} is listed under,
+            if any.  This parameter is listed under parameter C{M{p}}
+            if it contained in C{M{p}.shared_descr_params()}.
+        @see: L{shared_descr_params}
+        """
+        return self._listed_under
+
     def set_shared_descr_params(self, shared_descr_params):
         """
         Register a list of C{Param}s that share the description given
@@ -292,8 +306,23 @@ class Param:
         @param C{shared_descr_params}: The C{Param}s that share the
             description given by this parameter
         @rtype: C{None}
+        @see: L{shared_descr_params}
         """
+        if self._shared_descr_params is not None:
+            for p in self._shared_descr_params: p._listed_under = None
         self._shared_descr_params = shared_descr_params
+        if self._shared_descr_params is not None:
+            for p in self._shared_descr_params: p._listed_under = self
+
+    def remove_shared_descr_param(self, param):
+        """
+        Remove a parameter from the list of C{Param}s that share the
+        description given by this parameter.
+        @type {param}: L{Param}
+        @see: L{shared_descr_params}
+        """
+        self._shared_descr_params.remove(param)
+        param._listed_under = None
     
     def set_type(self, type):
         """
@@ -2326,6 +2355,10 @@ class FuncDoc(ObjDoc):
                 else:
                     if param.descr() is not None:
                         warnings.append('Redefinition of parameter %s' % arg)
+                    elif param.listed_under() is not None:
+                        warnings.append('Redefinition of parameter %s' % arg)
+                        old_parent = param.listed_under()
+                        old_parent.remove_shared_descr_param(param)
                     param.set_descr(descr)
             else:
                 # Special case: multiple parameters listed at once.
