@@ -170,8 +170,10 @@ class UID:
     def module(self):
         """
         @return: The UID of the module that contains the object
-            identified by this UID.
-        @rtype: L{UID}
+            identified by this UID.  If the module cannot be found
+            (e.g., if this is the UID for a builtin function), return
+            None. 
+        @rtype: L{UID} or L{None}
         """
         if type(self._obj) is _MethodType:
             return UID(sys.modules[self._obj.im_class.__module__])
@@ -183,7 +185,7 @@ class UID:
         elif type(self._obj) is _FunctionType:
             return UID(_find_function_module(self._obj))
         else:
-            raise TypeError()
+            return None
 
     def package(self):
         """
@@ -388,19 +390,26 @@ def _makeuid(obj):
     else:
         return None
 
-def _namedModule(name):
+def _named_module(name):
     """
     @return: The module with the given fully qualified name.  
     @rtype: C{module}
     @raise ImportError: If there is no module with the given name. 
     """
-    return __import__(name, None, None, 1)
+    # Don't just use __import__(name, None, None, 1) because we don't
+    # want it to re-import the module if there was a problem.
+    topLevel = __import__(name)
+    packages = name.split(".")[1:]
+    m = topLevel
+    for p in packages:
+        m = getattr(m, p)
+    return m
 
-def _namedObject(name):
+def _named_object(name):
     """Get a fully named module-global object.
     """
     classSplit = name.split('.')
-    module = _namedModule('.'.join(classSplit[:-1]))
+    module = _named_module('.'.join(classSplit[:-1]))
     return getattr(module, classSplit[-1])
 
 def findUID(name, container, docmap=None):
@@ -461,7 +470,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            return(_makeuid(_namedModule(modname)))
+            return(_makeuid(_named_module(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -472,10 +481,10 @@ def findUID(name, container, docmap=None):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                mod = _namedModule(modname)
+                mod = _named_module(modname)
                 if _is_variable_in(name, UID(mod), docmap):
                     return UID('%s.%s' % (container, name))
-                obj = _namedObject(modname + '.' + objname)
+                obj = _named_object(modname + '.' + objname)
                 return _makeuid(obj)
             except: pass
 
