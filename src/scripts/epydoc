@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+#
+# Call the command line interface for Epydoc.
+#
+
+from epydoc.cli import cli
+cli()
+
