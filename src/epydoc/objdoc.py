@@ -1649,6 +1649,15 @@ class DocMap(UserDict.UserDict):
         @type obj: any
         @rtype: C{None}
         """
+        # Check that it's a good object, and if not, issue a warning.
+        if type(object) not in (_ModuleType, _ClassType, _TypeType,
+                                _BuiltinFunctionType, _BuiltinMethodType,
+                                _FunctionType, _MethodType):
+            if sys.stderr.softspace: print >>sys.stderr
+            estr = 'Error: docmap cannot add a %s' % type(object)
+            print >>sys.stderr, estr
+            return
+        
         objID = make_uid(obj)
         if self.data.has_key(objID): return
 
