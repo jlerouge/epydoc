@@ -525,7 +525,7 @@ class HTMLFormatter:
         if self._failed_xrefs:
             estr = 'Warning: Failed identifier crossreference targets:\n'
             failed_identifiers = self._failed_xrefs.keys()
-            failed_identifiers.sort(lambda a,b: cmp(a[1],b[1]))
+            failed_identifiers.sort()
             for identifier in failed_identifiers:
                 uids = self._failed_xrefs[identifier].keys()
                 uids.sort()
