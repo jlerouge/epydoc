@@ -41,7 +41,7 @@ produce API documentation using the following steps:
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1+, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
-@version: 2.0
+@version: 2.1
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
@@ -84,7 +84,7 @@ produce API documentation using the following steps:
 __docformat__ = 'epytext en'
 
 # General info
-__version__ = '2.0'
+__version__ = '2.1'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 __license__ = 'IBM Open Source License'
@@ -106,3 +106,4 @@ __license__ = 'IBM Open Source License'
 #   - Add a faq?
 #   - @type a,b,c: ...
 #   - new command line option: --command-line-order
+
