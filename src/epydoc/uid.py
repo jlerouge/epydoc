@@ -1004,13 +1004,27 @@ def findUID(name, container=None, docmap=None):
         found.
     @rtype: L{UID} or C{None}
     """
+    original_container = container
     if name == '': return None
     name = re.sub(r'\(.*\)$', '', name)
-    if container and not (container.is_module() or container.is_class()):
-        raise ValueError('Bad container %r' % container)
+
+    # Get a container for the docstring.  Names are resolved relative
+    # to this container.
+    if container and not (container.is_module() or container.is_class()
+                          or container.is_routine()):
+        container = container.cls() or container.module()
     if container is None:
         try: container = make_uid(sys.modules['__builtin__'])
-        except: pass
+        except: container = None
+
+    # Is it a function/method parameter?
+    if container and container.is_routine():
+        if _is_parameter_for(name, container, docmap):
+            # It's a parameter for the function that we're currently
+            # documenting.
+            return container
+        else:
+            container = container.cls() or container.module()
 
     # Is it the short name for a member of the containing class?
     if container and container.is_class():
@@ -1066,7 +1080,7 @@ def findUID(name, container=None, docmap=None):
     modcomponents = container_name.split('.')
     components = name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
-        for j in range(len(components)-1, 0, -1):
+        for j in range(len(components)-1, -1, -1):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
@@ -1084,7 +1098,7 @@ def findUID(name, container=None, docmap=None):
     modcomponents = container_name.split('.')
     components = name.split('.')
     for i in range(len(modcomponents)-1, -1, -1):
-        for j in range(len(components)-1, 0, -1):
+        for j in range(len(components)-1, -1, -1):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:-1])
@@ -1100,18 +1114,7 @@ def findUID(name, container=None, docmap=None):
 
     # If the name starts with 'self.', then try leaving that off.
     if name.startswith('self.'):
-        return findUID(name[5:], container, docmap)
-
-    ## Is it a parameter of a function/method?  If so, return the UID
-    ## of the function/method.
-    #if '.' in name and docmap:
-    #    components = name.split('.')
-    #    parent = '.'.join(components[:-1])
-    #    param = components[-1]
-    #    parent = findUID(parent, container, docmap)
-    #    if parent is not None and parent.is_routine():
-    #        if _is_parameter_for(param, parent, docmap):
-    #            return parent
+        return findUID(name[5:], original_container, docmap)
 
     # We couldn't find it; return None.
     return None
@@ -1143,8 +1146,9 @@ def _is_variable_in(name, container, docmap):
     return 0
 
 def _is_parameter_for(name, container, docmap):
+    if docmap is None or not docmap.has_key(container): return 0
     container_doc = docmap.get(container)
     if container.is_routine():
         for param in container_doc.parameter_list():
-            if param.name == name: return 1
+            if param.name() == name: return 1
     return 0
