@@ -248,7 +248,7 @@ class HTMLFormatter:
               objects.  By default, private objects are documented.
               (type=C{boolean})
             - C{frames}: Whether to create a frames-based table of
-              contents.  By default, it is not produced.
+              contents.  By default, it is produced.
               (type=C{boolean}) 
             - C{show_imports}: Whether or not to display lists of
               imported functions and classes.  By default, they are
@@ -275,7 +275,7 @@ class HTMLFormatter:
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
         self._create_private_docs = kwargs.get('private', 1)
-        self._create_frames = kwargs.get('frames', 0)
+        self._create_frames = kwargs.get('frames', 1)
         self._show_imports = kwargs.get('show_imports', 0)
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
@@ -401,8 +401,7 @@ class HTMLFormatter:
         # Write the index file.
         filename = os.path.join(directory, 'epydoc-index.html')
         if progress_callback: progress_callback(filename, None)
-        str = self._index_to_html()
-        open(filename, 'w').write(str)
+        self._write_index_to_stream(open(filename, 'w'))
 
         # Write the help file.
         filename = os.path.join(directory, 'epydoc-help.html')
@@ -735,46 +734,72 @@ class HTMLFormatter:
         str += self._footer()
         return str
 
-    def _index_to_html(self):
+    def _write_index_to_stream(self, out):
         """
-        @return: An HTML page containing the index terms.
-        @rtype: C{string}
+        Write the index to the given file-like object.  I write
+        directly to the file (unlike most other pages, which are
+        converted to strings, and then written) because the index page
+        can be quite large.  For example, for the Python standard
+        library, the index page is over 1.5mb.
+        @param out: The stream to which the index should be written.
+        @type out: C{stream}
+        @rtype: C{None}
         """
         # Header and navigation bar.
-        str = self._header('Index')
-        str += self._navbar('epydoc-index', 1) 
-        str += '<br>\n'
+        out.write(self._header('Index'))
+        out.write(self._navbar('epydoc-index', 1))
+        out.write('<br>\n')
 
         # Term index
         terms = self._extract_term_index().items()
         if terms:
-            str += self._start_of('Term Index')
-            str += self._table_header('Term Index', 'index')
+            out.write(self._start_of('Term Index'))
+            out.write(self._table_header('Term Index', 'index'))
             terms.sort()
             for (term, links) in terms:
-                str += '  <tr><td width="15%">'+term+'</td>\n    <td>'
+                str = '  <tr><td width="15%">'+term+'</td>\n    <td>'
                 links.sort()
                 for link in links:
                     str += ('<i><a href="%s#%s">%s</a></i>, ' %
                             (self._uid_to_uri(link.target()),
                              self._term_index_to_anchor(term), link.name()))
-                str = str[:-2] + '</tr></td>\n'
-            str += '</table>\n' +  '<br>\n'
+                out.write(str[:-2] + '</tr></td>\n')
+            out.write('</table>\n' +  '<br>\n')
 
         # Identifier index
         identifiers = self._extract_identifier_index()
         if identifiers:
-            str += self._start_of('Identifier Index')
-            str += self._table_header('Identifier Index', 'index')
-            for (href, descr) in identifiers:
-                str += '  <tr><td width="15%%">%s</td>\n' % href
-                str += '    <td>%s</td></tr>\n' % descr
-            str += '</table>\n' +  '<br>\n'
+            out.write(self._start_of('Identifier Index'))
+            out.write(self._table_header('Identifier Index', 'index'))
+            for uid in identifiers:
+                href = self._uid_to_href(uid, uid.shortname())
+
+                # Create the description string.
+                if uid.is_package(): descr = 'Package'
+                elif uid.is_module(): descr = 'Module'
+                elif uid.is_class(): descr = 'Class'
+                elif uid.is_variable(): descr = 'Variable'
+                elif uid.is_method() or uid.is_builtin_method():
+                    descr = 'Method'
+                elif uid.is_function() or uid.is_builtin_function():
+                    descr = 'Function'
+                puid = uid.parent()
+                if puid:
+                    if puid.is_package(): descr +=' in package '
+                    elif puid.is_module(): descr +=' in module '
+                    elif puid.is_class(): descr +=' in class '
+                    else: descr +=' in '
+                    descr += self._uid_to_href(uid.parent())
+
+                # Write the index entry.
+                out.write('  <tr><td width="15%%">%s</td>\n' % href)
+                out.write('    <td>%s</td></tr>\n' % descr)
+
+            out.write('</table>\n' +  '<br>\n')
 
         # Navigation bar and footer.
-        str += self._navbar('epydoc-index')
-        str += self._footer()
-        return str
+        out.write(self._navbar('epydoc-index'))
+        out.write(self._footer())
 
     def _toc_to_html(self):
         """
@@ -1792,6 +1817,27 @@ class HTMLFormatter:
         """
         @rtype: C{list} of C{(string, string)}
         """
+        # List of (sort-key, UID), where sort-key is
+        # uid.shortname().lower().
+        uids = []
+
+        for (uid, doc) in self._docmap.items():
+            if (not self._show_private) and uid.is_private():
+                continue
+            
+            uids.append( (uid.shortname().lower(), uid) )
+            if uid.is_module():
+                uids += [(v.name().lower(), v.uid())
+                         for v in doc.variables()
+                         if not v.uid().is_private()]
+            elif uid.is_class():
+                uids += [(v.name().lower(), v.uid())
+                         for v in doc.ivariables() + doc.cvariables()
+                         if not v.uid().is_private()]
+
+        uids.sort()
+        return [u[1] for u in uids]
+
         # list of (name, href, descr) tripples
         identifiers = []
         
@@ -1961,7 +2007,7 @@ class HTMLFormatter:
         """
         # This takes care of converting > to &gt;, etc.:
         if isinstance(tree, xml.dom.minidom.Text): return tree.toxml()
-    
+
         if tree.tagName == 'epytext': indent -= 2
         if tree.tagName == 'section': seclevel += 1
     
