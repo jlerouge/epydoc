@@ -2451,9 +2451,9 @@ class DocMap(UserDict.UserDict):
         you also want to include the objects contained by C{obj}, then
         use L{add}.
 
-        @param obj: The object whose documentation should be added to
-            this documentation map.
-        @type obj: any
+        @param objID: The UID of the object whose documentation should
+            be added to this documentation map.
+        @type objID: L{UID}
         @rtype: C{None}
         """
         obj = objID.value()
