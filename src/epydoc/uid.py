@@ -281,7 +281,7 @@ class UID:
 
     def is_module(self):
         """
-        @return: True if this is the UID for a module.
+        @return: True if this is the UID for a module or a package.
         @rtype: C{boolean}
         """
         return type(self._obj) is _ModuleType
