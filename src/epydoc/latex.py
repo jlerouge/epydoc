@@ -739,6 +739,7 @@ class LatexFormatter:
             str += ' '*6+'\\begin{quote}\n'
             str += '        \\begin{Ventry}{%s}\n\n' % (longest*'x')
             for param in fparam:
+                if param.listed_under(): continue
                 pname = self._text_to_latex(param.name())
                 str += ' '*10+'\\item[' + self._text_to_latex(pname)
                 if param.shared_descr_params():
@@ -747,7 +748,13 @@ class LatexFormatter:
                 str += ']\n\n'
                 if param.descr():
                     str += self._docstring_to_latex(param.descr(), 10)
-                if param.type():
+                if param.shared_descr_params():
+                    for p in [param]+param.shared_descr_params():
+                        if not p.type(): continue
+                        ptype = self._docstring_to_latex(p.type(), 14).strip()
+                        str += (' '*12+'\\textit{(typeof %s=%s)}\n\n' %
+                                (self._text_to_latex(p.name()), ptype))
+                elif param.type():
                     ptype = self._docstring_to_latex(param.type(), 12).strip()
                     str += ' '*12+'\\textit{(type=%s)}\n\n' % ptype
             str += '        \\end{Ventry}\n\n'

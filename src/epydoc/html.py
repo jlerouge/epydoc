@@ -1931,6 +1931,9 @@ class HTMLFormatter:
             parameters = [p for p in parameters if p.descr() or p.type()]
         if not parameters: return ''
 
+        # For shared descrs, only list once.
+        parameters = [p for p in parameters if not p.listed_under()]
+
         # Get the UID of the function (for docstring output)
         fuid = container.uid()
 
@@ -1956,7 +1959,14 @@ class HTMLFormatter:
                     pdescr = self._docstring_to_html(param.descr(), fuid, 8)
                     str += ' -\n %s' % pdescr.rstrip()
                 str += '\n'
-                if param.type():
+                if param.shared_descr_params():
+                    for p in [param]+param.shared_descr_params():
+                        if not p.type(): continue
+                        ptype = self._docstring_to_html(p.type(), fuid, 14)
+                        str += ' '*8+'<br /><i>'+('&nbsp;'*10)+'\n'
+                        str += (' '*8+'(type of %s=%s)</i>\n' %
+                                (p.name(), ptype.strip()))
+                elif param.type():
                     ptype = self._docstring_to_html(param.type(), fuid, 14)
                     str += ' '*8+'<br /><i>'+('&nbsp;'*10)+'\n'
                     str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
