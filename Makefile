@@ -5,7 +5,7 @@
 ############################################################
 
 # Python source files
-PY_SRC = src/epydoc/*.py
+PY_SRC = $(wildcard src/epydoc/*.py)
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -15,6 +15,8 @@ DIR = /home/groups/e/ep/epydoc/htdocs
 WEBDIR = html
 
 ############################################################
+
+.PHONY: all usage distributions web webpage xfer refdocs verbose
 
 all: usage
 
@@ -33,6 +35,20 @@ webpage: xfer
 xfer: refdocs
 	rsync -arz -e ssh $(WEBDIR)/* $(HOST):$(DIR)
 
-refdocs: 
+local: refdocs
+	rsync -arz -e ssh $(WEBDIR)/* /var/www/epydoc
+
+refdocs: .up2date.refdocs
+.up2date.refdocs: ${PY_SRC}
 	epydoc ${PY_SRC} -o ${WEBDIR} -n epydoc \
-	       -u http://epydoc.sf.net -css blue
+	       -u http://epydoc.sf.net --css blue
+	touch .up2date.refdocs
+
+checkdocs:
+	epydoc --check ${PY_SRC}
+
+# This is basically just for testing..
+verbose:
+	epydoc ${PY_SRC} -o ${WEBDIR} -n epydoc \
+	       -u http://epydoc.sf.net --css blue -vvv
+	touch .up2date.refdocs
