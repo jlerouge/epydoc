@@ -33,7 +33,7 @@ installdocs:
 	    echo "Could not find ${DOC}; check the makefile variables."
 	@test -e ${MAN}
 	@test -e ${DOC}
-	test -e doc || ln -s ../doc doc
+	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	cp man/*.1 ${MAN}/man1/
 	cp -r doc ${DOC}/epydoc/
@@ -64,25 +64,25 @@ bdist: rpmdist windist
 
 # Produce dist/$(NAME)-$(VERSION).tar.gz
 gztardist:
-	test -e doc || ln -s ../html doc
+	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	python setup.py -q sdist --format=gztar
 
 # Produce dist/$(NAME)-$(VERSION).tar.gz
 zipdist:
-	test -e doc || ln -s ../html doc
+	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	python setup.py -q sdist --format=zip
 
 # Produce dist/$(NAME)-$(VERSION)-1.noarch.rpm
 # Produce dist/$(NAME)-$(VERSION)-1.src.rpm
 rpmdist:
-	test -e doc || ln -s ../html doc
+	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	python setup.py -q bdist --format=rpm
 
 # Produce dist/$(NAME)-$(VERSION).win32.exe
 windist:
-	test -e doc || ln -s ../html doc
+	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	python setup.py -q bdist --format=wininst
