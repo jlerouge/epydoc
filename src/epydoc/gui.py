@@ -496,11 +496,13 @@ class EpydocGUI:
         if 1:#try:
             opts = load(open(prjfile, 'r'))
             self._name_entry.delete(0, 'end')
-            self._name_entry.insert(0, opts.get('pkg_name', ''))
+            if opts.get('pkg_name'):
+                self._name_entry.insert(0, opts['pkg_name'])
             self._url_entry.delete(0, 'end')
-            self._url_entry.insert(0, opts.get('pkg_url', ''))
+            if opts.get('pkg_url'):
+                self._url_entry.insert(0, opts['pkg_url'])
             self._out_entry.delete(0, 'end')
-            self._out_entry.insert(0, opts.get('outdir', ''))
+            self._out_entry.insert(0, opts.get('outdir', 'html'))
             self._css_entry.delete(0, 'end')
             if opts.get('css', 'default') in STYLESHEETS.keys():
                 self._css_var.set(opts.get('css', 'default'))
