@@ -1358,7 +1358,7 @@ class HTMLFormatter:
         for link in functions:
             func = link.target()
             fname = link.name()
-            if func.is_method():
+            if func.is_method() or func.is_builtin_method():
                 container = func.cls()
                 inherit = (container != cls.uid())
             else:
@@ -1419,7 +1419,7 @@ class HTMLFormatter:
         for link in functions:
             fname = link.name()
             func = link.target()
-            if func.is_method():
+            if func.is_method() or func.is_builtin_method():
                 container = func.cls()
                 inherit = (container != cls.uid())
             else:
