@@ -315,12 +315,22 @@ class HTMLFormatter:
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
         self._variable_linelen = kwargs.get('variable_linelength', 70)
-        if self._prj_name and self._prj_url and not self._prj_link:
-            self._prj_link = '%s homepage' % self._prj_name
-            self._prj_link = self._prj_link.replace('&', '&amp;')
-            self._prj_link = self._prj_link.replace('<', '&lt;')
-            self._prj_link = self._prj_link.replace('>', '&gt;')
-            self._prj_link = self._prj_link.replace(' ', '&nbsp;')
+
+        # Create the project homepage link, if it was not specified.
+        if (self._prj_name or self._prj_url) and not self._prj_link:
+            name = self._prj_name or 'Project Homepage'
+            name = name.replace('&', '&amp;')
+            name = name.replace('<', '&lt;')
+            name = name.replace('>', '&gt;')
+            name = name.replace(' ', '&nbsp;')
+            self._prj_link = name
+
+        # Add a hyperlink to _prj_url, if _prj_link doesn't already
+        # contain any hyperlinks.
+        if (self._prj_link and self._prj_url and
+            not re.search(r'<a[^>]*\shref', self._prj_link)):
+            self._prj_link = ('<a class="navbar" target="_top" href="'+
+                              self._prj_url+'">'+self._prj_link+'</a>')
 
     def num_files(self):
         """
@@ -1099,12 +1109,7 @@ class HTMLFormatter:
             str += '    <th class="navbar" align="right" width="100%">\n'
             str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
             str += '      <tr><th class="navbar" align="center">\n        '
-            if self._prj_url:
-                str += ('<a class="navbar" target="_top" href="%s">\n' %
-                        self._prj_url)
-                str += '        %s</a>' % self._prj_link
-            else:
-                str += self._prj_link
+            str += self._prj_link
             str += '\n      </th></tr></table>\n'
             str += '    </th>\n'
         str += '  </tr>\n</table>\n'

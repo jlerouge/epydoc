@@ -127,10 +127,14 @@ used to create the homepage link on the navigation bar, if the
 option is not used.
 .TP
 .BI "\-\-navlink " html
-HTML code for the homepage link on the navigation bar.
-.B html
-should only contain the label of the link; the link itself will be
-automatically created from the project URL.  
+HTML code for the homepage link on the navigation bar.  If this HTML
+code contains any hyperlinks
+.RB ( "<a href=...>" ),
+then it will be inserted verbatim.  If
+it does not contain any hperlinks, and a project url is specified
+(with
+.BR \-\-url ),
+then a hyperlink to the specified URL is added to the link.
 .TP
 .B \-\-no\-frames
 Do not display the frames-based table of contents on the main
