@@ -47,7 +47,7 @@ import inspect, UserDict, string, new, re, sys, types
 import parser, symbol, token
 
 import epydoc.markup as markup
-from epydoc.uid import UID, Link, make_uid
+from epydoc.uid import UID, Link, make_uid, findUID
 
 # Python 2.2 types
 from epydoc.uid import _WrapperDescriptorType
@@ -595,8 +595,16 @@ class ObjDoc:
         # Initialize fields.  Add any extra fields.
         self._fieldtypes = self.STANDARD_FIELDS[:]
         if module is not None:
-            try: extra_fields = module.value().__extra_epydoc_fields__
-            except: extra_fields = []
+            # Gather any extra fields from this module and all of its
+            # ancestor packages.
+            extra_fields = []
+            m = module
+            while m is not None:
+                try: extra_fields += m.value().__extra_epydoc_fields__
+                except: pass
+                m = m.parent()
+            
+            # Create the specified extra fields.
             for field in extra_fields:
                 try:
                     if type(field) == types.StringType:
@@ -860,8 +868,7 @@ class ObjDoc:
             if arg is None:
                 warnings.append(tag+' expected an argument (group name)')
                 return
-            try:
-                idents = _descr_to_identifiers(descr)
+            try: idents = _descr_to_identifiers(descr)
             except ValueError, e:
                 warnings.append('Bad group identifier list')
                 return
@@ -876,6 +883,8 @@ class ObjDoc:
                                                 self._group2groupnum[arg]))
                 else:
                     self._name2groupnum[ident] = self._group2groupnum[arg]
+            # @group implies @sort:
+            self._process_field('sort', None, descr, warnings)
             return
         
         if tag in ('deffield', 'newfield'):
@@ -926,6 +935,25 @@ class ObjDoc:
                 regexp = '^%s$' % ident.replace('*', '(.*)')
                 self._undocumented.append(re.compile(regexp))
             return
+
+        if tag == 'include':
+            if arg is not None:
+                warnings.append(tag+' did not expect an argument')
+                return
+            try: (source,) = _descr_to_identifiers(descr)
+            except ValueError:
+                warnings.append('Bad @include source')
+                return
+            source_uid = findUID(source, self._uid)
+            if source_uid is None:
+                warnings.append('Unable to resolve @include: %r' % source)
+                return
+            # Extract the docstring.
+            docstring = _getdoc(source_uid.value())
+            if type(docstring) != types.StringType: return
+            docstring = docstring.strip()
+            if not docstring: return
+            self.__include(docstring)
                 
         for field in self._fieldtypes:
             if tag not in field.tags: continue
@@ -1053,6 +1081,26 @@ class ObjDoc:
         for field in fields:
             self._process_field(field.tag(), field.arg(),
                                 field.body(), self._field_warnings)
+
+    def __include(self, docstring):
+        errors = []
+        parsed_docstring = markup.parse(docstring, self._docformat, errors)
+        descr, fields = parsed_docstring.split_fields(errors)
+        self._descr += descr
+
+        # Mark errors as coming from included docstring.
+        for e in errors: e._descr += ' (FROM INCLUDED DOCSTRING)'
+
+        # Divide errors into fatal & non-fatal.
+        self._parse_errors += [e for e in errors if e.is_fatal()]
+        self._parse_warnings += [e for e in errors if not e.is_fatal()]
+        
+        for field in fields:
+            self._process_field(field.tag(), field.arg(),
+                                field.body(), self._field_warnings)
+
+        
+        
         
 #////////////////////////////////////////////////////////
 #// ModuleDoc
