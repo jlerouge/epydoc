@@ -135,7 +135,11 @@ class ParsedJavadocDocstring(ParsedDocstring):
                 # Special processing for @see fields, since Epydoc
                 # allows unrestricted text in them, but Javadoc just
                 # uses them for xref links:
-                if tag == 'see': body = '{@link %s}' % body
+                if tag == 'see' and body:
+                    if body[0] in '"\'':
+                        if body[-1] == body[0]: body = body[1:-1]
+                    elif body[0] == '<': pass
+                    else: body = '{@link %s}' % body
 
                 # Construct the field.
                 parsed_body = ParsedJavadocDocstring(body)
