@@ -59,9 +59,13 @@ __epydoc_sort__ = ['cli',
 
 # To do:
 #   - improve support for builtin functions/modules [90% done]
-#   - frames [90% done]
-#   - better doc inheritence?
-#   - change epytext field syntax
-#   - add escape characters to epytext
 #   - support contained classes
 #   - better checks for private/public in _extract_index
+#   - change epytext field syntax
+#   - add escape characters to epytext
+#   - better doc inheritence?
+#   - refactor inheritance
+#   - turn off function doc inheritance?
+#   - add --check for doc inheritance?
+#   - add option: list vars that have no descr?
+#   - use __all__ when determining whether a name is private???
