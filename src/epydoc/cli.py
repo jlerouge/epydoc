@@ -25,7 +25,7 @@ Usage::
     --navlink HTML            HTML code for the navbar's homepage link.
     --private-css SHEET       CSS stylesheet for private objects.
     --help-file FILE          HTML body for the help page.
-    --no-frames               Do not create frames-based table of contents.
+    --no-frames               Do not use frames, by default.
     --no-private              Do not document private objects.
     --show-imports            Include lists of importes.
     --docformat=FORMAT        Set the default value for __docformat__.
@@ -143,15 +143,15 @@ def _parse_args():
         Currently, the following configuration parameters are set:
         C{target}, C{modules}, C{verbosity}, C{prj_name}, C{check},
         C{check_private}, C{show_imports}, C{frames}, C{private},
-        C{quiet}, C{debug}, C{top}, and C{docformat}.
+        C{debug}, C{top}, and C{docformat}.
     @rtype: C{None}
     """
     # Default values.
-    options = {'target':'html', 'modules':[], 'verbosity':0,
+    options = {'target':'html', 'modules':[], 'verbosity':1,
                'prj_name':'', 'check':0, 'check_private':0,
                'show_imports':0, 'frames':1, 'private':1,
-               'quiet':0, 'debug':0, 'docformat':None,
-               'top':None}
+               'debug':0, 'docformat':None, 'top':None}
+               
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:t:u:Vvpq?:'
@@ -194,7 +194,7 @@ def _parse_args():
         elif opt in ('-p',): options['check_private'] = 1
         elif opt in ('--private-css', '--private_css'):
             options['private_css'] = val
-        elif opt in ('--quiet', '-q'): options['quiet'] -= 3
+        elif opt in ('--quiet', '-q'): options['verbosity'] -= 1
         elif opt in ('--show-imports', '--show_imports'):
             options['show_imports'] = 1
         elif opt in ('-t', '--top'): options['top'] = val
@@ -313,7 +313,9 @@ def _make_docmap(modules, options):
 
     # Don't bother documenting base classes if we're just running
     # checks.
-    d = DocMap(options['quiet'], not options['check'])
+    quiet = -1 * (options['verbosity'] < 0)
+    document_bases = not options['check']
+    d = DocMap(quiet, document_bases)
     
     num_modules = len(modules)
     if options['verbosity'] > 0:
