@@ -1273,11 +1273,10 @@ class HTMLFormatter:
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
-            while (not fdoc.documented() and
-                   fdoc.overrides() and
+            while (not fdoc.documented() and fdoc.overrides() and
                    self._docmap.has_key(fdoc.overrides())):
                 fdoc = self._docmap[fdoc.overrides()]
-                
+
             rval = fdoc.returns()
             if rval.type():
                 rtype = self._dom_to_html(rval.type(), container, 8)
@@ -1346,39 +1345,11 @@ class HTMLFormatter:
 
             foverrides = fdoc.overrides()
 
-            # If we inherit docs, then make sure that the parameter
-            # names match the function that we're inheriting docs from.
-            fparam_names = [p.name() for p in fdoc.parameter_list()]
-            kwarg_name = fdoc.kwarg() and fdoc.kwarg().name()
-            vararg_name = fdoc.vararg() and fdoc.vararg().name()
-
             # Try to find a documented ancestor.
             inheritdoc = 0
-            while (not fdoc.documented() and
-                   fdoc.overrides() and
+            while (not fdoc.documented() and fdoc.overrides() and
                    self._docmap.has_key(fdoc.overrides())):
-                # Get the inherited documentation.
-                inh_fdoc = self._docmap[fdoc.overrides()]
-                
-                # Require that the names of parameters match.
-                ifparam_names = [p.name() for p in inh_fdoc.parameter_list()]
-                ikwarg_name = inh_fdoc.kwarg() and inh_fdoc.kwarg().name()
-                ivararg_name = inh_fdoc.vararg() and inh_fdoc.vararg().name()
-                if (fparam_names != ifparam_names[:len(fparam_names)] or
-                    kwarg_name != ikwarg_name or
-                    vararg_name != ivararg_name):
-                    if fname != '__init__':
-                        estr =(('Warning: The parameters of %s do not '+
-                                'match the parameters of the base class '+
-                                'method %s; not inheriting documentation.')
-                               % (fdoc.uid(), inh_fdoc.uid()))
-                        estr = epytext.wordwrap(estr, 9, 75-9).strip()
-                        if sys.stderr.softspace: print >>sys.stderr
-                        print >>sys.stderr, estr
-                    break
-
-                # Inherit the documentation.
-                fdoc = inh_fdoc
+                fdoc = self._docmap[fdoc.overrides()]
                 inheritdoc = 1
                 
             fdescr=fdoc.descr()
@@ -1440,10 +1411,7 @@ class HTMLFormatter:
             # Overrides
             if foverrides:
                 str += '    <dl><dt><b>Overrides:</b></dt>\n'
-                if self._docmap.has_key(foverrides.cls()):
-                    str += '      <dd>'+self._uid_to_uri(foverrides)
-                else:
-                    str += '      <dd><code>%s</code>' % func
+                str += '      <dd>'+self._uid_to_href(foverrides)
                 if inheritdoc:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
@@ -2405,8 +2373,8 @@ class HTMLFormatter:
             return 0
 
         # Is it a variable or routine whose parent is not documented?
-        if (uid.is_routine() or uid.is_variable() and not
-            self._docmap.has_key(uid.parent())):
+        if ((uid.is_routine() or uid.is_variable()) and
+            (not self._docmap.has_key(uid.parent()))):
             return 0
 
         # Is it a non-variable that's not documented? (variables are
