@@ -196,7 +196,7 @@ class DocChecker:
         docs = []
         self._docs = docmap.values()
         self._docmap = docmap
-        f = lambda d1,d2:cmp(`d1.uid()`, `d2.uid()`)
+        f = lambda d1,d2:cmp(d1.uid().name(), d2.uid().name())
         self._docs.sort(f)
         self._checks = 0
         self._last_warn = None
@@ -289,15 +289,15 @@ class DocChecker:
             if ((self._checks & DocChecker.DESCR_STRICT) or
                 (not isinstance(doc, FuncDoc)) or
                 (not doc.returns().descr())):
-                self._warn('No descr', `doc.uid()`)
+                self._warn('No descr', doc.uid().name())
         #if (self._checks & DocChecker.SEE):
         #    for link in doc.seealsos():
         #        if not self._docmap.has_key(link.target()):
         #            self._warn("Bad @see: %s" % link.target())
         if (self._checks & DocChecker.AUTHOR) and (not doc.authors()):
-            self._warn('No authors', `doc.uid()`)
+            self._warn('No authors', doc.uid().name())
         if (self._checks & DocChecker.VERSION) and (not doc.version()):
-            self._warn('No version', `doc.uid()`)
+            self._warn('No version', doc.uid().name())
             
     def _check_module(self, doc):
         """
@@ -307,12 +307,12 @@ class DocChecker:
         @type doc: L{UID}
         @rtype: C{None}
         """
-        if not self._check_name_publicity(`doc.uid()`): return
+        if not self._check_name_publicity(doc.uid().name()): return
         if self._checks & DocChecker.MODULE:
             self._check_basic(doc)
         if self._checks & DocChecker.VAR:
             for v in doc.variables():
-                self._check_var(v, `doc.uid()`)
+                self._check_var(v, doc.uid().name())
         
     def _check_class(self, doc):
         """
@@ -322,15 +322,15 @@ class DocChecker:
         @type doc: L{UID}
         @rtype: C{None}
         """
-        if not self._check_name_publicity(`doc.uid()`): return
+        if not self._check_name_publicity(doc.uid().name()): return
         if self._checks & DocChecker.CLASS:
             self._check_basic(doc)
         if self._checks & DocChecker.IVAR:
             for v in doc.ivariables():
-                self._check_var(v, `doc.uid()`)
+                self._check_var(v, doc.uid().name())
         if self._checks & DocChecker.CVAR:
             for v in doc.cvariables():
-                self._check_var(v, `doc.uid()`)
+                self._check_var(v, doc.uid().name())
 
     def _check_var(self, var, name, check_type=1):
         """
@@ -383,9 +383,9 @@ class DocChecker:
         @type doc: L{UID}
         @rtype: C{None}
         """
-        if not self._check_name_publicity(`doc.uid()`): return
+        name = doc.uid().name()
+        if not self._check_name_publicity(name): return
         if doc != self._documented_ancestor(doc): return
-        name = `doc.uid()`
 
         if (self._checks & DocChecker.FUNC and
             not doc.documented() and
