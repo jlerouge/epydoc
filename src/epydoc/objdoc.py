@@ -324,7 +324,7 @@ class ObjDoc:
             if self._version != None:
                 warnings.append('Version redefined')
             self._version = descr
-        elif tag == 'see':
+        elif tag in ('see', 'seealso'):
             if arg != None:
                 warnings.append(tag+' did not expect an argument')
             self._seealsos.append(descr)
@@ -460,9 +460,9 @@ class ModuleDoc(ObjDoc):
 
             # Add the field to the appropriate place.
             if type(val) in (_FunctionType, _BuiltinFunctionType):
-                self._functions.append(Link(field, val))
+                self._functions.append(Link(field, UID(val)))
             elif type(val) == _ClassType:
-                self._classes.append(Link(field, val))
+                self._classes.append(Link(field, UID(val)))
 
         # Add descriptions and types to variables
         self._variables = []
@@ -593,7 +593,7 @@ class ModuleDoc(ObjDoc):
             raise TypeError('This ModuleDoc does not '+
                             'document a package.')
         name = (module.__name__.split('.'))[-1]
-        self._modules.append(Link(name, module))
+        self._modules.append(Link(name, UID(module)))
 
 #////////////////////////////////////////////////////////
 #// ClassDoc
@@ -653,9 +653,9 @@ class ClassDoc(ObjDoc):
             # Function, not a Method.
             if type(val) is _FunctionType:
                 method = new.instancemethod(val, None, cls)
-                self._methods.append(Link(field, method))
+                self._methods.append(Link(field, UID(method)))
             elif type(val) is _BuiltinMethodType:
-                self._methods.append(Link(field, val))
+                self._methods.append(Link(field, UID(val)))
                 
         # Add descriptions and types to class variables
         self._cvariables = []
@@ -684,7 +684,7 @@ class ClassDoc(ObjDoc):
         # Add links to base classes.
         self._bases = []
         for base in cls.__bases__:
-            self._bases.append(Link(base.__name__, base))
+            self._bases.append(Link(base.__name__, UID(base)))
 
         # Initialize subclass list.  (Subclasses get added
         # externally with add_subclass())
@@ -757,9 +757,9 @@ class ClassDoc(ObjDoc):
             self._methodbyname[field] = 1
             if type(val) is _FunctionType:
                 method = new.instancemethod(val, None, base)
-                self._methods.append(Link(field, method))
+                self._methods.append(Link(field, UID(method)))
             elif type(val) is _BuiltinMethodType:
-                self._methods.append(Link(field, val))
+                self._methods.append(Link(field, UID(val)))
 
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
@@ -853,7 +853,7 @@ class ClassDoc(ObjDoc):
         @type cls: L{UID}
         @rtype: C{None}
         """
-        self._subclasses.append(Link(cls.__name__, cls))
+        self._subclasses.append(Link(cls.__name__, UID(cls)))
 
 #////////////////////////////////////////////////////////
 #// FuncDoc
@@ -1112,9 +1112,9 @@ class DocMap(UserDict.UserDict):
     the module "epydoc.epytext" to it, and looks up the documentation
     for "epydoc.epytext.parse":
 
-        >>> docmap = DocMap()
-        >>> docmap.add(epydoc.epytext)
-        >>> docmap[epydoc.epytext.parse]
+        >>> docmap = DocMap()               # Construct a docmap
+        >>> docmap.add(epydoc.epytext)      # Add epytext to it
+        >>> docmap[epydoc.epytext.parse]    # Look up epytext.parse
         <FuncDoc: epydoc.epytext.parse (3 parameters; 1 exceptions)>
     """
     
