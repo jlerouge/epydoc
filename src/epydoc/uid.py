@@ -26,6 +26,7 @@ from types import BuiltinFunctionType as _BuiltinFunctionType
 from types import BuiltinMethodType as _BuiltinMethodType
 from types import MethodType as _MethodType
 from types import StringType as _StringType
+from epydoc.imports import import_module
 
 __all__ = ['UID', 'Link']
 
@@ -68,7 +69,7 @@ class UID:
             self._name = obj.__name__
             
         elif type(obj) is _ClassType:
-            self._module = _import_module(obj.__module__)
+            self._module = import_module(obj.__module__)
             self._name = '%s.%s' % (self._module.__name__, obj.__name__)
 
         elif type(obj) is _FunctionType:
@@ -79,7 +80,7 @@ class UID:
                 print e
                           
         elif type(obj) is _MethodType:
-            self._module = _import_module(obj.im_class.__module__)
+            self._module = import_module(obj.im_class.__module__)
             self._cls = obj.im_class
             self._name = '%s.%s.%s' % (self._module.__name__,
                                        self._cls.__name__, obj.__name__)
@@ -103,7 +104,7 @@ class UID:
         elif isinstance(obj, _TypeType):
             if hasattr(obj, '__module__'):
                 # We're in Python 2.2+; just use the __module__ field.
-                self._module = _import_module(obj.__module__)
+                self._module = import_module(obj.__module__)
                 self._name = '%s.%s' % (self._module.__name__, obj.__name__)
             else:
                 # We're in Python 2.1 or earlier; look for the type's module.
@@ -473,31 +474,6 @@ def _makeuid(obj):
     if uid.found_fullname(): return uid
     else: return None
 
-def _import_module(name):
-    """
-    @return: The module with the given fully qualified name.  
-    @rtype: C{module}
-    @raise ImportError: If there is no module with the given name. 
-    """
-    if sys.modules.has_key(name):
-        return sys.modules[name]
-
-    # Don't just use __import__(name, None, None, 1) because we don't
-    # want it to re-import the module if there was a problem.
-    topLevel = __import__(name)
-    packages = name.split(".")[1:]
-    m = topLevel
-    for p in packages:
-        m = getattr(m, p)
-    return m
-
-def _import_object(name):
-    """Get a fully named module-global object.
-    """
-    classSplit = name.split('.')
-    module = _import_module('.'.join(classSplit[:-1]))
-    return getattr(module, classSplit[-1])
-
 def findUID(name, container, docmap=None):
     """
     Attempt to find the UID for the object that can be accessed with
@@ -556,7 +532,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            return(_makeuid(_import_module(modname)))
+            return(_makeuid(import_module(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -567,10 +543,10 @@ def findUID(name, container, docmap=None):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                mod = _import_module(modname)
+                mod = import_module(modname)
                 if _is_variable_in(name, UID(mod), docmap):
                     return UID('%s.%s' % (container, name))
-                obj = _import_object(modname + '.' + objname)
+                obj = getattr(import_module(modname), objname)
                 return _makeuid(obj)
             except: pass
 
