@@ -46,7 +46,7 @@ C{para} blocks:
     - X{link}:   A Python identifier which should be hyperlinked to
                  the named object's documentation, when possible.
 
-The returned DOM tree will confirm to the the following Document Type
+The returned DOM tree will conform to the the following Document Type
 Description::
 
    <!ENTITY % colorized '(code | math | index | italic |
@@ -61,9 +61,10 @@ Description::
                       section | ulist | olist)+>
 
    <!ELEMENT fieldlist (field+)>
-   <!ELEMENT field (tag, arg, (para | listblock | doctestblock)
-                               ulist | olist)+)>
+   <!ELEMENT field (tag, arg?, (para | listblock | doctestblock)
+                                ulist | olist)+)>
    <!ELEMENT tag (#PCDATA)>
+   <!ELEMENT arg (#PCDATA)>
    
    <!ELEMENT literalblock (#PCDATA)>
    <!ELEMENT doctestblock (#PCDATA)>
