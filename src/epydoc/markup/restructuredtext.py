@@ -31,7 +31,10 @@ integrate ReStructuredText output into epydoc, while still supporting
 both crossreferences (marked with ReStructuredText interpreted text)
 and fields (marked with ReStructuredText fields).
 
+@warning: Epydoc only supports HTML output for ReStructuredText
+docstrings.
 """
+__docformat__ = 'epytext en'
 
 # Imports
 import re
@@ -62,7 +65,6 @@ def parse(docstring):
 
 class _EpydocWriter(HTMLWriter):
     """
-    
     A simple writer class that uses an L{_EpydocTranslator} to produce
     an XML representation of a ReStructuredText, which can be used by
     epydoc to generate html output.
