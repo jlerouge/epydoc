@@ -76,6 +76,7 @@ produce API documentation using the following steps:
 @contributor: U{Bruce Mitchener <mailto:bruce@cubik.org>}
 @contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
 @contributor: U{Christian Reis <mailto:kiko@async.com.br>}
+@contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
 
 @var __license__: The license governing the use and distribution of
     epydoc.
