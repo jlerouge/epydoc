@@ -45,6 +45,14 @@ class UID:
     @type _obj: (any)
     """
     def __init__(self, obj):
+        """
+        Create a globally unique identifier for C{obj}.
+
+        @param obj: The object for which a unique identifier should be
+            created.
+        @type obj: (any)
+        """
+        
         # Special case: create a UID from just a name.
         if type(obj) == _StringType:
             self._obj = self._typ = self._id = None
@@ -76,10 +84,36 @@ class UID:
             except:
                 self._name = 'unknown-'+`id(obj)`
 
-    def name(self): return self._name
-    def shortname(self): return self._name.split('.')[-1]
-    def pathname(self): return os.path.join(*self._name.split('.'))
-    def object(self): return self._obj
+    def name(self):
+        """
+        @return: The complete name of this C{UID}.  This is typically
+            a fully qualified dotted name, such as
+            C{epydoc.epytext.UID}; but if the dotted name of an object
+            cannot be found, a name will be constructed based on the
+            object's Python identifier.            
+        @rtype: C{string}
+        """
+        return self._name
+    
+    def shortname(self):
+        """
+        @return: The "short name" for this C{UID}.  This is typically
+            the last part of the fully qualified dotted name, such as
+            C{UID}; but if the dotted name of an object cannot be
+            found, a name will be constructed based on the object's
+            Python identifier.
+        @rtype: C{string}
+        """
+        return self._name.split('.')[-1]
+    
+    def object(self):
+        """
+        @return: The object identified by this C{UID}; or C{None} if
+            that object is not available.
+        @rtype: (any)
+        """
+        return self._obj
+    
     def __repr__(self): return self._name
     def __hash__(self): return hash(self._name)
     def __cmp__(self, other):
@@ -88,7 +122,13 @@ class UID:
 
     def descendant_of(self, ancestor):
         """
-        Return true if self is a X{descendant} of other.
+        @return: True if the object identified by this UID is a
+            descendant of C{ancestor}.  M{d} is a descendant of M{a}
+            if M{d}=M{a}; or if M{d} is a descendent of an object
+            contained by M{a}.
+        @rtype: C{boolean}
+        @param ancestor: The UID of the potential ancestor.
+        @type ancestor: C{UID}
         """
         descendant = self
         
@@ -113,12 +153,22 @@ class UID:
         return 0
 
     def cls(self):
+        """
+        @return: The UID of the class that contains the object
+            identified by this UID.
+        @rtype: C{UID}
+        """
         if type(self._obj) == _MethodType: 
             return UID(self._obj.im_class)
         else:
             raise TypeError()
         
     def module(self):
+        """
+        @return: The UID of the module that contains the object
+            identified by this UID.
+        @rtype: C{UID}
+        """
         if type(self._obj) == _MethodType:
             return UID(sys.modules[self._obj.im_class.__module__])
         elif type(self._obj) == _ClassType:
@@ -129,6 +179,11 @@ class UID:
             raise TypeError()
 
     def package(self):
+        """
+        @return: The UID of the package that contains the object
+            identified by this UID.
+        @rtype: C{UID}
+        """
         if type(self._obj) == _ModuleType:
             dot = self._name.rfind('.')
             if dot < 0: return None
@@ -139,19 +194,38 @@ class UID:
             raise TypeError()
 
     def is_function(self):
+        """
+        @return: True if this is the UID for a function.
+        @rtype: C{boolean}
+        """
         return type(self._obj) in (_FunctionType,)
 
     def is_class(self):
+        """
+        @return: True if this is the UID for a class.
+        @rtype: C{boolean}
+        """
         return type(self._obj) == _ClassType
 
     def is_method(self):
+        """
+        @return: True if this is the UID for a method.
+        @rtype: C{boolean}
+        """
         return type(self._obj) == _MethodType
 
     def is_module(self):
+        """
+        @return: True if this is the UID for a module.
+        @rtype: C{boolean}
+        """
         return type(self._obj) == _ModuleType
 
     def is_package(self):
-        "Return true if this is the UID for a package"
+        """
+        @return: True if this is the UID for a package.
+        @rtype: C{boolean}
+        """
         return (type(self._obj) == _ModuleType and
                 hasattr(self._obj, '__path__'))
 
@@ -174,28 +248,55 @@ class Link:
 
     @ivar _target: The UID of the Python object pointed to by this
         Link. 
-    @type _target: C{UID}
+    @type _target: L{UID}
     @ivar _name: The name by which should be used to indicate this
         link in source documents.
     @type _name: C{string}
     """
     def __init__(self, name, target):
         """
+        Create a new cross-reference link, with the given name and 
+        target.
+        
+        @param name: A string specifying how the link should appear in
+            the source document.
         @type name: C{string}
-        @type target: Python object or string
+        @param target: The object that is pointed to by the new
+            C{Link}. 
+        @type target: L{UID}
         """
         self._name = name
         self._target = UID(target)
 
     def __repr__(self):
+        """
+        @return: A string representation of this C{Link}.
+        @rtype: C{string}
+        """
         return self._name+'->'+`self._target`
         
-    def name(self): return self._name
-    def target(self): return self._target
+    def name(self):
+        """
+        @return: This link's name.  This string specifies how the link
+            should appear in the source document.
+        @rtype: C{string}
+        """
+        return self._name
+    
+    def target(self):
+        """
+        @return: This link's target.  This UID specifies what object
+            is pointed to by this link.
+        @rtype: L{UID}
+        """
+        return self._target
 
 def _find_function_module(func):
     """
-    @return: the module that defines the given function.
+    @return: The module that defines the given function.
+    @rtype: C{module}
+    @param func: The function whose module should be found.
+    @type func: C{function}
     """
     if not inspect.isfunction(func):
         raise TypeError("Expected a function")
@@ -205,59 +306,122 @@ def _find_function_module(func):
             return module
     raise ValueError("Couldn't the find module for this function")
 
-def findUID(name, container):
+def _is_variable_in(name, container, docmap):
+    """
+    @return: True if C{name} is a variable documented by
+        C{container} in C{docmap}.
+    @rtype: C{boolean}
+    @param name: The name to check.
+    @type name: C{string}
+    @param container: The UID of the object which might contain a
+        variable named C{name}.
+    @type container: L{UID}
+    @param docmap: A documentation map containing the documentation
+        for the object identified by C{container}.
+    @type docmap: L{objdoc.DocMap}
+    """
+    if docmap is None or not docmap.has_key(container): return 0
+    container_doc = docmap.get(container)
+    if container.is_module():
+        for var in container_doc.variables():
+            if var.name() == name: return 1
+    elif container.is_class():
+        for var in container_doc.ivariables():
+            if var.name() == name: return 1
+        for var in container_doc.cvariables(): 
+            if var.name() == name: return 1
+    return 0
+
+def _makeuid(obj):
+    """
+    @return: A UID constructed from C{obj}, if C{obj} is a module,
+        class, function, or method.  Otherwise, return C{None}.
+    @rtype: L{UID} or C{None}
+    @param obj: The object whose UID should be returned.
+    @type obj: (any)
+    """
+    if type(obj) in (_FunctionType, _BuiltinFunctionType,
+                     _MethodType, _BuiltinMethodType,
+                     _ClassType, _ModuleType):
+        return UID(obj)
+    else:
+        return None
+
+def findUID(name, container, docmap=None):
     """
     Attempt to find the UID for the object that can be accessed with
     the name C{name} from the module C{module}.
 
-    Note: This could be implemented (perhaps mor robustly?) with eval,
-    but I chose not to, for security reasons.
-
-    @type container: C{UID}
+    @param name: The name used to identify the object.
+    @type name: C{string}
+    @param container: The UID of the class or module containing the
+        object.
+    @type container: L{UID}
+    @param docmap: A documentation map, which is used to check if
+        C{name} is the name of a module variable, class variable,
+        or instance variable.
+    @type docmap: L{objdoc.DocMap}
+    @return: The UID for the object that can be accessed with the name
+        C{name} from the module C{module}; or C{None} if no object was
+        found.
+    @rtype: C{UID} or C{None}
     """
     if container is None: return None
+    if not (container.is_module() or container.is_class()):
+        raise ValueError('Bad container %r' % container)
+
+    # Is it the short name for a member of the containing class?
     if container.is_class():
-        if container.object().__dict__.has_key(name):
+        if _is_variable_in(name, container, docmap):
+            return UID('%s.%s' % (container, name))
+        elif container.object().__dict__.has_key(name):
             cls = container.object()
             obj = cls.__dict__[name]
             if type(obj) is _FunctionType:
                 return UID(new.instancemethod(obj, None, cls))
             else:
-                return UID(obj)
+                return _makeuid(obj)
         else:
             container = container.module()
-    if not container.is_module():
-        raise ValueError('Bad container %r' % container)
 
     module = container.object()
     components = name.split('.')
 
-    # First, try looking for it in the given module.
+    # Is it a variable in the containing module?
+    if _is_variable_in(name, container, docmap):
+        return UID('%s.%s' % (container, name))
+
+    # Is it an object in the containing module?
     try:
         obj = module
         for component in components:
             obj = obj.__dict__[component]
-        return UID(obj)
+        return _makeuid(obj)
     except KeyError: pass
 
-    # If that doesn't work, try importing it as a module.
+    # Is it a module name?  The module name may be relative to the
+    # containing module, or any of its ancestors.
     modcomponents = container.name().split('.')
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            exec('import %s as rv' % modname)
-            return UID(rv)
+            exec('import %s as obj' % modname)
+            return(_makeuid(obj))
         except ImportError: pass
         
-    # If that doesn't work, try importing it as an object
+    # Is it an object in a module?  The module part of the name may be
+    # relative to the containing module, or any of its ancestors.
     modcomponents = container.name().split('.')
     for i in range(len(modcomponents)-1, -1, -1):
         for j in range(len(components)-1, 0, -1):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                exec('from %s import %s as rv' % (modname, objname))
-                return UID(rv)
+                exec('import %s as mod' % modname)
+                if _is_variable_in(name, UID(mod), docmap):
+                    return UID('%s.%s' % (container, name))
+                exec('from %s import %s as obj' % (modname, objname))
+                return _makeuid(obj)
             except ImportError: pass
 
     # We couldn't find it; return None.
