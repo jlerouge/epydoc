@@ -10,7 +10,9 @@
 """
 Documentation formatter that produces man-style documentation.
 
-This module is under development.
+@note: This module is under development.  It generates incomplete
+documentation pages, and is not yet incorperated into epydoc's
+command-line interface.
 """
 __docformat__ = 'epytext en'
 
