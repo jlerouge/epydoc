@@ -104,9 +104,9 @@ contents</i>: </p>
 
 <center>
 <table class="summary" border="1" cellspacing="0" cellpadding="3">
-  <tr heigh="30%">
+  <tr heigh="30%%">
     <td align="center"> Project<br>Contents<hr>...</td>
-    <td align="center" rowspan="2" width="70%">
+    <td align="center" rowspan="2" width="70%%">
       API<br>Documentation<br>Frame
     </td>
   </tr>
@@ -141,7 +141,7 @@ you to go to related pages.  The following table describes the labels
 on the navigation bar.  Note that not some labels (such as
 [Parent]) are not displayed on all pages. </p>
 
-<table class="summary" border="1" cellspacing="0" cellpadding="3" width="100%">
+<table class="summary" border="1" cellspacing="0" cellpadding="3" width="100%%">
 <tr class="summary">
   <th>Label</th>
   <th>Highlighted when...</th>
