@@ -243,7 +243,8 @@ def cli():
                           DocChecker.TYPE | DocChecker.PUBLIC)
     else:
         # Write documentation.
-        if param['verbosity'] > 0: print 'Writing docs to', param['target']
+        if param['verbosity'] == 2: print 'Writing docs to', param['target'],
+        elif param['verbosity'] > 0: print 'Writing docs to', param['target']
         if param.get('css', None) == 2: param['css'] = CSS_FILE2
         else: css=None
         htmldoc = HTML_Doc(d, **param)
