@@ -114,7 +114,7 @@ api-html: .api-html.up2date
 	mkdir -p $(HTML_API)
 	$(EPYDOC) \
 	       -o $(HTML_API) -n epydoc -u http://epydoc.sourceforge.net \
-	       --inheritance=listed --navlink "epydoc 2.0&alpha;"\
+	       --inheritance=listed --navlink "epydoc 2.0"\
 	       --css blue --private-css green -v --debug \
 	       --docformat plaintext $(PY_SRC)
 	touch .api-html.up2date

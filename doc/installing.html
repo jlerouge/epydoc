@@ -48,13 +48,13 @@ install files. </p>
 <div class="screen"><pre>
 <code class="prompt">[/tmp]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-2.0a.noarch.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-2.0.noarch.rpm</code>
 </pre></div></li>
 
 <li> Once epydoc is installed, you can delete the RPM file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0a.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0.rpm</code>
 </pre></div> </li>
 </ol>
 
@@ -62,7 +62,7 @@ Password:
 <h2> Installing from the Windows Installer </h2>
 
 <ol>
-  <li> Download and run <code>epydoc-2.0a.win32.exe</code>. </li>
+  <li> Download and run <code>epydoc-2.0.win32.exe</code>. </li>
   <li> Follow the on-screen instructions.  Epydoc will be installed in
   the <code>epydoc</code> subdirectory of your Python installation
   directory (typically <code>C:\Python22\</code>). </li>
@@ -74,7 +74,7 @@ Password:
   scripts to more convenient locations (such as your desktop or start
   menu). </li>
   <li> Once epydoc is installed, you can delete
-  <code>epydoc-2.0a.win32.exe</code>. </li>
+  <code>epydoc-2.0.win32.exe</code>. </li>
 </ol>
 
 <a name="src"></a>
@@ -85,19 +85,19 @@ Password:
   to a directory of your choice, and uncompress it.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-2.0a.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-2.0a.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-2.0a.tar</code>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-2.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-2.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-2.0.tar</code>
 </pre></div></li>
 
-  <li> Use "<code>make install</code>" in the <code>eydoc-2.0a/</code>
+  <li> Use "<code>make install</code>" in the <code>eydoc-2.0/</code>
   directory to install epydoc.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-2.0a/</code>
-<code class="prompt">[/tmp/epydoc-2.0a]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-2.0/</code>
+<code class="prompt">[/tmp/epydoc-2.0]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-2.0a]#</code> <code class="user">make install</code>
+<code class="prompt">[/tmp/epydoc-2.0]#</code> <code class="user">make install</code>
 running install
 running build
 <i>[...]</i>
@@ -115,16 +115,16 @@ documentation to different directories (such as
 running "<code>make installdocs</code>".
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp/epydoc-2.0a]#</code> <code class="user">make installdocs</code>
+<code class="prompt">[/tmp/epydoc-2.0]#</code> <code class="user">make installdocs</code>
 </pre></div></li>
 
 <li> Once epydoc is installed, you can delete the installation
 directory and the source distribution file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp/epydoc-2.0a]#</code> <code class="user">cd ..</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-2.0a</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0a.tar</code>
+<code class="prompt">[/tmp/epydoc-2.0]#</code> <code class="user">cd ..</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-2.0</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0.tar</code>
 </pre></div> </li>
 </ol>
 
@@ -136,25 +136,25 @@ directory and the source distribution file.
   to a directory of your choice, and uncompress it.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-2.0a.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-2.0a.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-2.0a.tar</code>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-2.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-2.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-2.0.tar</code>
 </pre></div></li>
 
   <li> Use the <code>setup.py</code> script in the
-  <code>eydoc-2.0a/</code> directory to install epydoc. 
+  <code>eydoc-2.0/</code> directory to install epydoc. 
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-2.0a/</code>
-<code class="prompt">[/tmp/epydoc-2.0a]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-2.0/</code>
+<code class="prompt">[/tmp/epydoc-2.0]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-2.0a]#</code> <code class="user">python setup.py install</code>
+<code class="prompt">[/tmp/epydoc-2.0]#</code> <code class="user">python setup.py install</code>
 running install
 running build
 <i>[...]</i>
 copying build/scripts/epydoc -> /usr/bin
 changing mode of /usr/bin/epydoc to 100775
-<code class="prompt">[/tmp/epydoc-2.0a]#</code> <code class="user">cd ..</code>
+<code class="prompt">[/tmp/epydoc-2.0]#</code> <code class="user">cd ..</code>
 <code class="prompt">[/tmp]#</code>
 </pre></div></li>
 
@@ -164,24 +164,25 @@ You may also want to copy the man pages to a permanat location, such
 as <code>/usr/share/man/</code>.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-2.0a/doc/ /usr/share/doc/epydoc/</code>
-<code class="prompt">[/tmp]#</code> <code class="user">cp epydoc-2.0a/man/* /usr/share/man/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-2.0/doc/ /usr/share/doc/epydoc/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp epydoc-2.0/man/* /usr/share/man/</code>
 </pre></div> </li>
 
 <li> Once epydoc is installed, you can delete the installation
 directory and the source distribution file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-2.0a</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0a.tar</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-2.0</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-2.0.tar</code>
 </pre></div> </li>
 </ol>
 
 <a name="debian"></a>
 <h2> Installing on Debian </h2>
 
-<p> Epydoc 2.0a has not yet been packaged for debian; please use one
-of the other install methods. </p>
+<p> Epydoc 1.1 is available as an unstable debian package.  Epydoc 2.0
+has not yet been packaged for debian; please use one of the other
+install methods. </p>
 
 <table width="100%" class="navbox" cellpadding="1" cellspacing="0">
   <tr>
@@ -204,7 +205,7 @@ of the other install methods. </p>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Mon Jul 21 06:45:37 XXX 2003 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Tue Jul 22 03:01:30 XXX 2003 <!-- hhmts end -->
 </font>
 </body>
 </html>
