@@ -754,6 +754,8 @@ class HTMLFormatter:
         allmethods = doc.methods()+doc.staticmethods()+doc.classmethods()
         str += self._func_summary(allmethods, doc.sortorder(),
                                   doc, doc.groups(), 'Method Summary')
+        str += self._property_summary(doc.properties(), doc.sortorder(),
+                                      uid, doc.groups(), 'Property Summary')
         str += self._var_summary(doc.ivariables(), doc.sortorder(),
                                  uid, doc.groups(),
                                  'Instance Variable Summary')
@@ -772,6 +774,8 @@ class HTMLFormatter:
         else:
             str += self._func_details(doc.methods(), doc, 
                                       'Method Details')
+        str += self._property_details(doc.properties(), uid,
+                                     'Property Details')
         str += self._var_details(doc.ivariables(), uid,
                                  'Instance Variable Details')
         str += self._var_details(doc.cvariables(), uid,
@@ -1652,6 +1656,110 @@ class HTMLFormatter:
         return str
 
     #////////////////////////////////////////////////////////////
+    # Property tables
+    #////////////////////////////////////////////////////////////
+    def _property_summary(self, properties, sortorder, container,
+                          groups, heading='Property Summary'):
+        properties = self._filtersort_links(properties, sortorder)
+        if len(properties) == 0: return ''
+
+        # Create the portion of the table containing the group
+        # entries.  Do this first, so we can see what's not in any
+        # group; but add it to the string last, so the groupless
+        # properties are at the top.
+        groupstr = ''
+        for groupname, groupmembers in groups:
+            # Extract the group
+            group = [p for p in properties if p.target() in groupmembers]
+            if not group: continue
+            properties = [p for p in properties if p not in group]
+            # Print a header within the table
+            groupstr += self._group_header(groupname)
+            # Add the lines for each func
+            for property in group:
+                groupstr += self._property_summary_line(property, container)
+
+        str = self._table_header(heading, 'summary')
+        for property in properties:
+            str += self._property_summary_line(property, container)
+        str += groupstr
+        return str + '</table><br />\n\n'
+
+    def _property_summary_line(self, link, container):
+        prop = link.target()
+        pname = link.name()
+        
+        # If we don't have documentation for the properties, then we
+        # can't say anything about it.
+        if not self._docmap.has_key(prop): return ''
+        pdoc = self._docmap[prop]
+
+        # Get the property's type, if it has one.
+        if pdoc.type():
+            ptype = self._dom_to_html(pdoc.type(), container, 10).strip()
+        else: ptype = '&nbsp;'
+
+        # Get the summary of the description.
+        descrstr = self._summary(pdoc, container)
+        if descrstr != '&nbsp;': psum = ' - '+descrstr
+        else: psum = ''
+        
+        str = '<tr><td align="right" valign="top" '
+        str += 'width="15%"><font size="-1">'+ptype+'</font></td>\n'
+        str += '  <td><code><b><a href="#%s">' % pname
+
+        str += '%s</a></b></code>%s</td></tr>' % (pname, psum)
+        return str
+
+    def _property_details(self, properties, container,
+                          heading='Property Details'):
+        properties = self._filtersort_links(properties)
+        if len(properties) == 0: return ''
+        str = self._table_header(heading, 'details')+'</table>\n'
+
+        numprops = 0
+        for link in properties:
+            prop = link.target()
+            pname = link.name()
+            
+            if not self._docmap.has_key(prop): continue
+            pdoc = self._docmap[prop]
+            numprops += 1
+
+            str += '<table width="100%" class="func-details"'
+            str += ' bgcolor="#e0e0e0"><tr><td>\n'
+            str += '\n<a name="%s"></a>\n' % pname
+            str += '<h3>'+pname+'</h3>\n'
+
+            if pdoc.descr():
+                str += self._dom_to_html(pdoc.descr(), container)
+
+            # Print the accessors for the property (fget=get property
+            # value; fset=set value, and fdel=delete value).
+            if pdoc.fget() or pdoc.fset() or pdoc.fdel():
+                str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
+                for (func,name) in [(pdoc.fget(), 'Get'),
+                                    (pdoc.fset(), 'Set'),
+                                    (pdoc.fdel(), 'Delete')]:
+                    if func:
+                        str += '      <dt><b>%s Function:' % name
+                        str += '</b></dt>\n      <dd>'
+                        if self._docmap.has_key(func):
+                            fdoc = self._docmap[func]
+                            fname = func.name()
+                            str += self._func_signature(fname, fdoc, 1, 0,
+                                                    'summary-sig')
+                        else:
+                            str += self._uid_to_href(func)
+                        str += '\n      </dd>\n'
+                str += '    </dl>\n  </dd>\n</dl>'
+
+            str += '</td></tr></table>'
+
+        if numprops == 0: return ''
+        return str+'<br />'
+    
+    #////////////////////////////////////////////////////////////
     # Variable tables
     #////////////////////////////////////////////////////////////
     
@@ -1727,19 +1835,18 @@ class HTMLFormatter:
 
         numvars = 0
         for var in variables:
+            vname = var.name()
+            vtyp = var.type()
+            hasval = var.has_value()
+
             # Don't bother if we don't know anything about it.
-            if (var.descr() is None and var.type() is None and
-                not var.has_value()): continue
+            if (var.descr() is None and vtyp is None and not hasval):
+                continue
             numvars += 1
             
             str += ('<table width="100%" class="var-details"'+
                     ' bgcolor="#e0e0e0">'+
                     '<tr><td>\n')
-            
-            vname = var.name()
-            vtyp = var.type()
-            hasval = var.has_value()
-
             str += '<a name="'+vname+'"></a>\n'
             str += '<h3>'+vname+'</h3>\n'
 
