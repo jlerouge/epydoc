@@ -1,6 +1,5 @@
 import inspect, re, sys
-from apidoc import *
-#import apidoc; reload(apidoc); from apidoc import *
+from epydoc.apidoc import *
 from types import *
 
 class DocInspector:
