@@ -9,12 +9,13 @@ from types import *
 class ASTMatcher:
     DEBUG = 0
     
-    def __init__(self, sym=None, tok=None, children=None, 
+    def __init__(self, sym=None, tok=None, toktext=None, children=None, 
                  varname=None, qmrk=0, star=0):
         if (sym is None) == (tok is None):
             raise ValueError, 'must specify sym or tok'
         self.sym = sym
         self.tok = tok
+        self.toktext = toktext
         self.varname = varname
         self.children = children
         self.qmrk = qmrk
@@ -55,7 +56,9 @@ class ASTMatcher:
 
         # Match tokens (ast leaves)
         if self.tok is not None:
-            if type(ast) is StringType or ast[0] != self.tok:
+            if type(ast) is StringType or self.tok != ast[0]:
+                match = 0
+            if self.toktext is not None and self.toktext != ast[1]:
                 match = 0
 
         # Match symbols (ast nodes).
@@ -157,6 +160,7 @@ _TOKEN_RE = re.compile(r'\s*(%s)\s*' % '|'.join([
     r'(?P<dots>\.\.\.)',
     r'(?P<close>\))',
     r'(?P<tok>[A-Z_]+)',
+    r'(?P<toktext>\'[^\']*\'|\"[^\"]*")',
     r'(:\s*(?P<varname>\w+))',
     r'(?P<mod>[*?])',
     ]))
@@ -193,6 +197,7 @@ def compile_ast_matcher(pattern):
             if len(stack) == 1:
                 if pos != len(pattern):
                     _pattern_error(pattern, pos)
+                stack[0].pattern = pattern # Record the pattern
                 return stack[0]
             stack[-2].children.append(stack.pop())
             
@@ -202,6 +207,11 @@ def compile_ast_matcher(pattern):
             except: _pattern_error(pattern, match.start('tok'),
                                    'unknown token')
             tokmatcher = ASTMatcher(tok=tok)
+            stack[-1].children.append(tokmatcher)
+
+        elif match.group('toktext') is not None:
+            toktext = match.group('toktext')[1:-1] # strip quotes.
+            tokmatcher = ASTMatcher(tok=tokenize.NAME, toktext=toktext)
             stack[-1].children.append(tokmatcher)
 
         elif match.group('varname') is not None:
