@@ -12,7 +12,9 @@
 #
 
 """
-Epydoc package
+Automatic Python reference documentation generator.  Epydoc processes
+Python modules and docstrings to generate formatted documentation, in
+the form of HTML pages.
 """
 
 __version__ = 0.2
