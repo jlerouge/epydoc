@@ -8,13 +8,10 @@
 
 """
 Documentation to HTML converter.
-
-Testing L{re} and L{objdoc} and L{re.compile} and L{objdoc.DocMap}.
 """
 
 # To do:
 #   - Control over whether you link to non-documented objects
-#   - Control over whether L{...} links to non-documented objs
 #   - Better help
 
 ##################################################
@@ -530,13 +527,13 @@ class HTML_Doc:
         str += self._table_header('Index', 'index')
         index = self._extract_index().items()
         index.sort()
-        for (term, sources) in index:
-            str += '  <tr><td width="10%">'+term+'</td>\n    <td>'
-            sources.sort()
-            for source in sources:
-                target = source+'.html#'+self._index_to_anchor(term)
-                str += '<i><a href="' + target + '">'
-                str += source + '</a></i>, '
+        for (term, links) in index:
+            str += '  <tr><td width="15%">'+term+'</td>\n    <td>'
+            links.sort()
+            for link in links:
+                str += ('<i><a href="%s#%s">%s</a></i>, ' %
+                        (self._uid_to_uri(link.target()),
+                         self._index_to_anchor(term), link.name()))
             str = str[:-2] + '</tr></td>\n'
         str += '</table>\n' +  '<br>\n'
 
@@ -1131,12 +1128,12 @@ class HTML_Doc:
                 vtype = self._dom_to_html(var.type(), container, 10).strip()
             else: vtype = '&nbsp;'
             if var.descr():
-                vsum = '<br>'+self._summary(var, container)
+                vsum = ' - ' +self._summary(var, container)
             else: vsum = ''
             str += '<tr><td align="right" valign="top" '
             str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
             str += '  <td><code><b><a href="#'+vname+'">'+vname
-            str += '</a>'+'</b></code>\n  ' + vsum+'</td></tr>\n'
+            str += '</a></b></code>\n  ' + vsum + '</td></tr>\n'
         return str + '</table><br>\n\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
@@ -1193,20 +1190,21 @@ class HTML_Doc:
     # Index generation
     #////////////////////////////////////////////////////////////
     
-    def _get_index_items(self, tree, base, dict=None):
+    def _get_index_items(self, tree, link, dict=None):
+        if tree is None: return
         if dict == None: dict = {}
     
         if isinstance(tree, _Text): return dict
         elif tree.tagName != 'index':
             for child in tree.childNodes:
-                self._get_index_items(child, base, dict)
+                self._get_index_items(child, link, dict)
         else:
             children = [self._dom_to_html(c) for c in tree.childNodes]
             key = ''.join(children).lower().strip()
             if dict.has_key(key):
-                dict[key].append(base)
+                dict[key].append(link)
             else:
-                dict[key] = [base]
+                dict[key] = [link]
         return dict
 
     def _extract_index(self):
@@ -1216,12 +1214,40 @@ class HTML_Doc:
         """
         index = {}
         for (uid, doc) in self._docmap.items():
-            if uid.is_function(): uid = uid.module()
-            if uid.is_method(): uid = uid.cls()
-            base = `uid`
-            descr = doc.descr()
-            if descr:
-                self._get_index_items(descr, base, index)
+            if uid.is_function():
+                link = Link(`uid`, uid.module())
+            elif uid.is_method():
+                link = Link(`uid`, uid.cls())
+            else:
+                link = Link(`uid`, uid)
+
+            # Get index items from standard fields.
+            self._get_index_items(doc.descr(), link, index)
+            for see in doc.seealsos():
+                self._get_index_items(see, link, index)
+            if doc.version() is not None: 
+                self._get_index_items(doc.version(), link, index)
+            for author in doc.authors():
+                self._get_index_items(author, link, index)
+
+            # Get index items from object-specific fields.
+            if isinstance(doc, ModuleDoc):
+                for param in doc.variables():
+                    self._get_index_items(param.descr(), link, index)
+                    self._get_index_items(param.type(), link, index)
+            elif isinstance(doc, ClassDoc):
+                for param in doc.ivariables() + doc.cvariables():
+                    self._get_index_items(param.descr(), link, index)
+                    self._get_index_items(param.type(), link, index)
+            elif isinstance(doc, FuncDoc):
+                extra_p = [v for v in [doc.vararg(), doc.kwarg(),
+                                       doc.returns()] if v is not None]
+                for param in doc.parameters()+extra_p:
+                    self._get_index_items(param.descr(), link, index)
+                    self._get_index_items(param.type(), link, index)
+                for fraise in doc.raises():
+                    self._get_index_items(fraise.descr(), link, index)
+                    
         return index
 
     #////////////////////////////////////////////////////////////
@@ -1234,17 +1260,15 @@ class HTML_Doc:
         These anchors are used to create links from the index page to each
         index item.
         """
-        return "_index_"+re.sub("[^a-zA-Z0-9]", "_", str)
+        # Include "-" so we don't accidentally collide with the name
+        # of a python identifier. 
+        return "index-"+re.sub("[^a-zA-Z0-9]", "_", str)
     
     def _dom_to_html(self, tree, container=None, indent=0):
         """
         Given the DOM tree for an epytext string (as returned by
         L{epytext.parse}), return a string encoding it in HTML.  This
         string does not include C{<html>} or C{<body>} tags.
-    
-        To do:
-          - honor ordered list bullets
-          - implement more advanced uri links
     
         @param tree: The DOM tree for an epytext string.
         @type tree: C{xml.dom.minidom.Element}
@@ -1307,8 +1331,8 @@ class HTML_Doc:
         elif tree.tagName == 'uri':
             return '<a href="%s">%s</a>' % (children[1], children[0])
         elif tree.tagName == 'link':
-            target = re.sub('[^a-zA-Z0-9.]', '_', children[1])
-            return self._dom_link_to_html(target, children[0], container)
+            return self._dom_link_to_html(children[1], children[0],
+                                          container)
         elif tree.tagName == 'italic':
             return '<i>%s</i>' % childstr
         elif tree.tagName == 'math':
@@ -1319,9 +1343,13 @@ class HTML_Doc:
         elif tree.tagName == 'bold':
             return '<b>%s</b>' % childstr
         elif tree.tagName == 'ulist':
-            return indent*' '+'<ul>\n%s%s</ul>\n' % (childstr, indent*' ')
+            return '%s<ul>\n%s%s</ul>\n' % (indent*' ', childstr, indent*' ')
         elif tree.tagName == 'olist':
-            return indent*' '+'<ol>\n%s%s</ol>\n' % (childstr, indent*' ')
+            startAttr = tree.getAttributeNode('start')
+            if startAttr: start = ' start="%s"' % startAttr.value
+            else: start = ''
+            return ('%s<ol%s>\n%s%s</ol>\n' %
+                    (indent*' ', start, childstr, indent*' '))
         elif tree.tagName == 'li':
             return indent*' '+'<li>\n%s%s</li>\n' % (childstr, indent*' ')
         elif tree.tagName == 'heading':
@@ -1330,8 +1358,8 @@ class HTML_Doc:
         elif tree.tagName == 'literalblock':
             return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
         elif tree.tagName == 'doctestblock':
-            childstr = self._colorize_doctestblock(childstr)
-            return '<pre class="doctestblock">\n%s\n</pre>\n' % childstr
+            dtb = self._colorize_doctestblock(childstr.strip())
+            return '<pre class="doctestblock">\n%s</pre>\n' % dtb
         elif tree.tagName == 'fieldlist':
             raise AssertionError("There should not be any field lists left")
         elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
@@ -1340,20 +1368,82 @@ class HTML_Doc:
         else:
             print 'Warning: unknown epytext DOM element %r' % tree.tagName
     
+    # Construct two regular expressions that are useful for colorizing
+    # doctest blocks: _PROMPT_RE and _COLORIZE_RE.
+    _KEYWORDS = ["del", "from", "lambda", "return", "and", "or", "is", 
+                 "global", "not", "try", "break", "else", "if", "elif", 
+                 "while", "class", "except", "import", "pass", "raise",
+                 "continue", "finally", "in", "print", "def", "for"]
+    _KEYWORD = '|'.join([r'(\b%s\b)' % kw for kw in _KEYWORDS])
+    _STRING = '|'.join([r'("""("""|.*?[^\\"]"""))', r'("("|.*?[^\\"]"))',
+                        r"('''('''|.*?[^\\']'''))", r"('('|.*?[^\\']'))"])
+    _STRING = _STRING.replace('"', '&quot;')
+    _COMMENT = '(#.*?$)'
+    _PROMPT = r'(^\s*(&gt;&gt;&gt;|\.\.\.)(\s|$))'
+    _PROMPT_RE = re.compile(_PROMPT, re.MULTILINE | re.DOTALL)
+    _COLORIZE_RE = re.compile('|'.join([_STRING, _COMMENT, _KEYWORD]),
+                              re.MULTILINE | re.DOTALL)
+    del _KEYWORDS, _KEYWORD, _STRING, _COMMENT
     def _colorize_doctestblock(self, str):
         """
-        Do some colorization for a doctest block (minor for now).
-    
+        Do some colorization for a doctest block.  In particular, this
+        identifies spans with the following css classes:
+          - pysrc: The Python source code
+          - pyprompt: The ">>>" and "..." prompts
+          - pystring: Strings in the Python source code
+          - pycomment: Comments in the Python source code
+          - pykeyword: Keywords in the Python source code
+          - pyoutput: Python's output (lines without a prompt)
+        
         @type str: C{string}
         @param str: The contents of the doctest block to be colorized.
         @rtype: C{string}
         @return: The colorized doctest block.
         """
-        regexp = re.compile(r'^(\s*)(&gt;&gt;&gt;|\.\.\.)(\s*)(.*)$',
-                            re.MULTILINE)
-        return regexp.sub(r'\1<span class="pyprompt">\2</span>\3'+
-                          r'<span class="pycode">\4</span>', str)
+        PROMPT_RE = HTML_Doc._PROMPT_RE
+        COLORIZE_RE = HTML_Doc._COLORIZE_RE
+        pysrc = pyout = ''
+        outstr = ''
+        for line in str.split('\n')+['\n']:
+            if PROMPT_RE.match(line):
+                if pyout:
+                    outstr += ('<span class="pyoutput">%s</span>\n\n' %
+                               pyout.strip())
+                    pyout = ''
+                pysrc += line+'\n'
+            else:
+                if pysrc:
+                    # Prompt over-rides other colors (incl string)
+                    pysrc = COLORIZE_RE.sub(self._colorize_match, pysrc)
+                    pysrc = PROMPT_RE.sub(r'<span class="pyprompt">'+
+                                          r'\1</span>', pysrc)
+                    outstr += ('<span class="pysrc">%s</span>\n'
+                               % pysrc.strip())
+                    pysrc = ''
+                pyout += line+'\n'
+        if pyout.strip():
+            outstr += ('<span class="pyoutput">%s</span>\n' %
+                       pyout.strip())
+        return outstr.strip()
+        
+    def _colorize_match(self, match):
+        """
+        This helper function is used by L{_colorize_doctestblock} to
+        add colorization to matching expressions.  It is called by
+        C{_COLORIZE_RE.sub} with an expression that matches
+        C{_COLORIZE_RE}.
 
+        @return: The HTML code for the colorized expression.
+        @rtype: C{string}
+        """
+        str = match.group()
+        if str[:1] == "'" or str[:6] == '&quot;':
+            return '<span class="pystring">%s</span>' % str
+        elif str[:1] in '#':
+            return '<span class="pycomment">%s</span>' % str
+        else:
+            return '<span class="pykeyword">%s</span>' % str
+        
     def _dom_link_to_html(self, target, name, container):
         uid = findUID(target, container, self._docmap)
         if uid is None:
