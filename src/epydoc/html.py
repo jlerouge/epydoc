@@ -145,7 +145,7 @@ SPECIAL_METHODS ={
 ##################################################
 
 # system imports
-import re, sys, os.path, time, pprint
+import re, sys, os.path, time, pprint, types
 import xml.dom.minidom
 
 # epydoc imports
@@ -1323,8 +1323,7 @@ class HTMLFormatter:
         """
         str = '<ul>\n'
         uids = self._filter_private(self._docmap.keys())
-        # Find all top-level packages. (what about top-level
-        # modules?) XXXXXXXXXXXXX
+        # Find all top-level packages.
         for uid in uids:
             doc = self._docmap[uid]
             if not isinstance(doc, ModuleDoc): continue
@@ -1443,13 +1442,13 @@ class HTMLFormatter:
         # group; but add it to the string last, so the groupless
         # functions are at the top.
         groupstr = ''
+        all_groupmembers = {}
         for groupname, groupmembers in groups:
             # Extract the group
             groupset = _dictset(groupmembers)
+            all_groupmembers.update(groupset)
             group = [f for f in functions if groupset.has_key(f.target())]
             if not group: continue
-            functions = [f for f in functions
-                         if not groupset.has_key(f.target())]
             # Print a header within the table
             groupstr += self._group_header(groupname)
             # Add the lines for each func
@@ -1460,7 +1459,8 @@ class HTMLFormatter:
 
         str = self._table_header(heading, 'summary')
         for link in functions:
-            str += self._func_summary_line(link, cls)
+            if not all_groupmembers.has_key(link.target()):
+                str += self._func_summary_line(link, cls)
         if self._inheritance == 'listed' and cls is not None:
             str += self._inheritance_list(functions, cls.uid())
         return str + groupstr + '</table><br />\n\n'
@@ -1702,7 +1702,7 @@ class HTMLFormatter:
         PARAM_JOIN = ',\n'+' '*15
         str = ''
         for param in parameters:
-            if type(param) in (type([]), type(())):
+            if type(param) in (types.ListType, types.TupleType):
                 sublist = self._params_to_html(param, css_class,
                                                show_defaults)
                 str += '(%s), ' % sublist[:-len(PARAM_JOIN)]
@@ -1898,7 +1898,7 @@ class HTMLFormatter:
             vsum = ': ' +self._summary(var.descr(), var.uid())
         else:
             title = self._var_value_tooltip(var)
-            val = self._pprint_var_value(var, context='summary')
+            val = self._pprint_var_value(var, multiline=0)
             vsum = ' = <span title="%s">%s</span>' % (title, val)
         str = '<tr><td align="right" valign="top" '
         str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
@@ -1973,7 +1973,10 @@ class HTMLFormatter:
                 str += '\n      </dd>\n'
 
             str += '<span title="%s">' % self._var_value_tooltip(var)
+            str += '      <dt><b>Value:</b></dt>\n' 
+            str += '      <dd><table><tr><td>\n<pre class="variable">\n'
             str += self._pprint_var_value(var)
+            str += '</pre>\n        </td></tr></table></dd>\n'
             str += '</span>'
 
             if vtyp is not None or hasval:
@@ -1993,70 +1996,75 @@ class HTMLFormatter:
         val = val.replace('<', '&lt;').replace('>', '&gt;')
         return val
 
-    def _pprint_var_value(self, var, context='details'):
+    def _pprint_var_value(self, var, multiline=1):
         if not var.has_value(): return ''
         val = var.uid().value()
-        do_quoting = 1
 
-        # For regexps, use colorize_re.
-        if type(val).__name__ == 'SRE_Pattern':
-            val = colorize_re(val)
-            do_quoting = 0
-            
+        # Handle the most common cases first.  The following types
+        # will never need any line wrapping, etc; and they cover most
+        # variable values (esp int, for constants).  I leave out
+        # LongType on purpose, since long values may need line-
+        # wrapping.
+        if (type(val) is types.IntType or type(val) is types.FloatType or
+            type(val) is types.NoneType or type(val) is types.ComplexType):
+            # none of these should contain '&', '<' or '>'.
+            return repr(val)
+
         # For strings, use repr.  Use tripple-quoted-strings where
         # appropriate.
-        elif type(val) is type(''):
-            val = `val`
-            val = re.sub('&', '&amp;', val)
-            val = re.sub('<', '&lt;', val)
-            val = re.sub('>', '&gt;', val)
-            do_quoting = 0
-            if val.find(r'\n') >= 0 and context != 'summary':
-                val = ('<span class="variable-quote">'+val[0]*3+'</span>'+
-                        val[1:-1].replace(r'\n', '\n') +
-                       '<span class="variable-quote">'+val[0]*3+'</span>')
-                       
+        elif type(val) is types.StringType:
+            vstr = repr(val)
+            if vstr.find(r'\n') >= 0 and multiline:
+                body = vstr[1:-1].replace(r'\n', '\n')
+                vstr = ('<span class="variable-quote">'+vstr[0]*3+'</span>'+
+                        markup.plaintext_to_html(body) +
+                       '<span class="variable-quote">'+vstr[0]*3+'</span>')
+                     
             else:
-                val = ('<span class="variable-quote">'+val[0]+'</span>'+
-                       val[1:-1]+
-                       '<span class="variable-quote">'+val[0]+'</span>')
+                vstr = ('<span class="variable-quote">'+vstr[0]+'</span>'+
+                        markup.plaintext_to_html(vstr[1:-1])+
+                       '<span class="variable-quote">'+vstr[0]+'</span>')
 
-        # For lists, tuples, and dicts, use pprint.
-        elif type(val) in (type(()), type([]), type({})):
-            val = pprint.pformat(val)
+        # For lists, tuples, and dicts, use pprint.  When possible,
+        # restrict the amount of stuff that pprint needs to look at,
+        # since pprint is surprisingly slow.
+        elif type(val) is types.TupleType or type(val) is types.ListType:
+            vstr = repr(val)
+            if multiline and len(vstr) > self._variable_linelen:
+                vstr = pprint.pformat(val[:self._variable_maxlines+1])
+        elif type(val) is type({}):
+            vstr = repr(val)
+            if multiline and len(vstr) > self._variable_linelen:
+                if len(val) < self._variable_maxlines+50:
+                    vstr = pprint.pformat(val)
+                else:
+                    shortval = {}
+                    for (k,v) in val.items()[:self._variable_maxlines+1]:
+                        shortval[k]=v
+                    vstr = pprint.pformat(shortval)
 
+        # For regexps, use colorize_re.
+        elif type(val).__name__ == 'SRE_Pattern':
+            vstr = colorize_re(val)
+           
         # For other objects, use repr to generate a representation.
         else:
-            try: val = `val`
-            except: val = '...'
-
-        # Quote characters, where appropriate.
-        if do_quoting:
-            val = re.sub('&', '&amp;', val)
-            val = re.sub('<', '&lt;', val)
-            val = re.sub('>', '&gt;', val)
+            try: vstr = markup.plaintext_to_html(repr(val))
+            except: vstr = '...'
 
         # For the summary table, just return the value; don't
         # bother to word-wrap.
-        if context == 'summary':
-            val = re.sub(r'\n', '', val)
-            if val.startswith('<span class='):
-                val = val[:12] + re.sub(' ', '&nbsp;', val[12:])
-            else:
-                val = re.sub(' ', '&nbsp;', val)
-            val = self._linewrap_html(val, self._variable_summary_linelen, 1)
-            return '<code>%s</code>\n' % val
+        if not multiline:
+            vstr = vstr.replace('\n', '')
+            # Change spaces to &nbsp; (except spaces in html tags)
+            vstr = vstr.replace(' ', '&nbsp;')
+            vstr = vstr.replace('<span&nbsp;', '<span ')
+            vstr = self._linewrap_html(vstr, self._variable_summary_linelen, 1)
+            return '<code>%s</code>\n' % vstr
 
         # Do line-wrapping.
-        val = self._linewrap_html(val, self._variable_linelen,
-                                  self._variable_maxlines)
-
-        # Construct the value box.
-        str = '      <dt><b>Value:</b></dt>\n' 
-        str += '      <dd><table><tr><td>\n'
-        str += '<pre class="variable">\n%s</pre>\n' % val
-        str += '        </td></tr></table></dd>\n'
-        return str
+        return self._linewrap_html(vstr, self._variable_linelen,
+                                   self._variable_maxlines)
 
     def _linewrap_html(self, str, linelen, maxlines):
         """
@@ -2541,20 +2549,26 @@ class HTMLFormatter:
         @param uid: A unique identifier for the object.
         @type uid: L{UID}
         """
+        # Cache the URI, since we re-use these a lot.  (This is a
+        # slight hack, but profiling shows that it's worth it.)
+        if hasattr(uid, '_uri'): return uid._uri
         if uid.is_module():
-            return '%s-module.html' % uid.name()
+            uid._uri = '%s-module.html' % uid.name()
         elif uid.is_class():
-            return '%s-class.html' % uid.name()
+            uid._uri = '%s-class.html' % uid.name()
         else:
             parent = uid.parent()
             if parent is None:
-                return '%s-unknown.html' % uid.name() # Error
+                uid._uri = '%s-unknown.html' % uid.name() # Error
             elif parent.is_module():
-                return '%s-module.html#%s' % (parent.name(), uid.shortname())
+                uid._uri = '%s-module.html#%s' % (parent.name(),
+                                                  uid.shortname())
             elif parent.is_class():
-                return '%s-class.html#%s' % (parent.name(), uid.shortname())
+                uid._uri = '%s-class.html#%s' % (parent.name(),
+                                                 uid.shortname())
             else:
-                return '%s-unknown.html' % uid.name() # Error
+                uid._uri = '%s-unknown.html' % uid.name() # Error
+        return uid._uri
             
     def _documented(self, uid):
         """
