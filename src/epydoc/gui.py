@@ -192,19 +192,26 @@ def document(options, progress, cancel):
     progress[0] = 0.02
     from epydoc.html import HTMLFormatter
     from epydoc.objdoc import DocMap
-    from epydoc.imports import import_module
+    from epydoc.imports import import_module, find_modules
 
     try:
         # Import the modules.
         modnames = options['modules']
+        # First, expand packages.
+        for name in modnames[:]:
+            if os.path.isdir(name):
+                modnames.remove(name)
+                new_modules = find_modules(name)
+                if new_modules: modnames += new_modules
+                sys.stderr.write('!!!Error: %r is not a pacakge\n!!!' % name)
+                
         modules = []
         for (name, num) in zip(modnames, range(len(modnames))):
             if cancel[0]: exit_thread()
             sys.stderr.write('***Importing %s\n***' % name)
             try:
                 module = import_module(name)
-                if module not in modules:
-                    modules.append(module)
+                if module not in modules: modules.append(module)
             except ImportError, e:
                 sys.stderr.write('!!!Error importing %s: %s\n!!!', (mname, e))
             progress[0] += (IMPORT_PROGRESS*0.98)/len(modnames)
@@ -741,25 +748,31 @@ class EpydocGUI:
         self._root = None
 
     def add_module(self, name, check=0):
-        from epydoc.imports import import_module
-        # Check that it's a good module, if requested.
-        if check:
-            try:
-                m = import_module(name)
-                # This would normalize the name.  But that seems to
-                # mess up some modules (e.g., xml.dom.minidom), so
-                # don't do it:
-                ##if hasattr(m, '__file__'): name = m.__file__
-                ##if name[-4:-1] == '.py': name = name[:-1]
-            except:
-                print >>sys.stderr, "Error importing module: %s" % name
+        from epydoc.imports import import_module, find_modules
+
+        # First, expand packages.
+        if os.path.isdir(name):
+            module_names = find_modules(name)
+            if not module_names:
+                sys.stderr.write('!!!Error: %r is not a pacakge\n!!!' % name)
                 self._update_messages()
                 self._root.bell()
-                return
+        else:
+            module_names = [name]
 
-        # Add the module to the list of modules.
-        self._module_list.insert('end', name)
-        self._module_list.yview('end')
+        for name in module_names:
+            # Check that it's a good module, if requested.
+            if check:
+                try: import_module(name)
+                except ImportError, e:
+                    print >>sys.stderr, e
+                    self._update_messages()
+                    self._root.bell()
+                    continue
+
+            # Add the module to the list of modules.
+            self._module_list.insert('end', name)
+            self._module_list.yview('end')
         
     def mainloop(self, *args, **kwargs):
         self._root.mainloop(*args, **kwargs)

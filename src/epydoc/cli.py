@@ -78,7 +78,7 @@ def cli():
     options = _parse_args()
 
     # Import all the specified modules.
-    modules = _find_modules(options['modules'], options['verbosity'])
+    modules = _import(options['modules'], options['verbosity'])
 
     # Build their documentation
     docmap = _make_docmap(modules, options)
@@ -286,7 +286,7 @@ def _parse_args():
 
     return options
 
-def _find_modules(module_names, verbosity):
+def _import(module_names, verbosity):
     """
     @return: A list of the modules contained in the given files.
         Duplicates are removed.
@@ -296,7 +296,17 @@ def _find_modules(module_names, verbosity):
     @param verbosity: Verbosity level for tracing output.
     @type verbosity: C{int}
     """
-    from epydoc.imports import import_module
+    from epydoc.imports import import_module, find_modules
+
+    # First, expand packages.
+    for name in module_names[:]:
+        if os.path.isdir(name):
+            module_names.remove(name)
+            new_modules = find_modules(name)
+            if new_modules: module_names += new_modules
+            elif verbosity >= 0:
+                if sys.stderr.softspace: print >>sys.stderr
+                print  >>sys.stderr, 'Error: %r is not a pacakge' % name
 
     if verbosity > 0:
         print >>sys.stderr, 'Importing %s modules.' % len(module_names)
@@ -308,16 +318,17 @@ def _find_modules(module_names, verbosity):
         # Import the module, and add it to the list.
         try:
             module = import_module(name)
-            if module not in modules:
-                modules.append(module)
+            if module not in modules: modules.append(module)
             elif verbosity > 2:
-                print  >>sys.stderr, '  (duplicate)'
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, '    (duplicate)'
         except ImportError, e:
-            if verbosity >= 0: 
-                print  >>sys.stderr, '\n  Warning: %s' % e
+            if verbosity >= 0:
+                if sys.stderr.softspace: print >>sys.stderr
+                print  >>sys.stderr, e
 
     if len(modules) == 0:
-        print >>sys.stderr, 'Error: no modules successfully loaded!'
+        print >>sys.stderr, '\nError: no modules successfully loaded!'
         sys.exit(1)
     return modules
 
