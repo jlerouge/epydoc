@@ -32,8 +32,7 @@ Installing
 
         [user epydoc-1.0]$ su
         Password:
-        [root epydoc-1.0]# cd src
-        [root src]# python setup.py install
+        [root epydoc-1.0]# python setup.py install
 
     For complete installation instructions, including instructions on
     how to install from the RPM or windows installer, see the epydoc
