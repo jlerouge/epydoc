@@ -886,7 +886,7 @@ class HTMLFormatter:
         self._write_class_tree(public, private)
 
         # Write another navigation bar and the footer.
-        self._write_navbar(public, private, uid)
+        self._write_navbar(public, private, 'tree')
         footer = self._footer()
         public.write(footer); private.write(footer)
 
