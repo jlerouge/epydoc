@@ -53,7 +53,7 @@ local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
 
 checkdocs:
-	epydoc --check ${PY_SRC} -v
+	epydoc --check -v ${PY_SRC}
 
 .html.up2date: refdocs examples #distributions
 	rm -rf ${WEBDIR}
@@ -68,7 +68,8 @@ refdocs: .refdocs.up2date
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --css blue --private-css green -vv -f ${PY_SRC} 
+	       --css blue --private-css green -vv -f ${PY_SRC} \
+	       xml.dom.minidom
 	touch .refdocs.up2date
 
 examples: .examples.up2date
