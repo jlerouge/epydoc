@@ -84,32 +84,26 @@ __epydoc_sort__ = [
     # Documentation completeness checker
     'checker']
 
-# Done todo:
-#   - add @group (e.g. "@group accessors:")
-#   - Add other field tags?
-#   - add escape characters to epytext? (e.g. E{->})
-#   - adding fields dynamically: __extra_epydoc_fields__
-
 # To do:
+#   - Add more escape characters?
+#   - Add escape character & group support to latex
+#   - finish man-page output
 #   - Change html to write directly to files, instead of building up strings
-#      and then writing them.
-#   - switch to turn on/off inherited methods in the method summary
-#     list. (like the [frames/noframes] and [show/hide private] 
-#     switches?)
+#      and then writing them?
+#   - add option: don't include vars and cvars that have no descr?
+#   - create a better default top_page than trees.html
+#   - options to --check (--check all, --check basic, etc)
+#   - Improve error message "Unknown field tag 'ivar'" when they
+#     try to use an ivar in the wrong context (etc.)
+#   - Add support for properties
+
+# To do: medium-term
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - option to turn off function doc inheritance?
 #     - add --check for doc inheritance?
-#   - add option: don't include vars and cvars that have no descr?
-#   - create a better default top_page than trees.html
-#   - render package's module sublists as some kind of table?
-#   - use <SPAN TITLE=""> for partially ellided var values?
-#   - put var values in the summary table?
-#   - options to --check (--check all, --check basic, etc)
-#   - Improve error message "Unknown field tag 'ivar'" when they
-#     try to use an ivar in the wrong context (etc.)
-#   - document the method for deciding what's public/private
-#   - Add support for properties
+
+# To do: long-term
 #   - Add support for getting docs from parsing?
 
 # Other issues
@@ -117,7 +111,8 @@ __epydoc_sort__ = [
 #     distinguish them?  Of course, we can't even *access* the module,
 #     since "import curses.wrapper" gives us a function. :-/
 
-# Changes for docs:
+# Changes needed for docs:
+#   - document the method for deciding what's public/private
 #   - fields are defined slightly differently (@group)
 #   - new fields (@group: order is significant)
 #   - staticmethod/classmethod
