@@ -69,8 +69,8 @@ class UID:
     C{shortname}, C{is_private}, C{__str__}, and C{__repr__}; all
     other methods must be defined by derived classes.
 
-    @ivar __name: This UID's globally unique name.
-    @type __name: C{string}
+    @ivar _name: This UID's globally unique name.
+    @type _name: C{string}
 
     @cvariable _ids: A dictionary mapping from names to Python
         identifiers (as returned by C{id}).  This dictionary is used
@@ -105,7 +105,7 @@ class UID:
             definining the object.  For example, the UID for this
             class has the name C{'UID'}.
         """
-        return self.name().split('.')[-1]
+        return self._name.split('.')[-1]
 
     def value(self):
         """
@@ -292,7 +292,7 @@ class UID:
         @return: The globally unique name for this identifier.
         @see: L{name}
         """
-        return self.name()
+        return self._name
 
     def __repr__(self):
         """
@@ -301,7 +301,7 @@ class UID:
             representations of UIDs have the form::
                 <UID: epydoc.uid.UID>
         """
-        return '<UID: %s>' % self.name()
+        return '<UID: %s>' % self._name
 
     def __cmp__(self, other):
         """
@@ -316,7 +316,7 @@ class UID:
         @see: C{name}
         """
         if not isinstance(other, UID): return -1
-        return cmp(self.name(), other.name())
+        return cmp(self._name, other._name)
 
     def __hash__(self): raise NotImplementedError()
     def __eq__(self, other): raise NotImplementedError()
@@ -339,7 +339,10 @@ class ObjectUID(UID):
             self._id = id(object.im_func)
         else:
             self._id = id(object)
-        n = self.name()
+        self._name = self._findname()
+
+        # Note that this works right even if rfind return -1:
+        self._shortname = self._name[self._name.rfind('.')+1:]
 
     # The value of an ObjectUID is the object that was used to
     # construct the UID.
@@ -379,37 +382,38 @@ class ObjectUID(UID):
     def is_property(self): return 0
     def is_variable(self): return 0
 
-    def name(self):
-        if not hasattr(self, '_name'):
-            typ = type(self._obj)
-            if typ is _ModuleType:
-                if self.package():
-                    shortname = self._obj.__name__.split('.')[-1]
-                    self._name = '%s.%s' % (self.package(), shortname)
-                else:
-                    self._name = self._obj.__name__
-            elif typ is _ClassType or typ is _FunctionType:
-                self._name = '%s.%s' % (self.module(), self._obj.__name__)
-            elif typ is _MethodType or (typ is _BuiltinMethodType and
-                                        self._obj.__self__ is not None):
-                self._name = '%s.%s' % (self.cls(), self._obj.__name__)
-            elif (isinstance(self._obj, _TypeType) and
-                  hasattr(self._obj, '__module__')):
-                self._name = '%s.%s' % (self.module(), self._obj.__name__)
-            elif (isinstance(self._obj, _TypeType) or
-                  (typ is _BuiltinFunctionType and
-                   self._obj.__self__ is None)):
-                module = self.module()
-                if module is None:
-                    self._name = '__unknown__.%s' % self._obj.__name__
-                else:
-                    name = _find_name_in(self._obj, self.module()._obj)
-                    self._name = '%s.%s' % (self.module(), name)
-            elif typ in (_WrapperDescriptorType, _MethodDescriptorType):
-                self._name = '%s.%s' % (self.cls(), self._obj.__name__)
+    def shortname(self): return self._shortname
+    def name(self): return self._name
+    
+    def _findname(self):
+        typ = type(self._obj)
+        if typ is _ModuleType:
+            if self.package():
+                shortname = self._obj.__name__.split('.')[-1]
+                return '%s.%s' % (self.package(), shortname)
             else:
-                raise ValueError("Can't find name for %r" % self._obj)
-        return self._name
+                return self._obj.__name__
+        elif typ is _ClassType or typ is _FunctionType:
+            return '%s.%s' % (self.module(), self._obj.__name__)
+        elif typ is _MethodType or (typ is _BuiltinMethodType and
+                                    self._obj.__self__ is not None):
+            return '%s.%s' % (self.cls(), self._obj.__name__)
+        elif (isinstance(self._obj, _TypeType) and
+              hasattr(self._obj, '__module__')):
+            return '%s.%s' % (self.module(), self._obj.__name__)
+        elif (isinstance(self._obj, _TypeType) or
+              (typ is _BuiltinFunctionType and
+               self._obj.__self__ is None)):
+            module = self.module()
+            if module is None:
+                return '__unknown__.%s' % self._obj.__name__
+            else:
+                name = _find_name_in(self._obj, self.module()._obj)
+                return '%s.%s' % (self.module(), name)
+        elif typ in (_WrapperDescriptorType, _MethodDescriptorType):
+            return '%s.%s' % (self.cls(), self._obj.__name__)
+        else:
+            raise ValueError("Can't find name for %r" % self._obj)
         
     def cls(self):
         if not hasattr(self, '_cls'):
@@ -555,6 +559,7 @@ class RelativeUID(UID):
         self._base = base_uid
         self._shortname = shortname
         self._value = value
+        self._name = '%s.%s' % (self._base._name, self._shortname)
 
     def value(self): return self._value
 
@@ -574,7 +579,7 @@ class RelativeUID(UID):
     def is_property(self): return 0
 
     # Return the UID's full name and short name.
-    def name(self): return '%s.%s' % (self._base.name(), self._shortname)
+    def name(self): return self._name
     def shortname(self): return self._shortname
 
     # The following methods report about the ancestors of the UID, 
