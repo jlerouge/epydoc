@@ -131,6 +131,21 @@ SPECIAL_METHODS ={
     '__str__': 'Informal representation operator',
     }
 
+SYMBOL_TO_HTML = {
+    # Symbols
+    '<-': 'larr', '->': 'rarr', 
+
+    # Greek letters
+    'alpha': 'alpha', 'beta': 'beta', 'gamma': 'gamma',
+    'delta': 'delta', 'epsilon': 'epsilon', 'zeta': 'zeta',  
+    'eta': 'eta', 'theta': 'theta', 'iota': 'iota', 
+    'kappa': 'kappa', 'lambda': 'lambda', 'mu': 'mu',  
+    'nu': 'nu', 'xi': 'xi', 'omicon': 'omicon',  
+    'pi': 'pi', 'rho': 'rho', 'sigma': 'sigma',  
+    'tau': 'tau', 'upsilon': 'upsilon', 'phi': 'phi',  
+    'chi': 'chi', 'psi': 'psi', 'omega': 'omega',  
+    }
+
 ##################################################
 ## Imports
 ##################################################
@@ -1964,7 +1979,7 @@ class HTMLFormatter:
             val = re.sub('<', '&lt;', val)
             val = re.sub('>', '&gt;', val)
             do_quoting = 0
-            if val.find(r'\n') >= 0:
+            if val.find(r'\n') >= 0 and context != 'summary':
                 val = ('<span class="variable-quote">'+val[0]*3+'</span>'+
                         val[1:-1].replace(r'\n', '\n') +
                        '<span class="variable-quote">'+val[0]*3+'</span>')
@@ -2418,7 +2433,11 @@ class HTMLFormatter:
                               'name', 'target', 'html'):
             return childstr
         elif tree.tagName == 'symbol':
-            return '&%s;' % childstr
+            symbol = tree.childNodes[0].data
+            if SYMBOL_TO_HTML.has_key(symbol):
+                return '&%s;' % SYMBOL_TO_HTML[symbol]
+            else:
+                return '[??]'
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
     
@@ -2759,7 +2778,8 @@ class HTMLFormatter:
                 doc = self._docmap[doc.overrides()]
 
         if descr != None:
-            str = self._dom_to_html(epytext.summary(descr), container).strip()
+            summary = epytext.summary(descr)
+            str = self._dom_to_html(summary, container).strip()
             if str == '': str = '&nbsp;'
             return str
         elif (isinstance(doc, FuncDoc) and
