@@ -1277,7 +1277,7 @@ class ModuleDoc(ObjDoc):
             filename = filename[:-1]
     
         # Parse the module's source code.
-        try: ast = parser.suite(open(filename).read())
+        try: ast = parser.suite(open(filename).read().replace('\r\n','\n'))
         except: return # E.g., a .pyc with no corresponding .py
     
         # Construct a list of defined variables.  To do this, we search
