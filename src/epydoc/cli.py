@@ -12,7 +12,7 @@
 Command-line interface for epydoc.
 
 Usage::
-    epydoc [-o DIR] [-n NAME] [-p] [--css SHEET] [-v] MODULE...
+    epydoc [-o DIR] [-n NAME] [-p] [-c SHEET] [-v] MODULE...
     epydoc --check [-p] [-a] [-v] MODULE...
     epydoc --help
     epydoc --version
@@ -38,7 +38,7 @@ Usage::
     -u URL, --url URL
         Package URL (for HTML header/footer)
 
-    --css SHEET
+    -c SHEET, --css SHEET
         CSS stylesheet for HTML files.  If SHEET is a file, then the
         stylesheet is copied from that file; otherwise, SHEET is taken
         to be the name of a built-in stylesheet.  For a list of the
@@ -176,7 +176,7 @@ def _parse_args():
                 argvals['show_private'] = 1
             elif arg in ('-a', '-check_all'):
                 argvals['check_all'] = 1
-            elif arg in ('--css',):
+            elif arg in ('--css', '-c'):
                 argvals['css'] = args.pop()
                 if argvals['css'] == 'help':
                     _csshelp()
@@ -197,7 +197,8 @@ def _find_module_from_filename(filename,verbosity):
     @param verbosity: Verbosity level for tracing output.
     @type verbosity: C{int}
     """
-    old_cwd = os.getcwd()
+    #old_cwd = os.getcwd()
+    old_sys_path = sys.path
 
     # Normalize the filename
     filename = os.path.normpath(os.path.abspath(filename))
@@ -223,13 +224,14 @@ def _find_module_from_filename(filename,verbosity):
     try:
         try:
             if verbosity > 1: print 'Importing', module
-            if basedir: os.chdir(basedir)
+            if basedir:
+                #os.chdir(basedir)
+                sys.path = [basedir] + sys.path
             exec('import %s as rv' % module)
-            #exec('import %s' % module)
-            #exec('rv = %s' % module)
             return rv
         finally:
-            os.chdir(old_cwd)
+            #os.chdir(old_cwd)
+            sys.path = old_sys_path
     except ImportError, e:
         if re.match(r'^.*__init__\.py?$', filename):
             raise ImportError("Run epydoc from the parent directory "+
@@ -267,20 +269,18 @@ def _find_modules(module_names, verbosity):
 
     return modules
 
-
 def cli():
     """
     Command line interface for epydoc.
     
     @rtype: C{None}
     """
-    sys.path.append('.')
     param = _parse_args()
 
     try:
         modules = _find_modules(param['modules'], param['verbosity'])
     except ImportError, e:
-        if e.args: self._error(e.args[0])
+        if e.args: _error(e.args[0])
         else: raise
 
     # Wait to do imports, to make --usage faster.
