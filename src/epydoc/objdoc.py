@@ -191,7 +191,30 @@ def _descr_to_identifiers(descr):
     idents = para.childNodes[0].data
     if not _IDENTIFIER_LIST_REGEXP.match(idents):
         raise ValueError, 'Bad Identifier list: %r' % idents
-    return re.split('[ ?:;,]+', idents)
+    return re.split('[ :;,]+', idents)
+
+def _descr_to_docfield(arg, descr):
+    tags = [s.lower() for s in re.split('[ :;,]+', arg)]
+    
+    if len(descr.childNodes) != 1:
+        raise ValueError, 'Expected a single paragraph'
+    para = descr.childNodes[0]
+    if para.tagName != 'para':
+        raise ValueError, 'Expected a para; got a %s' % para.tagName
+    if len(para.childNodes) != 1:
+        raise ValueError, 'Colorization is not allowed'
+
+    args = re.split(' *[:;,]+ *', para.childNodes[0].data)
+    if len(args) == 0 or len(args) > 3:
+        raise ValueError, 'Wrong number of arguments'
+    singular = args[0]
+    if len(args) >= 2: plural = args[1]
+    else: plural = None
+    short = 0
+    if len(args) >= 3:
+        if args[2] == 'short': short = 1
+        else: raise ValueError('Bad arg 2 (expected "short")')
+    return DocField(tags, singular, plural, 1, short)
 
 ##################################################
 ## __docformat__
@@ -691,6 +714,14 @@ class ObjDoc:
         This method should be overridden, and called as the default
         case.
         """
+        if tag == 'newfield':
+            try:
+                field = _descr_to_docfield(arg, descr)
+                self._fields.append(field)
+            except ValueError:
+                warnings.append('Bad newfield')
+            return
+        
         if tag == 'sort':
             if arg is not None:
                 warnings.append(tag+' did not expect an argument')
