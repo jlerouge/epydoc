@@ -555,7 +555,7 @@ class ObjDoc:
                 warnings.append(tag+' did not expect an argument')
             self._warnings.append(descr)
         else:
-            warnings.append('Unknown tag %r' %tag)
+            warnings.append('Unknown field tag %r' %tag)
     
     #////////////////////////////
     #// Private
@@ -1231,7 +1231,7 @@ class FuncDoc(ObjDoc):
             self._init_params()
         else:
             raise TypeError("Can't document %s" % func)
-        if self._uid.is_method():
+        if self._uid.is_method() and not self.documented():
             self._find_override(self._uid.cls().value())
 
         # Print out any errors/warnings that we encountered.
