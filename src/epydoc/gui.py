@@ -26,7 +26,7 @@ possible).
 
 from Tkinter import *
 from tkFileDialog import askopenfilename, asksaveasfilename
-from thread import start_new_thread
+from thread import start_new_thread, exit_thread
 from pickle import dump, load
 import sys
 
@@ -38,6 +38,8 @@ from epydoc.objdoc import DocMap
 ##/////////////////////////////////////////////////////////////////////////
 ## CONSTANTS
 ##/////////////////////////////////////////////////////////////////////////
+
+DEBUG = 0
 
 # Colors for tkinter display
 BG_COLOR='#90a0b0'
@@ -122,7 +124,7 @@ BAMCADs=
 ## THREADED DOCUMENTER
 ##/////////////////////////////////////////////////////////////////////////
 
-def document(modules, options, progress):
+def document(modules, options, progress, cancel):
     """
     Create the documentation for C{modules}, using the options
     specified by C{options}.  C{document} is designed to be started in
@@ -145,10 +147,13 @@ def document(modules, options, progress):
     d = DocMap()
 
     # Build the documentation.
-    progress[0] = 0.05
+    progress[0] = 0.02
     for module in modules:
+        if cancel[0]:
+            progress[0] = 'cancel'
+            exit_thread()
         d.add(module)
-        progress[0] += (BUILD_PROGRESS*0.975)/len(modules)
+        progress[0] += (BUILD_PROGRESS*0.98)/len(modules)
 
     # How many files does HTML_Doc need to write?
     numfiles = 4
@@ -156,8 +161,13 @@ def document(modules, options, progress):
         if uid.is_module() or uid.is_class(): numfiles += 2
 
     # Set up the progress callback.
-    def progress_callback(f, d, numfiles=numfiles, progress=progress):
-        progress[0] += (WRITE_PROGRESS*0.975)/numfiles
+    def progress_callback(f, d, numfiles=numfiles,
+                          progress=progress, cancel=cancel):
+        if cancel[0]:
+            progress[0] = 'cancel'
+            exit_thread()
+        if DEBUG: print 'documenting', f, d
+        progress[0] += (WRITE_PROGRESS*0.98)/numfiles
 
     # Write the documentation.
     htmldoc = HTML_Doc(d, **options)
@@ -178,6 +188,7 @@ class EpydocGUI:
         self._afterid = 0
         self._modules = []
         self._progress = [None]
+        self._cancel = [0]
         self._filename = None
 
         # Create the main window.
@@ -378,6 +389,7 @@ class EpydocGUI:
             self._options_visible = 1
 
     def add_module(self, name, beep=1):
+        if DEBUG: print 'importing', name
         try: [module] = _find_modules([name], 0)
         except:
             if beep: self._top.bell()
@@ -448,14 +460,15 @@ class EpydocGUI:
             self._top.bell()
             return
 
-        # We can't handle the "stop" button yet.
         if self._progress[0] != None:
-            self._top.bell()
+            self._cancel[0] = 1
             return
         
         # Start documenting
         self._progress[0] = 0.0
-        args = (self._modules, self._getopts(), self._progress)
+        self._cancel[0] = 0
+        args = (self._modules, self._getopts(),
+                self._progress, self._cancel)
         start_new_thread(document, args)
 
         # Start the progress bar.
@@ -471,13 +484,14 @@ class EpydocGUI:
 
         # Update the progress bar.
         if self._progress[0] == 'done': p = self._W + DX
+        elif self._progress[0] == 'cancel': p = 0
         else: p = DX + self._W * self._progress[0]
         self._canvas.coords(self._r1, DX+1, DY+1, p, self._H+1)
         self._canvas.coords(self._r2, DX, DY, p-1, self._H)
         self._canvas.coords(self._r3, DX+1, DY+1, p, self._H+1)
 
         # Are we done?
-        if self._progress[0] == 'done':
+        if self._progress[0] in ('done', 'cancel'):
             self._go_button['text'] = 'Start'
             self._progress[0] = None
             return
@@ -496,6 +510,7 @@ class EpydocGUI:
         self._filename = prjfile
         if 1:#try:
             opts = load(open(prjfile, 'r'))
+            opts['modules'].sort(lambda e1, e2: cmp(e1[1], e2[1]))
             self._name_entry.delete(0, 'end')
             if opts.get('prj_name'):
                 self._name_entry.insert(0, opts['prj_name'])
@@ -520,10 +535,13 @@ class EpydocGUI:
         if self._filename is None: return self._saveas()
         try:
             opts = self._getopts()
-            opts['modules'] = [(m.__file__, m.__name__)
+            opts['modules'] = [(hasattr(m, '__file__') and m.__file__,
+                                m.__name__)
                                for m in self._modules]
+            opts['modules'].sort(lambda e1, e2: cmp(e1[1], e2[1]))
             dump(opts, open(self._filename, 'w'))
-        except:
+        except Exception, e:
+            if DEBUG: print e
             self._top.bell()
              
     def _saveas(self, *e): 
