@@ -33,6 +33,11 @@ from tkFileDialog import askopenfilename, asksaveasfilename
 from thread import start_new_thread, exit_thread
 from pickle import dump, load
 
+# askdirectory is only defined in python 2.2+; fall back on
+# asksaveasfilename if it's not available.
+try: from tkFileDialog import askdirectory
+except: askdirectory = None
+
 ##/////////////////////////////////////////////////////////////////////////
 ## CONSTANTS
 ##/////////////////////////////////////////////////////////////////////////
@@ -682,35 +687,29 @@ class EpydocGUI:
         self._module_entry.delete(0, 'end')
 
     def _browse_module(self, *e):
+        title = 'Select a module for documentation'
         ftypes = [('Python module', '.py'),
+                  ('Python extension', '.so'),
                   ('All files', '*')]
-        filename = askopenfilename(filetypes=ftypes,
+        filename = askopenfilename(filetypes=ftypes, title=title,
                                    defaultextension='.py')
         if not filename: return
         self.add_module(filename, check=1)
         
     def _browse_css(self, *e):
-        #self._css_var.set('-other-')
+        title = 'Select a CSS stylesheet'
         ftypes = [('CSS Stylesheet', '.css'), ('All files', '*')]
-        filename = askopenfilename(filetypes=ftypes,
+        filename = askopenfilename(filetypes=ftypes, title=title,
                                    defaultextension='.css')
         if not filename: return
         self._css_entry.delete(0, 'end')
         self._css_entry.insert(0, filename)
 
-    def _browse_private_css(self, *e):
-        self._private_css_var.set('-other-')
-        ftypes = [('CSS Stylesheet', '.css'), ('All files', '*')]
-        filename = askopenfilename(filetypes=ftypes,
-                                   defaultextension='.css')
-        if not filename: return
-        self._private_css_entry.delete(0, 'end')
-        self._private_css_entry.insert(0, filename)
-
     def _browse_help(self, *e):
+        title = 'Select a help file'
         self._help_var.set('-other-')
         ftypes = [('HTML file', '.html'), ('All files', '*')]
-        filename = askopenfilename(filetypes=ftypes,
+        filename = askopenfilename(filetypes=ftypes, title=title,
                                    defaultextension='.html')
         if not filename: return
         self._help_entry.delete(0, 'end')
@@ -718,8 +717,17 @@ class EpydocGUI:
 
     def _browse_out(self, *e):
         ftypes = [('All files', '*')]
-        filename = asksaveasfilename(filetypes=ftypes)
-        if not filename: return
+        title = 'Choose the output directory'
+        if askdirectory is not None:
+            filename = askdirectory(mustexist=0, title=title)
+            if not filename: return
+        else:
+            # Hack for Python 2.1 or earlier:
+            filename = asksaveasfilename(filetypes=ftypes, title=title,
+                                         initialfile='--this directory--')
+            if not filename: return
+            (f1, f2) = os.path.split(filename)
+            if f2 == '--this directory--': filename = f1
         self._out_entry.delete(0, 'end')
         self._out_entry.insert(0, filename)
 
@@ -899,9 +907,10 @@ class EpydocGUI:
         self._filename = None
 
     def _open(self, *e):
+        title = 'Open project'
         ftypes = [('Project file', '.prj'),
                   ('All files', '*')]
-        filename = askopenfilename(filetypes=ftypes,
+        filename = askopenfilename(filetypes=ftypes, title=title,
                                    defaultextension='.css')
         if not filename: return
         self.open(filename)
@@ -971,9 +980,10 @@ class EpydocGUI:
                                  (self._filename, e))
             self._root.bell()
              
-    def _saveas(self, *e): 
+    def _saveas(self, *e):
+        title = 'Save project as'
         ftypes = [('Project file', '.prj'), ('All files', '*')]
-        filename = asksaveasfilename(filetypes=ftypes,
+        filename = asksaveasfilename(filetypes=ftypes, title=title,
                                      defaultextension='.prj')
         if not filename: return
         self._filename = filename
