@@ -10,6 +10,10 @@ epydocgui \- graphical interface to epydoc
 .HP 10
 .B epydocgui
 .RI [ project.prj " | " modules ...]
+.HP 10
+.B epydoc \-h
+.HP 10
+.B epydoc \-V
 .\" ================== DESCRIPTION ====================
 .SH DESCRIPTION
 .B epydocgui
@@ -28,16 +32,14 @@ every class and module is documented in its own file.  An index file,
 a trees file, and a help file are also created.  If you select the
 .B frames
 option, then a frames\-based table of contents is also produced.
-.PP
-This program will launch a GUI to get the modules to document. It can
-be given an initial list of modules on the command lines, and project
-files. Project files are saved from within the GUI.
 .\" ================== OPTIONS ====================
 .SH OPTIONS
 .TP
 .I project.prj
 The name of a project file that was saved with
 .BR epydocgui .
+Project files record a list of related modules, and the options that
+should be used to generate the documentation for those modules.
 .TP
 .IR modules ...
 The list of the modules that should be documented.  Modules may be
@@ -48,6 +50,12 @@ or module names (such as
 The filename for a package is its
 .B __init__.py
 file.
+.TP
+.B \-h, \-\-help, \-\-usage, \-?
+Display a usage message.
+.TP
+.B \-V, \-\-version
+Print the version of Epydoc.
 .\" ================== HTML FILES ====================
 .\" (this was copied from epydoc.1)
 .SH HTML FILES
