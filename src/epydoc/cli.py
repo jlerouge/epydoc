@@ -96,6 +96,10 @@ def cli():
     # Import all the specified modules.
     modules = _import(options['modules'], options['verbosity'])
 
+    # Record the order of the modules in options.
+    from epydoc.uid import make_uid
+    options['modules'] = [make_uid(m) for m in modules]
+
     # Build their documentation
     docmap = _make_docmap(modules, options)
 
@@ -261,7 +265,7 @@ def _parse_args():
                'show_imports':0, 'frames':1, 'private':None,
                'list_classes_separately': 0, 'debug':0,
                'docformat':None, 'top':None, 'inheritance': None,
-               'ignore_param_mismatch': 0}
+               'ignore_param_mismatch': 0, 'alphabetical': 1}
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:h:n:o:t:u:Vvq?:'
@@ -275,7 +279,7 @@ def _parse_args():
                 'quiet show-imports show_imports '+
                 'target= version verbose '+
                 'navlink= nav_link= nav-link= '+
-                
+                'command-line-order command_line_order '+
                 'inheritance= inheritence= '+
                 'ignore_param_mismatch ignore-param-mismatch '+
                 'test= tests= checks=').split()
@@ -293,6 +297,8 @@ def _parse_args():
             modules += sys.builtin_module_names
             modules.remove('__main__')
         elif opt in ('--check',): options['action'] = 'check'
+        elif opt in ('--command-line-order', '--command_line_order'):
+            options['alphabetical'] = 0
         elif opt in ('--css', '-c'): options['css'] = val
         elif opt in ('--debug',): options['debug']=1
         elif opt in ('--dvi',): options['action'] = 'dvi'
@@ -395,7 +401,7 @@ def _parse_args():
 def _import(module_names, verbosity):
     """
     @return: A list of the modules contained in the given files.
-        Duplicates are removed.
+        Duplicates are removed.  Order is preserved.
     @rtype: C{list} of C{module}
     @param module_names: The list of module filenames.
     @type module_names: C{list} of C{string}
@@ -407,9 +413,11 @@ def _import(module_names, verbosity):
     # First, expand packages.
     for name in module_names[:]:
         if os.path.isdir(name):
-            module_names.remove(name)
+            # In-place replacement.
+            index = module_names.index(name)
             new_modules = find_modules(name)
-            if new_modules: module_names += new_modules
+            if new_modules:
+                module_names[index:index+1] = new_modules
             elif verbosity >= 0:
                 if sys.stderr.softspace: print >>sys.stderr
                 print  >>sys.stderr, 'Error: %r is not a pacakge' % name
@@ -427,7 +435,7 @@ def _import(module_names, verbosity):
             if module not in modules: modules.append(module)
             elif verbosity > 2:
                 if sys.stderr.softspace: print >>sys.stderr
-                print >>sys.stderr, '    (duplicate)'
+                print >>sys.stderr, '  (duplicate)'
         except ImportError, e:
             if verbosity >= 0:
                 if sys.stderr.softspace: print >>sys.stderr

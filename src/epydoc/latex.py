@@ -167,6 +167,10 @@ class LatexFormatter:
               imported objects that are not defined by any of the
               modules that are being documented.  By default, these
               objects are excluded.  (type=C{boolean})
+            - C{alphabetical}: Whether to list modules in alphabetical
+              order or in the order that they were specified in on
+              the command line.  By default, modules are listed in
+              alphabetical order.  (type=C{boolean})
         """
         self._docmap = docmap
 
@@ -181,6 +185,9 @@ class LatexFormatter:
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
+        self._module_uids = kwargs.get('modules', [])[:]
+        if kwargs.get('alphabetical', 1):
+            self._module_uids.sort()
 
     def write(self, directory=None, progress_callback=None):
         """
@@ -316,11 +323,8 @@ class LatexFormatter:
         str += '\\addtolength{\\parskip}{1ex}\n'
 
         str += self._start_of('Includes')
-        uids = self._filter(self._docmap.keys())
-        uids.sort()
-        for uid in uids:
-            if uid.is_module():
-                str += '\\include{%s-module}\n' % uid.name()
+        for uid in self._module_uids:
+            str += '\\include{%s-module}\n' % uid.name()
 
         # If we're listing classes separately, put them after all the
         # modules.
