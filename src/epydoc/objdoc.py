@@ -1064,6 +1064,15 @@ class ClassDoc(ObjDoc):
             if vuid.is_routine():
                 self._methods.append(Link(field, vuid))
 
+            # Is it an instance variable?
+            elif self._tmp_ivar.has_key(field):
+                descr = self._tmp_ivar[field]
+                del self._tmp_ivar[field]
+                typ = self._tmp_type.get(field)
+                if typ is not None: del self._tmp_type[field]
+                else: typ = epytext.parse_type_of(val)
+                self._ivariables.append(Var(vuid, descr, typ, 1))
+
             # Is it a class variable?
             else:
                 descr = self._tmp_cvar.get(field)
