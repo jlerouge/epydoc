@@ -57,10 +57,6 @@ def _internal_error(e=None):
     Print a warning message about an internal error.
     @return: The return value from calling C{func}
     """
-    # If we're debugging, then propagate the error.
-    if debug: raise
-
-    # Otherwise, report it.
     _encountered_internal_error = 1
     if sys.stderr.softspace: print >>sys.stderr
     if e: print >>sys.stderr, "INTERNAL ERROR: %s" % e
@@ -306,12 +302,12 @@ def _make_docmap(modules, options):
 
         # Add the module.  Catch any exceptions that get generated.
         try: d.add(module)
-        except Exception, e:             
-            if options['debug']: _internal_error(e)
-            else: raise
+        except Exception, e:
+            if options['debug']: raise
+            else: _internal_error(e)
         except:   
-            if options['debug']: _internal_error()
-            else: raise
+            if options['debug']: raise
+            else: _internal_error()
                 
     return d
 
