@@ -16,12 +16,6 @@ L{DocMap} into a set of HTML files.
 @todo: finish updating docstrings.
 
 @newfield question: Question
-@question: Should functions with no docstrings be listed in the
-    details section?  Currently, they are not, with the reasoning
-    being that there's nothing else to say about them.  But parameter
-    defaults are listed in details, and not in summary.
-    C.f. properties, where properties without docstrings are always
-    listed in details (since we want to list their accessor methods).
 
 @var HEADER: The header for standard documentation HTML pages.
 @var FOOTER: The footer for standard documentation HTML pages.
@@ -1853,15 +1847,17 @@ class HTMLFormatter:
             functions = [f for f in functions
                          if f.target().cls() == cuid]
 
-            # Filter out methods that don't define or inherit docstrings;
-            # they are just listed in the summary table.
-            functions = [f for f in functions
-                         if docmap.documented_ancestor(f.target())]
-        else:
-            # Filter out functions that don't define docstrings; they
-            # are just listed in the summary table.
-            functions = [f for f in functions
-                         if docmap[f.target()].has_docstring()]
+        ## [XX] Don't do this: it can hide default values and
+        ## parameter types!
+        #    # Filter out methods that don't define or inherit docstrings;
+        #    # they are just listed in the summary table.
+        #    functions = [f for f in functions
+        #                 if docmap.documented_ancestor(f.target())]
+        #else:
+        #    # Filter out functions that don't define docstrings; they
+        #    # are just listed in the summary table.
+        #    functions = [f for f in functions
+        #                 if docmap[f.target()].has_docstring()]
 
         # If there are no functions left, then just return.
         if len(functions) == 0: return
