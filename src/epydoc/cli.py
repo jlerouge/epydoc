@@ -340,9 +340,9 @@ def _html(docmap, options):
             TRACE_FORMAT = (('  [%%%dd/%d]' % (len(`numfiles`), numfiles)) +
                             ' Writing docs for %s %s')
             if doc and doc.uid().is_module():
-                print TRACE_FORMAT % (filenum[0], 'module:', `doc.uid()`)
+                print TRACE_FORMAT % (filenum[0], 'module:', doc.uid())
             elif doc and doc.uid().is_class():
-                print TRACE_FORMAT % (filenum[0], 'class: ', `doc.uid()`)
+                print TRACE_FORMAT % (filenum[0], 'class: ', doc.uid())
             else:
                 print TRACE_FORMAT % (filenum[0], 'file:  ',
                                       os.path.basename(file))
