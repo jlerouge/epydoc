@@ -502,7 +502,11 @@ class HTMLFormatter:
             else:
                 raise IOError("Can't find help file: %r" % self._helpfile)
         else:
-            help = HTML_HELP
+            if re.search('<.*>', self._prj_name): thisprj = 'this project'
+            else: thisprj = '<b>%s</b>' % self._prj_name
+            help = HTML_HELP % {'this_project':thisprj}
+            
+            
         
         # Write the help file.
         helpfile = open(filename, 'w')
