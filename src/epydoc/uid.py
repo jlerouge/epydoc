@@ -17,7 +17,7 @@ crossreferencing between C{ObjDoc}s.
 @see: L{epydoc.objdoc}
 """
 
-import inspect, sys, os.path, new
+import inspect, sys, os.path, new, re
 from types import ModuleType as _ModuleType
 from types import ClassType as _ClassType
 from types import FunctionType as _FunctionType
@@ -412,7 +412,7 @@ def findUID(name, container, docmap=None):
             modname = '.'.join(modcomponents[:i]+[name])
             exec('import %s as obj' % modname)
             return(_makeuid(obj))
-        except ImportError: pass
+        except: pass
         
     # Is it an object in a module?  The module part of the name may be
     # relative to the containing module, or any of its ancestors.
@@ -427,7 +427,7 @@ def findUID(name, container, docmap=None):
                     return UID('%s.%s' % (container, name))
                 exec('from %s import %s as obj' % (modname, objname))
                 return _makeuid(obj)
-            except ImportError: pass
+            except: pass
 
     # We couldn't find it; return None.
     return None
