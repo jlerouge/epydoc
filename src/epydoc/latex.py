@@ -90,10 +90,10 @@ class LatexFormatter:
         file that you should run C{latex} on.
       - X{I{module}-module.tex}: The API documentation for a module.
         I{module} is the complete dotted name of the module, such as
-        sys or epydoc.epytext.
+        C{sys} or C{epydoc.epytext}.
       - X{I{class}-class.tex}: The API documentation for a class,
         exception, or type.  I{class} is the complete dotted name of
-        the class, such as epydoc.epytext.Token or array.ArrayType.
+        the class, such as C{epydoc.epytext.Token} or C{array.ArrayType}.
         These class documentation files are only created if the
         C{list_classes_separately} option is used; otherwise, the
         documentation for each class is included in its module's
