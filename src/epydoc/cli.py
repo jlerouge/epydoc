@@ -56,7 +56,7 @@ __docformat__ = 'epytext en'
 # Use "%(tex)s" to include the latex filename, "%(ps)s" for the
 # postscript filename, etc.  (You must include the "s" after the close
 # parenthasis).
-LATEX_COMMAND = 'echo x | latex %(tex)s'
+LATEX_COMMAND = r"echo x | latex '\batchmode\input %(tex)s'"
 MAKEINDEX_COMMAND = 'makeindex -q %(idx)s'
 DVIPS_COMMAND = 'dvips -q %(dvi)s -o %(ps)s -G0 -Ppdf'
 PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
@@ -351,11 +351,8 @@ def _run(cmd, options):
     elif options['verbosity'] > 1:
         cmd_str = wordwrap(`cmd`, 10+len(name)).lstrip()
         print >>sys.stderr, 'Running %s' % cmd_str.rstrip()
-    pipe = os.popen(cmd)
-    output = pipe.read()
-    exitcode = pipe.close()
-    if exitcode is not None:
-        print output
+
+    if os.system(cmd) != 0:
         raise OSError('%s failed: %s' % (name, exitcode))
 
 def _latex(docmap, options, format):
@@ -411,6 +408,7 @@ def _latex(docmap, options, format):
 
         except OSError, e:
             print  >>sys.stderr, 'Error: %s' % e
+            sys.exit(1)
     finally:
         os.chdir(oldpath)
 
