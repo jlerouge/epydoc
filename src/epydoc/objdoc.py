@@ -548,10 +548,13 @@ class ModuleDoc(ObjDoc):
                 else:
                     self._imported_classes.append(Link(field, vuid))
             else:
-                value = UID(val)
-                if not value.found_fullname():
-                    try: value = `val`
-                    except: value = None
+                if type(val) is types.StringType:
+                    value = `val`
+                else:
+                    value = UID(val)
+                    if not value.found_fullname():
+                        try: value = `val`
+                        except: value = None
                 if self._tmp_type.has_key(field):
                     typ = self._tmp_type[field]
                     variables[field] = Var(field, None, typ, value)
@@ -778,10 +781,13 @@ class ClassDoc(ObjDoc):
             elif vuid.is_routine():
                 self._methods.append(Link(field, vuid))
             else:
-                value = UID(val)
-                if not value.found_fullname():
-                    try: value = `val`
-                    except: value = None
+                if type(val) is types.StringType:
+                    value = `val`
+                else:
+                    value = UID(val)
+                    if not value.found_fullname():
+                        try: value = `val`
+                        except: value = None
                 if self._tmp_type.has_key(field):
                     typ = self._tmp_type[field]
                     cvariables[field] = Var(field, None, typ, value)
