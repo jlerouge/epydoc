@@ -61,7 +61,8 @@ _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{alltt, parskip, fancyheadings, boxedminipage}
 \usepackage{makeidx, multirow, longtable, tocbibind, amssymb}
-\usepackage[headings]{fullpage}
+\usepackage{fullpage}
+%\usepackage[headings]{fullpage}
 \begin{document}
 
 \setlength{\parindent}{0ex}
@@ -1231,7 +1232,7 @@ class LatexFormatter:
     def _descrlist(self, items, singular, plural=None, short=0):
         if plural is None: plural = singular
         if len(items) == 0: return ''
-        if len(items) == 1:
+        if len(items) == 1 and singular is not None:
             return '\\textbf{%s:} %s\n\n' % (singular, items[0])
         if short:
             str = '\\textbf{%s:}\n' % plural
