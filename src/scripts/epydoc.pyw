@@ -1,3 +1,5 @@
+#!/usr/bin/python
+#
 # Call the graphical interface for Epydoc.
 #
 
