@@ -174,7 +174,8 @@ def summary(tree):
     # Find the first paragraph.
     children = [tree]
     while (len(children) > 0) and (children[0].tagName != 'para'):
-        if children[0].tagName in ('epytext', 'section', 'ulist', 'olist'):
+        if children[0].tagName in ('epytext', 'section',
+                                   'ulist', 'olist', 'li'):
             children = children[0].childNodes
         else:
             children = children[1:]
@@ -186,9 +187,10 @@ def summary(tree):
     parachildren = children[0].childNodes
     summary = Element('epytext')
     for parachild in parachildren:
-        if (isinstance(parachild, Text) and '.' in parachild.data):
-            dotloc = parachild.data.find('.')
-            summary.appendChild(Text(parachild.data[:dotloc+1]))
+        if (isinstance(parachild, Text) and
+            re.search(r'\.(\s|$)', parachild.data)):
+            sumstr = re.match('(.*?\.)(\s|$)', parachild.data).group(1)
+            summary.appendChild(Text(sumstr))
             return summary
         summary.appendChild(parachild.cloneNode(1))
 
@@ -289,10 +291,9 @@ def parse(str, errors = None, warnings = None):
             encountered_field = 1
         elif encountered_field == 1:
             if len(stack) <= 3:
-                # For now, make this a warning; later it will be an error
                 estr = ("Fields must be the final elements in a "+
                         "epytext string.")
-                warnings.append(StructuringError(estr, token))
+                errors.append(StructuringError(estr, token))
 
     # If there was an error, then signal it!
     if errors != []:
