@@ -105,6 +105,60 @@ def _type(obj):
         code.appendChild(xml.dom.minidom.Text(type(obj).__name__))
     return text
 
+def _find_docstring(uid):
+    """
+    @return: The file name and line number of the docstring for the
+        given object; or C{None} if the docstring cannot be found.
+        Line numbers are indexed from zero (i.e., the first line's
+        line number is 0).
+    @rtype: C{(string, int)} or C{(None, None)}
+    """
+    # This function is based on inspect.findsource; but I don't want
+    # to use that function directly, because it's not as smart about
+    # finding modules for objects (esp. functions).
+
+    # Get the filename of the source file.
+    object = uid.object()
+    try:
+        if uid.is_module(): muid = uid
+        else: muid = uid.module()
+        filename = muid.object().__file__
+    except: return (None, None)
+    if string.lower(filename[-4:-1]) == '.py':
+        filename = filename[:-4] + '.py'
+
+    # Read the source file's contents.
+    try: lines = open(filename).readlines()
+    except: return (None, None)
+
+    # Figure out the starting line number of the object
+    linenum = 0
+    if inspect.isclass(object):
+        pat = re.compile(r'^\s*class\s*%s\b' % object.__name__)
+        for linenum in range(len(lines)):
+            if pat.match(lines[linenum]): break
+        else: return (None, None)
+    if inspect.ismethod(object): object = object.im_func
+    if inspect.isfunction(object): object = object.func_code
+    if inspect.istraceback(object): object = object.tb_frame
+    if inspect.isframe(object): object = object.f_code
+    if inspect.iscode(object):
+        if not hasattr(object, 'co_firstlineno'): return (None, None)
+        linenum = object.co_firstlineno - 1
+        pat = re.compile(r'^\s*def\s')
+        while linenum > 0:
+            if pat.match(lines[linenum]): break
+            linenum = linenum - 1
+
+    # Find the line number of the docstring.
+    for linenum in range(linenum, len(lines)):
+        line = lines[linenum].split('#', 1)[0]
+        pat = re.compile(r'(^|.*[^\\"\'])["\']')
+        if pat.match(line): break
+    else: return (None, None)
+        
+    return (filename, linenum)
+
 ##################################################
 ## ObjDoc
 ##################################################
@@ -409,7 +463,7 @@ class ObjDoc:
                 warnings.append(tag+' did not expect an argument')
             self._seealsos.append(descr)
         else:
-            warnings.append('Unknown tag: '+tag)
+            warnings.append('Unknown tag %r' %tag)
     
     #////////////////////////////
     #// Private
@@ -447,6 +501,12 @@ class ObjDoc:
                 field.tagName = 'epytext'
                 self._process_field(tag, arg, field, field_warnings)
 
+        # Save the remaining docstring as the description..
+        if pdoc.hasChildNodes():
+            self._descr = pdoc
+        else:
+            self._descr = None
+        
         # Supress warnings/errors, if requested
         if verbosity <= -1: parse_warnings = []
         if verbosity <= -2: field_warnings = []
@@ -454,24 +514,29 @@ class ObjDoc:
         
         # Print the errors and warnings.
         if (parse_warnings or parse_errors or field_warnings):
-            if parse_errors:
-                print "WARNING: Treating", self._uid, "docstring as literal"
-            print '='*70
-            print 'In '+`self.uid()`+' docstring:'
-            print '-'*70
-            for warning in parse_warnings:
-                print warning.as_warning()
-            for error in parse_errors:
-                print error.as_error()
-            for warning in field_warnings:
-                print warning
+            # Figure out our file and line number, if possible.
+            (filename, startline) = _find_docstring(self._uid)
+            if startline is None: startline = 0
+            
             print
-        
-        # Save the remaining docstring as the description..
-        if pdoc.hasChildNodes():
-            self._descr = pdoc
-        else:
-            self._descr = None
+            print '='*75
+            if filename is not None:
+                print filename
+                print 'In %s docstring (line %s):' % (self._uid, startline+1)
+            else:
+                print 'In %s docstring:' % self._uid
+            print '-'*75
+            for error in parse_errors:
+                error.linenum += startline
+                print error.as_error()
+            for warning in parse_warnings:
+                warning.linenum += startline
+                print warning.as_warning()
+            for warning in field_warnings:
+                if startline is None:
+                    print '       '+warning
+                else:
+                    print '%5s: Warning: %s' % ('L'+`startline+1`, warning)
         
 #////////////////////////////////////////////////////////
 #// ModuleDoc
@@ -1128,7 +1193,7 @@ class FuncDoc(ObjDoc):
                         self._params.append(Var(name.strip(), value=default))
             # Extract the return type from the signature
             if rtype:
-                self._return.set_type(epytext.parse(rtype))
+                self._return.set_type(epytext.parse_as_para(rtype))
 
             # Remove the signature from the description.
             text = self._descr.childNodes[0].childNodes[0]
