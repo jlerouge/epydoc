@@ -51,12 +51,12 @@ HEADER = '''<?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
           "DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-  <head>
-    <title>%s</title>
-    <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
-  </head>
-  <body bgcolor="white" text="black" link="blue" vlink="#204080"
-        alink="#204080">
+<head>
+  <title>%s</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
+</head>
+<body bgcolor="white" text="black" link="blue" vlink="#204080"
+      alink="#204080">
 '''
 # Expects: (version, date)
 FOOTER = '''
@@ -73,29 +73,29 @@ FOOTER = '''
 # Expects: (name, mainFrame_src)
 FRAMES_INDEX = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
 <html>
-  <head>
-    <title> %s </title>
-  </head>
-  <frameset cols="20%%,80%%">
-    <frameset rows="30%%,70%%">
-      <frame src="toc.html" name="moduleListFrame">
-      <frame src="toc-everything.html" name="moduleFrame">
-    </frameset>
-    <frame src="%s" name="mainFrame">
+<head>
+  <title> %s </title>
+</head>
+<frameset cols="20%%,80%%">
+  <frameset rows="30%%,70%%">
+    <frame src="toc.html" name="moduleListFrame">
+    <frame src="toc-everything.html" name="moduleFrame">
   </frameset>
+  <frame src="%s" name="mainFrame">
+</frameset>
 </html>
 '''
 # Expects (url, url, name)
 REDIRECT_INDEX = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
 <html>
-  <head>
-    <title> Redirect </title>
-    <meta http-equiv="refresh" content="1;url=%s">
-    <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
-  </head>
-  <body>
-    Redirecting to the API documentation for <a href="%s">%s</a>...
-  </body>
+<head>
+  <title> Redirect </title>
+  <meta http-equiv="refresh" content="1;url=%s">
+  <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
+</head>
+<body>
+  Redirecting to the API documentation for <a href="%s">%s</a>...
+</body>
 </html>
 '''
 
@@ -170,10 +170,10 @@ class HTMLFormatter:
         side of the window contains documentation pages.  But if the
         --no-frames option is used, then index.html will redirect the
         user to the project's top page.
-      - X{m-I{module}.html}: The API documentation for a module.  module
+      - X{I{module}-module.html}: The API documentation for a module.  module
         is the complete dotted name of the module, such as sys or
         epydoc.epytext.
-      - X{c-I{class}.html}: The API documentation for a class, exception,
+      - X{I{class}-class.html}: The API documentation for a class, exception,
         or type.  class is the complete dotted name of the class, such
         as epydoc.epytext.Token or array.ArrayType.
       - X{trees.html}: The module and class hierarchies.
@@ -183,14 +183,14 @@ class HTMLFormatter:
         epydoc.
       - X{toc.html}: The top-level table of contents page.  This page
         is displayed in the upper-left frame, and provides links to
-        toc-everything.html and the toc-m-I{module}.html files.  toc.html
+        toc-everything.html and the toc-I{module}-module.html files.  toc.html
         is not generated if the --no-frames option is used.
       - X{toc-everything.html}: The table of contents for the entire
         project.  This page is displayed in the lower-left frame, and
         provides links to every class, type, exception, function,
         and variable defined by the project.  toc-everything.html is
         not generated if the --no-frames option is used.
-      - X{toc-m-I{module}.html}: The table of contents for a module.
+      - X{toc-I{module}-module.html}: The table of contents for a module.
         This page is displayed in the lower-left frame, and provides
         links to every class, type, exception, function, and variable
         defined by the module.  module is the complete dotted name of
@@ -309,7 +309,7 @@ class HTMLFormatter:
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
         self._create_private_docs = kwargs.get('private', 1)
-        self._create_frames = kwargs.get('frames', 1)
+        self._frames_index = kwargs.get('frames', 1)
         self._show_imports = kwargs.get('show_imports', 0)
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
@@ -321,29 +321,17 @@ class HTMLFormatter:
             self._prj_link = self._prj_link.replace('>', '&gt;')
             self._prj_link = self._prj_link.replace(' ', '&nbsp;')
 
-        # Find the top-level object (if any)
-        self._find_toplevel()
-
-        # Cache the HTML that we generate for each docstring.
-        self._epytext_cache = {}
-
     def num_files(self):
         """
         @return: The number of files that this C{HTMLFormatter} will
             generate.
         @rtype: C{int}
         """
-        # Basic files (index.html, tree, indices, help, css)
-        n = 5
-
-        # TOC files (toc, toc-everything)
-        if self._create_frames: n += 2
-
-        # Private basic & TOC files.
-        if self._create_private_docs: n *= 2
-
-        # Base directory index.html file
-        if self._create_private_docs: n += 1
+        # Basic files (index.html, tree, indices, help, css, toc,
+        # toc-everything, frames, base directory index.html, base
+        # directory css)
+        if self._create_private_docs: n = 18
+        else: n = 8
 
         for uid in self._docmap.keys():
             # Module and class API files
@@ -352,7 +340,7 @@ class HTMLFormatter:
             if self._create_private_docs: n += 1
 
             # Module TOC files.
-            if not (uid.is_module() and self._create_frames): continue
+            if not uid.is_module(): continue
             if not uid.is_private(): n += 1
             if self._create_private_docs: n += 1
         return n
@@ -402,24 +390,25 @@ class HTMLFormatter:
 
         if self._create_private_docs:
             # Create the public version of the API docs
+            self._epytext_cache = {}
             self._show_private = 0
             self._write(os.path.join(directory, 'public/'),
                         progress_callback)
 
-            # Create the private version of the API docs.  We have to
-            # clear the epytext cache, since some L{...} links might
-            # be available in the private docs that weren't in the
-            # public docs. 
+            # Create the private version of the API docs.
             self._epytext_cache = {}
             self._show_private = 1
             self._write(os.path.join(directory, 'private/'),
                         progress_callback)
 
-            if self._create_frames:
-                self._write_frames_index(directory, progress_callback, 1)
-            else:
-                self._write_redirect_index(directory, progress_callback, 1)
+            # Create the base directory index.html file.
+            self._write_index(directory, progress_callback, 1)
+            filename = os.path.join(directory, 'epydoc.css')
+            if progress_callback: progress_callback(filename, None)
+            self._show_private = 0
+            self._write_css(filename)
         else:
+            self._epytext_cache = {}
             self._show_private = 0
             self._write(directory, progress_callback)
 
@@ -435,13 +424,12 @@ class HTMLFormatter:
         # Write the tree file (package & class hierarchies)
         filename = os.path.join(directory, 'trees.html')
         if progress_callback: progress_callback(filename, None)
-        str = self._tree_to_html()
-        open(filename, 'w').write(str)
+        self._write_trees(filename)
 
         # Write the index file.
         filename = os.path.join(directory, 'indices.html')
         if progress_callback: progress_callback(filename, None)
-        self._write_index_to_stream(open(filename, 'w'))
+        self._write_indices_to_stream(open(filename, 'w'))
 
         # Write the help file.
         filename = os.path.join(directory, 'help.html')
@@ -449,10 +437,10 @@ class HTMLFormatter:
         self._write_help(filename)
         
         # Write the frames-based table of contents
-        if self._create_frames:
-            self._write_frames(directory, progress_callback)
-        else:
-            self._write_redirect_index(directory, progress_callback)
+        self._write_frames(directory, progress_callback)
+        
+        # Write the index.html file.
+        self._write_index(directory, progress_callback, 0)
         
         # Write the CSS file.
         filename = os.path.join(directory, 'epydoc.css')
@@ -484,15 +472,18 @@ class HTMLFormatter:
         Write the frames-driven contents files for the project to the
         given directory.
 
-          - C{index.html}
+          - C{frames.html}
           - C{toc.html}
           - C{toc-everything.html}
-          - C{toc-m-I{module}.html}
+          - C{toc-I{module}-module.html}
 
         @rtype: C{None}
         """
         # Write the frames index file
-        self._write_frames_index(directory, progress_callback)
+        filename = os.path.join(directory, 'frames.html')
+        if progress_callback: progress_callback(filename, None)
+        prj_name = self._prj_name or "API Documentation"
+        open(filename, 'w').write(FRAMES_INDEX % (prj_name, self._top_page))
 
         # Write the top-level table of contents.
         filename = os.path.join(directory, 'toc.html')
@@ -516,14 +507,8 @@ class HTMLFormatter:
                 open(filename, 'w').write(str)
 
     def _write_frames_index(self, directory, progress_callback, frombase=0):
-        """
-        Write the index for the frames-based table of contents.
-        @param frombase: True if this is the index file for the base
-            directory when we are generating both public and private
-            documentation.  In this case, all hyperlinks should be
-            changed to point into the C{public} subdirectory.
-        @type frombase: C{boolean}
-        """
+        # !! OBSOLETE !!
+        raise ValueError('obsolete')
         top = self._top_page
         if frombase and not top.startswith('http:') and not '/' in top:
             top = 'public/%s' % top
@@ -534,11 +519,10 @@ class HTMLFormatter:
         if frombase: frames = re.sub('src="toc', 'src="public/toc', frames)
         open(filename, 'w').write(frames)
         
-    def _write_redirect_index(self, directory, progress_callback, frombase=0):
+    def _write_index(self, directory, progress_callback, frombase):
         """
-        Write an index.html file that redirects the user to the main
-        page.  When the frames-based table of contents is not
-        generated, this method is used to create index.html.
+        Write the C{index.html} file to the given file.
+        
         @param frombase: True if this is the index file for the base
             directory when we are generating both public and private
             documentation.  In this case, all hyperlinks should be
@@ -546,22 +530,52 @@ class HTMLFormatter:
         @type frombase: C{boolean}
         """
         filename = os.path.join(directory, 'index.html')
-        top = self._top_page
-        
-        # When possible, just copy the file.  This isn't possible if
-        # top is an external link, or if it's the base index (since
-        # the links would point to the current directory).
-        if not frombase and not top.startswith('http:') and not '/' in top:
-            try:
-                import shutil
-                shutil.copy(top, filename)
-                return
-            except: pass
+        if progress_callback: progress_callback(filename, None)
+        if self._frames_index: top = 'frames.html'
+        else: top = self._top_page
 
-        # If we can't symlink, then use a redirect page.
+        ## Write a frames index file.  This is basically the same as
+        ## frames.html, but we have to do some redirection if
+        ## frombase=1.
+        #if self._frames_index:
+        #    prj_name = self._prj_name or "API Documentation"
+        #    if frombase and top[:5] != 'http:' and '/' not in top:
+        #        top = 'public/%s' % top
+        #    frames = FRAMES_INDEX % (prj_name, top)
+        #    if frombase:
+        #        frames = re.sub('src="toc', 'src="public/toc', frames)
+        #    open(filename, 'w').write(frames)
+        #    return
+
+        # Copy the non-frames index file from top, if it's internal.
+        if top[:5] != 'http:' and '/' not in top:
+            try:
+                # Read top into str.
+                if frombase:
+                    pubdir = os.path.join(directory, 'public')
+                    topfile = os.path.join(pubdir, top)
+                else:
+                    topfile = os.path.join(directory, top)
+                str = open(topfile, 'r').read()
+
+                # Redirect links, if appropriate.
+                if frombase:
+                    INTERNAL_LINK = r'(<a[^>]+href=")([^:">]+"[^>]*>)'
+                    FRAME_LINK = r'(<frame[^>]+src=")([^:">]+"[^>]*>)'
+                    str = re.sub(INTERNAL_LINK, r'\1public/\2', str)
+                    str = re.sub(FRAME_LINK, r'\1public/\2', str)
+
+                # Write the output file.
+                open(filename, 'w').write(str)
+                return
+            except:
+                if sys.stderr.softspace: print >>sys.stderr
+                estr = 'Warning: error copying index; using a redirect page'
+                print >>sys.stderr, estr
+                if frombase: top = 'public/%s' % top
+
+        # Use a redirect if top is external, or if we faild to copy.
         name = self._prj_name or 'this project'
-        if frombase and not top.startswith('http:') and not '/' in top:
-            top = 'public/%s' % top
         open(filename, 'w').write(REDIRECT_INDEX % (top, top, name))
 
     def _write_help(self, filename):
@@ -581,7 +595,7 @@ class HTMLFormatter:
             else:
                 raise IOError("Can't find help file: %r" % self._helpfile)
         else:
-            if self._prj_name: thisprj = '<b>%s</b>' % self._prj_name
+            if self._prj_name: thisprj = self._prj_name
             else: thisprj = 'this project'
             help = HTML_HELP % {'this_project':thisprj}
         
@@ -590,6 +604,12 @@ class HTMLFormatter:
         helpfile.write(self._header('Help')+self._navbar('help', 1)+
                        help+self._navbar('help', 0)+self._footer())
         helpfile.close()
+
+    def _write_trees(self, filename):
+        """
+        Write the trees file to the given file.
+        """
+        open(filename, 'w').write(self._trees_to_html())
         
     def _write_css(self, filename):
         """
@@ -649,14 +669,12 @@ class HTMLFormatter:
         if uid.is_package(): str += self._start_of('Package Description')
         else: str += self._start_of('Module Description')
             
-        # Write the breadcrumb trail.
-        breadcrumbs = self._breadcrumbs(uid)
-        if not breadcrumbs: str += '<h2>'
-        else: str += '<h2><font size="-1">\n%s\n</font><br>\n' % breadcrumbs
-
-        # Write the module's name.
-        if uid.is_package(): str += 'Package '+uid.name()+'</h2>\n\n'
-        else: str += 'Module '+uid.name()+'</h2>\n\n'
+        # The breadcrumbs & module  name
+        #str += '<h3 class="module">%s</h3>' % self._breadcrumbs(uid)
+        if uid.is_package():
+            str += '<h2 class="package">Package '+uid.name()+'</h2>\n\n'
+        else:
+            str += '<h2 class="module">Module '+uid.name()+'</h2>\n\n'
 
         # Write the module's description.
         if doc.descr():
@@ -723,13 +741,9 @@ class HTMLFormatter:
         str += self._navbar(uid, 1)
         str += self._start_of('Class Description')
 
-        # Write the breadcrumb trail.
-        breadcrumbs = self._breadcrumbs(uid)
-        if not breadcrumbs: str += '<h2>'
-        else: str += '<h2><font size="-1">\n%s\n</font><br>\n' % breadcrumbs
-
-        # Write the class's name
-        str += 'Class ' + uid.shortname()+'</h2>\n\n'
+        # The breadcrumbs & class name
+        #str += '<h3 class="class">%s</h3>' % self._breadcrumbs(uid)
+        str += '<h2 class="class">Class ' + uid.shortname()+'</h2>\n\n'
 
         # Write the base class tree
         if doc.bases():
@@ -792,7 +806,7 @@ class HTMLFormatter:
         
         return str
 
-    def _tree_to_html(self):
+    def _trees_to_html(self):
         """
         @return: An HTML page containing the module and class
             hierarchies. 
@@ -807,17 +821,23 @@ class HTMLFormatter:
         str += '<h2>Module Hierarchy</h2>\n'
         str += self._module_tree()
 
+        # Does the project define any classes?
+        defines_classes = 0
+        for uid in self._docmap.keys():
+            if uid.is_class(): defines_classes = 1; break
+
         # Class hierarchy
-        str += self._start_of('Class Hierarchy')
-        str += '<h2>Class Hierarchy</h2>\n'
-        str += self._class_tree()
+        if defines_classes:
+            str += self._start_of('Class Hierarchy')
+            str += '<h2>Class Hierarchy</h2>\n'
+            str += self._class_tree()
 
         # Navigation bar and footer
         str += self._navbar('trees')
         str += self._footer()
         return str
 
-    def _write_index_to_stream(self, out):
+    def _write_indices_to_stream(self, out):
         """
         Write the index to the given file-like object.  I write
         directly to the file (unlike most other pages, which are
@@ -1024,17 +1044,17 @@ class HTMLFormatter:
         str += ' cellpadding="0" bgcolor="#a0c0ff" cellspacing="0">\n'
         str += '  <tr valign="center">\n'
 
-        # The "Top" link
+        # The "Home" link
         if self._top_page in ('trees.html', 'indices.html',
                               'help.html'):
             pass # We already have a link for these.
         elif (isinstance(where, UID) and
             self._uid_to_uri(where) == self._top_page):
             str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
-            str += '&nbsp;&nbsp;Top&nbsp;&nbsp;&nbsp;</th>\n'
+            str += '&nbsp;&nbsp;Home&nbsp;&nbsp;&nbsp;</th>\n'
         else:
             str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;<a '
-            str += 'class="navbar" href="%s">Top</a>' % self._top_page
+            str += 'class="navbar" href="%s">Home</a>' % self._top_page
             str += '&nbsp;&nbsp;&nbsp;</th>\n' 
 
         # The "Tree" link
@@ -1080,14 +1100,19 @@ class HTMLFormatter:
             str += '    </th>\n'
         str += '  </tr>\n</table>\n'
 
-        # Frames and public/private link
-        if top and (self._create_private_docs or self._create_frames):
-            str += '<table width="100%" cellpadding="0" cellspacing="0"><tr>\n'
-            if self._create_frames:
-                str += '  <td>%s</td>\n' % self._frames_link(where)
-            str += '  <td width="100%"></td>\n'
+        # Breadcrumb, frames, and private/public link
+        if top:
+            str += '<table width="100%" cellpadding="0" cellspacing="0">\n'
+            str += '  <tr valign="top">\n    <td width="100%">\n'
+            if isinstance(where, UID): str += self._breadcrumbs(where)
+            str += '    </td>\n    <td>'
+            str += '<table cellpadding="0" cellspacing="0">\n'
             if self._create_private_docs:
-                str += '  <td>%s</td>\n' % self._public_private_link(where)
+                str += ('      <tr><td align="right">%s</td></tr>\n' %
+                        self._public_private_link(where))
+            str += ('      <tr><td align="right">%s</td></tr>\n' %
+                    self._frames_link(where))
+            str += '    </table></td>'
             str += '</tr></table>\n'
             
         return str
@@ -1095,7 +1120,7 @@ class HTMLFormatter:
     def _frames_link(self, where):
         if isinstance(where, UID): uri = self._uid_to_uri(where)
         else: uri = where+'.html'
-        return ('<font size="-2">[<a href="index.html"'+
+        return ('<font size="-2">[<a href="frames.html"'+
                 'target="_top">frames</a>&nbsp;|&nbsp;<a href="'+uri+
                 '" target="_top">no&nbsp;frames</a>]</font>')
     
@@ -1198,7 +1223,7 @@ class HTMLFormatter:
     def _class_tree(self, sortorder=None):
         """
         @return: The HTML code for the class hierarchy tree.  This is
-            used by L{_tree_to_html} to construct the hierarchy page.
+            used by L{_trees_to_html} to construct the hierarchy page.
         @rtype: C{string}
         """
         str = '<ul>\n'
@@ -1247,7 +1272,7 @@ class HTMLFormatter:
     def _module_tree(self, sortorder=None):
         """
         @return: The HTML code for the module hierarchy tree.  This is
-            used by L{_tree_to_html} to construct the hiearchy page.
+            used by L{_trees_to_html} to construct the hiearchy page.
         @rtype: C{string}
         """
         str = '<ul>\n'
@@ -1299,8 +1324,8 @@ class HTMLFormatter:
             cdoc = self._docmap[cls]
             csum = self._summary(cdoc, cls.module())
             str += '<tr><td width="15%">\n'
-            str += '  <b><i>'+self._link_to_html(link)
-            str += '</i></b></td>\n  <td>' + csum + '</td></tr>\n'
+            str += '  <b>'+self._link_to_html(link)
+            str += '</b></td>\n  <td>' + csum + '</td></tr>\n'
         return str + '</table><br>\n\n'
 
     #////////////////////////////////////////////////////////////
@@ -2140,13 +2165,24 @@ class HTMLFormatter:
             C{uid}.
         @rtype: C{string}
         """
+        #if not uid.parent(): return '</br>\n'
+        if uid.is_package(): crumbs = ['Package&nbsp;%s' % uid.shortname()]
+        elif uid.is_module(): crumbs = ['Module&nbsp;%s' % uid.shortname()]
+        elif uid.is_class(): crumbs = ['Class&nbsp;%s' % uid.shortname()]
         uid = uid.parent()
-        crumbs = []
         while uid is not None:
-            crumbs.append(self._uid_to_href(uid, uid.shortname(), code=0))
+            if uid.is_package(): label = 'Package&nbsp;%s' % uid.shortname()
+            elif uid.is_module(): label = 'Module&nbsp;%s' % uid.shortname()
+            elif uid.is_class(): label = 'Class&nbsp;%s' % uid.shortname()
+            else: raise ValueError('Bad uid type for breadcrumbs')
+            crumbs.append(self._uid_to_href(uid, label, code=0))
             uid = uid.parent()
         crumbs.reverse()
-        return '.'.join(crumbs)
+        # PICK A BETTER CLASS NAME!!
+        str = '<font size="-1"><b class="breadcrumbs">\n  '
+        str += ' ::\n  '.join(crumbs)
+        str += '</b></font></br>\n'
+        return str
 
     def _find_top_page(self, pagename):
         """
@@ -2511,17 +2547,17 @@ class HTMLFormatter:
         @type uid: L{UID}
         """
         if uid.is_module():
-            return 'm-%s.html' % uid.name()
+            return '%s-module.html' % uid.name()
         elif uid.is_class():
-            return 'c-%s.html' % uid.name()
+            return '%s-class.html' % uid.name()
         else:
             parent = uid.parent()
             if parent is None:
                 raise ValueError("Cannot find URI for uid %s" % uid)
             elif parent.is_module():
-                return 'm-%s.html#%s' % (parent.name(), uid.shortname())
+                return '%s-module.html#%s' % (parent.name(), uid.shortname())
             elif parent.is_class():
-                return 'c-%s.html#%s' % (parent.name(), uid.shortname())
+                return '%s-class.html#%s' % (parent.name(), uid.shortname())
             else:
                 raise ValueError("Cannot find URI for uid %s" % uid)
             
