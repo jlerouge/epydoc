@@ -17,6 +17,12 @@
 .dark    { background: #8098a0; color: #000000; }
 .darkest { background: #607880; color: #b8d0d0; }
 
+.grayf { background: #f0f0f0; color: #000000; }
+.grayc { background: #c0c0c0; color: #000000; }
+.gray9 { background: #909090; color: #000000; }
+.gray6 { background: #606060; color: #000000; }
+.gray3 { background: #303030; color: #000000; }
+
 /*===================================================================*/
 /* Default body appearance */
 
@@ -59,12 +65,15 @@ th           { background: #c0d0d0; color: #000000;     /* = .light */
                font-weight: bold }
 th.secondary { background: #ffffff; color: #000000;      /* = .white */
                font-weight: bold; font-style: italic }
+table.transparent { background: transparent; color: #000000; }
 
 /* I use tables to show screenshots. */
 .screenshot  { background: #c0d0d0; color: #000000; }   /* = .light */
 
 /* Sometimes we want transparent tables, for positioning. */
 .transparent { background: transparent; }
+
+th.index { background: red; }
 
 /*===================================================================*/
 /* Lists. */
@@ -136,62 +145,6 @@ code.field { background: transparent; color: #006040; }
 
 a.nav:link    { background: transparent; color: #b8d0d0; } 
 a.nav:visited { background: transparent; color: #b8d0d0; } 
-
-/*===================================================================*/
-/* Bibliographic entries: */
-/*   - bib-article: DIV containing the description of an article */
-/*   - bib-title: The title of an article */
-/*   - bib-author: The author of an article */
-/*   - bib-box: Box containing info about an aspect of an article */
-/*   - bib-section: A section in the summary of an article */
-/*   - bib-part: The section title for a bib-box */
-/*   - bib-keywords: The contents of the keywords bib-box */
-/*   - bib-seealso: The contents of the see also bib-box */
-/*   - bib-bibtex: The contents of the bibtex bib-box */
-
-.bib-article {
-    background: #c0d0d0; color: #000000;                /* = .light */
-    border: 2px solid #000000;
-    margin: 1em 0em 1em 0em;
-    padding: 0.5em;
-    /* Put each article on a new page when printing */
-    page-break-before: always;
-}
-
-.bib-title {
-    background: transparent; color: #003800;
-    text-align: center;
-    font-weight: normal;
-    font-size: 150%;
-    margin: 0em;
-}
-
-.bib-author {
-    text-align: center;
-    font-weight: normal;
-    font-size: 130%;
-    margin: 0em;
-}
-
-.bib-box {                                              /* = .medium */
-    background: #b2c0c0; color: #000000;
-    border: 2px solid #607880;
-    margin: 0.5em 0em 0em 0em;
-    padding: 0.3em;
-    text-align: justify;
-}
-.bib-section{ font-weight: bold; font-style: italic;}
-
-.bib-part{
-    background: transparent; color: #003030;
-    font-weight: bold;
-    font-size: 120%;
-    margin: 0em 0em -0.5em 0em;
-}
-
-.bib-keywords { margin: 0.8em 0em 0.2em 2em; }
-.bib-seealso { margin: 0.8em 0em 0.2em 2em; }
-.bib-bibtex { font-size: 70%; margin: 1em 0em 0.2em 2em; }
 
 /*===================================================================*/
 /* End of stylesheet */

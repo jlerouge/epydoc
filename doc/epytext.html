@@ -7,11 +7,11 @@
 <body>
 <h1>The Epytext Markup Language</h1>
 
-<h2> Overview </h2>
+<h2> 1. Overview </h2>
 
 <p> Epytext is a lightweight markup language for Python docstrings.
-The Epytext markup language is used by Epydoc to parse docstrings and
-create structured API documentation.  Epytext markup is broken up into
+The epytext markup language is used by epydoc to parse docstrings and
+create structured API documentation.  epytext markup is broken up into
 the following categories: </p>
 
 <ul>
@@ -26,43 +26,8 @@ the following categories: </p>
   with properties, such as italics and hyperlinks. </li>
 </ul>
 
-<!--
-<p> Epytext defines markup for the following constructs: </p>
-
-<ul>
-  <li> <b>Block Structure</b>
-  <ul>
-    <li> <b>Basic Blocks</b>
-    <ul>
-      <li> Paragraphs </li> 
-      <li> Section headings </li>
-      <li> Literal blocks </li>
-      <li> Doctest blocks </li>
-    </ul> </li>
-    <li> <b>Hierarchical blocks</b>
-    <ul>
-      <li> Unordered lists </li>
-      <li> Ordered lists </li>
-      <li> Sections </li>
-      <li> Field lists </li>
-    </ul> </li>
-  </ul> </li>
-  <li> <b>Inline Markup</b>
-  <ul>
-    <li> Documentation crossreference links </li>
-    <li> External hyperlinks </li>
-    <li> Bold text </li>
-    <li> Italic text </li>
-    <li> Code text </li>
-    <li> Indexed terms </li>
-    <li> Mathematical expressions </li>
-    <li> Escaping mechanism </li>
-  </ul> </li>
-</ul>
--->
-
 <!-- =========== BLOCK STRUCTURE ============= -->
-<h2> Block Structure </h2>
+<h2> 2. Block Structure </h2>
 
 <p> Block structure is encoded using indentation, blank lines, and a
 handful of special character sequences. </p>
@@ -85,7 +50,7 @@ handful of special character sequences. </p>
 <p> The following sections describe how to use each type of block
 structure. </p>
 
-<h3> Paragraphs </h3>
+<h3> 2.1. Paragraphs </h3>
 
 <p> A paragraph is the simplest type of basic block.  It consists of
 one or more lines of text.  Paragraphs must be left justified (i.e.,
@@ -117,7 +82,7 @@ illustrates how paragraphs can be used: </p>
 </table>
   
   
-<h3> Lists </h3>
+<h3> 2.2. Lists </h3>
 
 <p> Epytext supports both ordered and unordered lists.  A list
 consists of one or more consecutive <i>list items</i> of the same type
@@ -170,7 +135,7 @@ newline is considered a list item.  Therefore, list items do not need
 to be separated by blank lines.  However, if a list follows a
 paragraph, it is recommended that you either separate it by a blank
 line, or indent it.  If a paragraph is immediately followed by an
-unindented list item, Epydoc will generate a warning.  This helps to
+unindented list item, epydoc will generate a warning.  This helps to
 avoid accidentally placing a dash, minus sign, or sentence-final
 number at the beginning of a line. </p>
 
@@ -218,7 +183,7 @@ used: </p>
   </td></tr>
 </table>
 
-<h3> Sections </h3>
+<h3> 2.3. Sections </h3>
 
 <p> A section consists of a heading followed by one or more
 child blocks. </p>
@@ -269,7 +234,7 @@ child blocks. </p>
   This is a paragraph in section 2.
 </table>
 
-<h3> Literal Blocks </h3>
+<h3> 2.4. Literal Blocks </h3>
 
 <p> Literal blocks are used to represent "preformatted" text.
 Everything within a literal block should be displayed exactly as it
@@ -284,7 +249,7 @@ appears in plaintext.  In particular: </p>
 <p> Literal blocks are introduced by paragraphs ending in the special
 sequence "<code>::</code>".  Literal blocks end at the first line
 whose indentation is equal to or less than that of the paragraph that
-introduced them.  The following examples shows how literal blocks can
+introduces them.  The following example shows how literal blocks can
 be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
@@ -313,12 +278,12 @@ be used: </p>
 </table>
 
 <p> Literal blocks are indented relative to the paragraphs that
-introduced them; for example, in the previous example, the word
+introduce them; for example, in the previous example, the word
 "Literal" is displayed with four leading spaces, not eight.  Also,
 note that the double colon ("<code>::</code>") that introduces the
 literal block is rendered as a single colon. </p>
 
-<h3> Doctest Blocks </h3>
+<h3> 2.5. Doctest Blocks </h3>
 
 <p> Doctest blocks contain examples consisting of Python expressions
 and their output.  Doctest blocks can be used by the <a
@@ -326,7 +291,7 @@ href="http://www.python.org/doc/current/lib/module-doctest.html">doctest</a>
 module to test the documented object.  Doctest blocks begin with the
 special sequence "<code>&gt;&gt;&gt;</code>".  Doctest blocks are
 delimited from surrounding blocks by blank lines.  Doctest blocks may
-not contain blank lines.  The following examples shows how doctest
+not contain blank lines.  The following example shows how doctest
 blocks can be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
@@ -361,19 +326,19 @@ blocks can be used: </p>
 </table>
 
 <p> Doctest blocks are indented relative to the paragraphs that
-introduced them; for example, in the previous example, the doctest
+introduce them; for example, in the previous example, the doctest
 block is displayed with four leading spaces, not eight. </p>
 
-<h3> Fields </h3>
+<h3> 2.6. Fields </h3>
 
 <p> Fields are used to describe specific properties of a documented
 object.  For example, fields can be used to define the parameters and
 return value of a function; the instance variables of a class; and the
-author of a module.  Each Field is marked by a <i>field tag</i>, which
+author of a module.  Each field is marked by a <i>field tag</i>, which
 consist of an at sign ("<code>@</code>") followed by a <i>field
 name</i>, optionally followed by a space and a <i>field argument</i>,
 followed by a colon ("<code>:</code>").  For example,
-"<code>return:</code>" and "<code>param&nbsp;x</code>" are field
+"<code>@return:</code>" and "<code>@param&nbsp;x:</code>" are field
 tags. </p>
 
 <p> Fields can contain paragraphs, lists, literal blocks, and doctest
@@ -433,7 +398,7 @@ used: </p>
 
 <p> Epydoc currently recognizes the following fields: </p>
 
-<table border="1" cellspacing="0" cellpadding="3">
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
 
   <tr><th width="10%" align="left"> <code>@<b>param</b>
   <i>p</i>:</code>&nbsp;... </th><td> A description of parameter
@@ -511,7 +476,7 @@ used: </p>
 <div class="box"> <p> <b>Note</b>: Currently, fields are parsed using
 the same algorithm used for lists.  In principle, this allows fields
 to be nested, and to be included anywhere in the docstring.  However,
-Epydoc does not make use of these features.  I will likely make some
+epydoc does not make use of these features.  I will likely make some
 minor modifications to the field parsing algorithm in the future.  In
 particular, I may remove the restriction that the blocks contained by
 a field have indentation greater than the indentation of the field
@@ -519,27 +484,293 @@ tag; and the recommendation that field lists be separated from
 paragraphs by a blank line. </p> </div>
 
 <!-- =========== INLINE MARKUP ============= -->
-<h2> Inline Markup </h2>
+<h2> 3. Inline Markup </h2>
 
-<h3> Linking </h3>
+<p> Inline markup has the form
+"<i>x</i><code>{</code>...<code>}</code>", where "<i>x</i>" is a
+single capital letter that specifies how the text between the braces
+should be rendered.  Inline markup is recognized within paragraphs and
+section headings.  It is <i>not</i> recognized within literal and
+doctest blocks.  Inline markup can contain multiple words, and can
+span multiple lines.  Inline markup may be nested. </p>
 
-<p> Two inline markup constructs can use a special syntax: L and
-U.. </p>
+<p> A matching pair of curly braces is only interpreted as inline
+markup if the left brace is immediately preceeded by a capital letter.
+So in most cases, you can use curly braces in your text without any
+form of escaping.  However, you <i>do</i> need to escape curly braces
+when: </p>
+
+<ol>
+  <li> You want to include a single (un-matched) curly brace.
+  <li> You want to preceed a matched pair of curly braces with a
+  capital letter. </li>
+</ol>
+
+<p> Note that there is no valid Python expression where a pair of
+matched curly braces is immediately preceeded by a capital letter
+(except within string literals).  In particular, you never need to
+escape braces when writing Python dictionaries.  See <a
+href="#escaping">section 3.5</a> for a discussion of escaping.  </p>
+
+<h3> 3.1. Basic Inline Markup </h3>
+
+<p> Epytext defines four types of inline markup that specify how text
+should be displayed: </p>
+
+<ul>
+  <li> <code>I{</code>...<code>}</code>: Italicized text. </li>
+  <li> <code>B{</code>...<code>}</code>: Bold-faced text. </li>
+  <li> <code>C{</code>...<code>}</code>: Source code or a Python
+  identifier. </li>
+  <li> <code>M{</code>...<code>}</code>: A mathematical
+  expression. </li>
+</ul>
+
+<p> By default, source code is rendered in a fixed width font; and
+mathematical expressions are rendered in italics.  But those defaults
+may be changed by modifying the CSS stylesheet.  The following example
+illustrates how the four basic markup types can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td>
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    I{B{Inline markup} may be nested; and
+    it may span} multiple lines.
+
+      - I{Italicized text}
+      - B{Bold-faced text}
+      - C{Source code}
+      - M{Math}
+
+    Without the capital letter, matching
+    braces are not interpreted as markup:
+    C{my_dict={1:2, 3:4}}.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <i><b>Inline markup</b> may be nested; and it may span</i>
+  multiple lines.
+  <ul>
+    <li> <i>Italicized text</i> </li> 
+    <li> <b>Bold-faced text</b> </li> 
+    <li> <code>Source code</code> </li> 
+    <li> Math: <i>m*x+b</i> </li> 
+  </ul>
+  Without the capital letter, matching
+  braces are not interpreted as markup:
+  <code>my_dict={1:2, 3:4}</code>.
+</td></tr>
+</table>
+
+<h3> 3.2. URLs </h3>
+
+<p> The inline markup construct
+"<code>U{</code><i>text</i><code>&lt;</code><i>url</i><code>&gt;}</code>"
+is used to create links to external URLs and URIs.  "<i>Text</i>" is
+the text that should be displayed for the link, and "<i>url</i>" is
+the target of the link.  If you wish to use the URL as the text for
+the link, you can simply write
+"<code>U{</code><i>url</i><code>}</code>".  Whitespace within URL
+targets is ignored.  In particular, URL targets may be split over
+multiple lines.  The following example illustrates how URLs can be
+used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td rowspan="2">
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    - U{www.python.org}
+    - U{http://www.python.org}
+    - U{The epydoc homepage&lt;http://
+      epydoc.sourceforge.net&gt;}
+    - U{The B{I{Python}} homepage
+      &lt;www.python.org&gt;}
+    - U{Edward Loper&lt;mailto:edloper@
+      gradient.cis.upenn.edu&gt;}
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <ul>
+    <li> <a href="http://www.python.org">www.python.org</a> </li>
+    <li> <a href="http://www.python.org">http://www.python.org</a> </li>
+    <li> <a href="http://epydoc.sourceforge.net">The epydoc homepage</a> </li>
+    <li> <a href="http://www.python.org">The <b><i>Python</i></b> homepage</a> </li>
+    <li> <a href="mailto:edloper@gradient.cis.upenn.edu">Edward Loper</a> </li>
+  </ul>
+</td></tr>
+</table>
+
+<h3> 3.3. Documentation Crossreference Links </h3>
+
+<p> The inline markup construct
+"<code>L{</code><i>text</i><code>&lt;</code><i>object</i><code>&gt;}</code>"
+is used to create links to the documentation for other Python objects.
+"<i>Text</i>" is the text that should be displayed for the link, and
+"<i>object</i>" is the name of the Python object that should be linked
+to.  If you wish to use the name of the Python object as the text for
+the link, you can simply write
+"<code>L{</code><i>object</i><code>}</code>".  Whitespace within
+object names is ignored.  In particular, object names may be split
+over multiple lines.  The following example illustrates how
+documentation crossreference links can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td rowspan="2">
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    - L{x_transform}
+    - L{search&lt;re.search&gt;}
+    - L{The I{x-transform} function
+      &lt;x_transform&gt;}
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <ul>
+    <li> <a href="examples/example.html#x_intercept"
+    ><code>x_transform</code></a></li>
+    <li> <a href="examples/sre.html#search"
+    ><code>search</code></a></li>
+    <li> <a href="examples/example.html#x_intercept"
+    ><code>The <i>x-transform</i> function</code></a></li>
+    </ul>
+
+</td></tr>
+</table>
+
+<p> In order to find the object that corresponds to a given name,
+epydoc checks the following locations, in order: </p>
+
+<ol>
+  <li> If the link is made from a class or method docstring, then
+  epydoc checks for a method, instance variable, or class variable
+  with the given name. </li>
+  <li> Next, epydoc looks for an object with the given name in the
+  current module. </li>
+  <li> Epydoc then tries to import the given name as a module.  If
+  the current module is contained in a package, then epydoc will also
+  try importing the given name from all packages containing the
+  current module. </li>
+  <li> Finally, epydoc tries to divide the given name into a module
+  name and an object name, and to import the object from the module.
+  If the current module is contained in a package, then epydoc will
+  also try importing the module name from all packages containing the
+  current module. </li> </ol>
+
+<p> If no object is found that corresponds with the given name, then
+epydoc issues a warning. </p>
+
+<h3> 3.4. Indexed Terms </h3>
+
+<p> Epydoc automatically creates an index of term definitions for the
+API documentation.  The inline markup construct
+"<code>X{</code>...<code>}</code>" is used to mark terms for inclusion
+in the index.  The term itself will be italicized; and a link will be
+created from the index page to the location of the term in the text.
+The following example illustrates how index terms can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td rowspan="2">
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    An X{index term} is a term that
+    should be included in the index.
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  An <a name="index-index_term"><i>index term</i> is a term that
+  should be included in the index.
+
+</td></tr><tr><td>
+
+  <table border="1" cellpadding="3" cellspacing="0" width="100%" class="grayf">
+    <tr>
+      <th colspan="2" class="grayc">Index</th></tr>
+      <tr><td width="15%">index&nbsp;term</td>
+      <td><i><a href="#index-index_term">example</a></i></tr></td>
+      <tr><td width="15%">x&nbsp;intercept</td>
+      <td><i><a href="examples/example.html#index-x_intercept">x_intercept</a></i></tr></td>
+      <tr><td width="15%">y&nbsp;intercept</td>
+      <td><i><a href="examples/example.html#index-y_intercept">x_intercept</a></i></tr></td>
+    </table>
+
+</td></tr>
+</table>
+
+<a name="escaping">
+<h3> 3.5. Escaping </h3>
+
+<p> Escaping can be used to write text that would otherwise be
+interpreted as epytext markup.  Epytext was carefully constructed to
+minimize the need for escaping; but sometimes, it is unavoidable.
+Escaped text has the form "<code>E{</code><i>code</i><code>}</code>",
+where <i>code</i> is an escape code that specifies what character
+should be produced.  If the escape code is a single character (other
+than "<code>{</code>" or "<code>}</code>"), then that character is
+produced.  For example, to begin a paragraph with a dash (which would
+normally signal a list item), write "<code>E{-}</code>".  In addition,
+two special escape codes are defined: "<code>E{lb}</code>" produces a
+left curly brace ("<code>{</code>"); and "<code>E{rb}</code>"
+produces a right curly brace ("<code>}</code>").  The following example
+illustrates how escaping can be used: </p>
+
+<table border="1" cellspacing="0" cellpadding="3" width="100%">
+  <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
+  <tr valign="top"><td rowspan="2">
+<pre>
+<code class="keyword">def</code> <code class="function">example</code>():
+    <code class="string">"""
+    This paragraph ends with two
+    colons, but does not introduce
+    a literal blockE{:}E{:}
+
+    E{-} This is not a list item.
+
+    Escapes can be used to write
+    unmatched curly braces:
+    E{rb}E{lb}
+    """</code>
+    <i>[...]</i>
+</pre>
+</td><td>
+  <p>This paragraph ends with two colons, but does not introduce
+  a literal block::</p>
+  <p>- This is not a list item.</p>
+  <p>Escapes can be used to write unmatched curly braces: }{</p>
+</td></tr>
+</table>
+
+<p> In the future, I may define escape sequences for special
+characters.  For example, "<code>E{->}</code>" could be used to
+produce a right arrow; and "<code>E{&nbsp;}</code>" could be used to
+produce a non-breaking space. </p>
 
 <!-- =========== CHARACTERS ============= -->
-<h2> Characters </h2>
+<h2> 4. Characters </h2>
 
-<h3> Valid Characters </h3>
+<h3> 4.1. Valid Characters </h3>
 
-<p> Valid characters for a formatted documentation string are space
-("\040"); newline ("\012"); and any letter, digit, or punctuation, as
-defined by the current locale.  Control characters ("\000"-"\010" and
+<p> Valid characters for an epytext docstring are space ("\040");
+newline ("\012"); and any letter, digit, or punctuation, as defined by
+the current locale.  Control characters ("\000"-"\010" and
 "\013"-"\037") are not valid content characters.  Tabs ("\011") are
 expanded to spaces, using the same algorithm used by the Python
 parser.  Carridge-return/newline pairs ("\015\012") are converted to
 newlines. </p>
 
-<h3> Content Characters </h3>
+<h3> 4.2. Content Characters </h3>
 
 <p> Characters in a docstring that are not involved in markup are
 called <i>content characters</i>.  Content characters are always
@@ -551,32 +782,48 @@ through.  For example, consider the following example: </p>
   <tr valign="top"><td>
 <pre>
 <code class="keyword">def</code> <code class="function">example</code>():
-    <code class="string">"&lt;B&gt;hi&lt;/B&gt;"</code>
-    <code class="keyword">return</code> x**2
+    <code class="string">"""
+    &lt;B&gt;test&lt;/B&gt;
+    """</code>
+    <i>[...]</i>
 </pre>
 </td><td>
-  &lt;B&gt;hi&lt;/B&gt;
+  &lt;B&gt;test&lt;/B&gt;
 </table>
 
-<p> The docstring is rendered as "&lt;B&gt;hi&lt;/B&gt;", and not
-as the word "hi" in bold face. </p>
+<p> The docstring is rendered as "&lt;B&gt;test&lt;/B&gt;", and not
+as the word "test" in bold face. </p>
 
-<h3> Spaces and Newlines </h3>
+<h3> 4.3. Spaces and Newlines </h3>
 
-<p> In general spaces and newlines within the docstring are treated as
+<p> In general, spaces and newlines within docstrings are treated as
 <i>soft spaces</i>.  In other words, sequences of spaces and newlines
 (that do not contain a blank line) are rendered as a single space, and
 words may wrapped at spaces.  However, within literal blocks and
 doctest blocks, spaces and newlines are preserved, and no
-word-wrapping occurs. </p>
+word-wrapping occurs; and within URL targets and documentation link
+targets, whitespace is ignored. </p>
 
-<table width="100%" class="navbox">
-  <tr><td align="left">
-<!-- hhmts start --> Last modified: Sat Sep 21 23:50:11 EDT 2002 <!-- hhmts end -->
-  </td><td align="right">
-<A href="http://sourceforge.net/projects/epydoc"> 
-<IMG src="http://sourceforge.net/sflogo.php?group_id=32455&type=1" 
-width="88" height="31" border="0" alt="SourceForge Logo"
-align="top"/></A>
-  </td></tr>
+<table width="100%" class="navbox" cellpadding="1" cellspacing="0">
+  <tr>
+  <td align="center" width="25%">
+    <a class="nav" href="index.html">[Epydoc]</a></td>
+  <td align="center" width="25%">
+    <a class="nav" href="http://sourceforge.net/project/showfiles.php?group_id=32455">[Download]</a></td>
+  <!-- <td align="center" width="25%">
+    <a class="nav" href="epytext.html">[Epytext]</a></td> -->
+  <td align="center" width="25%">
+    <a class="nav" href="http://www.cis.upenn.edu/~edloper/">[Author]</a></td>
+  <td align="center" width="25%">
+    <A href="http://sourceforge.net/projects/epydoc"> 
+    <IMG src="sflogo.png" 
+    width="88" height="26" border="0" alt="SourceForge"
+    align="top"/></A></td>
+    </tr>
 </table>
+
+<font size="-1">
+<!-- hhmts start --> Last modified: Mon Sep 23 04:02:04 EDT 2002 <!-- hhmts end -->
+</font>
+</body>
+</html>

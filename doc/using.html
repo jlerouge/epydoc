@@ -1,0 +1,91 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>Using Epydoc</title>
+<link rel="stylesheet" href="epydoc.css" type="text/css"/>
+</head>
+
+<body>
+<h1>Using Epydoc</h1>
+
+<h2> Basic Usage </h2>
+
+
+
+<h2> Documentation Completeness Checks </h2>
+
+<h2> Stylesheets and Help Files </h2>
+
+<h2> Usage </h2>
+
+<pre code="screen">
+    epydoc [-o DIR] [-n NAME] [-p] [--css SHEET] [-v] MODULE...
+    epydoc --check [-p] [-a] [-v] MODULE...
+    epydoc --help
+    epydoc --version
+
+    MODULE...
+        List of filenames containing modules to process.  When
+        documenting packages, the filename must include the package
+        directory (i.e., you can't run epydoc within the package
+        directory, using relative filenames).
+        
+    --help, --usage, -h, -?
+        Display this usage message.
+
+    --version, -V
+        Print the version of Epydoc.
+
+    -o DIR, --output DIR, --target DIR
+        Output directory for HTML files
+        
+    -n NAME, --name NAME
+        Package name (for HTML header/footer)
+
+    -u URL, --url URL
+        Package URL (for HTML header/footer)
+
+    --css SHEET
+        CSS stylesheet for HTML files.  If SHEET is a file, then the
+        stylesheet is copied from that file; otherwise, SHEET is taken
+        to be the name of a built-in stylesheet.  For a list of the
+        built-in stylesheets, run "epydoc --help css".
+        
+    --check
+        Perform completeness checks on the documentation
+
+    -p
+        Check private objects (those that start with _)
+
+    -a
+        Run all checks.
+
+    -v, --verbose
+        Produce verbose output
+
+    -vv, -vvv, -vvvv
+        Produce successively more verbose output
+</pre>
+
+<table width="100%" class="navbox" cellpadding="1" cellspacing="0">
+  <tr>
+  <td align="center" width="20%">
+    <a class="nav" href="index.html">[Epydoc]</a></td>
+  <td align="center" width="20%">
+    <a class="nav" href="http://sourceforge.net/project/showfiles.php?group_id=32455">[Download]</a></td>
+  <td align="center" width="20%">
+    <a class="nav" href="epytext.html">[Epytext]</a></td>
+  <td align="center" width="20%">
+    <a class="nav" href="http://www.cis.upenn.edu/~edloper/">[Author]</a></td>
+  <td align="center" width="20%">
+    <A href="http://sourceforge.net/projects/epydoc"> 
+    <IMG src="sflogo.png" 
+    width="88" height="26" border="0" alt="SourceForge"
+    align="top"/></A></td>
+    </tr>
+</table>
+
+<font size="-1">
+<!-- hhmts start --> Last modified: Mon Sep 23 06:37:30 EDT 2002 <!-- hhmts end -->
+</font>
+</body>
+</html>
