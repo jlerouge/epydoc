@@ -53,9 +53,10 @@ h2.heading         { font-size: +125%; font-style: italic;
                      font-weight: bold; }
 h3.heading         { font-size: +110%; font-style: italic;
                      font-weight: normal; }
-h1.tocheading      { text-align: center; font-size: large; }
-h2.tocheading      { font-size: large; }
-                     
+h1.tocheading      { text-align: center; font-size: large; margin: 0; }
+h2.tocheading      { font-size: large; margin: 0.5em 0 0 0; }
+
+/* Table of contents */
 p.toc              { margin: 0; padding: 0; }
 
 /* Base tree */
