@@ -28,6 +28,8 @@ produce API documentation using the following steps:
   3. Produce HTML output, using L{epydoc.html}.
      - L{epydoc.css} is used to generate the CSS stylehseet.
      - L{epydoc.help} is used to generate the help page.
+     - L{epydoc.colorize} is used to colorize doctest blocks and
+       regular expressions variable values.
 
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
@@ -49,7 +51,7 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 # Sort order
 __epydoc_sort__ = ['cli', 'gui', 'imports', 
                    'objdoc', 'epytext', 'uid',
-                   'html', 'css', 'help',
+                   'html', 'css', 'help', 'colorize',
                    'checker']
 
 # To do for release 1.1:
