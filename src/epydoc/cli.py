@@ -46,7 +46,6 @@ true, then L{cli} will issue a warning once it completes running.
 """
 __docformat__ = 'epytext en'
 
-
 ##################################################
 ## Constants
 ##################################################
@@ -406,7 +405,7 @@ def _make_docmap(modules, options):
     @param options: Options from the command-line arguments.
     @type options: C{dict}
     """
-    from epydoc.objdoc import DocMap
+    from epydoc.objdoc import DocMap, report_param_mismatches
 
     verbosity = options['verbosity']
     document_bases = 1
@@ -431,10 +430,12 @@ def _make_docmap(modules, options):
             if options['debug']: raise
             else: _internal_error()
 
+    report_param_mismatches(d)
+
     return d
 
 def _run(cmd, options):
-    from epydoc.epytext import wordwrap
+    from epydoc.markup import wordwrap
     if '|' in cmd: name = cmd.split('|')[1].strip().split(' ', 1)[0]
     else: name = cmd.strip().split(' ', 1)[0]
     if options['verbosity'] == 1:
