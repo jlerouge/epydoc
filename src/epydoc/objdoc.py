@@ -1079,7 +1079,8 @@ class ClassDoc(ObjDoc):
         try: bases = cls.__bases__
         except AttributeError: bases = []
         self._bases = [Link(base.__name__, make_uid(base)) for base in bases
-                       if type(base) in (types.ClassType, types.TypeType)]
+                       if (type(base) is types.ClassType or
+                           (isinstance(base, types.TypeType)))]
 
         # Initialize subclass list.  (Subclasses get added
         # externally with add_subclass())
@@ -1759,7 +1760,8 @@ class DocMap(UserDict.UserDict):
             try: bases = obj.__bases__
             except: bases = []
             for base in bases:
-                if type(base) not in (types.ClassType, types.TypeType):
+                if not (type(base) is types.ClassType or
+                        (isinstance(base, types.TypeType))):
                     continue
                 baseID=make_uid(base)
                 if self.data.has_key(baseID):
@@ -1785,10 +1787,11 @@ class DocMap(UserDict.UserDict):
         @rtype: C{None}
         """
         # Check that it's a good object, and if not, issue a warning.
-        if type(obj) not in (types.ModuleType, types.ClassType, types.TypeType,
+        if ((type(obj) not in (types.ModuleType, _MethodDescriptorType,
                              types.BuiltinFunctionType, types.MethodType,
                              types.BuiltinMethodType, types.FunctionType,
-                             _WrapperDescriptorType, _MethodDescriptorType):
+                             _WrapperDescriptorType, types.ClassType) and
+             not isinstance(obj, types.TypeType))):
             if sys.stderr.softspace: print >>sys.stderr
             estr = 'Error: docmap cannot add an object with type '
             estr += type(obj).__name__

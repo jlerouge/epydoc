@@ -374,10 +374,12 @@ class ObjectUID(UID):
             elif typ is _MethodType or (typ is _BuiltinMethodType and
                                         self._obj.__self__ is not None):
                 self._name = '%s.%s' % (self.cls(), self._obj.__name__)
-            elif typ is _TypeType and hasattr(self._obj, '__module__'):
+            elif (isinstance(self._obj, _TypeType) and
+                  hasattr(self._obj, '__module__')):
                 self._name = '%s.%s' % (self.module(), self._obj.__name__)
-            elif (typ is _TypeType or (typ is _BuiltinFunctionType and
-                                       self._obj.__self__ is None)):
+            elif (isinstance(self._obj, _TypeType) or
+                  (typ is _BuiltinFunctionType and
+                   self._obj.__self__ is None)):
                 module = self.module()
                 if module is None:
                     self._name = '__unknown__.%s' % self._obj.__name__
@@ -433,14 +435,15 @@ class ObjectUID(UID):
                     module = _find_builtin_obj_module(cls)
                     if module is None: self._module = None
                     else: self._module = ObjectUID(module)
-                elif typ is _TypeType and hasattr(obj, '__module__'):
+                elif (isinstance(obj, _TypeType) and
+                      hasattr(obj, '__module__')):
                     self._module = ObjectUID(import_module(obj.__module__))
                     if (self._module is not None and
                         obj not in self._module.value().__dict__.values()):
                         # The __module__ attribute lied; try finding it ourselves.
                         module = _find_builtin_obj_module(obj)
                         if module is not None: self._module = ObjectUID(module)
-                elif typ is _TypeType:
+                elif isinstance(obj, _TypeType):
                     module = _find_builtin_obj_module(obj)
                     if module is None: self._module = None
                     else: self._module = ObjectUID(module)
@@ -588,11 +591,12 @@ def make_uid(object, base_uid=None, shortname=None):
     """
     Create a globally unique identifier for the given object.
     """
-    if type(object) in (_ModuleType, _ClassType, _TypeType,
+    if (type(object) in (_ModuleType, _ClassType, 
                         _BuiltinFunctionType, _BuiltinMethodType,
                         _FunctionType, _MethodType,
                         _WrapperDescriptorType,
-                        _MethodDescriptorType):
+                        _MethodDescriptorType) or
+        isinstance(object, _TypeType)):
         # If we've already seen this object, return its UID.
         if type(object) is _MethodType: key = id(object.im_func)
         else: key = id(object)
