@@ -881,6 +881,7 @@ def _tokenize(str, warnings):
         # Paragraph tokens ending in '::' initiate literal blocks.
         if (tokens[-1].tag == Token.PARA and
             tokens[-1].contents[-2:] == '::'):
+            tokens[-1].contents = tokens[-1].contents[:-1]
             linenum = _tokenize_literal(lines, linenum, indent,
                                         tokens, warnings)
 
