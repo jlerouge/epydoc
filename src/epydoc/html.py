@@ -307,9 +307,9 @@ class HTMLFormatter:
               truncated.  The default is 600 characters.  (type=C{int})
             - C{inheritance}: How inherited objects should be displayed.
               If C{inheritance='grouped'}, then inherited objects are
-              gathered into groups; if C{inheritance='short'}, then
+              gathered into groups; if C{inheritance='listed'}, then
               inherited objects are listed in a short list at the
-              end of their group; if C{inheritance='long'}, then
+              end of their group; if C{inheritance='included'}, then
               inherited objects are mixed in with non-inherited
               objects.  The default is 'grouped'.  (type=C{string})
         """
@@ -1413,13 +1413,13 @@ class HTMLFormatter:
             # Add the lines for each func
             for link in group:
                 groupstr += self._func_summary_line(link, cls)
-            if self._inheritance == 'short' and cls is not None:
+            if self._inheritance == 'listed' and cls is not None:
                 groupstr += self._inheritance_list(group, cls.uid())
 
         str = self._table_header(heading, 'summary')
         for link in functions:
             str += self._func_summary_line(link, cls)
-        if self._inheritance == 'short' and cls is not None:
+        if self._inheritance == 'listed' and cls is not None:
             str += self._inheritance_list(functions, cls.uid())
         return str + groupstr + '</table><br />\n\n'
 
@@ -1434,7 +1434,7 @@ class HTMLFormatter:
             try: container = func.module()
             except TypeError: container = None
 
-        if inherit and self._inheritance == 'short': return ''
+        if inherit and self._inheritance == 'listed': return ''
 
         # If we don't have documentation for the function, then we
         # can't say anything about it.
@@ -1702,13 +1702,13 @@ class HTMLFormatter:
             # Add the lines for each func
             for property in group:
                 groupstr += self._property_summary_line(property, container)
-                if self._inheritance == 'short':
+                if self._inheritance == 'listed':
                     groupstr += self._inheritance_list(group, container)
 
         str = self._table_header(heading, 'summary')
         for property in properties:
             str += self._property_summary_line(property, container)
-        if self._inheritance == 'short':
+        if self._inheritance == 'listed':
             str += self._inheritance_list(properties, container)
         return str + groupstr + '</table><br />\n\n'
 
@@ -1717,7 +1717,7 @@ class HTMLFormatter:
         pname = link.name()
         
         inherit = (container.is_class() and container != prop.cls())
-        if inherit and self._inheritance == 'short': return ''
+        if inherit and self._inheritance == 'listed': return ''
         
         # If we don't have documentation for the properties, then we
         # can't say anything about it.
@@ -1829,19 +1829,19 @@ class HTMLFormatter:
             # Add the lines for each func
             for var in group:
                 groupstr += self._var_summary_line(var, container)
-            if self._inheritance == 'short' and container.is_class():
+            if self._inheritance == 'listed' and container.is_class():
                 groupstr += self._inheritance_list(group, container)
 
         str = self._table_header(heading, 'summary')
         for var in variables:
             str += self._var_summary_line(var, container)
-        if self._inheritance == 'short' and container.is_class():
+        if self._inheritance == 'listed' and container.is_class():
             str += self._inheritance_list(variables, container)
         return str + groupstr + '</table><br />\n\n'
 
     def _var_summary_line(self, var, container):
         inherit = (container.is_class() and container != var.uid().cls())
-        if inherit and self._inheritance == 'short': return ''
+        if inherit and self._inheritance == 'listed': return ''
             
         vname = var.name()
         if var.type():
@@ -1866,9 +1866,8 @@ class HTMLFormatter:
             str += self._uid_to_href(var.uid(), vname)
         str += '</b>\n  ' + vsum 
         if (self._inheritance != 'grouped' and inherit):
-            cls = var.uid().cls()
             str += ('    <i>(Inherited from %s)</i>\n' %
-                    self._uid_to_href(cls, cls.shortname()))
+                    self._uid_to_href(container, container.shortname()))
         return str + '</td></tr>\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
@@ -2962,11 +2961,11 @@ class HTMLFormatter:
             Only the objects linked to from one of the links in
             C{links} are considered.  The HTML lists the objects in
             one row of a table, grouped by ancestor.
-        @type C{links}: C{list} of L{Link}
-        @param C{links}: The set of member objects of C{cls}
+        @type links: C{list} of L{Link}
+        @param links: The set of member objects of C{cls}
             that should be listed by ancestor.
-        @type C{cls}: L{UID}
-        @param C{cls}: The UID of the class whose inherited objects
+        @type cls: L{UID}
+        @param cls: The UID of the class whose inherited objects
             should be listed.
         """
         # Group the objects by defining class
@@ -2975,6 +2974,7 @@ class HTMLFormatter:
             if isinstance(link, Link): key = link.target().cls()
             else: key = link.uid().cls()
             if key == cls: continue
+            if key is None: continue
             if not inh_dict.has_key(key): inh_dict[key] = []
             inh_dict[key].append(link)
 
