@@ -1,0 +1,165 @@
+.\"
+.\" Epydoc graphical interface man page.
+.\" $Id$
+.\"
+.TH EPYDOCGUI 1 
+.SH NAME
+epydocgui \- graphical interface to epydoc
+.\" ================== SYNOPSIS ====================
+.SH SYNOPSIS
+.HP 10
+.B epydocgui
+.RI [ project.prj " | " modules ...]
+.\" ================== DESCRIPTION ====================
+.SH DESCRIPTION
+.B epydocgui
+is a graphical interface to epydoc, which generates API documentation
+for Python modules and packages, based on their docstrings.  A
+lightweight markup language called
+.B epytext
+can be used to format docstrings, and to add information about
+specific fields, such as parameters and instance variables.
+.PP
+The API documentation produced by 
+.B epydocgui
+consists of a set of HTML files.  Two subdirectories are created for
+the public and private documentation.  Within each subdirectories,
+every class and module is documented in its own file.  An index file,
+a trees file, and a help file are also created.  If you select the
+.B frames
+option, then a frames\-based table of contents is also produced.
+.PP
+This program will launch a GUI to get the modules to document. It can
+be given an initial list of modules on the command lines, and project
+files. Project files are saved from within the GUI.
+.\" ================== OPTIONS ====================
+.SH OPTIONS
+.TP
+.I project.prj
+The name of a project file that was saved with
+.BR epydocgui .
+.TP
+.IR modules ...
+The list of the modules that should be documented.  Modules may be
+specified using either filenames (such as
+.BR epydoc/epytext.py )
+or module names (such as
+.BR os.path ).
+The filename for a package is its
+.B __init__.py
+file.
+.\" ================== HTML FILES ====================
+.\" (this was copied from epydoc.1)
+.SH HTML FILES
+The API documentation produced by 
+.B epydocgui
+consists of the following files:
+.RS 4
+.TP
+.IB module .html
+The API documentation for a module.  
+.I module
+is the complete dotted name of the module, such as 
+.B sys
+or
+.BR epydoc.epytext .
+.TP
+.IB class .html
+The API documentation for a class, exception, or type.
+.I class
+is the complete dotted name of the class, such as
+.B epydoc.epytext.Token
+or
+.BR array.ArrayType .
+.TP
+.B epydoc\-trees.html
+The module and class hierarchies for the project.
+.TP
+.B epydoc\-index.html
+The term index and identifier index for the project.
+.TP
+.B epydoc\-help.html
+The help page for the project.  This page explains how to use and
+navigate the webpage produced by epydoc.
+.TP
+.B epydoc\-frames.html
+The frames index file.  This file defines three frames: two frames on
+the left side of the window contain a table of contents, and the main
+frame on the right side of the window contains documentation pages.
+.B epydoc\-frames.html
+is only generated if the
+.B \-f
+option is used to create a frames\-based table of contents.
+.TP
+.B epydoc\-toc.html
+The top\-level table of contents page.  This page is displayed in the
+upper\-left frame of
+.BR epydoc\-frames.html ,
+and provides links to
+.B epydoc\-project\-toc.html
+and the
+.IB module \-mtoc.html
+files.
+.B epydoc\-toc.html
+is only generated if the
+.B \-f
+option is used to create a frames\-based table of contents.
+.TP
+.B epydoc\-project\-toc.html
+The table of contents for the entire project.  This page is displayed
+in the lower\-left frame of
+.BR epydoc\-frames.html ,
+and provides links to every class, type, exception, function, and
+variable defined by the project.
+.B epydoc\-project\-toc.html
+is only generated if the
+.B \-f
+option is used to create a frames\-based table of contents.
+.TP
+.IB module \-mtoc.html
+The table of contents for a module.  This page is displayed in the
+lower\-left frame of
+.BR epydoc\-frames.html ,
+and provides links to every class, type, exception, function, and
+variable defined by the module.
+.I module
+is the complete dotted name of the module, such as 
+.B sys
+or
+.BR epydoc.epytext .
+.IB module \-mtoc.html
+is only generated if the
+.B \-f
+option is used to create a frames\-based table of contents.
+.TP
+.B epydoc.css
+The CSS stylesheet used to display all HTML pages.
+.RE
+.PP
+By default,
+.B epydoc
+creates two subdirectories in the output directory:
+.B public
+and
+.BR private .
+Each directory contains all of the files specified above.
+But if you select the
+.B no private
+option, then no subdirectories are created, and the public
+documentation is written directly to the output directory.
+.\" ================== AUTHOR ====================
+.SH AUTHOR
+Epydoc was written by Edward Loper.  This man page was originally
+written by Moshe Zadka, and is currently maintained by Edward Loper.
+.\" ================== BUGS ====================
+.SH BUGS
+Report bugs to <edloper@gradient.cis.upenn.edu>.
+.\" ================== SEE ALSO ====================
+.SH SEE ALSO
+.BR epydoc (1)
+.TP
+.B The epydoc webpage
+<http://epydoc.sourceforge.net>
+.TP
+.B The epytext markup language manual
+<http://epydoc.sourceforge.net/epytext.html>
