@@ -81,16 +81,16 @@ examples: .examples.up2date
 
 #//////////////////////////////////////////////////////////////////////
 # Build documentation for the Python Standard Library
-LNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
-LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
+SLNAME = '<font size="-2">Python&nbsp;2.1<br>Standard&nbsp;Library</font>'
+SLURL = 'http://www.python.org/doc/current/lib/lib.html'
+SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 	      |grep -v '/lib-old/' \
 	      |grep -v '/site-packages/')
 stdlib:
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
 	epydoc -o ${STDLIB} -f -vvvv -q -c white --show-imports \
-	       -n ${LNAME} -u http://www.python.org \
-	       --builtins ${LIBS}
+	       -n ${SLNAME} -u ${SLURL} --builtins ${SLFILES}
 
 ##//////////////////////////////////////////////////////////////////////
 ## Build documentation for everything installed on this system.
