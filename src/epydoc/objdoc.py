@@ -706,7 +706,7 @@ class ObjDoc:
                     print >>stream, '       '+warning
                 else:
                     estr =' Warning: %s' % warning
-                    estr = epytext.wordwrap(estr, 7, 75-7).strip()
+                    estr = epytext.wordwrap(estr, 7, startindex=7).strip()
                     print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
             print >>stream
         
