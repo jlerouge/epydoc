@@ -796,7 +796,12 @@ def _find_builtin_obj_module(obj, show_warnings=1):
                                  ' appears in multiple .py modules')
         module = py_modules[0]
     else:
-        if show_warnings:
+        # Hack: don't issue a warning for <type 'method_descriptor'>
+        # or <type 'wrapper_descriptor'>.  (Can't have epydoc
+        # issuing warnings when run on itself. ;-) )
+        if obj in (_WrapperDescriptorType, _MethodDescriptorType):
+            pass
+        elif show_warnings:
             if sys.stderr.softspace: print >>sys.stderr
             print >>sys.stderr, ('Warning: could not find a '+
                                  'module for %r' % obj)
