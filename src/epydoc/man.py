@@ -25,7 +25,6 @@ import sys, xml.dom.minidom
 
 # epydoc imports
 import epydoc
-import epydoc.epytext as epytext
 from epydoc.uid import UID, Link, findUID, make_uid
 from epydoc.imports import import_module
 from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
@@ -109,12 +108,8 @@ class ManFormatter:
             foverrides = fdoc.overrides()
 
             # Try to find a documented ancestor.
-            inhdoc = fdoc
-            inherit_docs = 0
-            while (not inhdoc.documented() and inhdoc.matches_override() and
-                   self._docmap.has_key(inhdoc.overrides())):
-                inherit_docs = 1
-                inhdoc = self._docmap[inhdoc.overrides()]
+            inhdoc = self._docmap.documented_ancestor(func) or fdoc
+            inherit_docs = (inhdoc is not fdoc)
 
             numfuncs += 1
             str += '    %s\n' % self._func_signature(self._bold(fname), fdoc)
@@ -135,7 +130,7 @@ class ManFormatter:
 
             # Description
             if fdescr:
-                fdescr_str = epytext.to_plaintext(fdescr, 8)
+                fdescr_str = fdescr.to_plaintext(None, indent=8)
                 if fdescr_str.strip(): str += fdescr_str
 
             # Parameters
@@ -145,20 +140,20 @@ class ManFormatter:
                     pname = param.name()
                     str += '            ' + pname
                     if param.descr():
-                        pdescr = epytext.to_plaintext(param.descr(), 12)
+                        pdescr = param.descr().to_plaintext(None, indent=12)
                         str += ' - %s' % pdescr.strip()
                     str += '\n'
                     if param.type():
-                        ptype = epytext.to_plaintext(param.type(), 16)
+                        ptype = param.type().to_plaintext(none, indent=16)
                         str += ' '*16+'(type=%s)\n' % ptype.strip()
 
             # Returns
             if freturn.descr():
-                fdescr = epytext.to_plaintext(freturn.descr(), 12)
+                fdescr = freturn.descr().to_plaintext(None, indent=12)
                 str += '        Returns:\n%s' % fdescr
                     
             if freturn.type():
-                ftype = epytext.to_plaintext(freturn.type(), 12)
+                ftype = freturn.type().to_plaintext(None, indent=12)
                 str += ("        Return Type: %s" % ftype.lstrip())
 
             ## Raises
@@ -246,10 +241,8 @@ class ManFormatter:
 
     def _descr(self, uid, doc):
         if not doc.descr(): return ''
-        descr = epytext.to_plaintext(doc.descr(), 4)
+        descr = doc.descr().to_plaintext(None, indent=4)
         return '%s%s' % (self._title('DESCRIPTION'), descr)
-
-
 
 if __name__ == '__main__':
     docmap = DocMap(document_bases=1)
