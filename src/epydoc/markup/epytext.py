@@ -10,7 +10,7 @@
 Parser for epytext strings.  Epytext is a lightweight markup whose
 primary intended application is Python documentation strings.  This
 parser converts Epytext strings to a XML/DOM representation.  Epytext
-strings can contain the following structural blocks:
+strings can contain the following X{structural blocks}:
 
     - X{epytext}: The top-level element of the DOM tree.
     - X{para}: A paragraph of text.  Paragraphs contain no newlines, 
@@ -32,7 +32,7 @@ strings can contain the following structural blocks:
     - X{li}: A list item.  This tag is used both for unordered list
       items and for ordered list items.
 
-Additionally, the following 'colorizing' regions may be used within
+Additionally, the following X{inline regions} may be used within
 C{para} blocks:
     
     - X{code}:   Source code and identifiers.
@@ -75,11 +75,13 @@ Description::
 
    <!ELEMENT code   (#PCDATA | %colorized;)*>
    <!ELEMENT math   (#PCDATA | %colorized;)*>
-   <!ELEMENT index  (#PCDATA | %colorized;)*>
    <!ELEMENT italic (#PCDATA | %colorized;)*>
    <!ELEMENT bold   (#PCDATA | %colorized;)*>
-   <!ELEMENT uri    (#PCDATA | %colorized;)*>
-   <!ELEMENT link   (#PCDATA | %colorized;)*>
+
+   <!-- Need to fix these: -->
+   <!ELEMENT uri    (???)*>
+   <!ELEMENT link   (#PCDATA)*>
+   <!ELEMENT index  (#PCDATA)*>
 
 This package also contains a number of formatters, which can be used
 to convert the XML/DOM representations of Epytext strings to HTML,
@@ -103,7 +105,7 @@ Supported features:
 #   4. helpers
 #   5. testing
 
-import re
+import re, epydoc.uid
 from xml.dom.minidom import Element, Text
 
 ##################################################
@@ -889,7 +891,7 @@ def _tokenize(str, warnings):
 
 
 ##################################################
-## Colorizing
+## Inline markup ("colorizing")
 ##################################################
 
 def _colorize(token, errors, warnings=None):
@@ -921,21 +923,13 @@ def _colorize(token, errors, warnings=None):
 
 # Assorted regular expressions used for colorizing.
 _BRACE_RE = re.compile('{|}')
-_DASH_RE = re.compile(r'\s-(\s|$)')
     
 def _colorize_brace(token, errors, warnings):
 
     str = token.contents
     linenum = 0
-    
-    # Initial check for warnings/errors
     if warnings == None: warnings = []
-    if _DASH_RE.search(str):
-        pass
-    #estr = "'-' might get word-wrapped to the beginning of a line."
-    #index = _DASH_RE.search(str).start()+1
-    #warnings.append(ColorizingError(estr, token, index))
-
+    
     # Maintain a stack of DOM elements, containing the ancestors of
     # the text currently being analyzed.  New elements are pushed when 
     # "{" is encountered, and old elements are popped when "}" is
@@ -947,7 +941,10 @@ def _colorize_brace(token, errors, warnings):
     # open brace.
     openbrace_stack = [0]
 
-    # Process the string, scanning for '{' and '}'s.  start is the 
+    # Process the string, scanning for '{' and '}'s.  start is the
+    # index of the first unprocessed character.  Each time through the
+    # loop, we process the text from the first unprocessed character
+    # to the next open or close brace.
     start = 0
     while 1:
         match = _BRACE_RE.search(str, start)
@@ -1073,13 +1070,16 @@ def to_html(tree, indent=0, seclevel=0, **kwargs):
             not isinstance(tree.childNodes[-1], Text) and
             tree.childNodes[-1].tagName == 'para'):
             children[-1] = children[-1][5+indent:-5]
-            
+          
     childstr = ''.join(children)
 
     if tree.tagName == 'para':
-        return _wordwrap('<p>' + childstr + '</p>', indent)
-    elif tree.tagName in ('code', 'uri', 'link'):
+        return wordwrap('<p>' + childstr + '</p>', indent)
+    elif tree.tagName in ('code', 'uri'):
         return '<code>' + childstr + '</code>'
+    elif tree.tagName == 'link':
+        return '<code>' + childstr + '</code>'
+        #return ('<code>'+childstr+'='+`epydoc.uid.getUID(childstr)`+'</code>')
     elif tree.tagName in ('italic', 'math'):
         return '<i>' + childstr + '</i>'
     elif tree.tagName == 'index':
@@ -1132,7 +1132,7 @@ def to_plaintext(tree, indent=0, seclevel=0):
     childstr = ''.join(children)
 
     if tree.tagName == 'para':
-        return _wordwrap(childstr, indent)+'\n'
+        return wordwrap(childstr, indent)+'\n'
     elif tree.tagName == 'li':
         # We should be able to use getAttribute here; but there's no
         # convenient way to test if an element has an attribute..
@@ -1169,7 +1169,7 @@ def to_debug(tree, indent=4, seclevel=0):
     childstr = ''.join(children)
 
     if tree.tagName == 'para':
-        lines = ['     |'+l for l in _wordwrap(childstr, indent-6).split('\n')]
+        lines = ['     |'+l for l in wordwrap(childstr, indent-6).split('\n')]
         return '\n'.join(lines)+'\n'
     elif tree.tagName == 'li':
         bulletAttr = tree.getAttributeNode('bullet')
@@ -1207,7 +1207,7 @@ def to_debug(tree, indent=4, seclevel=0):
 ## Helper Functions
 ##################################################
 
-def _wordwrap(in_str, indent=0, right=SCRWIDTH):
+def wordwrap(in_str, indent=0, right=SCRWIDTH):
     """Word-wrap the given string.  Indent the text C{indent} spaces
     on the left, and assume a right margin of C{right}.  C{in_str}
     should not contain any newlines."""
@@ -1478,7 +1478,7 @@ class TokenizationError(ParseError):
     
     def _repr(self, typ):
         return (typ+' on line ' + `self.linenum` +
-                ' during tokenization:\n'+_wordwrap(self.descr, 2) +
+                ' during tokenization:\n'+wordwrap(self.descr, 2) +
                 '  ' + `self.line`)
 
 class StructuringError(ParseError):
@@ -1499,7 +1499,7 @@ class StructuringError(ParseError):
         # entire paragraph!!
         return(typ+' on the ' + self.token.tag + ' at line '
                + `self.linenum` + ' during structuring:\n' +
-               _wordwrap(self.descr, 2)[:-1])
+               wordwrap(self.descr, 2)[:-1])
 
 class ColorizingError(ParseError):
     """
@@ -1530,7 +1530,7 @@ class ColorizingError(ParseError):
         
         return(typ+' colorizing the ' + self.token.tag +
                ' at line ' + `self.linenum` + ':\n' +
-               _wordwrap(self.descr, 2) + '  ' +
+               wordwrap(self.descr, 2) + '  ' +
                left+right + '\n  '+ (' '*len(left)) +'^')
 
 
