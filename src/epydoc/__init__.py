@@ -21,12 +21,13 @@ produce API documentation using the following steps:
 
   1. Import the requested modules, using L{epydoc.imports}.
   2. Construct documentation for each object, using L{epydoc.objdoc}.
-     L{epydoc.uid} is used to create unique identifiers for each
-     object, and L{epydoc.epytext} is used to parse the objects'
-     docstrings. 
-  3. Produce HTML output, using L{epydoc.html}.  L{epydoc.css} and
-     L{epydoc.help} are used to generate the CSS stylesheet and the
-     help file.
+     - L{epydoc.uid} is used to create unique identifiers for each
+       object.
+     - L{epydoc.epytext} is used to parse the objects' documentation
+       strings.
+  3. Produce HTML output, using L{epydoc.html}.
+     - L{epydoc.css} is used to generate the CSS stylehseet.
+     - L{epydoc.help} is used to generate the help page.
 
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
@@ -51,7 +52,7 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
                    'html', 'css', 'help',
                    'checker']
 
-# To do:
+# To do for release 1.1:
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - turn off function doc inheritance?
@@ -60,6 +61,10 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 #   - add option: don't include vars and cvars that have no descr?
 #   - use __all__ when determining whether a name is private???
 #     - change _is_private to only take uids?  or var+uid?
+#   - update docs
+
+# To do after release 1.1:
+#   - ...
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
