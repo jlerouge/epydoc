@@ -15,6 +15,8 @@
 Automatic Python reference documentation generator.  Epydoc processes
 Python modules and docstrings to generate formatted documentation, in
 the form of HTML pages.
+
+@author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
 
 __version__ = 0.2
