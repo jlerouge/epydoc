@@ -35,7 +35,7 @@ Usage::
      -h TOPIC, --help TOPIC    Display information about TOPIC (docformat,
                                css, inheritance, usage, or version).
 
- See the epytext(1) man page for a complete list of options.
+ See the epydoc(1) man page for a complete list of options.
 
 @var PROFILE: Whether or not to run the profiler.
 @var TESTS: The lists of tests that can be run with
