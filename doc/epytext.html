@@ -347,19 +347,18 @@ tags. </p>
 
 <p> Fields can contain paragraphs, lists, literal blocks, and doctest
 blocks.  All of the blocks contained by a field must all have equal
-indentation, and that indentation must be greater than the indentation
-of the field's tag.  If the first contained block is a paragraph, it
-may appear on the same line as the field tag, separated from the field
-tag by one or more spaces.  All other block types must follow on
-separate lines. </p>
+indentation, and that indentation must be greater than or equal to the
+indentation of the field's tag.  If the first contained block is a
+paragraph, it may appear on the same line as the field tag, separated
+from the field tag by one or more spaces.  All other block types must
+follow on separate lines. </p>
 
-<p> Fields should be placed at the end of the docstring, after the
+<p> Fields must be placed at the end of the docstring, after the
 description of the object.  Fields may be included in any order. </p>
 
-<p> Any line that begins with a field tag followed by a space or
-newline is considered a field.  Therefore, fields do not need to be
-separated by blank lines.  However, if a field follows a paragraph, it
-is recommended that you separate it by a blank line. </p>
+<p> Fields do not need to be separated from other blocks by a blank
+line.  Any line that begins with a field tag followed by a space or
+newline is considered a field. </p>
 
 <p> The following example illustrates how lists can be
 used: </p>
@@ -445,47 +444,64 @@ used: </p>
   <code>@<b>version</b>:</code>&nbsp;... </th><td> The version of a
   module, class, function, or method. </td></tr>
   
-  <tr><th width="10%" align="left"> <code>@<b>see</b>:</code>&nbsp;... </th><td> A
-  description of a related topic.  <code>see</code> fields typically
-  use documentation crossreference links or external hyperlinks to
-  link to the related topic. </td></tr>
+  <tr><th width="10%" align="left"> <code>@<b>see</b>:</code>&nbsp;... </th><td>
+    A description of a related topic.  <code>see</code> fields
+    typically use documentation crossreference links or external
+    hyperlinks to link to the related topic. </td></tr>
+
+  <tr><th width="10%" align="left"> <code>@<b>requires</b>:</code>&nbsp;... </th><td> 
+    A requirement for using a module, class, function, or method.
+    Multiple <code>requires</code> fields may be used if an object has
+    multiple requirements.</td></tr>
+    
+  <tr><th width="10%" align="left"> <code>@<b>warning</b>:</code>&nbsp;... </th><td> 
+    A warning about a module, class, function, or method.  Multiple
+    <code>warning</code> fields may be used to report separate
+    warnings.</td></tr>
 
 </table>
 
 <p> Several fields have "synonyms," or alternate field names: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="100%">
+  
   <tr><th width="10%" align="left"> <b><code>@param&nbsp;<i>p</i>:</code>&nbsp;...</b> </th>
   <td><code>@parameter&nbsp;<i>p</i>:</code>&nbsp;...</td>
   <td><code>@arg&nbsp;<i>p</i>:</code>&nbsp;...</td>
   <td><code>@argument&nbsp;<i>p</i>:</code>&nbsp;...</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@return:</code>&nbsp;...</b> </th><td>
   <code>@returns:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@ivar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
   <code>@ivariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@cvar&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
   <code>@cvariable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@var&nbsp;<i>v</i>:</code>&nbsp;...</b> </th><td>
   <code>@variable&nbsp;<i>v</i>:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@rtype:</code>&nbsp;...</b> </th><td>
   <code>@returntype:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@raise&nbsp;<i>e</i>:</code>&nbsp;...</b> </th>
   <td><code>@raises&nbsp;<i>e</i>:</code>&nbsp;...</td>
   <td><code>@except&nbsp;<i>e</i>:</code>&nbsp;...</td>
   <td><code>@exception&nbsp;<i>e</i>:</code>&nbsp;...</td></tr>
+  
   <tr><th width="10%" align="left"> <b><code>@see:</code>&nbsp;...</b> </th><td>
   <code>@seealso:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
-</table>
 
-<div class="box"> <p> <b>Note</b>: Currently, fields are parsed using
-the same algorithm used for lists.  In principle, this allows fields
-to be nested, and to be included anywhere in the docstring.  However,
-epydoc does not make use of these features.  I will likely make some
-minor modifications to the field parsing algorithm in the future.  In
-particular, I may remove the restriction that the blocks contained by
-a field have indentation greater than the indentation of the field
-tag; and the recommendation that field lists be separated from
-paragraphs by a blank line. </p> </div>
+  <tr><th width="10%" align="left"> <b><code>@requires:</code>&nbsp;...</b> </th><td>
+  <code>@require:</code>&nbsp;... </td>
+  <td><code>@requirement:</code>&nbsp;... </td><td>&nbsp;</td></tr>
+  
+  <tr><th width="10%" align="left"> <b><code>@warning:</code>&nbsp;...</b> </th><td>
+  <code>@warn:</code>&nbsp;... </td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  
+  
+</table>
 
 <!-- =========== INLINE MARKUP ============= -->
 <a name="inline"/>
@@ -763,8 +779,8 @@ illustrates how escaping can be used: </p>
 
 <p> In the future, I may define escape sequences for special
 characters.  For example, "<code>E{->}</code>" could be used to
-produce a right arrow; and "<code>E{&nbsp;}</code>" could be used to
-produce a non-breaking space. </p>
+produce a right arrow (&rarr;); and "<code>E{&nbsp;}</code>" could be
+used to produce a non-breaking space. </p>
 
 <!-- =========== CHARACTERS ============= -->
 <a name="characters"/>
@@ -838,7 +854,7 @@ targets, whitespace is ignored. </p>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Mon Oct  7 04:17:27 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Sat Oct 19 02:08:51 EDT 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
