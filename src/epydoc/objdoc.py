@@ -491,22 +491,22 @@ class ObjDoc:
             self._misc_warnings.append(estr)
         
         # Initialize fields.  Add any extra fields.
-        self._fields = self.FIELDS[:]
+        self._fieldtypes = self.FIELDS[:]
         if module is not None:
             try: extra_fields = module.value().__extra_epydoc_fields__
             except: extra_fields = []
             for field in extra_fields:
                 try:
                     if type(field) == type(''):
-                        self._fields.append(DocField(field.lower(), field))
+                        self._fieldtypes.append(DocField(field.lower(), field))
                     else:
-                        self._fields.append(DocField(*field))
+                        self._fieldtypes.append(DocField(*field))
                 except:
                     estr = 'Bad extra epydoc field: %r' % field
                     misc_warnings.append(estr)
 
-        # Initialize the fields map.  This is where field values are
-        # actually kept.
+        # Initialize the fields map.  This is where the actualy field
+        # bodies are stored.
         self._fields_map = {}
 
         # Look up __docformat__
@@ -537,6 +537,10 @@ class ObjDoc:
             self.__parse_docstring(docstring)
         else:
             self._documented = 0
+    
+        # Sort the fields in the order specified by _fieldtypes.
+        self._fields = [f for f in self._fieldtypes
+                        if self._fields_map.has_key(f)]
     
     #////////////////////////////
     #// Accessors
@@ -583,8 +587,7 @@ class ObjDoc:
             appear in the docstring.
         @rtype: C{list} of L{DocField}
         """
-        # Sort by self._fields:
-        return [f for f in self._fields if self._fields_map.has_key(f)]
+        return self._fields
 
     def field_values(self, field):
         """
@@ -652,7 +655,7 @@ class ObjDoc:
         if tag in ('deffield', 'newfield'):
             try:
                 field = _descr_to_docfield(arg, descr)
-                self._fields.append(field)
+                self._fieldtypes.append(field)
             except ValueError:
                 warnings.append('Bad %s' % tag)
             return
@@ -678,7 +681,7 @@ class ObjDoc:
             self._summary = descr
             return
                 
-        for field in self._fields:
+        for field in self._fieldtypes:
             if tag not in field.tags: continue
             
             # Special handling for @todo <version>: ...
@@ -686,7 +689,7 @@ class ObjDoc:
                 field = DocField(['todo:%s' % arg],
                                  'To Do for Version %s' % arg)
                 if not self._fields_map.has_key(field):
-                    self._fields.append(field)
+                    self._fieldtypes.append(field)
                 arg = None
                     
             # Create the field, if it doesn't exist yet.
@@ -1006,6 +1009,8 @@ class ModuleDoc(ObjDoc):
                 else:
                     estr = 'Empty group %r deleted' % name
                     self._field_warnings.append(estr)
+        del self._tmp_groups
+        del self._tmp_group_order
 
     #////////////////////////////
     #// Import Discovery
@@ -1041,6 +1046,9 @@ class ModuleDoc(ObjDoc):
         C{try}/C{except} block, or directly modifies their modules'
         C{__dict__}, then we'll be fooled.
         """
+        # Don't bother if there aren't any variables, anyway.
+        if len(self._variables) == 0: return
+        
         # Get the filename of the module.
         try: filename = self._uid.value().__file__
         except: return # E.g., a builtin module.
@@ -1067,10 +1075,10 @@ class ModuleDoc(ObjDoc):
         # Go through our list of variables.  Move any variables that
         # were *not* defined by a top-level statement to the
         # imported_variables list.
-        for i in range(len(self._variables)-1,-1,-1):
-            if not defined_variables.has_key(self._variables[i].name()):
-                self._imported_variables.append(self._variables[i])
-                del self._variables[i]
+        self._imported_variables = [v for v in self._variables
+                                    if not defined_variables.has_key(v.name())]
+        self._variables = [v for v in self._variables
+                           if defined_variables.has_key(v.name())]
 
     def _find_defined_vars(self, lhs_testlist, defined_variables):
         """
@@ -1421,6 +1429,7 @@ class ClassDoc(ObjDoc):
                 estr = '@type for unknown variable %s' % key
                 self._field_warnings.append(estr)
         del self._tmp_ivar
+        del self._tmp_cvar
         del self._tmp_type
 
         # Add links to base classes.
@@ -1550,6 +1559,8 @@ class ClassDoc(ObjDoc):
                 else:
                     estr = 'Empty group %r deleted' % name
                     self._field_warnings.append(estr)
+        del self._tmp_groups
+        del self._tmp_group_order
 
     #////////////////////////////
     #// Accessors
