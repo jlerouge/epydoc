@@ -368,21 +368,32 @@ class ObjDoc:
         - X{authors}: A list of the object's authors
         - X{version}: The object's version
         - X{seealsos}: A list of the object's see-also links
+        - X{requires}: Requirements for using the object
+        - X{warnings}: Warnings about the object
         - X{sortorder}: The object's sort order, as defined by its
           C{__epydoc_sort__} variable.
 
     @ivar _uid: The object's unique identifier
     @type _uid: L{UID}
-    
     @ivar _descr: The object's description, encoded as epytext.
     @type _descr: L{xml.dom.minidom.Document}
-
     @ivar _authors: Author(s) of the object
     @type _authors: C{list} of L{xml.dom.minidom.Element}
     @ivar _version: Version of the object
     @type _version: L{xml.dom.minidom.Element}
     @ivar _seealsos: See also entries
     @type _seealsos: C{list} of L{xml.dom.minidom.Element}
+    @ivar _requires: Requirements of the object
+    @type _requires: C{list} of L{xml.dom.minidom.Element}
+    @ivar _warnings: Warnings about the object
+    @type _warnings: C{list} of L{xml.dom.minidom.Element}
+
+    @ivar _parse_warnings: Warnings generated when parsing the
+        object's docstring.
+    @ivar _parse_errors: Errors generated when parsing the object's
+        docstring.
+    @ivar _field_warnings: Warnings generated when processing the
+        object's docstring's fields.
     """
     def __init__(self, obj, verbosity=0):
         """
@@ -403,6 +414,10 @@ class ObjDoc:
         self._version = None
         self._seealsos = []
         self._descr = None
+        self._requires = []
+        self._warnings = []
+
+        # Initialize errors/warnings, and remember verbosity.
         self.__verbosity = verbosity
         self._parse_errors = []
         self._parse_warnings = []
@@ -431,7 +446,7 @@ class ObjDoc:
     def documented(self):
         """
         @return: True if the object documented by this C{ObjDoc} has a
-            docstring.
+        docstring.
         @rtype: C{boolean}
         """
         return self._documented
@@ -446,34 +461,50 @@ class ObjDoc:
     def descr(self):
         """
         @return: A description of the object documented by this
-            C{ObjDoc}.
-        @returntype: L{xml.dom.minidom.Document}
+        C{ObjDoc}.
+        @rtype: L{xml.dom.minidom.Document}
         """
         return self._descr
     
     def authors(self):
         """
         @return: A list of the authors of the object documented by
-            this C{ObjDoc}.
-        @returntype: C{list} of L{xml.dom.minidom.Element}
+        this C{ObjDoc}.
+        @rtype: C{list} of L{xml.dom.minidom.Element}
         """
         return self._authors
     
     def version(self):
         """
         @return: The version of the object documented by this
-            C{ObjDoc}.
-        @returntype: L{xml.dom.minidom.Element}
+        C{ObjDoc}.
+        @rtype: L{xml.dom.minidom.Element}
         """
         return self._version
     
     def seealsos(self):
         """
-        @return: A list of objects related to the object documented by 
-            this C{ObjDoc}.
-        @returntype: C{list} of L{xml.dom.minidom.Element}
+        @return: A list of descriptions of resources that are related
+        to the object documented by this C{ObjDoc}.
+        @rtype: C{list} of L{xml.dom.minidom.Element}
         """
         return self._seealsos
+
+    def requires(self):
+        """
+        @return: A list of requirements for using the object
+        documented by this C{ObjDoc}.
+        @rtype: C{list} of L{xml.dom.minidom.Element}
+        """
+        return self._requires
+
+    def warnings(self):
+        """
+        @return: A list of warnings about the object documented by
+        this C{ObjDoc}.
+        @rtype: C{list} of L{xml.dom.minidom.Element}
+        """
+        return self._warnings
 
     def sortorder(self):
         """
@@ -505,6 +536,14 @@ class ObjDoc:
             if arg != None:
                 warnings.append(tag+' did not expect an argument')
             self._seealsos.append(descr)
+        elif tag in ('requires', 'require', 'requirement'):
+            if arg != None:
+                warnings.append(tag+' did not expect an argument')
+            self._requires.append(descr)
+        elif tag in ('warn', 'warning'):
+            if arg != None:
+                warnings.append(tag+' did not expect an argument')
+            self._warnings.append(descr)
         else:
             warnings.append('Unknown tag %r' %tag)
     
@@ -653,9 +692,9 @@ class ModuleDoc(ObjDoc):
         for (field, val) in mod.__dict__.items():
             vuid = make_uid(val, self._uid, field)
                 
-            # Don't do anything for introspection specials.
-            if field in ('__builtins__', '__doc__',
-                         '__file__', '__path__', '__name__'):
+            # Don't do anything for these special variables:
+            if field in ('__builtins__', '__doc__', '__all__', '__file__',
+                         '__path__', '__name__', '__epydoc_sort__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
@@ -890,8 +929,8 @@ class ClassDoc(ObjDoc):
         for (field, val) in items:
             vuid = make_uid(val, self._uid, field)
             
-            # Don't do anything for introspection specials.
-            if field in ('__doc__', '__module__'):
+            # Don't do anything for these special variables:
+            if field in ('__doc__', '__module__', '__epydoc_sort__'):
                 continue
             # Don't do anything if it doesn't have a full-path UID.
             if vuid is None: continue
@@ -1024,15 +1063,6 @@ class ClassDoc(ObjDoc):
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
             
-            # Don't do anything for introspection specials.
-            if field in ('__builtins__', '__doc__',
-                         '__file__', '__path__', '__name__'):
-                continue
-            # Don't do anything if it doesn't have a full-path UID.
-            if vuid is None: continue
-            # Don't do anything for modules.
-            if vuid.is_module(): continue
-
 #     # This never gets called right now!
 #     def inherit(self, *basedocs):
 #         self._inh_cvariables = []
