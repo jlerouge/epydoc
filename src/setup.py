@@ -8,18 +8,25 @@
 #
 
 from distutils.core import setup
-import re, epydoc
+import re, sys, epydoc
 
 VERSION = str(epydoc.__version__)
 (AUTHOR, EMAIL) = re.match('^(.*?)\s*<(.*)>$', epydoc.__author__).groups()
 URL = epydoc.__url__
+LICENSE = epydoc.__license__
+
+if '--format=wininst' in sys.argv:
+    SCRIPTS = ['scripts/epydoc.pyw', 'scripts/epydoc.py']
+else:
+    SCRIPTS = ['scripts/epydoc', 'scripts/epydocgui']
 
 setup(name="epydoc",
-      description="Edloper's Python Documentation Suite",
+      description="Edward Loper's API Documentation Generation Tool",
       version=VERSION,
       author=AUTHOR,
       author_email=EMAIL,
+      license=LICENSE,
       url=URL,
-      scripts=['scripts/epydoc'],
+      scripts=SCRIPTS,
       packages=['epydoc'])
 
