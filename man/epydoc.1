@@ -97,6 +97,8 @@ is a file, then the stylesheet is copied from that file; otherwise,
 is taken to be the name of a built\-in stylesheet.  For a list of
 the built\-in stylesheets, run
 .BR "epydoc \-\-help css" .
+If a CSS stylesheet is not specified, then the default stylesheet is
+used.
 .TP
 .BI "\-\-docformat " format
 Set the default value for
@@ -131,13 +133,20 @@ should only contain the label of the link; the link itself will be
 automatically created from the project URL.  
 .TP
 .B \-\-no\-frames
-Do not generate a frames\-based table of contents.
-.BR "epydoc \-\-help css" .
-If a CSS stylesheet is not specified, then the default stylesheet is
-used.
+Do not display the frames-based table of contents on the main
+API documentation page
+.RB ( index.html ).
+This option just changes the default view; the user can still access
+the frames-based table of contents by clicking on
+.B frames
+in the navigation bar.
 .TP
 .B \-\-no\-private
-Do not produce documentation for private objects.
+Do not generate any documentation for private objects.  This option
+can be useful if you want to discourage users from directly accessing
+private objects.  This option is also useful if you want to generate
+documentation more quickly, since epydoc will only need to produce
+half as many HTML pages.
 .TP
 .BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
 The output directory for HTML files.  By default, HTML files are
@@ -155,11 +164,15 @@ otherwise,
 is taken to be the name of a built\-in stylesheet.  For a list of the
 built\-in stylesheets, run 
 .BR "epydoc \-\-help css" .
-If a CSS stylesheet is not specified, then epydoc uses the same
-stylesheet that it uses for public API documentation.
+If a CSS stylesheet is not specified, then epydoc
+copies the stylesheet for public API documentation (see
+.BR \-\-css ).
 .TP
 .B \-q, \-\-quiet
-Supress the generation of epytext warnings and errors.
+Produce quiet output.  If
+.B \-q
+is used multiple times, it produces successively more quiet output (by
+suppressing warning messages).
 .TP
 .B \-\-show\-imports
 Include a list of the classes and functions that each module imports
@@ -174,19 +187,16 @@ with "http:"); or one of the special names
 .BR trees.html ,
 .BR indices.html ", or"
 .BR help.html ,
-indicating the corresponding documentation pages.
+indicating the corresponding API documentation pages.
 .TP
 .BI "\-u " url ", \-\-url " url
 The URL of the project's homepage.  This URL is used by the homepage
 link on the navigation bar.
 .TP
 .B \-v, \-\-verbose
-Produce verbose output.  In particular, this option displays progress
-bars while it imports the modules, builds the documentation, and
-writes the documentation.
-.TP
-.B \-vv, \-vvv, \-vvvv
-Produce successively more verbose output.
+Produce verbose output.  If
+.B \-v
+is used multiple times, it produces successively more verbose output.
 .RE
 .PP
 Documentation checking options:
@@ -208,11 +218,16 @@ Perform completeness checks on the documentation.
 .B \-p
 Perform checks on private objects.
 .TP
+.B \-q, \-\-quiet
+Produce quiet output.  If
 .B \-q
-Supress the generation of epytext warnings and errors.
+is used multiple times, it produces successively more quiet output (by
+suppressing warning messages).
 .TP
 .B \-v, \-\-verbose
-Produce verbose output.
+Produce verbose output.  If
+.B \-v
+is used multiple times, it produces successively more verbose output.
 .RE
 .PP
 Other options:
@@ -259,16 +274,17 @@ consists of the following files:
 .B index.html
 The standard entry point for the documentation.  Normally,
 .B index.html
-is a frame index file, which defines three frames: two frames on
-the left side of the browser contain a table of contents, and the main
-frame on the right side of the window contains documentation pages.
-But if the 
+is a copy of the frames file
+.RB ( frames.html ).
+But if the
 .B \-\-no\-frames
 option is used, then
 .B index.html
-will redirect the user to the project's top page.
+is a copy of the API documentation home page, which is normally the
+documentation page for the top-level package or module (or the trees
+page if there is no top-level package or module).
 .TP
-.BI m- module .html
+.IB module -module.html
 The API documentation for a module.  
 .I module
 is the complete dotted name of the module, such as 
@@ -276,7 +292,7 @@ is the complete dotted name of the module, such as
 or
 .BR epydoc.epytext .
 .TP
-.BI c- class .html
+.IB class -class.html
 The API documentation for a class, exception, or type.
 .I class
 is the complete dotted name of the class, such as
@@ -288,46 +304,45 @@ or
 The module and class hierarchies.
 .TP
 .B indices.html
-The term  and identifier indices.
+The term and identifier indices.
 .TP
 .B help.html
 The help page for the project.  This page explains how to use and
 navigate the webpage produced by epydoc.
 .TP
+.B frames.html
+The main frames file.  Two frames on the left side of the window
+contain a table of contents, and the main frame on the right side of
+the window contains API documentation pages.
+.TP
 .B toc.html
 The top\-level table of contents page.  This page is displayed in the
-upper\-left frame, and provides links to
+upper\-left frame of
+.BR frames.html ,
+and provides links to the
 .B toc\-everything.html
-and the
-.BI toc\-m\- module .html
-files.
-.B toc.html
-is not generated if the
-.B \-\-no\-frames
-option is used.
+and 
+.BI toc\- module \-module.html
+pages.
 .TP
 .B toc\-everything.html
 The table of contents for the entire project.  This page is displayed
-in the lower\-left frame, and provides links to every class, type,
-exception, function, and variable defined by the project.
-.B toc\-everything.html
-is not generated if the
-.B \-\-no\-frames
-option is used.
+in the lower\-left frame of
+.BR frames.html ,
+and provides links to every class, type, exception, function, and
+variable defined by the project.
 .TP
-.BI toc\-m\- module .html
+.BI toc\- module \-module.html
 The table of contents for a module.  This page is displayed in the
-lower\-left frame, and provides links to every class, type, exception,
-function, and variable defined by the module.
+lower\-left frame of
+.BR frames.html ,
+and provides links to every class, type, exception, function, and
+variable defined by the module.
 .I module
 is the complete dotted name of the module, such as 
 .B sys
 or
 .BR epydoc.epytext .
-.BI toc\-m\- module .html
-is not generated if the
-.B \-\-no\-frames
-option is used.
 .TP
 .B epydoc.css
 The CSS stylesheet used to display all HTML pages.
