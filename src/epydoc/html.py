@@ -1612,6 +1612,9 @@ class HTMLFormatter:
         submodules = [l.target() for l in doc.modules()]
         if not submodules: return
 
+        # Sort the submodules (by full name)
+        submodules.sort()
+
         # Write the beginning-of-list tag.
         _write_if_nonempty(public, private, submodules, ' '*depth+'  <ul>\n')
 
