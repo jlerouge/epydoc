@@ -13,8 +13,8 @@
 
 """
 Automatic Python reference documentation generator.  Epydoc processes
-Python modules and docstrings to generate formatted documentation, in
-the form of HTML pages.
+Python modules and docstrings to generate formatted API documentation,
+in the form of HTML pages.
 
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
@@ -42,3 +42,11 @@ __epydoc_sort__ = ['objdoc',
                    'checker',
                    'cli',
                    'gui']
+
+# To do:
+#   - improve support for builtin functions
+#   - check for builtin modules
+#   - when to inherit documentation?
+#   - change epytext field syntax
+#   - add escape characters
+
