@@ -32,8 +32,7 @@ class ASTMatcher:
 
         s = '%-35s <=> ' % s + ' '*indent
         if self.sym is not None:
-            if self.sym == -1: s += '*'
-            else: s += symbol.sym_name[self.sym]
+            if self.sym != -1: s += symbol.sym_name[self.sym]
         if self.tok is not None:
             s += tokenize.tok_name[self.tok]
         if self.qmrk:
@@ -67,12 +66,19 @@ class ASTMatcher:
                     match = 0
             
             # Check the children.
-            if match and self.children is not None:
+            if match:
                 i = 0 # The matcher child index.
                 j = 1 # The ast child index.
                 while i<len(self.children) and j<len(ast):
                     matcher_child = self.children[i]
                     ast_child = ast[j]
+
+                    # If matcher_child is None ('...'), then ignore
+                    # the remaining children.
+                    if matcher_child is None:
+                        i = len(self.children)
+                        j = len(ast)
+                        break
 
                     if matcher_child._match(ast_child, vars, indent+1):
                         # We matched; advance to the next ast.
@@ -126,6 +132,26 @@ class ASTMatcher:
                 if self.star:
                     vars.setdefault(self.varname, [])
 
+    def __repr__(self):
+        if self.sym is not None:
+            s = '(%s' % symbol.sym_name.get(self.sym, '')
+            if self.children is None:
+                s += '...)'
+            elif self.children == []:
+                s += ')'
+            else:
+                s += ' ' + ' '.join([`c` for c in self.children]) + ')'
+        
+        else:
+            s = tokenize.tok_name[self.tok]
+
+        # Add on any modifiers/bindings.
+        if self.qmrk: s += '?'
+        if self.star: s += '*'
+        if self.varname: s += ':%s' % self.varname
+
+        return s
+
 _TOKEN_RE = re.compile(r'\s*(%s)\s*' % '|'.join([
     r'(\(\s*(?P<sym>[a-z_]*))',
     r'(?P<dots>\.\.\.)',
@@ -137,16 +163,13 @@ _TOKEN_RE = re.compile(r'\s*(%s)\s*' % '|'.join([
 
 # This would be a static method in Python 2.2+
 def compile_ast_matcher(pattern):
-    pattern = pattern.strip()
+    pattern = ' '.join(pattern.strip().split())
     stack = []
     pos = 0
     while 1:
         match = _TOKEN_RE.match(pattern, pos)
         if not match:
-            errstr = (str(pattern[max(0,pos-20):pos]) +
-                      '[*ERROR*]' +
-                      str(pattern[pos:pos+20]))
-            raise ValueError, 'Bad pattern string\n%r' % errstr
+            _pattern_error(pattern, pos)
         pos = match.end()
 
         if match.group('sym') is not None:
@@ -155,23 +178,29 @@ def compile_ast_matcher(pattern):
                 sym = -1
             else:
                 try: sym = getattr(symbol, sym_name)
-                except: raise ValueError, 'Bad symbol %r' % sym_name
+                except: _pattern_error(pattern, match.start('sym'),
+                                       'unknown symbol')
+                    
             stack.append(ASTMatcher(sym=sym, children=[]))
 
         elif match.group('dots') is not None:
-            stack[-1].children = None
+            stack[-1].children.append(None)
 
         elif match.group('close') is not None:
+            if None in stack[-1].children[:-1]:
+                raise ValueError('Bad pattern: "..." must be the final elt')
+
             if len(stack) == 1:
                 if pos != len(pattern):
-                    raise ValueError, 'Bad pattern string'
+                    _pattern_error(pattern, pos)
                 return stack[0]
             stack[-2].children.append(stack.pop())
             
         elif match.group('tok') is not None:
             tok_name = match.group('tok')
             try: tok = getattr(tokenize, tok_name)
-            except: raise ValueError, 'Bad token %r' % tok_name
+            except: _pattern_error(pattern, match.start('tok'),
+                                   'unknown token')
             tokmatcher = ASTMatcher(tok=tok)
             stack[-1].children.append(tokmatcher)
 
@@ -188,5 +217,10 @@ def compile_ast_matcher(pattern):
             lastchild.qmrk = 1
 
         else:
-            assert 0, 'error in _TOKEN_RE handling'
+            assert 0, 'internal error: bad _TOKEN_RE'
 
+def _pattern_error(pattern, pos, msg='Bad pattern string'):
+    left = min(30, pos)
+    raise ValueError('Bad pattern: %s\n  ..."%s"...\n      %s^' %
+                     (msg, pattern[pos-left:pos+30], ' '*left))
+    
