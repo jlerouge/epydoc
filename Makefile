@@ -17,6 +17,9 @@ DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 HOST = shell.sf.net
 DIR = /home/groups/e/ep/epydoc/htdocs
 
+# The current version of epydoc.
+VERSION = $(shell python -c 'import epydoc; print epydoc.__version__')
+
 # Output directories
 WEBDIR = html
 API = api
@@ -103,7 +106,7 @@ pdf: .pdf.up2date
 .pdf.up2date: ${PY_SRC}
 	rm -rf ${LATEX}
 	mkdir -p ${LATEX}
-	epydoc --pdf -o ${LATEX} -n Epydoc --no-private ${PY_SRC}
+	epydoc --pdf -o ${LATEX} -n "Epydoc ${VERSION}" --no-private ${PY_SRC}
 	touch .pdf.up2date
 
 examples: .examples.up2date
