@@ -32,6 +32,12 @@ produce API documentation using the following steps:
        regular expressions variable values.
 
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
+@requires: Python 2.1, or Python 2.0 with
+    U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
+@version: 1.1
+@see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
+@see: U{The epytext markup language
+    manual<http://epydoc.sourceforge.net/epytext.html>}
 """
 
 # General info
@@ -56,16 +62,16 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 
 # To do for release 1.1:
 #   - add an option to specify the "top" object
-#   - better doc inheritence?
-#     - refactor inheritance
-#     - turn off function doc inheritance?
-#     - add --check for doc inheritance?
-#   - add escape characters to epytext
+#   - add escape characters to epytext??
 #   - add option: don't include vars and cvars that have no descr?
-#   - update docs
+#   - update webpage
+#   - update gui to reflect changes in epydoc.
 
 # To do after release 1.1:
-#   - ...
+#   - better doc inheritence?
+#     - refactor inheritance
+#     - option to turn off function doc inheritance?
+#     - add --check for doc inheritance?
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
