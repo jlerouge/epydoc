@@ -21,7 +21,7 @@ all: usage
 usage:
 	@echo "Usage:"
 	@echo "  make web"
-	@echo "  make epydoc"
+	@echo "  make refdocs"
 	@echo "  make checkdoc"
 	@echo "  make distributions"
 
@@ -33,11 +33,6 @@ webpage: xfer
 xfer: refdocs
 	rsync -arz -e ssh $(WEBDIR)/* $(HOST):$(DIR)
 
-old_web: refdocs
-	(cd ${WEBDIR} && tar -cvzf webpage.tgz *)
-	scp ${WEBDIR}/webpage.tgz ${HOST}:${DIR}
-	ssh ${HOST} "cd ${DIR} && tar -xvzf webpage.tgz && rm webpage.tgz"
-	ssh ${HOST} "cd ${DIR} && ln -s epydoc.html index.html || true"
-
 refdocs: 
-	epydoc ${PY_SRC} -o ${WEBDIR} -n epydoc -u http://epydoc.sf.net -css2
+	epydoc ${PY_SRC} -o ${WEBDIR} -n epydoc \
+	       -u http://epydoc.sf.net -css blue
