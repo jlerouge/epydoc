@@ -1340,6 +1340,7 @@ class FuncDoc(ObjDoc):
         self._tmp_type = {}
         self._raises = []
         self._overrides = None
+        self._matches_override = 0
         ObjDoc.__init__(self, func, verbosity)
 
         if self._uid.is_method(): func = func.im_func
@@ -1351,11 +1352,11 @@ class FuncDoc(ObjDoc):
             self._init_params()
         else:
             raise TypeError("Can't document %s" % func)
-        if self._uid.is_method() and not self.documented():
+        
+        if self._uid.is_method():
             self._find_override(self._uid.cls().value())
             if self._overrides == self._uid:
                 raise ValueError('Circular override')
-                self._overrides = None
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
@@ -1541,39 +1542,78 @@ class FuncDoc(ObjDoc):
                 if type(base_method) is types.FunctionType:
                     base_method = new.instancemethod(base_method, None, base)
 
-                # Make sure it's a method.
+                # Make sure it's some kind of method.
                 if type(base_method) not in (types.MethodType,
                                             types.BuiltinMethodType,
                                              _WrapperDescriptorType,
                                              _MethodDescriptorType):
                     return 0
 
-                # Check that the parameters match.
-                if (type(base_method) is types.MethodType and
-                    type(self._uid.value() is types.MethodType) and
-                    type(base_method.im_func) is types.FunctionType):
-                    self_func = self._uid.value().im_func
-                    base_func = base_method.im_func
-                    self_argspec = inspect.getargspec(self_func)
-                    base_argspec = inspect.getargspec(base_func)
-
-                    # If the parameters don't match, then leave
-                    # _overrides as None, and issue a warning message.
-                    if self_argspec[:3] != base_argspec[:3]:
-                        if name == '__init__': return 0
-                        estr =(('The parameters of %s do not match the '+
-                                'parameters of the base class method '+
-                                '%s; not inheriting documentation.')
-                               % (self.uid(), make_uid(base_method)))
-                        self._field_warnings.append(estr)
-                        return 0
-
-                # We've found the method that we override.
+                # We've found a method that we override.
                 self._overrides = make_uid(base_method)
+
+                # Get the base & child argspecs.  If either fails,
+                # then one is probably a builtin of some sort, so
+                # _match_overrides should be 0 anyway.
+                try:
+                    basespec = inspect.getargspec(base_method.im_func)
+                    childspec = inspect.getargspec(self._uid.value().im_func)
+                except:
+                    return 0
+                
+                # Does the signature of this method match the
+                # signature of the method it overrides?
+                if self._signature_match(basespec, childspec):
+                    self._matches_override = 1
+                elif name != '__init__':
+                    # Issue a warning if the parameters don't match.
+                    estr =(('The parameters of %s do not match the '+
+                            'parameters of the base class method '+
+                            '%s; not inheriting documentation.')
+                           % (self.uid(), make_uid(base_method)))
+                    self._field_warnings.append(estr)
+                    
                 return 0
             else:
                 # It's not in this base; try its ancestors.
                 if not self._find_override(base): return 0
+        return 1
+
+    def _signature_match(self, basespec, childspec):
+        """
+        @rtype: C{boolean}
+        @return: True if the signature of C{childfunc} matches the
+        signature of C{basefunc} well enough that we should inherit
+        its documentation.
+        """
+        (b_arg,b_vararg,b_kwarg,b_default) = basespec
+        (c_arg,c_vararg,c_kwarg,c_default) = childspec
+        b_default = b_default or ()
+        c_default = c_default or ()
+        
+        # The child method must define all arguments that the base
+        # method does.
+        if b_arg != c_arg[:len(b_arg)]:
+            return 0
+
+        # Any arg that's not defined by the base method must have a
+        # default value in the child method; and any arg that has a
+        # default value in the base method must have a default value
+        # in the child method.
+        if (len(b_arg)-len(b_default)) < (len(c_arg)-len(c_default)):
+            return 0
+
+        # Varargs must match; but the child method may add a varargs,
+        # if the base method doesn't have one.
+        if b_vararg is not None and b_vararg != c_vararg:
+            return 0
+    
+        # Kwargs must match; but the child method may add a kwargs,
+        # if the base method doesn't have one.
+        if b_kwarg is not None and b_kwarg != c_kwarg:
+            return 0
+
+        # Otherwise, they match.
         return 1
 
     def _process_field(self, tag, arg, descr, warnings):
@@ -1705,7 +1745,16 @@ class FuncDoc(ObjDoc):
             C{FuncDoc} documents a function.
         @rtype: L{Link} or C{None}
         """
-        return self._overrides    
+        return self._overrides
+
+    def matches_override(self):
+        """
+        @return: True if the method documented by this C{FuncDoc}
+            overrides another method, and its signature matches the
+            signature of the overridden method.
+        @rtype: C{boolean}
+        """
+        return self._matches_override
 
 ##################################################
 ## Documentation Management
