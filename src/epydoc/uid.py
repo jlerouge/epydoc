@@ -79,8 +79,36 @@ class UID:
     def pathname(self): return os.path.join(*self._name.split('.'))
     def object(self): return self._obj
     def __repr__(self): return self._name
-    def __cmp__(self, other): return cmp(self._name, other._name)
     def __hash__(self): return hash(self._name)
+    def __cmp__(self, other):
+        if not isinstance(other, UID): return -1
+        return cmp(self._name, other._name)
+
+    def descendant_of(self, ancestor):
+        """
+        Return true if self is a X{descendant} of other.
+        """
+        descendant = self
+        
+        if descendant.is_method():
+            if ancestor.is_class():
+                if descendant.cls() == ancestor: return 1
+                else: return 0
+            else: descendant = descendant.cls()
+
+        if descendant.is_class() or descendant.is_function():
+            if ancestor.is_module():
+                if descendant.module() == ancestor: return 1
+                else: return 0
+            else: descendant = descendant.module()
+
+        if not ancestor.is_package(): return 0
+
+        while descendant is not None and descendant.is_module():
+            if descendant.package() == ancestor: return 1
+            else: descendant = descendant.package()
+
+        return 0
 
     def cls(self):
         if type(self._obj) == _MethodType: 
@@ -108,8 +136,17 @@ class UID:
         else:
             raise TypeError()
 
+    def is_function(self):
+        return type(self._obj) in (_FunctionType,)
+
+    def is_class(self):
+        return type(self._obj) == _ClassType
+
     def is_method(self):
         return type(self._obj) == _MethodType
+
+    def is_module(self):
+        return type(self._obj) == _ModuleType
 
     def is_package(self):
         "Return true if this is the UID for a package"
