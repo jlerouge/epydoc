@@ -232,9 +232,11 @@ def parse(str, errors = None):
     indent_stack = [-1, None]
 
     for token in tokens:
-        # Uncomment these for debugging:
-        #print ''.join(['%11s' % (t and t.tagName) for t in stack]),':',token.tag
-        #print ''.join(['%11s' % i for i in indent_stack]),':',token.indent
+        # Uncomment this for debugging:
+        #print ('%s: %s\n%s: %s\n' % 
+        #       (''.join(['%-11s' % (t and t.tagName) for t in stack]),
+        #        token.tag, ''.join(['%-11s' % i for i in indent_stack]),
+        #        token.indent))
         
         # Pop any completed blocks off the stack.
         _pop_completed_blocks(token, stack, indent_stack)
@@ -390,6 +392,15 @@ def _add_list(doc, bullet_token, stack, indent_stack, errors):
 
     # Create the new list.
     if newlist:
+        if stack[-1].tagName is 'fieldlist':
+            # The new list item is not a field list item (since this
+            # is a new list); but it's indented the same as the field
+            # list.  This either means that they forgot to indent the
+            # list, or they are trying to put something after the
+            # field list.  The first one seems more likely, so we'll
+            # just warn about that (to avoid confusion).
+            estr = "Lists must be indented."
+            errors.append(StructuringError(estr, bullet_token.startline))
         if stack[-1].tagName in ('ulist', 'olist', 'fieldlist'):
             stack.pop()
             indent_stack.pop()
