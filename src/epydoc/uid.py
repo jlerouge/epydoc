@@ -748,16 +748,22 @@ def _find_builtin_obj_module(obj, show_warnings=1):
         if module in py_modules: continue
         if module.__name__ == '__main__': continue
         
-        for val in module.__dict__.values():
+        for (key, val) in module.__dict__.items():
             if val is obj:
                 if (module.__name__ in sys.builtin_module_names or
                     not hasattr(module, '__file__')):
                     builtin_modules.append(module)
+                    break # Stop looking in this module.
                 elif module.__file__[-3:] == '.so':
                     so_modules.append(module)
-                else:
+                    break # Stop looking in this module.
+                elif key == obj.__name__:
+                    # Require that the name match (is this a good idea??)
                     py_modules.append(module)
-                break # Stop looking in this module.
+                    break # Stop looking in this module.
+                elif module is types:
+                    py_modules.append(module)
+                    break # Stop looking in this module.
 
     # If it's in a .so module, use that.
     if so_modules:
