@@ -27,10 +27,6 @@ implemented with the C{UID} class.  These identifiers are also used by
 the C{Link} class to implement crossreferencing between C{ObjDoc}s.
 """
 
-##################################################
-## Constants
-##################################################
-
 WARN_SKIPPING = 0
 
 ##################################################
@@ -66,6 +62,23 @@ def _flatten(tree):
         else:
             lst.append(elt)
     return lst
+
+def _getdoc(obj):
+    """
+    Get the documentation string for an object.  This function is
+    similar to L{inspect.getdoc}.  In particular, it finds the minimum
+    indentation fromthe second line onwards, and removes that
+    indentation from each line.  But it also checks to make sure that
+    the docstring is actually a string (since some programs put other
+    data in the docstrings).
+
+    @param obj: The object whose documentation string should be returned.
+    @type obj: any
+    """
+    if not hasattr(obj, '__doc__') or type(obj.__doc__) != _StringType:
+        return None
+    else:
+        return inspect.getdoc(obj)
 
 ##################################################
 ## ObjDoc
@@ -235,7 +248,7 @@ class ObjDoc:
     @ivar _seealsos: See also entries
     @type _seealsos: C{list} of C{Element}
     """
-    def __init__(self, obj):
+    def __init__(self, obj, verbosity=0):
         """
         Create the documentation for the given object.
         
@@ -259,9 +272,10 @@ class ObjDoc:
             self._sortorder = None
 
         # If there's a doc string, parse it.
-        if hasattr(obj, '__doc__') and obj.__doc__ != None:
+        docstring = _getdoc(obj)
+        if docstring:
             self._documented = 1
-            self.__parse_docstring(inspect.getdoc(obj))
+            self.__parse_docstring(docstring, verbosity)
         else:
             self._documented = 0
     
@@ -353,7 +367,7 @@ class ObjDoc:
     #// Private
     #////////////////////////////
 
-    def __parse_docstring(self, docstring):
+    def __parse_docstring(self, docstring, verbosity):
         # Parse the documentation, and store any errors or warnings.
         parse_errors = []
         parse_warnings = []
@@ -385,6 +399,11 @@ class ObjDoc:
                 field.tagName = 'epytext'
                 self._process_field(tag, arg, field, field_warnings)
 
+        # Supress warnings/errors, if requested
+        if verbosity <= -1: parse_warnings = []
+        if verbosity <= -2: field_warnings = []
+        if verbosity <= -3: parse_errors = []
+        
         # Print the errors and warnings.
         if (parse_warnings or parse_errors or field_warnings):
             if parse_errors:
@@ -443,11 +462,11 @@ class ModuleDoc(ObjDoc):
     @ivar _modules: A list of all modules conained in the package
         (package only).
     """
-    def __init__(self, mod):
+    def __init__(self, mod, verbosity=0):
         # Initilize the module from its docstring.
         self._tmp_var = {}
         self._tmp_type = {}
-        ObjDoc.__init__(self, mod)
+        ObjDoc.__init__(self, mod, verbosity)
 
         # If mod is a package, then it will contain a __path__
         if mod.__dict__.has_key('__path__'): self._modules = []
@@ -457,6 +476,8 @@ class ModuleDoc(ObjDoc):
         self._classes = []
         self._functions = []
         self._variables = []
+        self._imported_classes = []
+        self._imported_functions = []
         for (field, val) in mod.__dict__.items():
             vuid = _makeuid(val)
             # Don't do anything for introspection specials.
@@ -468,17 +489,17 @@ class ModuleDoc(ObjDoc):
             # Don't do anything for modules.
             if vuid.is_module(): continue
 
-            if vuid.is_class() or vuid.is_function():
-                if vuid.module() != self._uid:
-                    if WARN_SKIPPING:
-                        print 'Skipping imported value', val
-                    continue
-
             # Add the field to the appropriate place.
             if vuid.is_function() or vuid.is_builtin_function():
-                self._functions.append(Link(field, UID(val)))
+                if vuid.module() == self._uid:
+                    self._functions.append(Link(field, vuid))
+                else:
+                    self._imported_functions.append(Link(field, vuid))
             elif vuid.is_class():
-                self._classes.append(Link(field, UID(val)))
+                if vuid.module() == self._uid:
+                    self._classes.append(Link(field, vuid))
+                else:
+                    self._imported_classes.append(Link(field, vuid))
 
         # Add descriptions and types to variables
         self._variables = []
@@ -533,7 +554,7 @@ class ModuleDoc(ObjDoc):
         
     def functions(self):
         """
-        @return: A list of all functions contained in the
+        @return: A list of all functions defined by the
             module/package documented by this C{ModuleDoc}.
         @rtype: C{list} of L{Link}
         """
@@ -541,7 +562,7 @@ class ModuleDoc(ObjDoc):
     
     def classes(self):
         """
-        @return: A list of all classes contained in the
+        @return: A list of all classes defined by the
             module/package documented by this C{ModuleDoc}. 
         @rtype: C{list} of L{Link}
         """
@@ -549,11 +570,29 @@ class ModuleDoc(ObjDoc):
     
     def variables(self):
         """
-        @return: A list of all variables defined by this
+        @return: A list of all variables defined by the
             module/package documented by this C{ModuleDoc}. 
         @rtype: C{list} of L{Var}
         """
         return self._variables
+
+    def imported_functions(self):
+        """
+        @return: A list of all functions contained in the
+            module/package documented by this C{ModuleDoc} that are
+            not defined by that module/package.
+        @rtype: C{list} of L{Link}
+        """
+        return self._imported_functions
+    
+    def imported_classes(self):
+        """
+        @return: A list of all classes contained in the
+            module/package documented by this C{ModuleDoc} that are
+            not defined by that module/package.
+        @rtype: C{list} of L{Link}
+        """
+        return self._imported_classes
     
     def package(self):
         """
@@ -646,12 +685,12 @@ class ClassDoc(ObjDoc):
     @type _bases: C{list} of L{Link}
     @ivar _bases: A list of the identifiers of this class's bases.
     """
-    def __init__(self, cls):
+    def __init__(self, cls, verbosity=0):
         # Initilize the module from its docstring.
         self._tmp_ivar = {}
         self._tmp_cvar = {}
         self._tmp_type = {}
-        ObjDoc.__init__(self, cls)
+        ObjDoc.__init__(self, cls, verbosity)
 
         # Handle methods & class variables
         self._cvariables = []
@@ -919,13 +958,13 @@ class FuncDoc(ObjDoc):
     @ivar _raises: The exceptions that may be raised by this
         function. 
     """
-    def __init__(self, func):
+    def __init__(self, func, verbosity=0):
         # Initilize the module from its docstring.
         self._tmp_param = {}
         self._tmp_type = {}
         self._raises = []
         self._overrides = None
-        ObjDoc.__init__(self, func)
+        ObjDoc.__init__(self, func, verbosity=0)
 
         if self._uid.is_function():
             self._init_signature(func)
@@ -952,7 +991,7 @@ class FuncDoc(ObjDoc):
                         r'\((?P<params>(\w+(,\s*\w+)*)?)\)' +
                         r'(\s*->\s*(?P<return>\S.*))?'+
                         r'\s*(\n|\s+--\s+|$)')
-        m = re.match(signature_re, func.__doc__)
+        m = re.match(signature_re, _getdoc(func))
         if m:
             # Extract the parameters from the signature
             if m.group('params'):
@@ -1212,15 +1251,21 @@ class DocMap(UserDict.UserDict):
         <FuncDoc: epydoc.epytext.parse (3 parameters; 1 exceptions)>
     """
     
-    def __init__(self, document_bases=1):
+    def __init__(self, verbosity=0, document_bases=1):
         """
         Create a new empty documentation map.
 
+        @param verbosity: The verbosity of output produced when
+            creating documentation for objects.  More positive numbers
+            produce more verbose output; negative numbers supress
+            warnings and errors.
+        @type verbosity: C{int}
         @param document_bases: Whether or not documentation should
             automatically be built for the bases of classes that are
             added to the documentation map.
         @type document_bases: C{boolean}
         """
+        self._verbosity = verbosity
         self._document_bases = document_bases
         self.data = {} # UID -> ObjDoc
         self._class_children = {} # UID -> list of UID
@@ -1247,7 +1292,7 @@ class DocMap(UserDict.UserDict):
         if self.data.has_key(objID): return
         
         if objID.is_module():
-            self.data[objID] = ModuleDoc(obj)
+            self.data[objID] = ModuleDoc(obj, self._verbosity)
             for module in self._package_children.get(objID, []):
                 self.data[objID].add_module(module)
             packageID = objID.package()
@@ -1260,7 +1305,7 @@ class DocMap(UserDict.UserDict):
                     self._package_children[packageID] = [obj]
             
         elif objID.is_class():
-            self.data[objID] = ClassDoc(obj)
+            self.data[objID] = ClassDoc(obj, self._verbosity)
             for child in self._class_children.get(objID, []):
                 self.data[objID].add_subclass(child)
             for base in obj.__bases__:
@@ -1283,9 +1328,9 @@ class DocMap(UserDict.UserDict):
             #        self.add(method.target().object())
                     
         elif objID.is_function() or objID.is_method():
-            self.data[objID] = FuncDoc(obj)
+            self.data[objID] = FuncDoc(obj, self._verbosity)
         elif objID.is_builtin_function():
-            self.data[objID] = FuncDoc(obj)
+            self.data[objID] = FuncDoc(obj, self._verbosity)
 
     def __setitem__(self, obj):
         """
