@@ -4,13 +4,11 @@
 #
 
 """
-
 Markup language support for docstrings.  Each submodule defines a
 parser for a single markup language.  These parsers convert an
 object's docstring to a L{ParsedDocstring}, a standard intermediate
 representation that can be used to generate output.
 C{ParsedDocstring}s support the following operations:
-
   - output generation (L{to_plaintext()<ParsedDocstring.to_plaintext>},
     L{to_html()<ParsedDocstring.to_html>}, and
     L{to_latex()<ParsedDocstring.to_latex>}).
@@ -28,11 +26,10 @@ The C{ParsedDocstring} output generation methods (C{to_M{format}()})
 use a L{DocstringLinker} to link the docstring output with the rest of
 the documentation that epydoc generates.  C{DocstringLinker}s are
 currently responsible for translating two kinds of crossreference:
-
   - index terms (L{translate_indexterm()
-    <ParsedDocstring.translate_indexterm>}).
+    <DocstringLinker.translate_indexterm>}).
   - identifier crossreferences (L{translate_identifier_xref()
-    <ParsedDocstring.translate_identifier_xref>}).
+    <DocstringLinker.translate_identifier_xref>}).
 
 A parsed docstring's fields can be extracted using the
 L{ParsedDocstring.split_fields()} method.  This method divides a
@@ -40,9 +37,9 @@ docstring into its main body and a list of L{Field}s, each of which
 encodes a single field.  The field's bodies are encoded as
 C{ParsedDocstring}s.
 
-All markup errors are represented using L{ParseError}s.  These
-exception classes record information about the cause, location, and
-severity of each error.
+Markup errors are represented using L{ParseError}s.  These exception
+classes record information about the cause, location, and severity of
+each error.
 
 The C{epydoc.markup} module also defines several utility functions,
 such as L{wordwrap}, L{plaintext_to_latex}, and L{plaintext_to_html},
@@ -55,6 +52,7 @@ which are used by several different markup language parsers.
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
+@var _parse_warnings: Used by L{_parse_warn}.
 """
 __docformat__ = 'epytext en'
 
@@ -84,14 +82,6 @@ def parse(docstring, markup='plaintext', errors=None):
     while parsing the docstring, then the docstring will be rendered
     as plaintext, instead.
 
-    @rtype: C{(L{ParsedDocstring}, list of L{ParseError})}
-    @return: A tuple C{(M{parsed_docstring}, M{errors})}, where:
-      - C{M{parsed_docstring}} is a L{ParsedDocstring} that encodes
-        the contents of C{docstring}.
-      - C{M{errors}} is a list of L{ParseError}s that lists all of the
-        warnings and errors that were encountered when parsing
-        C{docstring}.
-
     @type docstring: C{string}
     @param docstring: The docstring to encode.
     @type markup: C{string}
@@ -104,15 +94,15 @@ def parse(docstring, markup='plaintext', errors=None):
         will generate exceptions, and non-fatal errors will be
         ignored.
     @type errors: C{list} of L{ParseError}
+    @rtype: L{ParsedDocstring}
+    @return: A L{ParsedDocstring} that encodes the contents of
+        C{docstring}.
     @raise ParseError: If C{errors} is C{None} and an error is
         encountered while parsing.
     """
     # Initialize errors list.
-    if errors == None:
-        errors = []
-        raise_on_error = 1
-    else:
-        raise_on_error = 0
+    raise_on_error = (errors is None)
+    if errors == None: errors = []
 
     # Normalize the markup language name.
     markup = markup.lower()
@@ -128,19 +118,16 @@ def parse(docstring, markup='plaintext', errors=None):
         _parse_warn('Warning: Unsupported markup language: %s' % markup)
         return plaintext.parse_docstring(docstring, errors)
 
-    try:
-        parsed_docstring = parse_docstring(docstring, errors)
-        fatal_errors = [e for e in errors if e.is_fatal()]
-    except KeyboardError:
-        raise
+    # Parse the docstring.
+    try: parsed_docstring = parse_docstring(docstring, errors)
+    except KeyboardError: raise
     except Exception, e:
         errors.append(ParseError('Internal error: %s' % e))
         return plaintext.parse_docstring(docstring, errors)
 
-    # If there was an error, then signal it.
+    # Check for fatal errors.
+    fatal_errors = [e for e in errors if e.is_fatal()]
     if fatal_errors and raise_on_error: raise fatal_errors[0]
-
-    # If there were any fatal errors, then use plaintext.
     if fatal_errors:
         return plaintext.parse_docstring(docstring, errors)
 
@@ -149,12 +136,15 @@ def parse(docstring, markup='plaintext', errors=None):
 # only issue each warning once:
 _parse_warnings = {}
 def _parse_warn(estr):
+    """
+    Print a warning message.  If the given error has already been
+    printed, then do nothing.
+    """
     global _parse_warnings
     if _parse_warnings.has_key(estr): return
     _parse_warnings[estr] = 1
     if sys.stderr.softspace: print >>sys.stderr
     print >>sys.stderr, estr
-    
 
 ##################################################
 ## ParsedDocstring
@@ -182,7 +172,7 @@ class ParsedDocstring:
     methods.  The default behavior of each method is described below:
       - C{to_I{format}}: Calls C{to_plaintext}, and uses the string it
         returns to generate verbatim output.
-      - C{summary}: Returns C{self}.
+      - C{summary}: Returns C{self} (i.e., the entire docstring).
       - C{split_fields}: Returns C{(self, [])} (i.e., extracts no
         fields).
       - C{index_terms}: Returns C{[]} (i.e., extracts no index terms).
@@ -364,18 +354,28 @@ class ParseError(Exception):
     """
     The base class for errors generated while parsing docstrings.
 
-    The ParseError class is only used as a base class; it should never 
-    be directly instantiated. (??)
-
     @ivar _linenum: The line on which the error occured within the
-        docstring.  The first linenum of the first line is 1.
+        docstring.  The linenum of the first line is 0.
     @type _linenum: C{int}
+    @ivar _offset: The line number where the docstring begins.  This
+        offset is added to C{_linenum} when displaying the line number
+        of the error.  Default value: 1.
+    @type _offset: C{int}
     @ivar _descr: A description of the error.
     @type _descr: C{string}
     @ivar _fatal: True if this is a fatal error.
     @type _fatal: C{boolean}
     """
     def __init__(self, descr, linenum=None, is_fatal=1):
+        """
+        @type descr: C{string}
+        @param descr: A description of the error.
+        @type linenum: C{int}
+        @param linenum: The line on which the error occured within
+            the docstring.  The linenum of the first line is 0.
+        @type is_fatal: C{boolean}
+        @param is_fatal: True if this is a fatal error.
+        """
         self._descr = descr
         self._linenum = linenum
         self._fatal = is_fatal
@@ -391,13 +391,22 @@ class ParseError(Exception):
         return self._fatal
 
     def set_linenum_offset(self, offset):
+        """
+        Set the line number offset for this error.  This offset is the
+        line number where the docstring begins.  This offset is added
+        to C{_linenum} when displaying the line number of the error.
+
+        @param offset: The new line number offset.
+        @type offset: C{int}
+        @rtype: C{None}
+        """
         self._offset = offset
     
     def __str__(self):
         """
-        Return a string string representation of this C{ParseError}.
-        This multi-line string contains a description of the error,
-        and specifies where it occured.
+        Return a string representation of this C{ParseError}.  This
+        multi-line string contains a description of the error, and
+        specifies where it occured.
         
         @return: the informal representation of this C{ParseError}.
         @rtype: C{string}
@@ -405,7 +414,7 @@ class ParseError(Exception):
         if self._linenum is not None:
             str = '%5s: ' % ('L'+`self._linenum+self._offset`)
         else:
-            str = ' '*7
+            str = '     - '
         if self._fatal:
             str += 'Error: '
         else:
@@ -421,7 +430,7 @@ class ParseError(Exception):
         @return: the formal representation of this C{ParseError}.
         @rtype: C{string}
         """
-        return '<ParseError on line %d>' % linenum
+        return '<ParseError on line %d>' % self._linenum+self._offset
 
     def __cmp__(self, other):
         """
@@ -435,7 +444,8 @@ class ParseError(Exception):
         @rtype: C{int}
         """
         if not isinstance(other, ParseError): return -1000
-        return cmp(self.linenum, other.linenum)
+        return cmp(self._linenum+self._offset,
+                   other._linenum+other._offset)
 
 ##################################################
 ## Misc helpers
@@ -567,4 +577,8 @@ def parse_type_of(obj):
 ##################################################
 ## Sub-module Imports
 ##################################################
+# By default, just import plaintext.  That way we don't have to wait
+# for other modules (esp restructuredtext) to load if we're not going
+# to use them.
+
 import plaintext

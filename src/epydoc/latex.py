@@ -8,7 +8,21 @@
 #
 
 """
-Documentation to LaTeX converter.
+Documentation to LaTeX converter.  This module defines a single class,
+L{LatexFormatter}, which translates the API documentation encoded in a
+L{DocMap} into a set of LaTeX files.
+
+@var _LATEX_HEADER: The header for standard documentation LaTeX pages.
+@var _HRULE: LaTeX code for a horizontal rule across the page
+@var _SECTIONS: A list of string patterns that encode each numbered
+    section level.
+@var _STARSECTIONS: A list of string patterns that encode each
+    un-numbered section level.
+
+@bug: If a longtable is generated with a single row that's larger than
+    a page, then LaTeX is unable to generate the correct output.  This
+    should only be a problem if a variable or property has a very long
+    description.
 """
 __docformat__ = 'epytext en'
 
@@ -42,6 +56,7 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 #   - multirow: multirow cells in tabulars
 #   - longtable: multi-page tables (for var lists)
 #   - tocbibind: add the index to the table of contents
+#   - amssymb: extra math symbols.
 _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
@@ -682,6 +697,9 @@ class LatexFormatter:
             try: container = func.module()
             except TypeError: container = None
 
+        # Don't include inherited functions, if inheritance=listed.
+        if inherit and self._inheritance == 'listed': return ''
+
         # If we don't have documentation for the function, then we
         # can't say anything about it.
         if not self._docmap.has_key(func): return ''
@@ -693,8 +711,6 @@ class LatexFormatter:
         # Try to find a documented ancestor.
         inhdoc = self._docmap.documented_ancestor(func) or fdoc
         inherit_docs = (inhdoc is not fdoc)
-
-        if inherit and self._inheritance == 'listed': return ''
 
         # nb: this gives the containing section, not a reference
         # directly to the function.
@@ -777,11 +793,11 @@ class LatexFormatter:
             str += '    \\vspace{1ex}\n\n'
 
         ## Overrides
-        #if foverrides:
-        #    str += '      Overrides: %s' % foverrides
-        #    if inherit_docs:
-        #        str += ' \textit{(inherited documentation)}'
-        #    str += '\n\n'
+        if foverrides:
+            str += '      Overrides: %s' % foverrides
+            if inherit_docs:
+                str += ' \textit{(inherited documentation)}'
+            str += '\n\n'
 
         # Add version, author, warnings, requirements, notes, etc.
         str += self._standard_fields(fdoc)
