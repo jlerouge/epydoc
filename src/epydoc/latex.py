@@ -32,11 +32,20 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 ## CONSTANTS
 ##################################################
 
-# (Once I'm done, check which pacakges I actually use.)
+# Packages:
+#   - fullpage: Bigger margins (c.f. normal latex article style)
+#   - alltt: a verbatim-like environment
+#   - parskip: put space between paragraphs
+#   - fancyheadings: put section names in headings
+#   - boxedminipage: boxes around functions/methods
+#   - makeidx: generate an index
+#   - multirow: multirow cells in tabulars
+#   - longtable: multi-page tables (for var lists)
+#   - tocbibind: add the index to the table of contents
 _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
-\usepackage{makeidx, multirow, longtable}
+\usepackage{makeidx, multirow, longtable, tocbibind}
 \begin{document}
 
 \setlength{\parindent}{0ex}
@@ -265,9 +274,9 @@ class LatexFormatter:
         str += '\\maketitle\n'
         
         str += self._start_of('Table of Contents')
-        str += '\\addtolength{\\parskip}{-1ex}'
+        str += '\\addtolength{\\parskip}{-1ex}\n'
         str += '\\tableofcontents\n'
-        str += '\\addtolength{\\parskip}{1ex}'
+        str += '\\addtolength{\\parskip}{1ex}\n'
 
         str += self._start_of('Includes')
         uids = self._filtersort_uids(self._docmap.keys())
@@ -310,25 +319,8 @@ class LatexFormatter:
         if doc.descr():
             str += self._dom_to_latex(doc.descr())
 
-        # Version
-        if doc.version():
-            str += self._version(doc.version(), uid)
-                
-        # Author
-        if doc.authors():
-            str += self._author(doc.authors(), uid)
-            
-        # Requirements
-        if doc.requires():
-            str += self._requires(doc.requires(), uid)
-            
-        # Warnings
-        if doc.warnings():
-            str += self._warnings(doc.warnings(), uid)
-            
-        # See also
-        if doc.seealsos():
-            str += self._seealso(doc.seealsos(), uid)
+        # Add version, author, warnings, requirements, notes, etc.
+        str += self._standard_fields(doc)
 
         # If it's a package, list the sub-modules.
         if doc.ispackage() and doc.modules():
@@ -341,7 +333,7 @@ class LatexFormatter:
                 str += self._start_of('Classes')
                 str += self._section('Classes', 1)
                 str += '\\begin{itemize}'
-                str += '  \\setlength{\\parskip}{0ex}'
+                str += '  \\setlength{\\parskip}{0ex}\n'
                 for link in classes:
                     cname = link.name()
                     cls = link.target()
@@ -402,25 +394,8 @@ class LatexFormatter:
         if doc.descr():
             str += self._dom_to_latex(doc.descr())
         
-        # Version
-        if doc.version():
-            str += self._version(doc.version(), uid)
-                
-        # Author
-        if doc.authors():
-            str += self._author(doc.authors(), uid)
-            
-        # Requirements
-        if doc.requires():
-            str += self._requires(doc.requires(), uid)
-            
-        # Warnings
-        if doc.warnings():
-            str += self._warnings(doc.warnings(), uid)
-            
-        # See also
-        if doc.seealsos():
-            str += self._seealso(doc.seealsos(), uid)
+        # Add version, author, warnings, requirements, notes, etc.
+        str += self._standard_fields(doc)
 
         # Methods.
         str += self._func_list(doc.methods(), doc,
@@ -632,26 +607,9 @@ class LatexFormatter:
             #    if inherit_docs:
             #        str += ' \textit{(inherited documentation)}'
             #    str += '\n\n'
-            #
-            # Version
-            if fdoc.version():
-                str += self._version(fdoc.version(), func.parent())
-                
-            # Author
-            if fdoc.authors():
-                str += self._author(fdoc.authors(), func.parent())
-                
-            # Requirements
-            if fdoc.requires():
-                str += self._requires(fdoc.requires(), func.parent())
-                
-            # Warnings
-            if fdoc.warnings():
-                str += self._warnings(fdoc.warnings(), func.parent())
-                
-            # See also
-            if fdoc.seealsos():
-                str += self._seealso(fdoc.seealsos(), func.parent())
+
+            # Add version, author, warnings, requirements, notes, etc.
+            str += self._standard_fields(fdoc)
 
             str += '    \\end{boxedminipage}\n\n'
 
@@ -768,12 +726,12 @@ class LatexFormatter:
             return indent*' '+'{omitted fieldlist}\n'
         elif tree.tagName == 'olist':
             return (' '*indent + '\\begin{enumerate}\n\n' + 
-                    ' '*indent + '\\setlength{\\parskip}{0.5ex}' +
+                    ' '*indent + '\\setlength{\\parskip}{0.5ex}\n' +
                     childstr +
                     ' '*indent + '\\end{enumerate}\n\n')
         elif tree.tagName == 'ulist':
             return (' '*indent + '\\begin{itemize}\n' +
-                    ' '*indent + '\\setlength{\\parskip}{0.6ex}' +
+                    ' '*indent + '\\setlength{\\parskip}{0.6ex}\n' +
                     childstr +
                     ' '*indent + '\\end{itemize}\n\n')
         else:
@@ -872,7 +830,7 @@ class LatexFormatter:
             str += ', p.~\\pageref{%s})}\n\n' % self._uid_to_label(uid)
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  \\begin{itemize}\n'
-            str += ' '*depth + '\\setlength{\\parskip}{0ex}'
+            str += ' '*depth + '\\setlength{\\parskip}{0ex}\n'
             modules = [l.target() for l in 
                        self._filtersort_links(doc.modules(), doc.sortorder())]
             for module in modules:
@@ -887,7 +845,7 @@ class LatexFormatter:
         @rtype: C{string}
         """
         str = '\\begin{itemize}\n'
-        str += '\\setlength{\\parskip}{0ex}'
+        str += '\\setlength{\\parskip}{0ex}\n'
         uids = self._filtersort_uids(self._docmap.keys())
         #docs.sort(lambda a,b: cmp(a[0], b[0]))
         # Find all top-level packages. (what about top-level
@@ -910,7 +868,7 @@ class LatexFormatter:
         str = self._start_of('Modules')
         str += self._section('Modules', 1)
         str += '\\begin{itemize}\n'
-        str += '\\setlength{\\parskip}{0ex}'
+        str += '\\setlength{\\parskip}{0ex}\n'
         modules = self._filtersort_links(modules, sortorder)
         
         for link in modules:
@@ -1143,6 +1101,45 @@ class LatexFormatter:
         
         return so_vars + vars
 
+    def _standard_fields(self, doc):
+        """
+        @return: HTML code containing descriptions of the epytext
+        fields that are common to all L{ObjDoc}s (except for C{descr}).
+        @rtype: C{string}
+        @param doc: The object whose fields should be described.
+        """
+        uid = doc.uid()
+        if uid.is_module() or uid.is_class(): container = uid
+        else: container = uid.cls() or uid.module()
+        str = ''
+
+        # Version.
+        if doc.version():
+            items = [self._dom_to_latex(doc.version())]
+            str += self._descrlist(items, 'Version')
+
+        # Authors
+        items = [self._dom_to_latex(a) for a in doc.authors()]
+        str += self._descrlist(items, 'Author', 'Authors', short=1)
+
+        # Requirements
+        items = [self._dom_to_latex(r) for r in doc.requires()]
+        str += self._descrlist(items, 'Requires')
+
+        # Warnings
+        items = [self._dom_to_latex(w) for w in doc.warnings()]
+        str += self._descrlist(items, 'Warning', 'Warnings')
+        
+        # Warnings
+        items = [self._dom_to_latex(n) for n in doc.notes()]
+        str += self._descrlist(items, 'Note', 'Notes')
+        
+        # See also
+        items = [self._dom_to_latex(s) for s in doc.seealsos()]
+        str +=  self._descrlist(items, 'See also', short=1)
+
+        return str
+            
     def _descrlist(self, items, singular, plural=None, short=0):
         if plural is None: plural = singular
         if len(items) == 0: return ''
@@ -1156,37 +1153,9 @@ class LatexFormatter:
             str = '\\textbf{%s:}\n' % plural
             str += '\\begin{quote}\n'
             str += '  \\begin{itemize}\n\n  \item '
-            str += '    \\setlength{\\parskip}{0.6ex}'
+            str += '    \\setlength{\\parskip}{0.6ex}\n'
             str += '\n\n  \item '.join(items)
             return str + '\n\n\\end{itemize}\n\n\\end{quote}\n\n'
-
-    def _seealso(self, seealso, container):
-        """
-        @return: The LaTeX code for the see-also fields.
-        """
-        items = [self._dom_to_latex(s) for s in seealso]
-        return self._descrlist(items, 'See also', short=1)
-        
-    def _author(self, authors, container):
-        """
-        @return: The LaTeX code for the author fields.
-        """
-        items = [self._dom_to_latex(a) for a in authors]
-        return self._descrlist(items, 'Author', 'Authors', short=1)
-
-    def _requires(self, requires, container):
-        """
-        @return: The LaTeX code for the requires field.
-        """
-        items = [self._dom_to_latex(r) for r in requires]
-        return self._descrlist(items, 'Requires')
-         
-    def _warnings(self, warnings, container):
-        """
-        @return: The LaTeX code for the warnings field.
-        """
-        items = [self._dom_to_latex(r) for r in warnings]
-        return self._descrlist(items, 'Warning', 'Warnings')
 
     def _subclasses(self, subclasses, container):
         """
@@ -1195,10 +1164,6 @@ class LatexFormatter:
         items = [self._text_to_latex(sc.name()) for sc in subclasses]
         return self._descrlist(items, 'Known Subclasses', short=1)
 
-    def _version(self, version, container):
-        items = [self._dom_to_latex(version)]
-        return self._descrlist(items, 'Version')
-        
     def _summary(self, doc, container=None):
         """
         @return: The LATEX code for the summary description of the
@@ -1226,7 +1191,6 @@ class LatexFormatter:
 
         if descr != None:
             str = self._dom_to_latex(epytext.summary(descr)).strip()
-            #if str == '': str = '&nbsp;'
             return str
         elif (isinstance(doc, FuncDoc) and
               doc.returns().descr() is not None):
@@ -1236,4 +1200,4 @@ class LatexFormatter:
             return ('Return '+ summary)
         else:
             return ''
-            #return '&nbsp;'
+
