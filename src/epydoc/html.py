@@ -1838,7 +1838,7 @@ class HTMLFormatter:
             self._get_term_index_items(tree.childNodes[0], link, dict)
             return
         if tree is None: return
-        elif tree.tagName != 'index':
+        elif tree.tagName != 'indexed':
             # Look for index items in the child nodes.
             for child in tree.childNodes:
                 self._get_term_index_items(child, link, dict)
@@ -2142,7 +2142,7 @@ class HTMLFormatter:
             return '<i>%s</i>' % childstr
         elif tree.tagName == 'math':
             return '<i class="math">%s</i>' % childstr
-        elif tree.tagName == 'index':
+        elif tree.tagName == 'indexed':
             return ('<a name="%s"></a><i class="indexterm">%s</i>' %
                     (self._term_index_to_anchor(childstr), childstr))
         elif tree.tagName == 'bold':
@@ -2270,7 +2270,7 @@ class HTMLFormatter:
 
         # Is it a special page name?  Note that these could, in
         # principle, be shadowed by modules or classes named "html"
-        # contained in modules named "index" etc.
+        # contained in packages named "index" etc.
         if pagename in ('indices.html', 'help.html',
                         'trees.html'):
             return pagename
