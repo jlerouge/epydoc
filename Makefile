@@ -23,14 +23,19 @@ DIR = /home/groups/e/ep/epydoc/htdocs
 # The current version of epydoc.
 VERSION = $(shell python -c 'import epydoc; print epydoc.__version__')
 
-# Output directories
-WEBDIR = webpage
-API = html/api
-EXAMPLES = examples
-STDLIB = stdlib
-LATEX = latex/api
-STDLIB_LATEX = latex/stdlib
+# Base output directories
+WEBDIR        = webpage
+LATEX         = latex
+HTML          = html
 
+# Output subdirectories
+HTML_API      = $(HTML)/api
+HTML_EXAMPLES = $(HTML)/examples
+HTML_STDLIB   = $(HTML)/stdlib
+LATEX_API     = $(LATEX)/api
+LATEX_STDLIB  = $(LATEX)/stdlib
+
+EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
 
 ##//////////////////////////////////////////////////////////////////////
@@ -60,7 +65,7 @@ usage:
 
 clean:
 	$(MAKE) -C src clean
-	rm -rf ${WEBDIR} ${API} ${EXAMPLES} ${STDLIB}
+	rm -rf $(WEBDIR) $(HTML) $(LATEX)
 	rm -rf .*.up2date
 
 ##//////////////////////////////////////////////////////////////////////
@@ -79,24 +84,24 @@ distributions: .distributions.up2date
 web: xfer
 webpage: xfer
 xfer: test .html.up2date stdlib-html
-	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
-	rsync -arzv -e ssh ${STDLIB}/ $(HOST):$(DIR)/stdlib
+	rsync -arzv -e ssh $(WEBDIR)/* $(HOST):$(DIR)
+	rsync -arzv -e ssh $(HTML_STDLIB)/ $(HOST):$(DIR)/stdlib
 
 local: .html.up2date
-	cp -r ${WEBDIR}/* /var/www/epydoc
+	cp -r $(WEBDIR)/* /var/www/epydoc
 
 checkdoc: checkdocs
 checkdocs:
-	epydoc --check --tests=vars,types ${PY_SRC}
+	epydoc --check --tests=vars,types $(PY_SRC)
 
 .html.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
-		doc/epydoc-man.html doc/epydocgui-man.html ${DOCS}
-	rm -rf ${WEBDIR}
-	mkdir -p ${WEBDIR}
-	cp -r ${DOCS} ${WEBDIR}
-	cp -r ${API} ${WEBDIR}/api
-	cp -r ${EXAMPLES} ${WEBDIR}/examples
-	cp ${LATEX}/api.pdf ${WEBDIR}/epydoc.pdf
+		doc/epydoc-man.html doc/epydocgui-man.html $(DOCS)
+	rm -rf $(WEBDIR)
+	mkdir -p $(WEBDIR)
+	cp -r $(DOCS) $(WEBDIR)
+	cp -r $(HTML_API) $(WEBDIR)/api
+	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
+	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
 	touch .html.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
@@ -104,44 +109,43 @@ checkdocs:
 # xml.dom.minidom and a few Docutils modules get plaintext
 # docstrings).
 api-html: .api-html.up2date
-.api-html.up2date: ${PY_SRC}
-	rm -rf ${API}
-	mkdir -p ${API}
-	${PYTHON} src/epydoc/cli.py \
-	       -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
+.api-html.up2date: $(PY_SRC)
+	rm -rf $(HTML_API)
+	mkdir -p $(HTML_API)
+	$(EPYDOC) \
+	       -o $(HTML_API) -n epydoc -u http://epydoc.sourceforge.net \
 	       --inheritance=listed --navlink "epydoc 2.0&alpha;"\
 	       --css blue --private-css green -v --debug \
-	       --docformat plaintext ${PY_SRC}
+	       --docformat plaintext $(PY_SRC)
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
-.api-pdf.up2date: ${PY_SRC}
-	rm -rf ${LATEX}
-	mkdir -p ${LATEX}
-	${PYTHON} src/epydoc/cli.py --pdf -o ${LATEX} \
-	       -n "Epydoc ${VERSION}" ${PY_SRC}
+.api-pdf.up2date: $(PY_SRC)
+	rm -rf $(LATEX_API)
+	mkdir -p $(LATEX_API)
+	$(EPYDOC) --pdf -o $(LATEX_API) \
+	       -n "Epydoc $(VERSION)" $(PY_SRC)
 	touch .api-pdf.up2date
 
-
 examples: .examples.up2date
-.examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
-	rm -rf ${EXAMPLES}
-	mkdir -p ${EXAMPLES}
-	${PYTHON} src/epydoc/cli.py \
-	       -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
+.examples.up2date: $(EXAMPLES_SRC) $(PY_SRC)
+	rm -rf $(HTML_EXAMPLES)
+	mkdir -p $(HTML_EXAMPLES)
+	$(EPYDOC) \
+	       -o $(HTML_EXAMPLES) -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue -t example --docformat=plaintext \
 	       --navlink 'epydoc examples' doc/epydoc_example.py sre
-	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/grouped \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped \
 	       --inheritance=grouped \
 	       -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
-	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/listed \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/listed \
 	       --inheritance=listed \
 	       -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
-	${PYTHON} src/epydoc/cli.py -o ${EXAMPLES}/included \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/included \
 	       --inheritance=included \
 	       -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue --debug \
@@ -187,22 +191,22 @@ SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
               |grep -v '/__')
 export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die?
 stdlib-html: .stdlib-html.up2date
-.stdlib-html.up2date: ${PY_SRC}
-	rm -rf ${STDLIB}
-	mkdir -p ${STDLIB}
-	${PYTHON} src/epydoc/cli.py -o ${STDLIB} -c white \
-	       -n ${SLNAME} -u ${SLURL} --docformat plaintext --debug \
-	       --show-imports --navlink ${SLLINK} --builtins ${SLFILES}
+.stdlib-html.up2date: $(PY_SRC)
+	rm -rf $(HTML_STDLIB)
+	mkdir -p $(HTML_STDLIB)
+	$(EPYDOC) -o $(HTML_STDLIB) -c white \
+	       -n $(SLNAME) -u $(SLURL) --docformat plaintext --debug \
+	       --show-imports --navlink $(SLLINK) --builtins $(SLFILES)
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
 stdlib-pdf: .stdlib-pdf.up2date
-.stdlib-pdf.up2date: ${PY_SRC}
-	rm -rf ${STDLIB_LATEX}
-	mkdir -p ${STDLIB_LATEX}
-	${PYTHON} src/epydoc/cli.py --pdf -o ${STDLIB_LATEX} \
-		--no-private -n ${SLNAME} --docformat plaintext \
-		--debug --builtins ${SLFILES}
+.stdlib-pdf.up2date: $(PY_SRC)
+	rm -rf $(LATEX_STDLIB)
+	mkdir -p $(LATEX_STDLIB)
+	$(EPYDOC) --pdf -o $(LATEX_STDLIB) \
+		--no-private -n $(SLNAME) --docformat plaintext \
+		--debug --builtins $(SLFILES)
 ##//////////////////////////////////////////////////////////////////////
 ## Unit Testing
 ##//////////////////////////////////////////////////////////////////////
@@ -210,3 +214,29 @@ stdlib-pdf: .stdlib-pdf.up2date
 tests: test
 test:
 	python src/epydoc/test/__init__.py
+
+##//////////////////////////////////////////////////////////////////////
+## Other test targets
+##//////////////////////////////////////////////////////////////////////
+
+docutils: docutils-html docutils-pdf
+
+docutils-html: .docutils-html.up2date
+.docutils-html.up2date: $(PY_SRC)
+	rm -rf $(HTML)/docutils
+	mkdir -p $(HTML)/docutils
+	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html \
+	        --docformat plaintext --ignore-param-mismatch \
+	        /usr/lib/python2.2/site-packages/docutils
+	touch .docutils-html.up2date
+
+docutils-pdf: .docutils-pdf.up2date
+.docutils-pdf.up2date: $(PY_SRC)
+	rm -rf $(LATEX)/docutils
+	mkdir -p $(LATEX)/docutils
+	$(EPYDOC) -o $(LATEX)/docutils -n 'Docutils' --pdf \
+	        --docformat plaintext --ignore-param-mismatch \
+	        /usr/lib/python2.2/site-packages/docutils
+	touch .docutils-pdf.up2date
+
+
