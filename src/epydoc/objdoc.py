@@ -50,20 +50,12 @@ import epydoc.markup as markup
 from epydoc.uid import UID, Link, make_uid
 
 # Python 2.2 types
-try:
-    _WrapperDescriptorType = type(list.__add__)
-    _MethodDescriptorType = type(list.append)
-    _PropertyType = property
-except:
-    _WrapperDescriptorType = None
-    _MethodDescriptorType = None
-    _PropertyType = None
+from epydoc.uid import _WrapperDescriptorType
+from epydoc.uid import _MethodDescriptorType
+from epydoc.uid import _PropertyType
 
 # Zope extension class type
-try:
-    from ExtensionClass import ExtensionClass as _ExtensionClass
-except:
-    _ExtensionClass = None
+from epydoc.uid import _ZopeType, _ZopeMethodType, _ZopeCMethodType
 
 # This is used when we get a bad field tag, to distinguish between
 # unknown field tags, and field tags that were just used in a bad
@@ -1555,14 +1547,7 @@ class ClassDoc(ObjDoc):
             # Find the class that defines the field; and get the value
             # directly from that class (so methods & variables have
             # the right uids).
-            for base in base_order:
-                if base.__dict__.has_key(field):
-                    container = make_uid(base)
-                    val = getattr(base, field)
-                    break
-            else:
-                container = None
-                val = getattr(cls, field)
+            (val, container) = _lookup_class_field(cls, field, base_order)
 
             linkname = field
             private_prefix = '_%s__' % container.shortname()
@@ -1675,7 +1660,7 @@ class ClassDoc(ObjDoc):
         try: bases = cls.__bases__
         except AttributeError: bases = []
         self._bases = [Link(base.__name__, make_uid(base)) for base in bases
-                       if (type(base) is types.ClassType or
+                       if (type(base) in (types.ClassType, _ZopeType) or
                            (isinstance(base, types.TypeType)))]
 
         # Initialize subclass list.  (Subclasses get added
@@ -2583,13 +2568,19 @@ class FuncDoc(ObjDoc):
         for base in bases[1:]:
             if base.value().__dict__.has_key(name):
                 # We found a candidate for an overriden method.
-                base_method = getattr(base.value(), name)
+                base_obj = base.value()
+                try:
+                    base_method = getattr(base_obj, name)
+                except:
+                    base_method = base_obj.__getattribute__(base_obj, name)
 
                 # Make sure it's some kind of method.
                 if type(base_method) not in (types.MethodType,
                                             types.BuiltinMethodType,
                                              _WrapperDescriptorType,
-                                             _MethodDescriptorType):
+                                             _MethodDescriptorType,
+                                             _ZopeMethodType,
+                                             _ZopeCMethodType):
                     return
 
                 # We've found a method that we override.  But
@@ -2693,10 +2684,11 @@ class PropertyDoc(ObjDoc):
         # its superclasses.
         for base in base_order:
             for (field, val) in base.__dict__.items():
-                if val == func:
+                if val is func:
                     container = make_uid(base)
-                    return make_uid(getattr(base, field),
-                                    container, field)
+                    try: obj = getattr(base, field)
+                    except: obj = base.__getattribute__(base, field)
+                    return make_uid(obj, container, field)
 
         # Otherwise, make a UID for it as a function (in the
         # containing module).
@@ -2820,6 +2812,7 @@ class DocMap(UserDict.UserDict):
         @type objID: L{UID}
         @rtype: C{None}
         """
+        if objID is None: return
         obj = objID.value()
         self._inherited = 0
         self._top = None
@@ -2833,7 +2826,8 @@ class DocMap(UserDict.UserDict):
 
         # If we're being very verbose, then report that we're adding it.
         if self._verbosity > 2:
-            print >>sys.stdout, '    Building docs for %s' % objID
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, '    Building docs for %s' % objID
         
         if objID.is_module():
             self.data[objID] = ModuleDoc(objID, self._verbosity)
@@ -2859,7 +2853,7 @@ class DocMap(UserDict.UserDict):
             except: bases = []
             for base in bases:
                 if not (type(base) is types.ClassType or
-                        type(base) is _ExtensionClass or
+                        type(base) is _ZopeType or
                         (isinstance(base, types.TypeType))):
                     continue
                 baseID=make_uid(base)
@@ -2893,9 +2887,11 @@ class DocMap(UserDict.UserDict):
         """
         # Check that it's a good object, and if not, issue a warning.
         if ((type(obj) not in (types.ModuleType, _MethodDescriptorType,
-                             types.BuiltinFunctionType, types.MethodType,
-                             types.BuiltinMethodType, types.FunctionType,
-                             _WrapperDescriptorType, types.ClassType) and
+                               types.BuiltinFunctionType, types.MethodType,
+                               types.BuiltinMethodType, types.FunctionType,
+                               _WrapperDescriptorType, types.ClassType,
+                               _ZopeType, _ZopeMethodType,
+                               _ZopeCMethodType) and
              not isinstance(obj, types.TypeType))):
             if sys.stderr.softspace: print >>sys.stderr
             estr = 'Error: docmap cannot add an object with type '
@@ -2907,6 +2903,7 @@ class DocMap(UserDict.UserDict):
         self._add(objID)
 
     def _add(self, objID):
+        if objID is None: return
         if self.data.has_key(objID): return
         
         # Add ourselves.
@@ -3191,37 +3188,6 @@ def _descr_to_docfield(arg, descr):
         else: raise ValueError('Bad arg 2 (expected "short")')
     return DocField(tags, singular, plural, short)
 
-def _dfs_bases(cls):
-    bases = [cls]
-    if not hasattr(cls, '__bases__'): return bases
-    for base in cls.__bases__: bases += _dfs_bases(base)
-    return bases
-
-def _find_base_order(cls):
-    # Try using mro (method resolution operator), if available.
-    if hasattr(cls, '__mro__'): return cls.__mro__
-    
-    # Use new or old inheritance rules?
-    new_inheritance = (sys.hexversion >= 0x02020000)
-
-    # Depth-first search,
-    base_order = _dfs_bases(cls)
-
-    # Eliminate duplicates.  For old inheritance order, eliminate from
-    # front to back; for new inheritance order, eliminate back to front.
-    if new_inheritance: base_order.reverse()
-    i = 0
-    seen_bases = {}
-    while i < len(base_order):
-        if seen_bases.has_key(base_order[i]):
-            del base_order[i]
-        else:
-            seen_bases[base_order[i]] = 1
-            i += 1
-    if new_inheritance: base_order.reverse()
-
-    return base_order
-
 # Copied from http://www.python.org/doc/current/lib/node566.html
 def _ast_match(pattern, data, vars=None, indent=0):
     """
@@ -3262,3 +3228,74 @@ def _ast_match(pattern, data, vars=None, indent=0):
         if not same:
             break
     return same, vars
+
+def _lookup_class_field(cls, field, base_order=None):
+    """
+    Find the value for a class's field by looking through its base
+    order list, and using getattr to access the first base that
+    contains the field.  Note that this is different from just using
+    C{getattr} directly, since for methods it will return a method of
+    the base class, rather than a method of the given class.  This is
+    useful for constructing UIDs for class methods.
+
+    @return: A pair C{(val, container)}, where C{val} is the value
+        that was found; and C{container} is the base that contains
+        C{val}.
+    """
+    if base_order is None: base_order = _find_base_order(cls)
+    for base in base_order:
+        if not hasattr(base, '__dict__'): continue
+        if base.__dict__.has_key(field):
+            container = make_uid(base)
+            try: val = getattr(base, field)
+            except: val = base.__getattribute__(base, field)
+            break
+    else:
+        container = make_uid(base_order[0])
+        try:
+            val = getattr(cls, field)
+        except:
+            try:
+                val = cls.__getattribute__(cls, field)
+            except:
+                val = '<Not Accessible>'
+    return (val, container)
+
+def _find_base_order(cls):
+    """
+    @return: A list of the base ancestors of C{cls}, in the order that
+        they should be searched for attributes.  Each base ancestor
+        should be listed exactly once.  The base order list includes
+        the given class as its first element.
+    @type: C{list} of C{class}
+    """
+    # Try using mro (method resolution operator), if available.
+    if hasattr(cls, '__mro__'): return cls.__mro__
+    
+    # Use new or old inheritance rules?
+    new_inheritance = (sys.hexversion >= 0x02020000)
+
+    # Depth-first search,
+    base_order = _dfs_bases(cls)
+
+    # Eliminate duplicates.  For old inheritance order, eliminate from
+    # front to back; for new inheritance order, eliminate back to front.
+    if new_inheritance: base_order.reverse()
+    i = 0
+    seen_bases = {}
+    while i < len(base_order):
+        if seen_bases.has_key(base_order[i]):
+            del base_order[i]
+        else:
+            seen_bases[base_order[i]] = 1
+            i += 1
+    if new_inheritance: base_order.reverse()
+
+    return base_order
+
+def _dfs_bases(cls):
+    bases = [cls]
+    if not hasattr(cls, '__bases__'): return bases
+    for base in cls.__bases__: bases += _dfs_bases(base)
+    return bases
+
