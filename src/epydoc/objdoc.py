@@ -113,27 +113,24 @@ def _find_docstring(uid):
         for linenum in range(len(lines)):
             if pat.match(lines[linenum]): break
         else: return (None, None)
+        linenum += 1
     if inspect.ismethod(object): object = object.im_func
     if inspect.isfunction(object): object = object.func_code
     if inspect.istraceback(object): object = object.tb_frame
     if inspect.isframe(object): object = object.f_code
     if inspect.iscode(object):
         if not hasattr(object, 'co_firstlineno'): return (None, None)
-        linenum = object.co_firstlineno - 1
-        if linenum >= len(lines): return (filename, linenum)
-        pat = re.compile(r'^\s*def\s')
-        while linenum > 0:
-            if pat.match(lines[linenum]): break
-            linenum = linenum - 1
+        linenum = object.co_firstlineno
 
-    # Find the line number of the docstring.
+    # Find the line number of the docstring.  Assume that it's the
+    # first non-blank line after the start of the object, since the
+    # docstring has to come first.
     for linenum in range(linenum, len(lines)):
-        line = lines[linenum].split('#', 1)[0]
-        pat = re.compile(r'(^|.*[^\\"\'])["\']')
-        if pat.match(line): break
-    else: return (None, None)
-        
-    return (filename, linenum)
+        if lines[linenum].split('#', 1)[0].strip():
+            return (filename, linenum)
+
+    # We couldn't find a docstring line number.
+    return (None, None)
 
 ##################################################
 ## ObjDoc
@@ -147,7 +144,7 @@ class Var:
     """
     The documentation for a variable.  This documentation consists of
     the following fields:
-
+    
         - X{uid}: The variable's UID
         - X{descr}: A description of the variable
         - X{type}: A description of the variable's type
@@ -637,8 +634,9 @@ class ObjDoc:
                 if startline is None:
                     print >>stream, '       '+warning
                 else:
-                    print >>stream, ('%5s: Warning: %s' %
-                                     ('L'+`startline+1`, warning))
+                    estr = '%5s: Warning: %s' % ('L'+`startline+1`, warning)
+                    estr = epytext.wordwrap(estr, 6, 75-6).strip()
+                    print >>stream, estr
             print >>stream
         
 #////////////////////////////////////////////////////////
@@ -880,7 +878,7 @@ class ModuleDoc(ObjDoc):
             raise TypeError('This ModuleDoc does not '+
                             'document a package.')
         name = (module.__name__.split('.'))[-1]
-        self._modules.append(Link(name, make_uid(module)))
+        self._modules.append(Link(name, make_uid(module, self._uid, name)))
 
 #////////////////////////////////////////////////////////
 #// ClassDoc
@@ -935,8 +933,8 @@ class ClassDoc(ObjDoc):
             # values via __dict__)
             if type(val) is types.FunctionType:
                 val = new.instancemethod(val, None, cls)
-                
             vuid = make_uid(val, self._uid, field)
+            
             
             # Don't do anything for these special variables:
             if field in ('__doc__', '__module__', '__epydoc_sort__'):
@@ -984,7 +982,8 @@ class ClassDoc(ObjDoc):
         # Add links to base classes.
         try: bases = cls.__bases__
         except AttributeError: bases = []
-        self._bases = [Link(base.__name__, make_uid(base)) for base in bases]
+        self._bases = [Link(base.__name__, make_uid(base)) for base in bases
+                       if type(base) in (types.ClassType, types.TypeType)]
 
         # Initialize subclass list.  (Subclasses get added
         # externally with add_subclass())
@@ -1054,16 +1053,18 @@ class ClassDoc(ObjDoc):
 
     def _inherit_methods(self, base):
         for (field, val) in base.__dict__.items():
+            if self._methodbyname.has_key(field): continue
             # Convert functions to methods.  (Since we're getting
             # values via __dict__)
-            if self._methodbyname.has_key(field): continue
             if type(val) is types.FunctionType:
-                val = new.instancemethod(val, None, self._uid.value())
+                val = new.instancemethod(val, None, base)
+            if type(val) not in (types.MethodType, types.BuiltinMethodType):
+                continue
             vuid = make_uid(val, self._uid, field)
             if vuid is None: continue
             if not vuid.is_routine(): continue
             self._methodbyname[field] = 1
-            self._methods.append(Link(field, make_uid(val)))
+            self._methods.append(Link(field, vuid))
 
         for nextbase in base.__bases__:
             self._inherit_methods(nextbase)
@@ -1157,7 +1158,8 @@ class ClassDoc(ObjDoc):
         @type cls: L{UID}
         @rtype: C{None}
         """
-        self._subclasses.append(Link(cls.__name__, make_uid(cls)))
+        cuid = make_uid(cls, self._uid, cls.__name__)
+        self._subclasses.append(Link(cls.__name__, cuid))
 
 #////////////////////////////////////////////////////////
 #// FuncDoc
@@ -1212,6 +1214,8 @@ class FuncDoc(ObjDoc):
             self._init_params()
         else:
             raise TypeError("Can't document %s" % func)
+        if self._uid.is_method():
+            self._find_override(self._uid.cls().value())
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
@@ -1361,21 +1365,49 @@ class FuncDoc(ObjDoc):
             else:
                 vars.append(self._params_to_vars(params[i], []))
         return vars
-    
+
     def _find_override(self, cls):
+        """
+        Find the method that this method overrides.
+        @return: True if we haven't found an overridden method yet.
+        @rtype: C{boolean}
+        """
         name = self.uid().shortname()
         for base in cls.__bases__:
             if base.__dict__.has_key(name):
-                func = base.__dict__[name]
-                fuid = make_uid(func)
-                if fuid.is_function():
-                    method = new.instancemethod(func, None, base)
-                    self._overrides = make_uid(method)
-                elif fuid.is_routine():
-                    self._overrides = fuid
-                break
+                # We found a candidate for an overriden method.
+                base_method = base.__dict__[name]
+                if type(base_method) is types.FunctionType:
+                    base_method = new.instancemethod(base_method, None, base)
+
+                # Make sure it's a method.
+                if type(base_method) not in (types.MethodType,
+                                            types.BuiltinMethodType):
+                    return 0
+
+                # Check that the parameters match.
+                if (type(base_method) is types.MethodType and
+                    type(self._uid.value() is types.MethodType)):
+                    self_func = self._uid.value().im_func
+                    base_func = base_method.im_func
+                    self_argspec = inspect.getargspec(self_func)
+                    base_argspec = inspect.getargspec(base_func)
+                    
+                    if self_argspec[:3] != base_argspec[:3]:
+                        if name == '__init__': return 0
+                        estr =(('The parameters of %s do not match the '+
+                                'parameters of the base class method '+
+                                '%s; not inheriting documentation.')
+                               % (self.uid(), make_uid(base_method)))
+                        self._field_warnings.append(estr)
+                        return 0
+                
+                # We've found the method that we override.
+                self._overrides = make_uid(base_method)
+                return 0
             else:
-                self._find_override(base)
+                if not self._find_override(base): return 0
+        return 1
 
     def _process_field(self, tag, arg, descr, warnings):
         # return, rtype, arg, type, raise
@@ -1591,6 +1623,8 @@ class DocMap(UserDict.UserDict):
             try: bases = obj.__bases__
             except: bases = []
             for base in bases:
+                if type(base) not in (types.ClassType, types.TypeType):
+                    continue
                 baseID=make_uid(base)
                 if self.data.has_key(baseID):
                     self.data[baseID].add_subclass(obj)
@@ -1627,7 +1661,7 @@ class DocMap(UserDict.UserDict):
 
                 # Skip any imported values.
                 if vuid.is_class() or vuid.is_function():
-                    if make_uid(val).module() != objID: continue
+                    if vuid.module() != objID: continue
 
                 if vuid.is_class():
                     self.add(val)
