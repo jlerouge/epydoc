@@ -37,6 +37,8 @@ Usage::
  See the epytext(1) man page for a complete list of options.
 
 @var PROFILE: Whether or not to run the profiler.
+@var TESTS: The lists of tests that can be run with
+    C{'epydoc --check'}.
 
 @var _encountered_internal_error: A global variable recording whether
 any internal errors have been detected.  If this variable is set to
@@ -63,6 +65,10 @@ PS2PDF_COMMAND = ('ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '+
 #LATEX_COMMAND = r"echo x | latex %(tex)s"
 
 PROFILE=0
+
+# What tests can we run?
+TESTS=('basic', 'type', 'full', 'private', 'author', 'version', 'all')
+
 ##################################################
 ## Command-Line Interface
 ##################################################
@@ -85,7 +91,7 @@ def cli():
 
     # Perform the requested action.
     if options['action'] == 'html': _html(docmap, options)
-    elif options['action'] == 'check': _check(docmap, options)
+    elif options['action'] == 'check': _check(docmap, modules, options)
     elif options['action'] == 'latex': _latex(docmap, options, 'latex')
     elif options['action'] == 'dvi': _latex(docmap, options, 'dvi')
     elif options['action'] == 'ps': _latex(docmap, options, 'ps')
@@ -160,8 +166,9 @@ def _help(arg):
         print 'string, consisting the name of a markup language, optionally '
         print 'followed by a language code (such as "en" for English).  Epydoc'
         print 'currently recognizes the following markup language names:'
-        print '  - epytext'
-        print '  - plaintext'
+        import objdoc
+        for format in objdoc.KNOWN_DOCFORMATS:
+            print '  - %s' % format
         print
         sys.exit(0)
     else:
@@ -187,20 +194,21 @@ def _parse_args():
         that value is used; otherwise, a default value is used.
         Currently, the following configuration parameters are set:
         C{target}, C{modules}, C{verbosity}, C{prj_name}, C{output},
-        C{check_private}, C{show_imports}, C{frames}, C{private},
-        C{debug}, C{top}, C{list_classes_separately}, and C{docformat}.
+        C{show_imports}, C{frames}, C{private}, C{debug}, C{top},
+        C{list_classes_separately}, C{docformat}, C{inheritance},
+        C{autogen_vars}, and C{test}.
     @rtype: C{None}
     """
     # Default values.
     options = {'target':None, 'modules':[], 'verbosity':1,
-               'prj_name':'', 'action':'html', 'check_private':0,
-               'show_imports':0, 'frames':1, 'private':1,
+               'prj_name':'', 'action':'html', 
+               'show_imports':0, 'frames':1, 'private':None,
                'list_classes_separately': 0, 'debug':0,
                'docformat':None, 'top':None, 'inheritance': 'grouped',
-               'autogen_vars': 1}
+               'autogen_vars': 1, 'tests':{}}
 
     # Get the command-line arguments, using getopts.
-    shortopts = 'c:fh:n:o:t:u:Vvpq?:'
+    shortopts = 'c:fh:n:o:pt:u:Vvq?:'
     longopts = ('check frames help= usage= helpfile= help-file= '+
                 'help_file= output= target= url= version verbose ' +
                 'private-css= private_css= quiet show-imports '+
@@ -210,6 +218,7 @@ def _parse_args():
                 'nav_link= nav-link= latex html dvi ps pdf '+
                 'separate-classes separate_classes '+
                 'inheritance= inheritence= '+
+                'test= tests= checks= private'+
                 'no-autogen-vars no_autogen_vars').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
@@ -247,8 +256,8 @@ def _parse_args():
             options['autogen_vars'] = 0
         elif opt in ('--no-private', '--no_private'): options['private']=0
         elif opt in ('--output', '--target', '-o'): options['target']=val
-        elif opt in ('-p',): options['check_private'] = 1
         elif opt in ('--pdf',): options['action'] = 'pdf'
+        elif opt in ('-p', '--private', '--private'): options['private']=1
         elif opt in ('--private-css', '--private_css'):
             options['private_css'] = val
         elif opt in ('--ps',): options['action'] = 'ps'
@@ -264,6 +273,9 @@ def _parse_args():
         elif opt in ('--builtins',):
             modules += sys.builtin_module_names
             modules.remove('__main__')
+        elif opt in ('--test', '--tests', '--checks'):
+            for test in re.split('\s*[,\s]\s*', val.lower()):
+                options['tests'][test] = 1
         else:
             _usage()
 
@@ -271,9 +283,18 @@ def _parse_args():
     if options['inheritance'] not in ('grouped', 'listed', 'included'):
         estr = 'Bad inheritance style.  Valid options are '
         estr += 'grouped, listed, included'
-        print >>sys.stderr, ('%s; run "%s -h" for usage' %
+        print >>sys.stderr, ('%s;\nrun "%s -h" for usage.' %
                              (estr,os.path.basename(sys.argv[0])))
         sys.exit(1)
+
+    # Make sure tests has a valid value.
+    for test in options['tests']:
+        if test not in TESTS:
+            estr = 'Bad epydoc test %r.  Valid options are:' % test
+            for t in TESTS: estr += '\n  - %r' % t
+            print >>sys.stderr, ('%s\nrun "%s -h" for usage.' %
+                                 (estr,os.path.basename(sys.argv[0])))
+            sys.exit(1)
 
     # Pick a default target directory, if none was specified.
     if options['target'] is None:
@@ -282,19 +303,24 @@ def _parse_args():
         elif options['action'] in ('latex', 'dvi', 'ps', 'pdf'):
             options['target'] = 'latex'
 
+    # Default for private depends on action.
+    if options['private'] is None:
+        if options['action'] == 'html': options['private'] = 1
+        else: options['private'] = 0
+
     # Check that the options all preceed the filenames.
     for m in modules:
         if m == '-': break
         elif m[0:1] == '-':
             estr = 'options must preceed modules'
-            print >>sys.stderr, ('%s; run "%s -h" for usage' %
+            print >>sys.stderr, ('%s; run "%s -h" for usage.' %
                                  (estr,os.path.basename(sys.argv[0])))
             sys.exit(1)
         
     # Make sure we got some modules.
     modules = [m for m in modules if m != '-']
     if len(modules) == 0:
-        print >>sys.stderr, ('no modules specified; run "%s -h" for usage' %
+        print >>sys.stderr, ('no modules specified; run "%s -h" for usage.' %
                              os.path.basename(sys.argv[0]))
         sys.exit(1)
     options['modules'] = modules
@@ -359,7 +385,7 @@ def _make_docmap(modules, options):
     from epydoc.objdoc import DocMap
 
     verbosity = options['verbosity']
-    document_bases = (options['action'] != 'check')
+    document_bases = 1 #(options['action'] != 'check')
     document_autogen_vars = options['autogen_vars']
     inheritance_groups = (options['inheritance'] == 'grouped')
     inherit_groups = (options['inheritance'] != 'grouped')
@@ -479,10 +505,16 @@ def _html(docmap, options):
     progress = _Progress('Writing', options['verbosity'], num_files, 1)
     html_doc.write(options['target'], progress.report)
 
-def _check(docmap, options):
+def _check(docmap, modules, options):
     """
     Run completeness checks on the objects in the given documentation
-    map. 
+
+    map.  By default, C{_check} checks for docstrings in all public
+    modules, classes, functions, and properties.  Additional checks
+    can be added with the C{'tests'} option:
+
+      - C{private}: Also checks private objects.
+      - C{full}: Also checks variables, parameters, and return values.
 
     @param docmap: A documentation map containing the documentation
         for the objects whose API documentation should be created.
@@ -493,15 +525,37 @@ def _check(docmap, options):
     
     # Run completeness checks.
     if options['verbosity'] > 0:
-        print  >>sys.stderr, 'Performing completeness checks'
-    checker = DocChecker(docmap)
-    if options['check_private']:
-        checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
-                      DocChecker.PRIVATE | DocChecker.DESCR_LAZY | 
-                      DocChecker.TYPE)
-    else:
-        checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
-                      DocChecker.DESCR_LAZY | DocChecker.TYPE)
+        print  >>sys.stderr, 'Performing completeness checks...'
+    checker = DocChecker(docmap, modules)
+
+    if options['tests'].get('all'):
+        for test in TESTS: options['tests'][test] = 1
+
+    # Run the checks
+    checks = 0
+    if (options['tests'].get('basic') or
+        options['tests'].get('full') or
+        options['tests'].get('private')):
+        checks |= (DocChecker.MODULE | DocChecker.CLASS |
+                   DocChecker.FUNC | DocChecker.PROPERTY |
+                   DocChecker.DESCR_LAZY | DocChecker.PUBLIC)
+    if options['tests'].get('private'): checks |= DocChecker.PRIVATE
+    if options['tests'].get('full'): checks |= DocChecker.ALL_T
+    if options['tests'].get('type'): DocChecker.TYPE
+    passed_checks = checker.check(checks)
+
+    if options['tests'].get('author'):
+        checks = DocChecker.MODULE | DocChecker.PUBLIC | DocChecker.AUTHOR
+        if options['tests'].get('private'): checks |= DocChecker.PRIVATE
+        passed_checks = checker.check(checks) and passed_checks
+    
+    if options['tests'].get('version'):
+        checks = DocChecker.MODULE | DocChecker.PUBLIC | DocChecker.VERSION
+        if options['tests'].get('private'): checks |= DocChecker.PRIVATE
+        passed_checks = checker.check(checks) and passed_checks
+    
+    if passed_checks and options['verbosity'] > 0:
+        print >>sys.stderr, '  All checks passed!'
            
 class _Progress:
     """
