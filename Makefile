@@ -53,7 +53,7 @@ local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
 
 checkdocs:
-	epydoc --check -v ${PY_SRC}
+	epydoc --check ${PY_SRC}
 
 .html.up2date: refdocs examples doc/epydoc-man.html doc/epydocgui-man.html
 	rm -rf ${WEBDIR}
@@ -70,7 +70,7 @@ refdocs: .refdocs.up2date
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --css blue --private-css green -vv --debug --navlink 'epydoc'\
+	       --css blue --private-css green -v --debug --navlink 'epydoc'\
 	       --docformat plaintext ${PY_SRC} xml.dom.minidom
 	touch .refdocs.up2date
 
@@ -79,7 +79,7 @@ examples: .examples.up2date
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
 	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue -t example \
+	       --no-private --css blue -t example -q \
 	       --navlink 'epydoc examples' ${EXAMPLES_SRC} sre
 	touch .examples.up2date
 
@@ -120,7 +120,7 @@ SLFILES = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
 stdlib:
 	rm -rf ${STDLIB}
 	mkdir -p ${STDLIB}
-	epydoc -o ${STDLIB} -v -q -c white --show-imports \
+	epydoc -o ${STDLIB} -c white --show-imports \
 	       -n ${SLNAME} -u ${SLURL} --docformat plaintext \
 	       --navlink ${SLLINK} --builtins ${SLFILES}
 
