@@ -594,10 +594,10 @@ def _tokenize_doctest(lines, start, block_indent, tokens, warnings):
         # A blank line ends doctest block.
         if indent == len(line): break
         
-        # A Dedent past block_indent givs a warning.
+        # A Dedent past block_indent gives a warning.
         if indent < block_indent:
             min_indent = min(min_indent, indent)
-            estr = 'Bad Doctest block indentation.'
+            estr = 'Improper doctest block indentation.'
             warnings.append(TokenizationError(estr, linenum, line))
 
         # Go on to the next line.
@@ -973,7 +973,7 @@ def _colorize(doc, token, errors, warnings=None, tagName='para'):
                 if (end-1) > start:
                     stack[-1].appendChild(doc.createTextNode(str[start:end-1]))
                 if not _COLORIZING_TAGS.has_key(str[end-1]):
-                    estr = "Unknown colorizing tag."
+                    estr = "Unknown inline markup tag."
                     errors.append(ColorizingError(estr, token, end-1))
                     stack.append(doc.createElement('unknown'))
                 else:
