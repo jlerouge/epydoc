@@ -743,7 +743,7 @@ class ObjDoc:
                     else:
                         estr =' Error: %s' % error
                         estr = markup.wordwrap(estr, 7, startindex=7).strip()
-                        print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
+                        print >>stream, '     - %s' % estr
                 else:
                     error.set_linenum_offset(startline+1)
                     print >>stream, error
@@ -760,7 +760,7 @@ class ObjDoc:
                 else:
                     estr =' Warning: %s' % warning
                     estr = markup.wordwrap(estr, 7, startindex=7).strip()
-                    print >>stream, '%5s: %s' % ('L'+`startline+1`, estr) 
+                    print >>stream, '     - %s' % estr
                     
             print >>stream
         
@@ -1484,9 +1484,6 @@ class ClassDoc(ObjDoc):
     #// Accessors
     #////////////////////////////
 
-#     def inherited_cvariables(self): return self._inh_cvariables 
-#     def inherited_ivariables(self): return self._inh_ivariables
-
     def groups(self):
         return self._groups
         
@@ -1993,19 +1990,6 @@ class FuncDoc(ObjDoc):
             self._vararg_param = Param('...')
             return 0
 
-        # What do we do with documented parameters?  Esp. if we just
-        # got "..." for the argument spec.
-        ## If they specified parameters, use them. ??
-        ## What about ordering??
-        #if self._tmp_param or self._tmp_type:
-        #    vars = {}
-        #    for (name, descr) in self._tmp_param.items():
-        #        vars[name] = Param(name, descr)
-        #    for (name, type_descr) in self._tmp_type.items():
-        #        if not vars.has_key(name): vars[name] = Param(name)
-        #        vars[name].set_type(type_descr)
-        #    self._params =
-        
     def _init_signature(self, func):
         # Get the function's signature
         (args, vararg, kwarg, defaults) = inspect.getargspec(func)
@@ -2308,8 +2292,8 @@ def report_param_mismatches(docmap):
     mismatches.sort()
     if sys.stderr.softspace: print >>sys.stderr
     estr = ("Warning: the following methods' parameters do not match "+
-            "the parameters of the base methods that they override; "+
-            "so documentation was not inherited:")
+            "the parameters of the base class methods that they "+
+            "override; so documentation was not inherited:")
     print >>sys.stderr, markup.wordwrap(estr, indent=9).lstrip()
     for mismatch in mismatches:
         estr = '    - %s\n      (base method=%s)' % mismatch
@@ -2621,15 +2605,6 @@ class DocMap(UserDict.UserDict):
             identified by C{key} is not contained in this
             documentation map.
         """
-#         # Make sure all inheritances are taken care of.
-#         if not self._inherited:
-#             # this really needs to be done top-down.. how?
-#             self._inherited = 1
-#             for cls in self.keys():
-#                 if not cls.is_class(): continue
-#                 self[cls].inherit(*[self.get(UID(baseid)) for baseid
-#                                     in cls.value().__bases__])
-
         if isinstance(key, UID):
             return self.data[key]
         else:
