@@ -42,6 +42,10 @@ table.summary, table.details, table.index
 tr.summary, tr.details, tr.index 
                    { background: #70b0f0; color: #000000;  
                      text-align: left; font-size: 120%; } 
+
+/* Documentation page titles */
+h2.module          { margin-top: 0.2em; }
+h2.class           { margin-top: 0.2em; }
  
 /* Headings */
 h1.heading         { font-size: +140%; font-style: italic;
@@ -52,7 +56,7 @@ h3.heading         { font-size: +110%; font-style: italic;
                      font-weight: normal; }
                     
 /* Base tree */
-pre.base-tree      { font-size: 80%; }
+pre.base-tree      { font-size: 80%; margin: 0; }
 
 /* Details Sections */
 table.func-details { background: #e8f0f8; color: #000000;
@@ -137,6 +141,10 @@ tr.details, tr.index
                    { background: #c0e0e0; color: #000000;
                      text-align: center; font-size: 120%; }
 
+/* Documentation page titles */
+h2.module          { margin-top: 0.2em; }
+h2.class           { margin-top: 0.2em ; }
+ 
 /* Headings */
 h1.heading         { font-size: +140%; font-style: italic;
                      font-weight: bold; color: #002040; }
@@ -146,7 +154,7 @@ h3.heading         { font-size: +110%; font-style: italic;
                      font-weight: normal; color: #002040; }
 
 /* Base tree */
-pre.base-tree      { font-size: 80%; }
+pre.base-tree      { font-size: 80%; margin: 0; }
 
 /* Details Sections */
 table.func-details { background: #a8c0c8; color: #000000;
