@@ -1698,9 +1698,8 @@ def parse_type_of(obj):
         para.appendChild(link)
         link.appendChild(name)
         link.appendChild(target)
-        name.appendChild(doc.createTextNode(str(obj.__class__)))
-        target.appendChild(doc.createTextNode(str(obj.__class__)))
-        
+        name.appendChild(doc.createTextNode(str(obj.__class__.__name__)))
+        target.appendChild(doc.createTextNode(str(obj.__class__)))        
     else:
         code = doc.createElement('code')
         para.appendChild(code)
