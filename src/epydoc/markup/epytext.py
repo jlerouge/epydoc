@@ -103,8 +103,8 @@ Description::
 #   4. helpers
 #   5. testing
 
-import re, epydoc.uid, string
-from xml.dom.minidom import Element, Text
+import re, epydoc.uid, string, types
+from xml.dom.minidom import Document, Text
 
 ##################################################
 ## Constants
@@ -136,97 +136,6 @@ _COLORIZING_TAGS = {
 _LINK_COLORIZING_TAGS = ['link', 'uri']
 
 ##################################################
-## Helpers
-##################################################
-
-def parse_as_literal(str):
-    """
-    Return a DOM tree matching the epytext DTD, containing a single
-    literal block.  That literal block will include the contents of
-    the given string.  This method is typically used as a fall-back
-    when the parser fails.
-
-    @param str: The string which should be enclosed in a literal
-        block.
-    @type str: C{string}
-    
-    @return: A DOM tree containing C{str} in a single literal block.
-    @rtype: C{xml.dom.minidom.Element}
-    """
-    epytext = Element('epytext')
-    lit = Element('literalblock')
-    epytext.appendChild(lit)
-    lit.appendChild(Text(str))
-    return epytext
-
-def parse_as_para(str):
-    """
-    Return a DOM tree matching the epytext DTD, containing a single
-    paragraph.  That paragraph will include the contents of the given
-    string.  This can be used to wrap some forms of automatically
-    generated information (such as type names) in paragraphs.
-
-    @param str: The string which should be enclosed in a paragraph.
-    @type str: C{string}
-    
-    @return: A DOM tree containing C{str} in a single paragraph.
-    @rtype: C{xml.dom.minidom.Element}
-    """
-    epytext = Element('epytext')
-    para = Element('para')
-    epytext.appendChild(para)
-    para.appendChild(Text(str))
-    return epytext
-
-def summary(tree):
-    """
-    Given a DOM tree representing formatted documentation, return a
-    new DOM tree containing the documentation's first sentence.
-
-    @param tree: A DOM tree representing formatted documentation, as
-        produced by L{parse}.
-    @type tree: C{xml.dom.minidom.Element}
-    @return: A DOM tree containing the first sentence of the
-        documentation.
-    @rtype: C{xml.dom.minidom.Element}
-    """
-    # Find the first paragraph.
-    children = [tree]
-    while (len(children) > 0) and (children[0].tagName != 'para'):
-        if children[0].tagName in ('epytext', 'section',
-                                   'ulist', 'olist', 'li'):
-            children = children[0].childNodes
-        else:
-            children = children[1:]
-
-    # Special case: if the docstring contains a single literal block,
-    # then try extracting the summary from it.
-    if (len(children) == 0 and len(tree.childNodes) == 1 and
-        tree.childNodes[0].tagName == 'literalblock'):
-        str = re.split(r'\n\s*(\n|$).*',
-                       tree.childNodes[0].childNodes[0].data, 1)[0]
-        children = [Element('para')]
-        children[0].appendChild(Text(str))
-
-    # If we didn't find a paragraph, return an empty epytext.
-    if len(children) == 0: return Element('epytext')
-
-    # Extract the first sentence.
-    parachildren = children[0].childNodes
-    summary = Element('epytext')
-    para = Element('para')
-    summary.appendChild(para)
-    for parachild in parachildren:
-        if isinstance(parachild, Text):
-            m = re.match(r'\s*([\w\W]*?\.)(\s|$)', parachild.data)
-            if m:
-                para.appendChild(Text(m.group(1)))
-                return summary
-        para.appendChild(parachild.cloneNode(1))
-
-    return summary
-
-##################################################
 ## Structuring (Top Level)
 ##################################################
 
@@ -250,12 +159,12 @@ def parse(str, errors = None, warnings = None):
     @type warnings: C{list} of L{ParseError}
 
     @return: a DOM tree encoding the contents of an epytext string.
-    @rtype: C{xml.dom.minidom.Element}
+    @rtype: L{xml.dom.minidom.Document}
     
     @raise ParseError: If C{errors} is C{None} and an error is
         encountered while parsing.
 
-    @see: C{xml.dom.minidom.Element}
+    @see: L{xml.dom.minidom.Document}
     """
     # Initialize warning and error lists.
     if warnings == None: warnings = []
@@ -272,7 +181,11 @@ def parse(str, errors = None, warnings = None):
     # Tokenize the input string.
     tokens = _tokenize(str, warnings)
 
-    encountered_field = 0       # Have we encountered a field yet?
+    # Have we encountered a field yet?
+    encountered_field = 0
+
+    # Create an XML document to hold the epytext.
+    doc = Document()
 
     # Maintain two parallel stacks: one contains DOM elements, and
     # gives the ancestors of the current block.  The other contains
@@ -284,7 +197,7 @@ def parse(str, errors = None, warnings = None):
     # corresponds to).  No 2 consecutive indent_stack values will be
     # ever be "None."  Use initial dummy elements in the stack, so we
     # don't have to worry about bounds checking.
-    stack = [None, Element('epytext')]
+    stack = [None, doc.createElement('epytext')]
     indent_stack = [-1, None]
 
     for token in tokens:
@@ -296,23 +209,23 @@ def parse(str, errors = None, warnings = None):
 
         # If Token has type PARA, colorize and add the new paragraph
         if token.tag == Token.PARA:
-            _add_para(token, stack, indent_stack, errors, warnings)
+            _add_para(doc, token, stack, indent_stack, errors, warnings)
                      
         # If Token has type HEADING, add the new section
         elif token.tag == Token.HEADING:
-            _add_section(token, stack, indent_stack, errors, warnings)
+            _add_section(doc, token, stack, indent_stack, errors, warnings)
 
         # If Token has type LBLOCK, add the new literal block
         elif token.tag == Token.LBLOCK:
-            stack[-1].appendChild(token.to_dom())
+            stack[-1].appendChild(token.to_dom(doc))
 
         # If Token has type DTBLOCK, add the new doctest block
         elif token.tag == Token.DTBLOCK:
-            stack[-1].appendChild(token.to_dom())
+            stack[-1].appendChild(token.to_dom(doc))
 
         # If Token has type BULLET, add the new list/list item/field
         elif token.tag == Token.BULLET:
-            _add_list(token, stack, indent_stack, errors, warnings)
+            _add_list(doc, token, stack, indent_stack, errors, warnings)
         else:
             assert 0, 'Unknown token type: '+token.tag
 
@@ -334,7 +247,8 @@ def parse(str, errors = None, warnings = None):
             #return None
         
     # Return the top-level epytext DOM element.
-    return stack[1]
+    doc.appendChild(stack[1])
+    return doc
 
 def _pop_completed_blocks(token, stack, indent_stack):
     """
@@ -380,7 +294,7 @@ def _pop_completed_blocks(token, stack, indent_stack):
     #        stack.pop()
     #        indent_stack.pop()
 
-def _add_para(para_token, stack, indent_stack, errors, warnings):
+def _add_para(doc, para_token, stack, indent_stack, errors, warnings):
     """Colorize the given paragraph, and add it to the DOM tree."""
     # Check indentation, and update the parent's indentation
     # when appropriate.
@@ -388,7 +302,7 @@ def _add_para(para_token, stack, indent_stack, errors, warnings):
         indent_stack[-1] = para_token.indent
     if para_token.indent == indent_stack[-1]:
         # Colorize the paragraph and add it.
-        para = _colorize(para_token, errors, warnings)
+        para = _colorize(doc, para_token, errors, warnings)
         stack[-1].appendChild(para)
     else:
         #if (len(stack[-1].childNodes)>0 and
@@ -400,7 +314,7 @@ def _add_para(para_token, stack, indent_stack, errors, warnings):
         estr = "Improper paragraph indentation."
         errors.append(StructuringError(estr, para_token))
 
-def _add_section(heading_token, stack, indent_stack, errors, warnings):
+def _add_section(doc, heading_token, stack, indent_stack, errors, warnings):
     """Add a new section to the DOM tree, with the given heading."""
     if indent_stack[-1] == None:
         indent_stack[-1] = heading_token.indent
@@ -424,16 +338,16 @@ def _add_section(heading_token, stack, indent_stack, errors, warnings):
     indent_stack[heading_token.level+2:] = []
 
     # Colorize the heading
-    head = _colorize(heading_token, errors, warnings, 'heading')
+    head = _colorize(doc, heading_token, errors, warnings, 'heading')
 
     # Add the section's and heading's DOM elements.
-    sec = Element("section")
+    sec = doc.createElement("section")
     stack[-1].appendChild(sec)
     stack.append(sec)
     sec.appendChild(head)
     indent_stack.append(None)
         
-def _add_list(bullet_token, stack, indent_stack, errors, warnings):
+def _add_list(doc, bullet_token, stack, indent_stack, errors, warnings):
     """
     Add a new list item or field to the DOM tree, with the given
     bullet or field tag.  When necessary, create the associated
@@ -479,7 +393,7 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
             indent_stack[2:] = []
 
         # Add the new list.
-        lst = Element(list_type)
+        lst = doc.createElement(list_type)
         stack[-1].appendChild(lst)
         stack.append(lst)
         indent_stack.append(bullet_token.indent)
@@ -493,18 +407,18 @@ def _add_list(bullet_token, stack, indent_stack, errors, warnings):
     # are adjoined directly into the "epytext" node, not into
     # the "fieldlist" node.
     if list_type == 'fieldlist':
-        li = Element("field")
+        li = doc.createElement("field")
         tagwords = bullet_token.contents[1:-1].split()
         assert 0 < len(tagwords) < 3, "Bad field tag"
-        tag = Element("tag")
-        tag.appendChild(Text(tagwords[0]))
+        tag = doc.createElement("tag")
+        tag.appendChild(doc.createTextNode(tagwords[0]))
         li.appendChild(tag)
         if len(tagwords) > 1:
-            arg = Element("arg")
-            arg.appendChild(Text(tagwords[1]))
+            arg = doc.createElement("arg")
+            arg.appendChild(doc.createTextNode(tagwords[1]))
             li.appendChild(arg)
     else:
-        li = Element("li")
+        li = doc.createElement("li")
         if list_type == 'olist':
             li.setAttribute("bullet", bullet_token.contents)
 
@@ -618,13 +532,13 @@ class Token:
         """
         return '<Token: %s at line %s>' % (self.tag, self.startline)
 
-    def to_dom(self):
+    def to_dom(self, doc):
         """
         @return: a DOM representation of this C{Token}.
-        @rtype: C{xml.dom.minidom.Element}
+        @rtype: L{xml.dom.minidom.Element}
         """
-        e = Element(self.tag)
-        e.appendChild(Text(self.contents))
+        e = doc.createElement(self.tag)
+        e.appendChild(doc.createTextNode(self.contents))
         return e
 
 # Construct regular expressions for recognizing bullets.  These are
@@ -1000,7 +914,7 @@ def _tokenize(str, warnings):
 _BRACE_RE = re.compile('{|}')
 _TARGET_RE = re.compile('^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
 
-def _colorize(token, errors, warnings=None, tagName='para'):
+def _colorize(doc, token, errors, warnings=None, tagName='para'):
     """
     Given a string containing the contents of a paragraph, produce a
     DOM C{Element} encoding that paragraph.  Colorized regions are
@@ -1031,7 +945,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
     # the text currently being analyzed.  New elements are pushed when 
     # "{" is encountered, and old elements are popped when "}" is
     # encountered. 
-    stack = [Element(tagName)]
+    stack = [doc.createElement(tagName)]
 
     # This is just used to make error-reporting friendlier.  It's a
     # stack parallel to "stack" containing the index of each element's 
@@ -1057,17 +971,18 @@ def _colorize(token, errors, warnings=None, tagName='para'):
         if match.group() == '{':
             if (end>0) and 'A' <= str[end-1] <= 'Z':
                 if (end-1) > start:
-                    stack[-1].appendChild(Text(str[start:end-1]))
+                    stack[-1].appendChild(doc.createTextNode(str[start:end-1]))
                 if not _COLORIZING_TAGS.has_key(str[end-1]):
                     estr = "Unknown colorizing tag."
                     errors.append(ColorizingError(estr, token, end-1))
-                    stack.append(Element('unknown'))
+                    stack.append(doc.createElement('unknown'))
                 else:
-                    stack.append(Element(_COLORIZING_TAGS[str[end-1]]))
+                    tag = _COLORIZING_TAGS[str[end-1]]
+                    stack.append(doc.createElement(tag))
             else:
                 if end > start:
-                    stack[-1].appendChild(Text(str[start:end]))
-                stack.append(Element('litbrace'))
+                    stack[-1].appendChild(doc.createTextNode(str[start:end]))
+                stack.append(doc.createElement('litbrace'))
             openbrace_stack.append(end)
             stack[-2].appendChild(stack[-1])
             
@@ -1082,7 +997,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
 
             # Add any remaining text.
             if end > start:
-                stack[-1].appendChild(Text(str[start:end]))
+                stack[-1].appendChild(doc.createTextNode(str[start:end]))
 
             # Special handling for escape elements:
             if stack[-1].tagName == 'escape':
@@ -1094,12 +1009,12 @@ def _colorize(token, errors, warnings=None, tagName='para'):
                     if _ESCAPES.has_key(stack[-1].childNodes[0].data):
                         escp = _ESCAPES[stack[-1].childNodes[0].data]
                         stack[-2].removeChild(stack[-1])
-                        stack[-2].appendChild(Text(escp))
+                        stack[-2].appendChild(doc.createTextNode(escp))
                     # Single-character escape.
                     elif len(stack[-1].childNodes[0].data) == 1:
                         escp = stack[-1].childNodes[0].data
                         stack[-2].removeChild(stack[-1])
-                        stack[-2].appendChild(Text(escp))
+                        stack[-2].appendChild(doc.createTextNode(escp))
                     else:
                         estr = "Invalid escape."
                         errors.append(ColorizingError(estr, token, end))
@@ -1108,14 +1023,15 @@ def _colorize(token, errors, warnings=None, tagName='para'):
             if stack[-1].tagName == 'litbrace':
                 children = stack[-1].childNodes
                 stack[-2].removeChild(stack[-1])
-                stack[-2].appendChild(Text('{'))
+                stack[-2].appendChild(doc.createTextNode('{'))
                 for child in children:
                     stack[-2].appendChild(child)
-                stack[-2].appendChild(Text('}'))
+                stack[-2].appendChild(doc.createTextNode('}'))
 
             # Special handling for link-type elements:
             if stack[-1].tagName in _LINK_COLORIZING_TAGS:
-                link = _colorize_link(stack[-1], token, end, warnings, errors)
+                link = _colorize_link(doc, stack[-1], token, end,
+                                      warnings, errors)
 
             # Pop the completed element.
             openbrace_stack.pop()
@@ -1125,7 +1041,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
 
     # Add any final text.
     if start < len(str):
-        stack[-1].appendChild(Text(str[start:]))
+        stack[-1].appendChild(doc.createTextNode(str[start:]))
         
     if len(stack) != 1: 
         estr = "Unbalanced '{'."
@@ -1133,7 +1049,7 @@ def _colorize(token, errors, warnings=None, tagName='para'):
 
     return stack[0]
 
-def _colorize_link(link, token, end, warnings, errors):
+def _colorize_link(doc, link, token, end, warnings, errors):
     children = link.childNodes[:]
 
     # If the last child isn't text, we know it's bad.
@@ -1156,7 +1072,7 @@ def _colorize_link(link, token, end, warnings, errors):
         return
 
     # Construct the name element.
-    name_elt = Element('name')
+    name_elt = doc.createElement('name')
     for child in children:
         name_elt.appendChild(link.removeChild(child))
 
@@ -1173,8 +1089,8 @@ def _colorize_link(link, token, end, warnings, errors):
             return
 
     # Construct the target element.
-    target_elt = Element('target')
-    target_elt.appendChild(Text(target))
+    target_elt = doc.createElement('target')
+    target_elt.appendChild(doc.createTextNode(target))
 
     # Add them to the link element.
     link.appendChild(name_elt)
@@ -1186,7 +1102,7 @@ def _colorize_link(link, token, end, warnings, errors):
 
 def to_epytext(tree, indent=0, seclevel=0):
     """
-    Convert a DOM tree encoding epytext back to an epytext string.
+    Convert a DOM document encoding epytext back to an epytext string.
     This is the inverse operation from L{parse}.  I.e., assuming there
     are no errors, the following is true:
         - C{parse(to_epytext(tree)) == tree}
@@ -1195,8 +1111,8 @@ def to_epytext(tree, indent=0, seclevel=0):
     character escaping may be done differently.
         - C{to_epytext(parse(str)) == str} (approximately)
 
-    @param tree: A DOM tree encoding of an epytext string.
-    @type tree: C{xml.dom.minidom.Element}
+    @param tree: A DOM document encoding of an epytext string.
+    @type tree: L{xml.dom.minidom.Document}
     @param indent: The indentation for the string representation of
         C{tree}.  Each line of the returned string will begin with
         C{indent} space characters.
@@ -1207,6 +1123,8 @@ def to_epytext(tree, indent=0, seclevel=0):
     @return: The epytext string corresponding to C{tree}.
     @rtype: C{string}
     """
+    if isinstance(tree, Document):
+        return to_epytext(tree.childNodes[0], indent, seclevel)
     if isinstance(tree, Text):
         str = re.sub(r'\{', '\0', tree.data)
         str = re.sub(r'\}', '\1', str)
@@ -1271,13 +1189,13 @@ def to_epytext(tree, indent=0, seclevel=0):
 
 def to_plaintext(tree, indent=0, seclevel=0):
     """    
-    Convert a DOM tree encoding epytext to a string representation.
+    Convert a DOM document encoding epytext to a string representation.
     This representation is similar to the string generated by
     C{to_epytext}, but C{to_plaintext} removes inline markup, prints
     escaped characters in unescaped form, etc.
 
-    @param tree: A DOM tree encoding of an epytext string.
-    @type tree: C{xml.dom.minidom.Element}
+    @param tree: A DOM document encoding of an epytext string.
+    @type tree: L{xml.dom.minidom.Document}
     @param indent: The indentation for the string representation of
         C{tree}.  Each line of the returned string will begin with
         C{indent} space characters.
@@ -1288,6 +1206,8 @@ def to_plaintext(tree, indent=0, seclevel=0):
     @return: The epytext string corresponding to C{tree}.
     @rtype: C{string}
     """
+    if isinstance(tree, Document):
+        return to_epytext(tree.childNodes[0], indent, seclevel)
     if isinstance(tree, Text): return tree.data
 
     if tree.tagName == 'epytext': indent -= 2
@@ -1329,13 +1249,13 @@ def to_plaintext(tree, indent=0, seclevel=0):
 
 def to_debug(tree, indent=4, seclevel=0):
     """    
-    Convert a DOM tree encoding epytext back to an epytext string,
+    Convert a DOM document encoding epytext back to an epytext string,
     annotated with extra debugging information.  This function is
     similar to L{to_epytext}, but it adds explicit information about
     where different blocks begin, along the left margin.
 
-    @param tree: A DOM tree encoding of an epytext string.
-    @type tree: C{xml.dom.minidom.Element}
+    @param tree: A DOM document encoding of an epytext string.
+    @type tree: L{xml.dom.minidom.Document}
     @param indent: The indentation for the string representation of
         C{tree}.  Each line of the returned string will begin with
         C{indent} space characters.
@@ -1346,6 +1266,8 @@ def to_debug(tree, indent=4, seclevel=0):
     @return: The epytext string corresponding to C{tree}.
     @rtype: C{string}
     """
+    if isinstance(tree, Document):
+        return to_epytext(tree.childNodes[0], indent, seclevel)
     if isinstance(tree, Text):
         str = re.sub(r'\{', '\0', tree.data)
         str = re.sub(r'\}', '\1', str)
@@ -1472,8 +1394,8 @@ def pparse(str, show_warnings=1, show_errors=1):
     @param show_errors: Whether or not to display errors generated
         by parsing C{str}.
     @type show_errors: C{boolean}
-    @return: a DOM tree encoding the contents of C{str}.
-    @rtype: C{xml.dom.minidom.Element}
+    @return: a DOM document encoding the contents of C{str}.
+    @rtype: L{xml.dom.minidom.Document}
     @raise SyntaxError: If any fatal errors were encountered.
     """
     errors = []
@@ -1698,3 +1620,145 @@ class ColorizingError(ParseError):
         return (str + '\n       %s%s\n       %s^' %
                 (left, right, ' '*len(left)))
                 
+##################################################
+## Convenience parsers
+##################################################
+
+def parse_as_literal(str):
+    """
+    Return a DOM document matching the epytext DTD, containing a
+    single literal block.  That literal block will include the
+    contents of the given string.  This method is typically used as a
+    fall-back when the parser fails.
+
+    @param str: The string which should be enclosed in a literal
+        block.
+    @type str: C{string}
+    
+    @return: A DOM document containing C{str} in a single literal
+        block.
+    @rtype: L{xml.dom.minidom.Document}
+    """
+    doc = Document()
+    epytext = doc.createElement('epytext')
+    lit = doc.createElement('literalblock')
+    doc.appendChild(epytext)
+    epytext.appendChild(lit)
+    lit.appendChild(doc.createTextNode(str))
+    return doc
+
+def parse_as_para(str):
+    """
+    Return a DOM document matching the epytext DTD, containing a
+    single paragraph.  That paragraph will include the contents of the
+    given string.  This can be used to wrap some forms of
+    automatically generated information (such as type names) in
+    paragraphs.
+
+    @param str: The string which should be enclosed in a paragraph.
+    @type str: C{string}
+    
+    @return: A DOM document containing C{str} in a single paragraph.
+    @rtype: L{xml.dom.minidom.Document}
+    """
+    doc = Document()
+    epytext = doc.createElement('epytext')
+    para = doc.createElement('para')
+    doc.appendChild(epytext)
+    epytext.appendChild(para)
+    para.appendChild(doc.createTextNode(str))
+    return doc
+
+def parse_type_of(obj):
+    """
+    Return a DOM document matching the epytext DTD, containing a
+    description of C{obj}'s type.  The description consists of a
+    sinlge paragraph.  If C{obj} is an instance, then its type
+    description is a link to its class.  Otherwise, its type
+    description is the name of its type.
+
+    @param obj: The object whose type should be returned as DOM document.
+    @type obj: any
+    @return: A DOM document containing a description of C{obj}'s type.
+    @rtype: L{xml.dom.minidom.Document}
+    """
+    doc = Document()
+    epytext = doc.createElement('epytext')
+    para = doc.createElement('para')
+    doc.appendChild(epytext)
+    epytext.appendChild(para)
+    
+    if type(obj) is types.InstanceType:
+        link = doc.createElement('link')
+        name = doc.createElement('name')
+        target = doc.createElement('target')
+        para.appendChild(link)
+        link.appendChild(name)
+        link.appendChild(target)
+        name.appendChild(doc.createTextNode(str(obj.__class__)))
+        target.appendChild(doc.createTextNode(str(obj.__class__)))
+        
+    else:
+        code = doc.createElement('code')
+        para.appendChild(code)
+        code.appendChild(doc.createTextNode(type(obj).__name__))
+    return doc
+
+# Is the cloning that happens here safe/proper?  (Cloning between 2
+# different documents)
+def summary(epytext_doc):
+    """
+    Given a DOM document representing formatted documentation, return
+    a new DOM document containing the documentation's first sentence.
+
+    @param epytext_doc: A DOM document representing formatted
+        documentation, as produced by L{parse}.
+    @type epytext_doc: L{xml.dom.minidom.Document} or
+        L{xml.dom.minidom.Element}
+    @return: A DOM document containing the first sentence of the
+        documentation.
+    @rtype: L{xml.dom.minidom.Document}
+    """
+    doc = Document()
+    epytext = doc.createElement('epytext')
+    doc.appendChild(epytext)
+
+    if isinstance(epytext_doc, Document):
+        tree = epytext_doc.childNodes[0]
+    else:
+        tree = epytext_doc
+    
+    # Find the first paragraph.
+    children = tree.childNodes
+    while (len(children) > 0) and (children[0].tagName != 'para'):
+        if children[0].tagName in ('section', 'ulist', 'olist', 'li'):
+            children = children[0].childNodes
+        else:
+            children = children[1:]
+
+    # Special case: if the docstring contains a single literal block,
+    # then try extracting the summary from it.
+    if (len(children) == 0 and len(tree.childNodes) == 1 and
+        tree.childNodes[0].tagName == 'literalblock'):
+        str = re.split(r'\n\s*(\n|$).*',
+                       tree.childNodes[0].childNodes[0].data, 1)[0]
+        children = [doc.createElement('para')]
+        children[0].appendChild(doc.createTextNode(str))
+
+    # If we didn't find a paragraph, return an empty epytext.
+    if len(children) == 0: return doc
+
+    # Extract the first sentence.
+    parachildren = children[0].childNodes
+    para = doc.createElement('para')
+    epytext.appendChild(para)
+    for parachild in parachildren:
+        if isinstance(parachild, Text):
+            m = re.match(r'\s*([\w\W]*?\.)(\s|$)', parachild.data)
+            if m:
+                para.appendChild(doc.createTextNode(m.group(1)))
+                return doc
+        para.appendChild(parachild.cloneNode(1))
+
+    return doc
+
