@@ -15,7 +15,7 @@
 """
 Support for C{ObjDoc}s, which encode the information about a Python
 object that is necessary to create its documentation.  C{ObjDoc}s are
-created and managed by the C{Documentation} class, which acts like a
+created and managed by the C{DocMap} class, which acts like a
 dictionary from Python objects to C{ObjDoc}s.
 
 Textual documentation entries (e.g., module descriptions, method
@@ -60,38 +60,133 @@ from epydoc.uid import UID, Link
 class Var:
     """
     The documentation for an individual variable.  This consists of
-    the variable's name, its description, and its type.  Variables are 
-    used by ModuleDoc (variables) and ClassDoc (ivariables and
-    cvariables); and functions (params, vararg, kwarg, retval).
+    the variable's name, its description, and its type.  C{Var}s are 
+    used by L{ModuleDoc} (variables) and L{ClassDoc} (ivariables and
+    cvariables); and L{FuncDoc} (params, vararg, kwarg, retval).
     """
     def __init__(self, name, descr=None, type=None, default=None):
+        """
+        Construct the documentation for a variable or parameter.
+
+        @param name: The name of the variable.
+        @type name: C{string}
+        @param descr: The DOM representation of an epytext description
+            of the variable (as produced by C{epytext.parse}).
+        @type descr: C{xml.dom.minidom.Element}
+        @param type: The DOM representation of an epytext description
+            of the variable's type (as produced by C{epytext.parse}).
+        @type type: C{xml.dom.minidom.Element}
+        @param default: The default value for parameters; or C{None}
+            for variables.
+        @type default: C{string} or C{None}
+        """
         self._name = name
         self._type = type
         self._descr = descr
         self._default = default
-    def type(self): return self._type
-    def descr(self): return self._descr
-    def name(self): return self._name
-    def default(self): return self._default
-    def set_type(self, type): self._type = type
+        
+    def type(self):
+        """
+        @return: The DOM representation of an epytext description of
+            this variable's type.
+        @rtype: C{xml.dom.minidom.Element}
+        """
+        return self._type
+    
+    def descr(self):
+        """
+        @return: The DOM representation of an epytext description of
+            this variable.
+        @rtype: C{xml.dom.minidom.Element}
+        """
+        return self._descr
+    
+    def name(self):
+        """
+        @return: The name of this variable.
+        @rtype: C{string}
+        """
+        return self._name
+    
+    def default(self):
+        """
+        @return: The default value for parameters; or C{None}
+            for variables.
+        @rtype: C{string} or C{None}
+        """
+        return self._default
+    
+    def set_type(self, type):
+        """
+        Set this variable's type.
+        
+        @param type: The DOM representation of an epytext description
+            of the variable's type (as produced by C{epytext.parse}).
+        @type type: C{xml.dom.minidom.Element}
+        @rtype: C{None}
+        """
+        self._type = type
+        
     def set_descr(self, descr):
+        """
+        Set this variable's description.
+        
+        @type descr: C{xml.dom.minidom.Element}
+        @param descr: The DOM representation of an epytext description
+            of the variable's type (as produced by C{epytext.parse}).
+        @rtype: C{None}
+        """
         self._descr = descr
-    def set_default(self, default): self._default = default
+        
+    def set_default(self, default):
+        """
+        Set this variable's default value.
+        
+        @param default: The default value for parameters; or C{None}
+            for variables.
+        @type default: C{string} or C{None}
+        @rtype: C{None}
+        """
+        self._default = default
+        
     def __repr__(self):
-        if self._type:
-            return '<Variable '+self._name+': '+`self._type`+'>'
-        else:
-            return '<Variable '+self._name+'>'
+        return '<Variable '+self._name+'>'
 
 class Raise:
     """
-    The documentation for the raising of an exception.
+    The documentation for the raising of an exception.  This consists
+    of the exception's name and its description.  Exceptions are used
+    by L{FuncDoc}.
     """
     def __init__(self, name, descr):
+        """
+        Construct the documentation for the raising of an exception.
+
+        @param name: The name of the exception.
+        @type name: C{string}
+        @param descr: The DOM representation of an epytext description
+            of when the exception is raised (as produced by
+            C{epytext.parse}). 
+        @type descr: C{xml.dom.minidom.Element}
+        """
         self._name = name
         self._descr = descr
-    def name(self): return self._name
-    def descr(self): return self._descr
+        
+    def name(self):
+        """
+        @return: The name of the exception.
+        @rtype: C{string}
+        """
+        return self._name
+    
+    def descr(self):
+        """
+        @return: The DOM representation of an epytext description
+            of when the exception is raised (as produced by
+            C{epytext.parse}).
+        @rtype: C{xml.dom.minidom.Element}
+        """
+        return self._descr
         
 #////////////////////////////////////////////////////////
 #// Base ObjDoc Class
@@ -99,20 +194,34 @@ class Raise:
 class ObjDoc:
     """
     A base class for encoding the information about a Python object
-    that is necessary to create its documentation.
+    that is necessary to create its documentation.  This base class
+    defines the following documentation fields:
+
+        - X{descr}: A description of the object
+        - X{authors}: A list of the object's authors
+        - X{version}: The object's version
+        - X{seealsos}: A list of the object's see-also links
+        - X{sortorder}: The object's sort order, as defined by its
+          C{__epydoc_sort__} variable.
 
     @ivar _uid: The object's unique identifier
     @type _uid: C{UID}
     
     @ivar _descr: The object's description, encoded as epytext.
-    @type _descr: DOM C{Element}
+    @type _descr: C{Element}
 
     @ivar _authors: Author(s) of the object
-    @ivar _version: Version(s) of the object
+    @type _authors: C{list} of C{Element}
+    @ivar _version: Version of the object
+    @type _version: C{Element}
     @ivar _seealsos: See also entries
+    @type _seealsos: C{list} of C{Element}
     """
     def __init__(self, obj):
         """
+        Create the documentation for the given object.
+        
+        @param obj: The object to document.
         @type obj: any
         """
         self._uid = UID(obj)
@@ -125,11 +234,11 @@ class ObjDoc:
 
         # If there's an __epydoc_sort__ attribute, keep it.
         if hasattr(obj, '__epydoc_sort__'):
-            self._sort_order = obj.__epydoc_sort__
+            self._sortorder = obj.__epydoc_sort__
         elif hasattr(obj, '__all__'):
-            self._sort_order = obj.__all__
+            self._sortorder = obj.__all__
         else:
-            self._sort_order = None
+            self._sortorder = None
 
         # If there's a doc string, parse it.
         if hasattr(obj, '__doc__') and obj.__doc__ != None:
@@ -144,18 +253,22 @@ class ObjDoc:
 
     def documented(self):
         """
-        @return: true if the object documented by this C{ObjDoc} has a
+        @return: True if the object documented by this C{ObjDoc} has a
             docstring.
-        @rtype: C{bool}
+        @rtype: C{boolean}
         """
         return self._documented
             
     def uid(self):
+        """
+        @return: The UID of the object documented by this C{ObjDoc}.
+        @rtype: L{UID}
+        """
         return self._uid
 
     def descr(self):
         """
-        @return: a description of the object documented by this
+        @return: A description of the object documented by this
             C{ObjDoc}.
         @returntype: C{Element}
         """
@@ -163,7 +276,7 @@ class ObjDoc:
     
     def authors(self):
         """
-        @return: a list of the authors of the object documented by
+        @return: A list of the authors of the object documented by
             this C{ObjDoc}.
         @returntype: C{list} of C{Element}
         """
@@ -171,7 +284,7 @@ class ObjDoc:
     
     def version(self):
         """
-        @return: the version of the object documented by this
+        @return: The version of the object documented by this
             C{ObjDoc}.
         @returntype: C{Element}
         """
@@ -179,17 +292,18 @@ class ObjDoc:
     
     def seealsos(self):
         """
-        @return: a list of objects related to the object documented by 
-            this C{ObjDoc}
+        @return: A list of objects related to the object documented by 
+            this C{ObjDoc}.
         @returntype: C{list} of C{Element}
         """
         return self._seealsos
 
-    def sort_order(self):
+    def sortorder(self):
         """
-        @return: the object's __epydoc_sort__ list.
+        @return: The object's C{__epydoc_sort__} list.
+        @rtype: C{list} of C{string}
         """
-        return self._sort_order
+        return self._sortorder
 
     #////////////////////////////
     #// Protected
@@ -270,10 +384,6 @@ class ObjDoc:
         
         # Save the remaining docstring as the description..
         if pdoc.hasChildNodes():
-            #if epytext.to_html(pdoc) == '':
-            #    print 'WARNING: DIDN"T CATCH'
-            #    print pdoc.toxml()
-            #    raise ValueError()
             self._descr = pdoc
         else:
             self._descr = None
@@ -287,13 +397,13 @@ class ModuleDoc(ObjDoc):
     consists of standard documentation fields (descr, author, etc.)
     and the following module-specific fields:
     
-        - classes: A list of any classes contained in the
+        - X{classes}: A list of any classes contained in the
           module/package 
-        - functions: A list of any functions contained in the
+        - X{functions}: A list of any functions contained in the
           module/package
-        - variables: A list of any variables contained in the
+        - X{variables}: A list of any variables contained in the
           module/package
-        - modules: A list of any modules contained in the
+        - X{modules}: A list of any modules contained in the
           package (packages only)
 
     For more information on the standard documentation fields, see
@@ -380,7 +490,7 @@ class ModuleDoc(ObjDoc):
                 warnings.append(tag+' expected an argument')
                 arg = ''
             if self._tmp_type.has_key(arg):
-                warnings.append('Redefinition of variable'+
+                warnings.append('Redefinition of variable '+
                                 'type: '+arg)
             self._tmp_type[arg] = descr
         else:
@@ -433,31 +543,18 @@ class ClassDoc(ObjDoc):
     standard documentation fields (descr, author, etc.)  and the
     following class-specific fields:
     
-        - bases: A list of the class's base classes
-        - children: A list of the class's known child classes
-        - methods: A list of the methods defined by the class
-        - ivariables: A list of the instance variables defined by the
+        - X{bases}: A list of the class's base classes
+        - X{children}: A list of the class's known child classes
+        - X{methods}: A list of the methods defined by the class
+        - X{ivariables}: A list of the instance variables defined by the
           class
-        - cvariables: A list of the class variables defined by the
+        - X{cvariables}: A list of the class variables defined by the
           class
-        - module: The module that defines the class
+        - X{module}: The module that defines the class
 
     For more information on the standard documentation fields, see
     L{ObjDoc}.
 
-    With classes comes inheritance.
-       - Inheritance of methods (link to method)
-       - Inheritance of method docs for overridden methods
-       - Inheritance of cvars
-       - Inheritance of ivars
-
-    The first we can do pretty easily; the others are more
-    troublesome.  For inheritance of method docs, we can decide
-    *which* method we're inheriting from, by checking whether things
-    have docstrings..  So we can have a link to it somehow.  For ivars 
-    and cvars, we really need to have processed the parent
-    docs.. hrm.  
-    
     @type _methods: C{list} of C{Link}
     @ivar _methods: A list of any methods contained in this class. 
 
@@ -537,32 +634,15 @@ class ClassDoc(ObjDoc):
         for m in self._methods:
             self._methodbyname[m.target().shortname()] = 1
         for base in cls.__bases__:
-            self._inherit(base)
+            self._inherit_methods(base)
 
         # Is it an exception?
         self._is_exception = issubclass(cls, Exception)
         
-        # Inherited values (added externally with inherit())
-        self._inh_methods = []
+        # Inherited variables (added externally with inherit())
         self._inh_cvariables = []
         self._inh_ivariables = []
 
-    def _inherit(self, base):
-        for (field, val) in base.__dict__.items():
-            if type(val) not in (_FunctionType, _BuiltinMethodType):
-                continue
-            if self._methodbyname.has_key(field):
-                continue
-            self._methodbyname[field] = 1
-            if type(val) is _FunctionType:
-                method = new.instancemethod(val, None, base)
-                self._methods.append(Link(field, method))
-            elif type(val) is _BuiltinMethodType:
-                self._methods.append(Link(field, val))
-
-        for nextbase in base.__bases__:
-            self._inherit(nextbase)
-            
     def _process_field(self, tag, arg, descr, warnings):
         if tag in ('cvariable', 'cvar'):
             if arg == None:
@@ -607,34 +687,50 @@ class ClassDoc(ObjDoc):
             str += `len(self._children)`+' child classes; '
         return str[:-2]+')>'
 
+    def _inherit_methods(self, base):
+        for (field, val) in base.__dict__.items():
+            if type(val) not in (_FunctionType, _BuiltinMethodType):
+                continue
+            if self._methodbyname.has_key(field):
+                continue
+            self._methodbyname[field] = 1
+            if type(val) is _FunctionType:
+                method = new.instancemethod(val, None, base)
+                self._methods.append(Link(field, method))
+            elif type(val) is _BuiltinMethodType:
+                self._methods.append(Link(field, val))
+
+        for nextbase in base.__bases__:
+            self._inherit_methods(nextbase)
+            
     # This never gets called right now!
-#     def inherit(self, basedoc):
-#         methods = [m.name() for m
-#                    in self._methods + self._inh_methods] 
-#         cvars = [cv.name() for cv
-#                  in self._cvariables + self._inh_cvariabels]
-#         ivars = [iv.name() for iv
-#                  in self._ivariables + self._inh_ivariables]
-        
-#         for method in basedoc.methods():
-#             if method.name() not in methods:
-#                 self._inh_methods.append(method)
-
-#         for cvar in basedoc.cvariables():
-#             if cvar.name() not in cvars:
-#                 self._inh_cvariables.append(cvar)
-
-#         for ivar in basedoc.ivariables():
-#             if ivar.name() not in ivars:
-#                 self._inh_ivariables.append(ivar)
+    def inherit(self, *basedocs):
+        self._inh_cvariables = []
+        self._inh_ivariables = []
+        for basedoc in basedocs:
+            if basedoc is None: continue
+            
+            cvars = [cv.name() for cv
+                     in self._cvariables + self._inh_cvariables]
+            ivars = [iv.name() for iv
+                     in self._ivariables + self._inh_ivariables]
+          
+            for cvar in basedoc.cvariables():
+                if cvar.name() not in cvars:
+                    self._inh_cvariables.append(cvar)
+    
+            for ivar in basedoc.ivariables():
+                if ivar.name() not in ivars:
+                    self._inh_ivariables.append(ivar)
+        print self.uid(), 'IC', self._inh_cvariables
+        print self.uid(), 'IV', self._inh_ivariables
 
     #////////////////////////////
     #// Accessors
     #////////////////////////////
 
-    def inherited_methods(self): return self._inh_methods
-    def inherited_cvariables(self): return self._inh_cvariables 
-    def inherited_ivariables(self): return self._inh_ivariables
+#     def inherited_cvariables(self): return self._inh_cvariables 
+#     def inherited_ivariables(self): return self._inh_ivariables
 
     def is_exception(self): return self._is_exception
 
@@ -656,7 +752,20 @@ class ClassDoc(ObjDoc):
 #////////////////////////////////////////////////////////
 class FuncDoc(ObjDoc):
     """
-    Add 'overrides'??
+    The documentation for a function of method.  This documentation
+    consists of the standard documentation fields (descr, author,
+    etc.) and the following class-specific fields:
+
+        - X{parameters}: A list of the function's parameters
+        - X{vararg}: The function's vararg parameter, or C{None}
+        - X{kwarg}: The function's keyword parameter, or C{None}
+        - X{returns}: The function's return value
+        - X{raises}: A list of exceptions that may be raised by the
+          function. 
+        - X{overrides}: The method that this method overrides.
+
+    For more information on the standard documentation fields, see
+    L{ObjDoc}.
 
     @type _params: C{list} of C{Var}
     @ivar _params: A list of this function's normal parameters.
@@ -836,30 +945,46 @@ class FuncDoc(ObjDoc):
     def raises(self): return self._raises
     def overrides(self): return self._overrides
 
-#class MethodDoc(FuncDoc):
-#    def __init__(self, method):
-#        FuncDoc.__init__(self, method)
-#    def __repr__(self):
-#        FuncDoc.__repr__(self)
-#    def parameters(self): FuncDoc.parameters(self)
-#    def vararg(self): FuncDoc.vararg(self)
-#    def kwarg(self): FuncDoc.kwarg(self)
-#    def returns(self): FuncDoc.returns(self)
-#    def raises(self): FuncDoc.raises(self)
-    
 ##################################################
 ## Documentation Management
 ##################################################
 
-class Documentation(UserDict.UserDict):
+class DocMap(UserDict.UserDict):
+    """
+    A dictionary mapping each object to the object's documentation.
+    Typically, modules or classes are added to the C{DocMap} using
+    C{add}, which adds an object and everything it contains.  For
+    example, the following code constructs a documentation map, adds
+    the module "epydoc.epytext" to it, and looks up the documentation
+    for "epydoc.epytext.parse":
+
+        >>> docmap = DocMap()
+        >>> docmap.add(epydoc.epytext)
+        >>> docmap[epydoc.epytext.parse]
+        <FuncDoc: epydoc.epytext.parse (3 parameters; 1 exceptions)>
+    """
+    
     def __init__(self):
+        """Create a new empty documentation map."""
         self.data = {} # UID -> ObjDoc
         self._class_children = {} # UID -> list of UID
         self._package_children = {} # UID -> list of UID
-
-    def inherit(): pass
+        self._top = None
+        self._inherited = 0
 
     def add_one(self, obj):
+        """
+        Add an object's documentation to this documentation map.  If
+        you also want to include the objects contained by C{obj}, then
+        use L{add}.
+
+        @param obj: The object whose documentation should be added to
+            this documentation map.
+        @type obj: any
+        @rtype: C{None}
+        """
+        self._inherited = 0
+        self._top = None
         objID = UID(obj)
             
         #print 'Constructing docs for:', objID
@@ -882,21 +1007,32 @@ class Documentation(UserDict.UserDict):
             self.data[objID] = ClassDoc(obj)
             for child in self._class_children.get(objID, []):
                 self.data[objID].add_child(child)
-                #child.inherit(self.data[objID])
             for base in obj.__bases__:
                 baseID=UID(base)
                 if self.data.has_key(baseID):
                     self.data[baseID].add_child(obj)
-                    #self.data[objID].inherit(self.data[baseID])
                 if self._class_children.has_key(baseID):
                     self._class_children[baseID].append(obj)
                 else:
                     self._class_children[baseID] = [obj]
+            # Make sure all methods are added (even inherited ones).
+            for method in self.data[objID].methods():
+                self.add(method.target().object())
+                self.add(method.target().cls().object())
                     
         elif type(obj) in (_MethodType, _FunctionType):
             self.data[objID] = FuncDoc(obj)
 
     def add(self, obj):
+        """
+        Add the documentation for an object, and everything contained
+        by that object, to this documentation map.
+
+        @param obj: The object whose documentation should be added to
+            this documentation map.
+        @type obj: any
+        @rtype: C{None}
+        """
         objID = UID(obj)
         if self.data.has_key(objID): return
 
@@ -925,7 +1061,69 @@ class Documentation(UserDict.UserDict):
                 elif type(val) is _BuiltinMethodType:
                     self.add(val)
 
+    def _toplevel(self, uid):
+        """
+        @return: True if the object identified by C{uid} is not
+            contained (as a sub-package, module contents, class
+            contents, etc.) by any other object in this docmap.
+        @rtype: C{boolean}
+        @param uid: The C{UID} to check.
+        @type uid: L{UID}
+        """
+        for doc in self.values():
+            if isinstance(doc, ModuleDoc):
+                if uid.is_function():
+                    if uid in [l.target() for l in doc.functions()]:
+                        return 0
+                elif uid.is_class():
+                    if uid in [l.target() for l in doc.classes()]:
+                        return 0
+                if uid in [l.target() for l in doc.variables()]:
+                    return 0
+            elif isinstance(doc, ClassDoc):
+                if uid.is_method():
+                    if uid in [l.target() for l in doc.methods()]:
+                        return 0
+                if uid in [l.target() for l in doc.cvariables()]:
+                    return 0
+                if uid in [l.target() for l in doc.ivariables()]:
+                    return 0
+        return 1
+
+    def top(self):
+        """
+        @return: The list of top-level objects documented by this
+            documentation map.  The top-level objects are those that
+            are not contained (as sub-packages, module contents, class
+            contents, etc) by any other objects in the documentation
+            map.
+        @rtype: C{list} of L{UID}
+        """
+        if self._top is None:
+            self._top = [uid for uid in self.keys()
+                         if self._toplevel(uid)]
+        return self._top
+
     def __getitem__(self, key):
+        """
+        @return: The documentation for the given object; or the object
+            identified by C{key}, if C{key} is a L{UID}.
+        @rtype: C{ObjDoc}
+        @param key: The object whose documentation should be returned.
+        @type key: any
+        @raise KeyError: If the documentation for the object
+            identified by C{key} is not contained in this
+            documentation map.
+        """
+#         # Make sure all inheritences are taken care of.
+#         if not self._inherited:
+#             # this really needs to be done top-down.. how?
+#             self._inherited = 1
+#             for cls in self.keys():
+#                 if not cls.is_class(): continue
+#                 self[cls].inherit(*[self.get(UID(baseid)) for baseid
+#                                     in cls.object().__bases__])
+
         if isinstance(key, UID):
             return self.data[key]
         else:
