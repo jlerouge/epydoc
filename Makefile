@@ -49,7 +49,7 @@ examples: .up2date.examples
 .up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
 	mkdir -p ${EXAMPLES}
 	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
-	       -u http://epydoc.sf.net --css blue
+	       -u http://epydoc.sourceforge.net --css blue
 	touch .up2date.examples
 
 local: refdocs examples
@@ -64,7 +64,7 @@ refdocs: .up2date.refdocs
 .up2date.refdocs: ${PY_SRC}
 	mkdir -p ${API}
 	epydoc ${PY_SRC} -o ${API} -n epydoc \
-	       -u http://epydoc.sf.net --css blue
+	       -u http://epydoc.sourceforge.net --css blue
 	touch .up2date.refdocs
 
 checkdocs:
