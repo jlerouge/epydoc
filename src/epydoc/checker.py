@@ -385,7 +385,7 @@ class DocChecker:
         if doc != self._docmap.documented_ancestor(doc.uid()): return
 
         if (self._checks & DocChecker.FUNC and
-            not doc.documented() and
+            not doc.has_docstring() and
             doc.uid().shortname() not in _NO_DOCS):
             self._warn('No docs', name)
             return
