@@ -72,7 +72,7 @@ accordingly. </p>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>type</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
-    The type of the parameter
+    The expected type for the parameter
     <code><i>p</i></code>. </td></tr>
   
   <tr><td width="10%" align="left" valign="top">
@@ -82,6 +82,11 @@ accordingly. </p>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>rtype</b>:</code>&nbsp;... </td><td>
     The type of the return value for a function or method. </td></tr>
+
+  <tr><td width="10%" align="left" valign="top">
+  <code>@<b>keyword</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
+    A description of the keyword parameter <code><i>p</i></code>.
+    </td></tr>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>raise</b>&nbsp;<i>e</i>:</code>&nbsp;... </td><td>
@@ -251,6 +256,14 @@ accordingly. </p>
     method.  Multiple <code>contact</code> fields may be used if an
     object has multiple contacts.</td></tr>
 
+  <!-- ========== Summarization ========== -->
+  <tr><th colspan="2" align="left">Summarization</th></tr>
+  <tr><td width="10%" align="left" valign="top">
+  <code>@<b>summary</b>:</code>&nbsp;... </td><td> A summary
+  description for an object.  This description overrides the default
+  summary (which is constructed from the first sentence of the
+  object's description). </td></tr>
+  
 </table>
 
 <h2>Field Synonyms</h2>
@@ -285,6 +298,10 @@ adjust the markup accordingly. </p>
       <code>@except&nbsp;<i>e</i>:</code>&nbsp;...</br>
       <code>@exception&nbsp;<i>e</i>:</code>&nbsp;...</td></tr>
     
+    <tr><td align="left" valign="top">
+      <b><code>@keyword&nbsp;<i>p</i>:</code>&nbsp;...</b> </td><td>
+      <code>@kwarg&nbsp;<i>p</i>:</code>&nbsp;... </td></tr>
+      
     <tr><td align="left" valign="top">
       <b><code>@ivar&nbsp;<i>v</i>:</code>&nbsp;...</b> </td><td>
       <code>@ivariable&nbsp;<i>v</i>:</code>&nbsp;... </td></tr>
@@ -411,7 +428,7 @@ should be used if the field has multiple entries. </p>
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Thu Jul  3 18:17:26 EDT 2003 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Thu Jul 17 22:10:02 EDT 2003 <!-- hhmts end -->
 </font>
 </body>
 </html>
