@@ -59,6 +59,12 @@ except:
     _MethodDescriptorType = None
     _PropertyType = None
 
+# Zope extension class type
+try:
+    from ExtensionClass import ExtensionClass as _ExtensionClass
+except:
+    _ExtensionClass = None
+
 # This is used when we get a bad field tag, to distinguish between
 # unknown field tags, and field tags that were just used in a bad
 # context. 
@@ -2816,6 +2822,7 @@ class DocMap(UserDict.UserDict):
             except: bases = []
             for base in bases:
                 if not (type(base) is types.ClassType or
+                        type(base) is _ExtensionClass or
                         (isinstance(base, types.TypeType))):
                     continue
                 baseID=make_uid(base)
@@ -3149,10 +3156,14 @@ def _descr_to_docfield(arg, descr):
 
 def _dfs_bases(cls):
     bases = [cls]
+    if not hasattr(cls, '__bases__'): return bases
     for base in cls.__bases__: bases += _dfs_bases(base)
     return bases
 
 def _find_base_order(cls):
+    # Try using mro (method resolution operator), if available.
+    if hasattr(cls, 'mro'): return cls.mro()
+    
     # Use new or old inheritance rules?
     new_inheritance = (sys.hexversion >= 0x02020000)
 
