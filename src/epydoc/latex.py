@@ -59,8 +59,9 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 #   - amssymb: extra math symbols.
 _LATEX_HEADER = r"""
 \documentclass{article}
-\usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
+\usepackage{alltt, parskip, fancyheadings, boxedminipage}
 \usepackage{makeidx, multirow, longtable, tocbibind, amssymb}
+\usepackage[headings]{fullpage}
 \begin{document}
 
 \setlength{\parindent}{0ex}
