@@ -136,7 +136,7 @@ SPECIAL_METHODS ={
 ##################################################
 
 # system imports
-import re, sys, os.path, string, time, pprint
+import re, sys, os.path, time, pprint
 import xml.dom.minidom
 
 # epydoc imports
@@ -2674,7 +2674,7 @@ class HTMLFormatter:
         @param heading: The name of the section that is starting.
         @type heading: C{string}
         """
-        return '\n<!-- =========== START OF '+string.upper(heading)+\
+        return '\n<!-- =========== START OF '+heading.upper()+\
                ' =========== -->\n'
     
     def _table_header(self, heading, css_class):
