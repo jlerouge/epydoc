@@ -58,6 +58,15 @@ except:
     _WrapperDescriptorType = None
     _MethodDescriptorType = None
 
+# This is used when we get a bad field tag, to distinguish between
+# unknown field tags, and field tags that were just used in a bad
+# context. 
+_KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
+                     'cvar', 'cvariable', 'type', 'group',
+                     'return', 'returns', 'rtype', 'returntype',
+                     'param', 'parameter', 'arg', 'argument',
+                     'raise', 'raises', 'exception', 'except')
+
 ##################################################
 ## Helper Functions
 ##################################################
@@ -660,7 +669,11 @@ class ObjDoc:
                     del values[:]
                 values.append(descr)
                 return
-        warnings.append('Unknown field tag %r' %tag)
+
+        if tag in _KNOWN_FIELD_TAGS:
+            warnings.append('Invalid context for field tag %r' % tag)
+        else:
+            warnings.append('Unknown field tag %r' % tag)
         
     #////////////////////////////
     #// Private
