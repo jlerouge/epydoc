@@ -533,8 +533,8 @@ class EpydocGUI:
         if not filename: return
         self._filename = filename
         self._save()
- 
-if __name__ == '__main__':
+
+def gui():
     gui = EpydocGUI()
     for arg in sys.argv[1:]:
         if arg[-4:] == '.prj':
@@ -544,3 +544,4 @@ if __name__ == '__main__':
             except: pass
     gui.mainloop()
 
+if __name__ == '__main__': gui()
