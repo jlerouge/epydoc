@@ -62,9 +62,9 @@ h4 { font-size: 130%; font-weight: bold; font-style: italic; }
 
 table        { background: #ffffff; color: #000000; }   /* = .white */
 th           { background: #c0d0d0; color: #000000;     /* = .light */
-               font-weight: bold }
+               font-weight: bold; }
 th.secondary { background: #ffffff; color: #000000;      /* = .white */
-               font-weight: bold; font-style: italic }
+               font-weight: bold; font-style: italic; }
 table.transparent { background: transparent; color: #000000; }
 
 /* I use tables to show screenshots. */
