@@ -51,6 +51,7 @@ def _is_private(str):
     @param str: The name to check.
     @type str: C{string}
     """
+    if str == '...': return 0
     for piece in str.split('.'):
         if piece[0] == '_' and piece[-1] != '_':
             return 1
