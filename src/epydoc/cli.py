@@ -117,8 +117,8 @@ def _parse_args():
                 argvals['show_private'] = 1
             elif arg in ('-a', '-check_all'):
                 argvals['check_all'] = 1
-            elif arg in ('-css2',):
-                argvals['css'] = 2
+            elif arg in ('-css',):
+                argvals['css'] = args.pop()
             else:
                 _usage()
         else:
@@ -155,8 +155,9 @@ def _find_module_from_filename(filename,verbosity):
         try:
             if verbosity == 1: print 'Importing', module
             if basedir: os.chdir(basedir)
-            exec('import %s' % module)
-            exec('rv = %s' % module)
+            exec('import %s as rv' % module)
+            #exec('import %s' % module)
+            #exec('rv = %s' % module)
             return rv
         finally:
             os.chdir(old_cwd)
@@ -202,7 +203,7 @@ def cli():
     modules = _find_modules(param['modules'], param['verbosity'])
 
     # Wait to do imports, to make --usage faster.
-    from epydoc.html import HTML_Doc, CSS_FILE2
+    from epydoc.html import HTML_Doc
     from epydoc.objdoc import Documentation
     from epydoc.checker import DocChecker
 
@@ -245,7 +246,7 @@ def cli():
         # Write documentation.
         if param['verbosity'] == 2: print 'Writing docs to', param['target'],
         elif param['verbosity'] > 0: print 'Writing docs to', param['target']
-        if param.get('css', None) == 2: param['css'] = CSS_FILE2
+        #if param.get('css', None) == 2: param['css'] = CSS_FILE2
         else: css=None
         htmldoc = HTML_Doc(d, **param)
         htmldoc.write(param['target'], param['verbosity']-1)
