@@ -128,7 +128,7 @@ def import_module(name):
     try:
         # If they gave us a file name, then convert it to a module
         # name, and update the path appropriately.
-        if '/' in name or re.match('\.py[cow]?$|\.so$', name):
+        if '/' in name or re.search('\.py[cow]?$|\.so$', name):
             if not os.path.exists(name):
                 raise ImportError('%r does not exist' % name)
                 return None
