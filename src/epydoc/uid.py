@@ -298,7 +298,7 @@ class UID:
         return cmp(self.name(), other.name())
 
     def __hash__(self): raise NotImplementedError()
-    def __eq__(self): raise NotImplementedError()
+    def __eq__(self, other): raise NotImplementedError()
 
 ##################################################
 ## UID Implementation Classes
@@ -491,18 +491,16 @@ class ObjectUID(UID):
 
 class VariableUID(UID):
     """
-
     A globally unique identifier used to refer to a variable, relative
     to a Python object.
-    
+
     This is used for variables.  I guess it could also be used for
-    parameters to functions..
-    
+    parameters to functions..  
     """
     def __init__(self, value, base_uid, shortname):
         """
         @param base_uid: The base ...
-        @param name: The name...
+        @param shortname: The name...
         """
         self._base = base_uid
         self._shortname = shortname
@@ -522,10 +520,9 @@ class VariableUID(UID):
     def is_builtin_method(self): return 0
     def is_routine(self): return 0
 
-    def name(self):
-        return '%s.%s' % (self._base.name(), self._shortname)
-    def shortname(self):
-        return self._shortname
+    # Return the UID's full name and short name.
+    def name(self): return '%s.%s' % (self._base.name(), self._shortname)
+    def shortname(self): return self._shortname
 
     # The following methods report about the ancestors of the UID, 
     # mainly by delegating to the base UID.
@@ -547,7 +544,7 @@ class VariableUID(UID):
     def __hash__(self):
         return hash( (self._base, self._shortname) )
 
-    def __eq__(self):
+    def __eq__(self, other):
         return (isinstance(other, ValueUID) and
                 self._shortname == other._shortname and
                 self._base == other._base)
@@ -649,10 +646,8 @@ class Link:
         @type target: L{UID}
         """
         self._name = name
-        if isinstance(target, UID): self._target = target
-        else:
-            raise TypeError()
-            self._target = make_uid(target)
+        if not isinstance(target, UID): raise TypeError()
+        self._target = target
 
     def __repr__(self):
         """
@@ -812,6 +807,7 @@ def findUID(name, container, docmap=None):
         found.
     @rtype: L{UID} or C{None}
     """
+    if name == '': return None
     if container is None: return None
     if not (container.is_module() or container.is_class()):
         raise ValueError('Bad container %r' % container)
@@ -825,9 +821,10 @@ def findUID(name, container, docmap=None):
             cls = container.value()
             obj = cls.__dict__[name]
             if type(obj) is _FunctionType:
-                return make_uid(new.instancemethod(obj, None, cls))
+                return make_uid(new.instancemethod(obj, None, cls),
+                                container, name)
             else:
-                return make_uid(obj)
+                return make_uid(obj, container, name)
         else:
             container = container.module()
 
@@ -843,9 +840,12 @@ def findUID(name, container, docmap=None):
     try:
         obj = module
         for component in components:
+            obj_parent = obj
+            obj_name = component
             try: obj = obj.__dict__[component]
             except: raise KeyError()
-        return make_uid(obj)
+        try: return make_uid(obj, make_uid(obj_parent), obj_name)
+        except: pass
     except KeyError: pass
 
     # Is it a module name?  The module name may be relative to the
@@ -870,7 +870,7 @@ def findUID(name, container, docmap=None):
                     val = None # it may not be a real object
                     return make_uid(val, container, name)
                 obj = getattr(import_module(modname), objname)
-                return make_uid(obj)
+                return make_uid(obj, make_uid(mod), objname)
             except: pass
 
     # We couldn't find it; return None.
