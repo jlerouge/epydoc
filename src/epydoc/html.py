@@ -250,9 +250,9 @@ class HTMLFormatter:
               navigation bar.  This link can contain arbitrary HTML
               code (e.g. images).  By default, a label is constructed
               from C{prj_name}.  (type=C{string})
-            - C{toppage}: The top page for the documentation.  This
+            - C{top}: The top page for the documentation.  This
               is the default page shown main frame, when frames are
-              enabled.  C{toppage} can be a URL, the name of a
+              enabled.  C{top} can be a URL, the name of a
               module, the name of a class, or one of the special
               strings C{"trees.html"}, C{"indices.html"}, or
               C{"help.html"}.  By default, the top-level package or
@@ -304,7 +304,7 @@ class HTMLFormatter:
         self._prj_name = kwargs.get('prj_name', None)
         self._prj_url = kwargs.get('prj_url', None)
         self._prj_link = kwargs.get('prj_link', None)
-        self._toppage = self._find_toppage(kwargs.get('toppage', None))
+        self._top_page = self._find_top_page(kwargs.get('top', None))
         self._css = kwargs.get('css')
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
@@ -524,7 +524,7 @@ class HTMLFormatter:
             changed to point into the C{public} subdirectory.
         @type frombase: C{boolean}
         """
-        top = self._toppage
+        top = self._top_page
         if frombase and not top.startswith('http:') and not '/' in top:
             top = 'public/%s' % top
         filename = os.path.join(directory, 'index.html')
@@ -546,7 +546,7 @@ class HTMLFormatter:
         @type frombase: C{boolean}
         """
         filename = os.path.join(directory, 'index.html')
-        top = self._toppage
+        top = self._top_page
         
         # When possible, just copy the file.  This isn't possible if
         # top is an external link, or if it's the base index (since
@@ -1025,16 +1025,16 @@ class HTMLFormatter:
         str += '  <tr valign="center">\n'
 
         # The "Top" link
-        if self._toppage in ('trees.html', 'indices.html',
+        if self._top_page in ('trees.html', 'indices.html',
                               'help.html'):
             pass # We already have a link for these.
         elif (isinstance(where, UID) and
-            self._uid_to_uri(where) == self._toppage):
+            self._uid_to_uri(where) == self._top_page):
             str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
             str += '&nbsp;&nbsp;Top&nbsp;&nbsp;&nbsp;</th>\n'
         else:
             str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;<a '
-            str += 'class="navbar" href="%s">Top</a>' % self._toppage
+            str += 'class="navbar" href="%s">Top</a>' % self._top_page
             str += '&nbsp;&nbsp;&nbsp;</th>\n' 
 
         # The "Tree" link
@@ -2148,7 +2148,7 @@ class HTMLFormatter:
         crumbs.reverse()
         return '.'.join(crumbs)
 
-    def _find_toppage(self, pagename):
+    def _find_top_page(self, pagename):
         """
         Find the top page for the API documentation.  This page is
         used as the default page shown in the main frame, when frames
@@ -2156,12 +2156,12 @@ class HTMLFormatter:
         created from C{index.html} to the top page.
 
         @param pagename: The name of the page, as specified by the
-            keyword argument C{toppage} to the constructor.
+            keyword argument C{top} to the constructor.
         @type pagename: C{string}
         @return: The URL of the top page.
         @rtype: C{string}
         """
-        # If the toppage is unspecified, find an appropriate page.
+        # If the top_page is unspecified, find an appropriate page.
         if not pagename:
             top = self._find_toplevel()
             if top: return self._uid_to_uri(top)
@@ -2181,7 +2181,7 @@ class HTMLFormatter:
                             + ' is not a module\n         or a class.')
                     if sys.stderr.softspace: print >>sys.stderr
                     print >>sys.stderr, estr
-                    return self._find_toppage(None)
+                    return self._find_top_page(None)
                 
         # Try importing it as a module.
         try:
@@ -2193,7 +2193,7 @@ class HTMLFormatter:
                         + ' is not documented.')
                 if sys.stderr.softspace: print >>sys.stderr
                 print >>sys.stderr, estr
-                return self._find_toppage(None)
+                return self._find_top_page(None)
         except: pass
 
         # Is it a special page name?  Note that these could, in
@@ -2204,11 +2204,11 @@ class HTMLFormatter:
             return pagename
 
         # We didn't find anything.
-        estr = ('Warning: Unable to find the specified toppage %s.'
+        estr = ('Warning: Unable to find the specified top_page %s.'
                 % pagename)
         if sys.stderr.softspace: print >>sys.stderr
         print >>sys.stderr, estr
-        return self._find_toppage(None)
+        return self._find_top_page(None)
     
     def _find_toplevel(self):
         """
