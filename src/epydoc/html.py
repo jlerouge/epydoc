@@ -679,7 +679,7 @@ class HTMLFormatter:
         cssfile.write(css)
         cssfile.close()
                        
-    def _write_module(self, public, private, uid, doc):
+    def _write_module(self, public, private, uid, doc, body_only=False):
         """
         Write an HTML page describing the given module to the given
         streams.
@@ -688,11 +688,12 @@ class HTMLFormatter:
         @param uid: The UID of the module to document.
         @param doc: The L{ModuleDoc} of the module to document.
         """
-        # Write the header & navigation bar.
-        str = self._header(uid.name())
-        public.write(str); private.write(str)
-        self._write_navbar(public, private, uid)
-        self._write_breadcrumbs(public, private, uid)
+        if not body_only:
+            # Write the header & navigation bar.
+            str = self._header(uid.name())
+            public.write(str); private.write(str)
+            self._write_navbar(public, private, uid)
+            self._write_breadcrumbs(public, private, uid)
 
         # Get the module name.
         if uid.is_package(): str = self._start_of('Package Description')
@@ -735,12 +736,13 @@ class HTMLFormatter:
         self._write_func_details(public, private, doc, doc.functions())
         self._write_var_details(public, private, doc, doc.variables())
 
-        # Write another navigation bar and the footer.
-        self._write_navbar(public, private, uid)
-        footer = self._footer()
-        public.write(footer); private.write(footer)
+        if not body_only:
+            # Write another navigation bar and the footer.
+            self._write_navbar(public, private, uid)
+            footer = self._footer()
+            public.write(footer); private.write(footer)
 
-    def _write_class(self, public, private, uid, doc):
+    def _write_class(self, public, private, uid, doc, body_only=False):
         """
         Write an HTML page describing the given module to the given
         streams.
@@ -749,11 +751,12 @@ class HTMLFormatter:
         @param uid: The UID of the module to document.
         @param doc: The L{ModuleDoc} of the module to document.
         """
-        # Write the header & navigation bar
-        str = self._header(uid.name())
-        public.write(str); private.write(str)
-        self._write_navbar(public, private, uid)
-        self._write_breadcrumbs(public, private, uid)
+        if not body_only:
+            # Write the header & navigation bar
+            str = self._header(uid.name())
+            public.write(str); private.write(str)
+            self._write_navbar(public, private, uid)
+            self._write_breadcrumbs(public, private, uid)
         
         # Get the class name.
         str = self._start_of('Class Description')
@@ -823,10 +826,11 @@ class HTMLFormatter:
         self._write_var_details(public, private, doc, doc.cvariables(),
                                 'Class Variable Details')
 
-        # Write another navigation bar and the footer.
-        self._write_navbar(public, private, uid)
-        footer = self._footer()
-        public.write(footer); private.write(footer)
+        if not body_only:
+            # Write another navigation bar and the footer.
+            self._write_navbar(public, private, uid)
+            footer = self._footer()
+            public.write(footer); private.write(footer)
 
     def _write_help(self, public, private):
         """
@@ -3334,6 +3338,92 @@ class HTMLFormatter:
         footer = '\n    </td></tr>\n'
         _write_if_nonempty(public, private, links, footer)
 
+    #////////////////////////////////////////////////////////////
+    # Public string generation functions
+    #////////////////////////////////////////////////////////////
+
+    def format(object, error_stream=None, show_private=True, 
+               body_only=True, **options): # [staticmethod]
+        """
+        @return: A string containing the HTML documentation for the
+            given object.
+        @param object: The object to document.  C{object} can be
+            a module, a class, a function, a method, or a property;
+            or it can be the L{UID} of any object; or it can be
+            a L{Link} to any object.
+        @param error_stream: A file or stream where errors and
+            warnings will be written.  If C{error_stream} is
+            unspecified, then warnings and errors are discarded.
+        @param show_private: If true, then include private objects
+            in the output; if false, then only include public objects.
+        @param body_only: If true, then don't include navigation bars
+            and breadcrumbs when generating the HTML documentation
+            for a module or a class.  If false, then do include them.
+        @param options: Options for the C{HTMLFormatter} object that
+            will be used to generate the HTML.  See
+            L{HTMLFormatter.__init__} for a complete list of options.
+        """
+        # Get the object's value, uid, and link.
+        if isinstance(object, Link):
+            link = object
+            uid = link.target()
+            value = uid.value()
+        elif isinstance(object, UID):
+            uid = object
+            link = Link(object.shortname(), uid)
+            value = uid.value()
+        else:
+            try:
+                value = object
+                uid = make_uid(object)
+                link = Link(object.__name__, uid)
+            except:
+                raise TypeError, ('You must use a Link or UID object '+
+                                  'to specify a '+type(link).__name__)
+
+        # Redirect stderr.
+        old_stderr = sys.stderr
+        try:
+            if error_stream is None: error_stream = StringIO()
+            sys.stderr = error_stream
+            
+            # Create a docmap and add the object.
+            docmap = DocMap()
+            docmap.add(object)
+            doc = docmap.get(uid)
+    
+            # Create a DocFormatter from the docmap.
+            formatter = HTMLFormatter(docmap)
+            
+            # Get the object's HTML documentation.
+            public = StringIO()
+            private = StringIO()
+            if show_private: outstream = private
+            else: outstream = public
+            if uid.is_module():
+                formatter._write_module(public, private, uid, doc,
+                                        body_only=body_only)
+                htmlstr = outstream.getvalue()
+            elif uid.is_class():
+                formatter._write_class(public, private, uid, doc,
+                                       body_only=body_only)
+                htmlstr = outstream.getvalue()
+            elif uid.is_property():
+                formatter._write_property_details_entry(public, private, link,
+                                                        uid.parent())
+                htmlstr = outstream.getvalue()
+            elif uid.is_routine():
+                htmlstr = formatter._func_details_entry(link, None)
+            else:
+                raise ValueError("Don't know how to document %s" % object)
+
+            return htmlstr
+        finally:
+            # Reset stderr & return the HTML documentation
+            sys.stderr = old_stderr
+            
+    format = staticmethod(format)
+    
 ##################################################
 ## Helper Functions & Classes
 ##################################################
