@@ -1103,15 +1103,16 @@ class HTMLFormatter:
             str += '<a class="navbar" href="help.html">Help</a>'
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
 
-        # The homepage link.
-        #str += '    <td width="100%"></td>\n'
         if self._prj_link:
             str += '    <th class="navbar" align="right" width="100%">\n'
             str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
-            str += '      <tr><th class="navbar" align="center">\n        '
+            str += '      <tr><th class="navbar" align="center">\n'
+            str += '        <p class="nomargin">\n          '
             str += self._prj_link
-            str += '\n      </th></tr></table>\n'
+            str += '\n      </p></th></tr></table>\n'
             str += '    </th>\n'
+        else:
+            str += '    <th class="navbar" width="100%"></th>\n'
         str += '  </tr>\n</table>\n'
 
         # Breadcrumb, frames, and private/public link

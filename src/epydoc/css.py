@@ -117,6 +117,7 @@ table.navbar       { background: #a0c0ff; color: #0000ff;
                      border: 2px groove #c0d0d0; }
 th.navbar          { background: #a0c0ff; color: #0000ff; } 
 th.navselect       { background: #70b0ff; color: #000000; } 
+.nomargin          { margin: 0; }
 
 /* Links */ 
 a:link             { background: transparent; color: #0000ff; }  
@@ -217,6 +218,7 @@ th.navbar          { background: #607880; color: #b8d0d0;
                      font-weight: normal; } 
 th.navselect       { background: #88a0a8; color: #000000;
                      font-weight: normal; } 
+.nomargin          { margin: 0; }
  
 /* Links */ 
 a:link             { background: transparent; color: #104060; }  
