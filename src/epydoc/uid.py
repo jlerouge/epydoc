@@ -53,40 +53,75 @@ class UID:
             created.
         @type obj: any
         """
-        
         # Special case: create a UID from just a name.
         if type(obj) is _StringType:
             self._obj = self._typ = self._id = None
             self._name = obj
+            self._found_fullname = 1
             return
         
         self._id = id(obj)
         self._obj = obj
+        self._module = self._cls = self._name = None
         
         if type(obj) is _ModuleType:
             self._name = obj.__name__
             
         elif type(obj) is _ClassType:
-            self._name = '%s.%s' % (obj.__module__, obj.__name__)
+            self._module = _import_module(obj.__module__)
+            self._name = '%s.%s' % (self._module.__name__, obj.__name__)
 
         elif type(obj) is _FunctionType:
-            self._name = '%s.%s' % (_find_function_module(obj).__name__,
-                                    obj.__name__)
+            try:
+                self._module = _find_function_module(obj)
+                self._name = '%s.%s' % (self._module.__name__, obj.__name__)
+            except ValueError, e:
+                print e
                           
         elif type(obj) is _MethodType:
-            self._name = '%s.%s.%s' % (obj.im_class.__module__,
-                                       obj.im_class.__name__,
-                                       obj.__name__)
+            self._module = _import_module(obj.im_class.__module__)
+            self._cls = obj.im_class
+            self._name = '%s.%s.%s' % (self._module.__name__,
+                                       self._cls.__name__, obj.__name__)
 
-        elif isinstance(obj, _TypeType) and hasattr(obj, '__module__'):
-            self._name = '%s.%s' % (obj.__module__, obj.__name__)
+        elif type(obj) in (_BuiltinFunctionType, _BuiltinMethodType):
+            if obj.__self__ is None:
+                # obj is a builtin function.
+                self._module = _find_builtin_obj_module(obj)
+                if self._module is not None:
+                    name = _find_name_in(obj, self._module)
+                    self._name = '%s.%s' % (self._module.__name__, name)
+            else:
+                # obj is a builtin method.
+                self._cls = type(obj.__self__)
+                self._module = _find_builtin_obj_module(self._cls)
+                if self._module is not None:
+                    name = _find_name_in(self._cls, self._module)
+                    self._name = '%s.%s.%s' % (self._module.__name__,
+                                               name, obj.__name__)
             
+        elif isinstance(obj, _TypeType):
+            if hasattr(obj, '__module__'):
+                # We're in Python 2.2+; just use the __module__ field.
+                self._module = _import_module(obj.__module__)
+                self._name = '%s.%s' % (self._module.__name__, obj.__name__)
+            else:
+                # We're in Python 2.1 or earlier; look for the type's module.
+                self._module = _find_builtin_obj_module(obj)
+                if self._module is not None:
+                    name = _find_name_in(obj, self._module)
+                    self._name = '%s.%s' % (self._module.__name__, name)
+
+        if self._name is not None:
+            self._found_fullname = 1
         else:
-            # Last resort: use object's internal id.
+            # If we couldn't find a name, then use the object's
+            # internal id as a last resort.
+            self._found_fullname = 0
             try:
-                self._name = obj.__name__+'-'+`id(obj)`
+                self._name = '%s-%s' % (obj.__name__, id(obj))
             except:
-                self._name = 'unknown-'+`id(obj)`
+                self._name = 'unknown-%s' % id(obj)
 
     def name(self):
         """
@@ -162,30 +197,17 @@ class UID:
             identified by this UID.
         @rtype: L{UID}
         """
-        if type(self._obj) is _MethodType: 
-            return UID(self._obj.im_class)
-        else:
-            raise TypeError()
+        return UID(self._cls)
         
     def module(self):
         """
         @return: The UID of the module that contains the object
             identified by this UID.  If the module cannot be found
-            (e.g., if this is the UID for a builtin function), return
+            (e.g., if this is the UID for a builtin method), return
             None. 
-        @rtype: L{UID} or L{None}
+        @rtype: L{UID} or C{None}
         """
-        if type(self._obj) is _MethodType:
-            return UID(sys.modules[self._obj.im_class.__module__])
-        elif type(self._obj) is _ClassType:
-            return UID(sys.modules[self._obj.__module__])
-        elif (isinstance(self._obj, _TypeType) and
-              hasattr(self._obj, '__module__')):
-            return UID(sys.modules[self._obj.__module__])
-        elif type(self._obj) is _FunctionType:
-            return UID(_find_function_module(self._obj))
-        else:
-            return None
+        return UID(self._module)
 
     def package(self):
         """
@@ -199,8 +221,7 @@ class UID:
             return UID(sys.modules[self._name[:dot]])
         elif type(self._obj) in (_MethodType, _ClassType):
             return self.module().package()
-        elif (isinstance(self._obj, _TypeType) and
-              hasattr(self._obj, '__module__')):
+        elif isinstance(self._obj, _TypeType) and self._module:
             return self.module().package()
         else:
             raise TypeError()
@@ -233,7 +254,7 @@ class UID:
         """
         return ((type(self._obj) is _ClassType) or
                 (isinstance(self._obj, _TypeType) and
-                 hasattr(self._obj, '__module__')))
+                 hasattr(self._obj, '__dict__')))
 
     def is_method(self):
         """
@@ -256,6 +277,15 @@ class UID:
         """
         return (type(self._obj) is _ModuleType and
                 hasattr(self._obj, '__path__'))
+
+    def found_fullname(self):
+        """
+        @return: True if this UID encodes the absolute name for the
+            object.  If C{found_fullname} is false, then the UID's
+            name is based on the object's internal id.
+        @rtype: C{boolean}
+        """
+        return self._found_fullname
 
 class Link:
     """
@@ -324,6 +354,61 @@ class Link:
         if not isinstance(other, Link): return -1
         return cmp(self._target, other._target)
 
+_find_builtin_obj_module_cache = {}
+def _find_builtin_obj_module(obj, show_warnings=1):
+    """
+    @return: The module that defines the given builtin object.
+    @rtype: C{module}
+    @param obj: The object whose module should be found.
+    @type obj: C{builtin object}
+    """
+    global _find_builtin_obj_module_cache
+    if _find_builtin_obj_module_cache.has_key(id(obj)):
+        return _find_builtin_obj_module_cache[id(obj)]
+    so_modules = []
+    builtin_modules = []
+    py_modules = []
+    for module in sys.modules.values():
+        if module is None: continue
+        if module.__name__ == '__main__': continue
+        for val in module.__dict__.values():
+            if val is obj:
+                if (module.__name__ in sys.builtin_module_names or
+                    not hasattr(module, '__file__')):
+                    builtin_modules.append(module)
+                elif module.__file__[-3:] == '.so':
+                    so_modules.append(module)
+                else:
+                    py_modules.append(module)
+
+    if so_modules:
+        if len(so_modules) > 1:
+            if show_warnings:
+                print 'Warning: %r appears in multiple .so modules' % obj
+        module = so_modules[0]
+    elif builtin_modules:
+        if len(builtin_modules) > 1:
+            if show_warnings:
+                print 'Warning: %r appears in multiple builtin modules' % obj
+        module = builtin_modules[0]
+    elif py_modules:
+        # Give precedence to the "types" module.
+        if types in py_modules: py_modules = [types]
+        if len(py_modules) > 1:
+            if show_warnings:
+                print 'Warning: %r appears in multiple .py modules' % obj
+        module = py_modules[0]
+    else:
+        if show_warnings:
+            print 'Warning: could not find a module for %r' % obj
+        module = None
+    _find_builtin_obj_module_cache[id(obj)] = module
+    return module
+
+def _find_name_in(obj, module):
+    for (key, val) in module.__dict__.items():
+        if val is obj: return key
+
 def _find_function_module(func):
     """
     @return: The module that defines the given function.
@@ -333,8 +418,10 @@ def _find_function_module(func):
     """
     if not inspect.isfunction(func):
         raise TypeError("Expected a function")
-    if inspect.getmodule(func):
-        return inspect.getmodule(func)
+    try:
+        if inspect.getmodule(func):
+            return inspect.getmodule(func)
+    except: pass
 
     # This fallback shouldn't usually be needed.  But it is needed in
     # a couple special cases (including using epydoc to document
@@ -381,21 +468,20 @@ def _makeuid(obj):
     @param obj: The object whose UID should be returned.
     @type obj: any
     """
-    if type(obj) in (_FunctionType, _BuiltinFunctionType,
-                      _MethodType, _BuiltinMethodType,
-                     _ClassType, _ModuleType):
-        return UID(obj)
-    elif isinstance(obj, _TypeType) and hasattr(obj, '__module__'):
-        return UID(obj)
-    else:
-        return None
+    if type(obj) is _StringType: return None
+    uid = UID(obj)
+    if uid.found_fullname(): return uid
+    else: return None
 
-def _named_module(name):
+def _import_module(name):
     """
     @return: The module with the given fully qualified name.  
     @rtype: C{module}
     @raise ImportError: If there is no module with the given name. 
     """
+    if sys.modules.has_key(name):
+        return sys.modules[name]
+
     # Don't just use __import__(name, None, None, 1) because we don't
     # want it to re-import the module if there was a problem.
     topLevel = __import__(name)
@@ -405,11 +491,11 @@ def _named_module(name):
         m = getattr(m, p)
     return m
 
-def _named_object(name):
+def _import_object(name):
     """Get a fully named module-global object.
     """
     classSplit = name.split('.')
-    module = _named_module('.'.join(classSplit[:-1]))
+    module = _import_module('.'.join(classSplit[:-1]))
     return getattr(module, classSplit[-1])
 
 def findUID(name, container, docmap=None):
@@ -470,7 +556,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            return(_makeuid(_named_module(modname)))
+            return(_makeuid(_import_module(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -481,12 +567,13 @@ def findUID(name, container, docmap=None):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                mod = _named_module(modname)
+                mod = _import_module(modname)
                 if _is_variable_in(name, UID(mod), docmap):
                     return UID('%s.%s' % (container, name))
-                obj = _named_object(modname + '.' + objname)
+                obj = _import_object(modname + '.' + objname)
                 return _makeuid(obj)
             except: pass
 
     # We couldn't find it; return None.
     return None
+
