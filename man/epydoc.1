@@ -8,37 +8,42 @@ epydoc \- generate API documentation from Python docstrings
 .\" ================== SYNOPSIS ====================
 .SH SYNOPSIS
 .HP 7
-.BR epydoc "\ [" \-o
+
+.B epydoc
+.RB [ \-\-html " | "
+.BR \-\-latex " |"
+.BR \-\-dvi " |"
+.BR \-\-ps " |"
+.BR \-\-pdf " |"
+.BR \-\-check ]
+.RB [ \-o
 .IR dir ]
 .RB [ \-n
 .IR name ]
 .RB [ \-u
 .IR url ]
-.RB [ \-v ]
-.RB [ \-q ]
+.RB [ \-t
+.IR  page ]
 .RB [ \-c
 .IR sheet ]
 .RB [ \-\-private\-css
 .IR sheet ]
-.RB [ \-t
-.IR  page ]
+.RB [ \-\-docformat
+.IR format ]
+.RB [ \-p ]
 .RB [ \-\-navlink
 .IR html ]
-.RB [ \-\-help\-file
-.IR file ]
 .RB [ \-\-show\-imports ]
 .RB [ \-\-no\-private ]
 .RB [ \-\-no\-frames ]
-.RB [ \-\-docformat
-.IR format ]
+.RB [ \-\-help\-file
+.IR file ]
 .RB [ \-\-builtins ]
-.IB modules ...
-.PP
-.B epydoc \-\-check
-.RB [ \-p ]
-.RB [ \-q ]
+.RB [ \-\-separate-classes ]
 .RB [ \-v ]
+.RB [ \-q ]
 .IB modules ...
+.HP 7
 .PP
 .B epydoc \-h
 .RI [ topic ]
@@ -52,14 +57,30 @@ their docstrings.  A lightweight markup language called
 .B epytext
 can be used to format docstrings, and to add information about
 specific fields, such as parameters and instance variables.
+Currently, epydoc
+.B supports
+two output formats: HTML and LaTeX.
 .PP
-The API documentation produced by 
+The HTML API documentation produced by 
 .B epydoc
 consists of a set of HTML files.  Two subdirectories are created for
 the public and private documentation.  Within each subdirectory,
 every class and module is documented in its own file.  An index file,
 a trees file, a help file, and a frames-based table of contents are
 also created.
+.PP
+The LaTeX API documentation produced by
+.B epydoc
+consists of a main LaTeX file, and one LaTeX file for each module.  If
+you use the
+.BR \-\-dvi ,
+.BR \-\-ps ,
+or
+.B \-\-pdf
+options, then
+.B epydoc
+will invoke external commands to convert the LaTeX output to the
+requested format.
 .PP
 .B epydoc
 can also be used to check the completeness of the API documentation.
@@ -68,11 +89,54 @@ method, and function has a description; and that every variable and
 parameter has a description and a type.
 .\" ================== OPTIONS ====================
 .SH OPTIONS
-Options are divided into three categories: documentation generation
+Options are divided into five categories: action selection options;
+HTML documentation generation options; LaTeX documentation generation
 options; documentation checking options; and other options.  All
 options must preceed the list of modules.
 .PP
-Documentation generation options:
+.B ACTION SELECTION OPTIONS
+.RS 4
+.TP
+.B \-\-html
+Generate HTML output. (default)
+.TP
+.B \-\-latex
+Generate LaTeX output.
+.TP
+.B \-\-dvi
+Generate dvi output.  This option first creates LaTeX output, and then
+uses
+.B latex
+and
+.B makeindex
+to convert the LaTeX files into a single
+.B dvi
+file.
+.TP
+.B \-\-ps
+Generate postscript output.  This option first creates LaTeX output,
+and then uses
+.BR latex ,
+.BR makeindex ,
+and
+.BR dvips
+to convert the LaTeX files into a single postscript file.
+.TP
+.B \-\-ps
+Generate Adobe Acrobat
+.RB ( pdf )
+output.  This option first creates LaTeX output, and then uses
+.BR latex ,
+.BR makeindex ,
+.BR dvips ,
+and
+.BR ps2pdf
+to convert the LaTeX files into a single
+.B pdf
+file.
+.RE
+.PP
+.B HTML DOCUMENTATION GENERATION OPTIONS 
 .RS 4
 .TP
 .B modules...
@@ -203,7 +267,72 @@ Produce verbose output.  If
 is used multiple times, it produces successively more verbose output.
 .RE
 .PP
-Documentation checking options:
+.B LATEX DOCUMENTATION GENERATION OPTIONS
+.RS 4
+.TP
+.B modules...
+The list of the modules that should be documented.  Modules may be
+specified using either filenames (such as
+.BR epydoc/epytext.py )
+or module names (such as
+.BR os.path ).
+The filename for a package is its
+.B __init__.py
+file.
+.TP
+.B \-\-builtins
+Add the builtin modules (as defined by sys.builtin_module_names) to
+the list of modules to document.
+.TP
+.BI "\-\-docformat " format
+Set the default value for
+.B __docformat__
+to
+.IR format .
+.B __docformat__
+is a module variable that specifies the markup language for the
+docstrings in a module.  Its value consists of the name of a markup
+language, optionally followed by a language code (such as
+.B en
+for English).  For a list of the markup languages currently recognized
+by epydoc, run
+.BR "epydoc \-\-help docformat" .
+.TP
+.BI "\-n " name ", \-\-name " name
+The name of the project whose documentation is being generated.  This
+is used in the index page's title, and in the help page.  It is also
+used to create the homepage link on the navigation bar, if the
+.B \-\-navlink
+option is not used.
+.TP
+.B \-\-no\-private
+Do not generate any documentation for private objects.  This option
+can be useful if you want to discourage users from directly accessing
+private objects.  This option is also useful if you want to generate
+documentation more quickly, since epydoc will only need to produce
+half as many HTML pages.
+.TP
+.BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
+The output directory.  By default, HTML files are
+written to the
+.B html
+directory, and LaTeX files are written to the
+.B latex
+directory.
+.TP
+.B \-q, \-\-quiet
+Produce quiet output.  If
+.B \-q
+is used multiple times, it produces successively more quiet output (by
+suppressing warning messages).
+.TP
+.B \-v, \-\-verbose
+Produce verbose output.  If
+.B \-v
+is used multiple times, it produces successively more verbose output.
+.RE
+.PP
+.B DOCUMENTATION COMPLETENESS CHECKING OPTIONS
 .RS 4
 .TP
 .B modules...
@@ -234,7 +363,7 @@ Produce verbose output.  If
 is used multiple times, it produces successively more verbose output.
 .RE
 .PP
-Other options:
+.B OTHER OPTIONS
 .RS 4
 .TP
 .B \-h, \-\-help, \-\-usage, \-?
@@ -252,14 +381,20 @@ Print the version of Epydoc.
 .SH EXAMPLES
 .TP
 .BR "epydoc \-n " epydoc " \-u " "http://epydoc.sf.net epydoc/*.py"
-Generate API documentation for the epydoc package and all of its
-submodules, and write the output to the
+Generate the HTML API documentation for the epydoc package and all of
+its submodules, and write the output to the
 .B html
 directory.  In the headers and footers, use
 .B epydoc
 as the project name, and
 .B http://epydoc.sf.net
 as the project URL.
+.TP
+.BR "epydoc \-\-pdf \-n " epydoc " --no-private epydoc/*.py"
+Generate the LaTeX API documentation for the epydoc package and all of
+its submodules, and write the output to the
+.B latex
+directory.  Do not include private objects in the documentation.
 .TP
 .BR "epydoc \-o "api " \-\-css " blue " \-\-private\-css " "green sys"
 Generate API documentation for the
@@ -270,7 +405,7 @@ directory.  Use different stylesheets for the public and private
 versions of the documentation.
 .\" ================== HTML FILES ====================
 .SH HTML FILES
-The API documentation produced by 
+The HTML API documentation produced by 
 .B epydoc
 consists of the following files:
 .RS 4
@@ -288,7 +423,7 @@ is a copy of the API documentation home page, which is normally the
 documentation page for the top-level package or module (or the trees
 page if there is no top-level package or module).
 .TP
-.IB module -module.html
+.IB module \-module.html
 The API documentation for a module.  
 .I module
 is the complete dotted name of the module, such as 
@@ -296,7 +431,7 @@ is the complete dotted name of the module, such as
 or
 .BR epydoc.epytext .
 .TP
-.IB class -class.html
+.IB class \-class.html
 The API documentation for a class, exception, or type.
 .I class
 is the complete dotted name of the class, such as
@@ -363,6 +498,59 @@ But if the
 .B \-\-no\-private
 option is used, then no subdirectories are created, and the public
 documentation is written directly to the output directory.
+.\" ================== LATEX FILES ====================
+.SH LATEX FILES
+The LaTeX API documentation produced by
+.B epydoc
+consists of the following files:
+.RS 4
+.TP
+.B api.pdf
+An Adobe Acrobat (pdf) file containing the complete API documentation.
+This file is only generated if you use the
+.B \-\-pdf
+option.
+.TP
+.B api.tex
+The top-level LaTeX file.  This file imports the other LaTeX files, to
+create a single unified document.
+.TP
+.B api.dvi
+A dvi file containing the complete API documentation.  This file is
+only generated if you use the 
+.B \-\-dvi
+option, the
+.B \-\-ps
+option, or the
+.B \-\-pdf
+option.
+.TP
+.B api.ps
+A postscript file containing the complete API documentation.  This
+file is only generated if you use the
+.B \-\-ps
+option or the
+.B \-\-pdf
+option.
+.TP
+.IB module -module.tex
+The API documentation for a module.
+.I module
+is the complete dotted name of the module, such as
+.B sys or
+.BR epydoc.epytext .
+.TP
+.IB class -class.tex
+The API documentation for a class, exception, or type.
+.I class
+is the complete dotted name of the class, such as
+.B epydoc.epytext.Token
+or array.ArrayType.  These class documentation files are only created
+if the
+.B \-\-separate\-classes
+option is used; otherwise, the documentation for each class is
+included in its module's documentation file.
+.RE
 .\" ================== DIAGNOSTICS ====================
 .SH DIAGNOSTICS
 Errors are divided into five categories: import errors; epytext
