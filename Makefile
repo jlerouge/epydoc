@@ -51,28 +51,39 @@ local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
 
 checkdocs:
-	epydoc --check ${PY_SRC}
+	epydoc --check ${PY_SRC} -v
 
-.html.up2date: refdocs examples distributions
+.html.up2date: refdocs examples #distributions
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
 	cp -r ${API} ${WEBDIR}
 	cp -r ${EXAMPLES} ${WEBDIR}
-	cp -r src/dist/epydoc* ${WEBDIR}
+#	cp -r src/dist/epydoc* ${WEBDIR}
 
 refdocs: .refdocs.up2date
 .refdocs.up2date: ${PY_SRC}
 	rm -rf ${API}
 	mkdir -p ${API}
-	epydoc ${PY_SRC} -o ${API} -n epydoc \
-	       -u http://epydoc.sourceforge.net --css blue
+	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
+	       --css blue --private-css green -vv -f ${PY_SRC} 
 	touch .refdocs.up2date
 
 examples: .examples.up2date
 .examples.up2date: ${EXAMPLES_SRC} ${PY_SRC}
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
-	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
-	       -u http://epydoc.sourceforge.net --css blue
+	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
+	       --no-private --css blue -v ${EXAMPLES_SRC} sre
 	touch .examples.up2date
+
+LIBS = $(shell find /usr/lib/python2.1/ -name '*.py' -o -name '*.so' \
+	      |grep -v '/eric/' \
+	      |grep -v '/lib-old/' \
+	      |grep -v '/site-packages/') # for now (?)
+
+libdocs:
+	mkdir -p libs
+	epydoc -o libs -f -vv -q -n 'Python Standard Library' \
+	       -u http://www.python.org -c white ${LIBS} #\
+#	       >libs/libdocs.out 2>libs/libdocs.err
