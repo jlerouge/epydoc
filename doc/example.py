@@ -1,3 +1,7 @@
+"""
+Examples for the epytext manual.
+"""
+
 def x_intercept(m, b):
     """
     Return the x intercept of the line M{y=m*x+b}.  The X{x intercept}
