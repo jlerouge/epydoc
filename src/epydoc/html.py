@@ -1,5 +1,5 @@
 #
-# epydoc.html: epydoc HTML output generator
+# epydoc.py: epydoc HTML output generator
 # Edward Loper
 #
 # Created [01/30/01 05:18 PM]
@@ -10,10 +10,6 @@
 Documentation to HTML converter.
 """
 __docformat__ = 'epytext en'
-
-# To do:
-#   - Control over whether you link to non-documented objects
-#   - Better help
 
 ##################################################
 ## Implementation Notes
@@ -42,23 +38,22 @@ __docformat__ = 'epytext en'
 
 # I chose to implement the formatter as a class (rather than as a
 # group of functions) because it lets me use instance variables to
-# remember all the configuration variables, which might have
-# far-reaching consequences.  Passing these around manually would be a
-# pain.  Also, I don't have to explicitly pass around the docmap,
-# which is used almost everywhere.
+# remember all the configuration variables.  Passing these around
+# manually would be a pain.  Also, I don't have to explicitly pass
+# around the docmap, which is used almost everywhere.
 
 ##################################################
 ## Constants
 ##################################################
 
-# Expects: (name, css)
+# Expects: name
 HEADER = '''<?xml version="1.0" encoding="iso-8859-1"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
           "DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
   <head>
-    <title> %s</title>
-    <link rel="stylesheet" href="%s" type="text/css"></link>
+    <title>%s</title>
+    <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
   </head>
   <body bgcolor="white" text="black" link="blue" vlink="#204080"
         alink="#204080">
@@ -76,18 +71,31 @@ FOOTER = '''
 </html>
 '''
 # Expects: (name, mainFrame_src)
-FRAMES = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
+FRAMES_INDEX = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
 <html>
   <head>
     <title> %s </title>
   </head>
   <frameset cols="20%%,80%%">
     <frameset rows="30%%,70%%">
-      <frame src="epydoc-toc.html" name="moduleListFrame">
-      <frame src="epydoc-project-toc.html" name="moduleFrame">
+      <frame src="toc.html" name="moduleListFrame">
+      <frame src="toc-everything.html" name="moduleFrame">
     </frameset>
     <frame src="%s" name="mainFrame">
   </frameset>
+</html>
+'''
+# Expects (url, url, name)
+REDIRECT_INDEX = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
+<html>
+  <head>
+    <title> Redirect </title>
+    <meta http-equiv="refresh" content="1;url=%s">
+    <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
+  </head>
+  <body>
+    Redirecting to the API documentation for <a href="%s">%s</a>...
+  </body>
 </html>
 '''
 
@@ -133,7 +141,8 @@ import xml.dom.minidom
 # epydoc imports
 import epydoc
 import epydoc.epytext as epytext
-from epydoc.uid import UID, Link, findUID
+from epydoc.uid import UID, Link, findUID, make_uid
+from epydoc.imports import import_module
 from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 from epydoc.css import STYLESHEETS
@@ -146,38 +155,49 @@ from epydoc.colorize import colorize_re, colorize_doctestblock
 
 class HTMLFormatter:
     """
-    Documentation to HTML converter.
+    Documentation to HTML converter.  The API documentation produced
+    C{HTMLFormatter} consists of a set of HTML files.  Two
+    subdirectories are created for the public and private
+    documentation.  Within each subdirectories, every class and module
+    is documented in its own file.  An index file, a trees file, a
+    help file, and a frames-based table of contents are also created.
+    In particular, C{HTMLFormatter} generates the following files:
 
-    For each module/package, create a file containing:
-      - Navbar
-      - Module Name
-      - Description
-      - See-also
-      - Module list
-      - Class summary
-      - Function summary
-      - Variable summary
-      - Function details
-      - Variable details
-      - Navbar
-
-    For each class, create a file containing:
-      - Navbar
-      - Module name
-      - Class Name
-      - Base tree
-      - Known subclasses
-      - Description
-      - See-also
-      - Method summary
-      - Instance Variable summary
-      - Class Variable summary
-      - Method details
-      - Instance Variable details
-      - Class Variable details
-      - Navbar
-
-    Also, generate an index file, a help file, and a tree file.
+      - X{index.html}: The standard entry point for the documentation.
+        Normally, index.html is a frame index file, which defines
+        three frames: two frames on the left side of the browser
+        contain a table of contents, and the main frame on the right
+        side of the window contains documentation pages.  But if the
+        --no-frames option is used, then index.html will redirect the
+        user to the project's top page.
+      - X{m-I{module}.html}: The API documentation for a module.  module
+        is the complete dotted name of the module, such as sys or
+        epydoc.epytext.
+      - X{c-I{class}.html}: The API documentation for a class, exception,
+        or type.  class is the complete dotted name of the class, such
+        as epydoc.epytext.Token or array.ArrayType.
+      - X{trees.html}: The module and class hierarchies.
+      - X{indices.html} The term and identifier indices.  
+      - X{help.html}: The help page for the project.  This page
+        explains how to use and navigate the webpage produced by
+        epydoc.
+      - X{toc.html}: The top-level table of contents page.  This page
+        is displayed in the upper-left frame, and provides links to
+        toc-everything.html and the toc-m-I{module}.html files.  toc.html
+        is not generated if the --no-frames option is used.
+      - X{toc-everything.html}: The table of contents for the entire
+        project.  This page is displayed in the lower-left frame, and
+        provides links to every class, type, exception, function,
+        and variable defined by the project.  toc-everything.html is
+        not generated if the --no-frames option is used.
+      - X{toc-m-I{module}.html}: The table of contents for a module.
+        This page is displayed in the lower-left frame, and provides
+        links to every class, type, exception, function, and variable
+        defined by the module.  module is the complete dotted name of
+        the module, such as sys or epydoc.epytext.  toc-m-module.html
+        is not generated if the --no-frames option is used.
+      - X{epydoc.css}: The CSS stylesheet used to display all HTML
+        pages.
 
     @type docmap: L{DocMap}
     @ivar docmap: The documentation object, encoding the objects that
@@ -186,7 +206,6 @@ class HTMLFormatter:
     @ivar _prj_name: A name for the documentation (for the navbar).
     @type _prj_url: C{string}
     @ivar _prj_url: A URL for the documentation (for the navpar).
-    
     @ivar _module: The UID of the top-level module, if there is one. 
         If there is more than one top-level module, then C{_module} is
         C{'multiple'}; if there is no top-level module, then
@@ -222,11 +241,23 @@ class HTMLFormatter:
         @param docmap: The documentation to output.
         @type docmap: L{DocMap}
         @param kwargs: Keyword arguments:
-            - C{prj_name}: A name for the documentation (for the
-              navbar).  This name can contain arbitrary HTML code
-              (e.g., images or tables).  (type=C{string})
-            - C{prj_url}: A URL for the documentation (for the
-              navbar).  (type=C{string})
+            - C{prj_name}: The name of the project.  Defaults to
+              none.  (type=C{string})
+            - C{prj_url}: The target for the project hopeage link on
+              the navigation bar.  If C{prj_url} is not specified,
+              then no hyperlink is created.  (type=C{string})
+            - C{prj_link}: The label for the project link on the
+              navigation bar.  This link can contain arbitrary HTML
+              code (e.g. images).  By default, a label is constructed
+              from C{prj_name}.  (type=C{string})
+            - C{toppage}: The top page for the documentation.  This
+              is the default page shown main frame, when frames are
+              enabled.  C{toppage} can be a URL, the name of a
+              module, the name of a class, or one of the special
+              strings C{"trees"}, C{"indices"}, or C{"help"}.
+              By default, the top-level package or module is used, if
+              there is one; otherwise, C{"trees"} is used.
+              (type=C{string}) 
             - C{css}: The CSS stylesheet file.  If C{css} is a file
               name, then the specified file's conents will be used.
               Otherwise, if C{css} is the name of a CSS stylesheet in
@@ -270,8 +301,10 @@ class HTMLFormatter:
         self._docmap = docmap
 
         # Process keyword arguments.
-        self._prj_name = kwargs.get('prj_name', '')
+        self._prj_name = kwargs.get('prj_name', None)
         self._prj_url = kwargs.get('prj_url', None)
+        self._prj_link = kwargs.get('prj_link', None)
+        self._toppage = self._find_toppage(kwargs.get('toppage', None))
         self._css = kwargs.get('css')
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
@@ -281,14 +314,12 @@ class HTMLFormatter:
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
         self._variable_linelen = kwargs.get('variable_linelength', 70)
-
-        # If the name doesn't include any html tags, then assume it's
-        # plaintext, and munge it appropriately.
-        if not re.match('^([^<>]*<[^<>]+>)+$', self._prj_name):
-            self._prj_name = re.sub('&', '&amp;', self._prj_name)
-            self._prj_name = re.sub('<', '&lt;', self._prj_name)
-            self._prj_name = re.sub('>', '&gt;', self._prj_name)
-            self._prj_name = re.sub(' ', '&nbsp;', self._prj_name)
+        if self._prj_name and self._prj_url and not self._prj_link:
+            self._prj_link = '%s homepage' % self._prj_name
+            self._prj_link = self._prj_link.replace('&', '&amp;')
+            self._prj_link = self._prj_link.replace('<', '&lt;')
+            self._prj_link = self._prj_link.replace('>', '&gt;')
+            self._prj_link = self._prj_link.replace(' ', '&nbsp;')
 
         # Find the top-level object (if any)
         self._find_toplevel()
@@ -296,38 +327,24 @@ class HTMLFormatter:
         # Cache the HTML that we generate for each docstring.
         self._epytext_cache = {}
 
-        # What is the project's text name?
-        self._text_prj_name = self._prj_name or 'API Documentation'
-        if re.search('<.*>', self._text_prj_name):
-            self._text_prj_name = 'API Documentation'
-        
-        # Which page is the "main" page?
-        if isinstance(self._package, UID):
-            self._mainpage = self._uid_to_uri(self._package)
-        elif isinstance(self._module, UID):
-            self._mainpage = self._uid_to_uri(self._module)
-        else:
-            self._mainpage = 'epydoc-tree.html'
-
     def num_files(self):
         """
         @return: The number of files that this C{HTMLFormatter} will
             generate.
         @rtype: C{int}
         """
-        # Basic files (tree, index, help, css)
-        n = 4
+        # Basic files (index.html, tree, indices, help, css)
+        n = 5
 
-        # TOC files (frames, toc, project-toc)
-        if self._create_frames: n += 3
+        # TOC files (toc, toc-everything)
+        if self._create_frames: n += 2
 
         # Private basic & TOC files.
         if self._create_private_docs: n *= 2
 
-        # index.html in the main directory.
-        if self._create_frames and self._create_private_docs:
-            n += 1
-            
+        # Base directory index.html file
+        if self._create_private_docs: n += 1
+
         for uid in self._docmap.keys():
             # Module and class API files
             if not (uid.is_module() or uid.is_class()): continue
@@ -398,14 +415,10 @@ class HTMLFormatter:
             self._write(os.path.join(directory, 'private/'),
                         progress_callback)
 
-            # Create an extra frames file in the parent directory,
-            # pointing at the public docs.
             if self._create_frames:
-                filename = os.path.join(directory, 'index.html')
-                frames = FRAMES % (self._text_prj_name, self._mainpage)
-                frames = re.sub('src="', 'src="public/', frames)
-                open(filename, 'w').write(frames)
-                if progress_callback: progress_callback(filename, None)
+                self._write_frames_index(directory, progress_callback, 1)
+            else:
+                self._write_redirect_index(directory, progress_callback, 1)
         else:
             self._show_private = 0
             self._write(directory, progress_callback)
@@ -420,24 +433,26 @@ class HTMLFormatter:
         self._write_docs(directory, progress_callback)
         
         # Write the tree file (package & class hierarchies)
-        filename = os.path.join(directory, 'epydoc-tree.html')
+        filename = os.path.join(directory, 'trees.html')
         if progress_callback: progress_callback(filename, None)
         str = self._tree_to_html()
         open(filename, 'w').write(str)
 
         # Write the index file.
-        filename = os.path.join(directory, 'epydoc-index.html')
+        filename = os.path.join(directory, 'indices.html')
         if progress_callback: progress_callback(filename, None)
         self._write_index_to_stream(open(filename, 'w'))
 
         # Write the help file.
-        filename = os.path.join(directory, 'epydoc-help.html')
+        filename = os.path.join(directory, 'help.html')
         if progress_callback: progress_callback(filename, None)
         self._write_help(filename)
         
         # Write the frames-based table of contents
         if self._create_frames:
             self._write_frames(directory, progress_callback)
+        else:
+            self._write_redirect_index(directory, progress_callback)
         
         # Write the CSS file.
         filename = os.path.join(directory, 'epydoc.css')
@@ -454,7 +469,7 @@ class HTMLFormatter:
         """
         for uid in self._filtersort_uids(self._docmap.keys()):
             doc = self._docmap[uid]
-            filename = os.path.join(directory, '%s.html' % uid)
+            filename = os.path.join(directory, self._uid_to_uri(uid))
             if isinstance(doc, ModuleDoc):
                 if progress_callback: progress_callback(filename, doc)
                 str = self._module_to_html(uid)
@@ -469,27 +484,23 @@ class HTMLFormatter:
         Write the frames-driven contents files for the project to the
         given directory.
 
-          - C{epydoc-frames.html}
-          - C{epydoc-toc.html}
-          - C{epydoc-project-toc.html}
-          - C{I{module}-toc.html}
+          - C{index.html}
+          - C{toc.html}
+          - C{toc-everything.html}
+          - C{toc-m-I{module}.html}
 
         @rtype: C{None}
         """
-        # Write the main frames index file
-        filename = os.path.join(directory, 'epydoc-frames.html')
-        if progress_callback: progress_callback(filename, None)
-
-        open(filename, 'w').write(FRAMES % (self._text_prj_name,
-                                            self._mainpage))
+        # Write the frames index file
+        self._write_frames_index(directory, progress_callback)
 
         # Write the top-level table of contents.
-        filename = os.path.join(directory, 'epydoc-toc.html')
+        filename = os.path.join(directory, 'toc.html')
         if progress_callback: progress_callback(filename, None)
         open(filename, 'w').write(self._toc_to_html())
 
         # Classes table of contents
-        filename = os.path.join(directory, 'epydoc-project-toc.html')
+        filename = os.path.join(directory, 'toc-everything.html')
         if progress_callback: progress_callback(filename, None)
         str = self._project_toc_to_html()
         open(filename, 'w').write(str)
@@ -498,10 +509,60 @@ class HTMLFormatter:
         for uid in self._filtersort_uids(self._docmap.keys()):
             if uid.is_module():
                 doc = self._docmap[uid]
-                filename = os.path.join(directory, '%s-mtoc.html' % uid)
+                filename = os.path.join(directory, 'toc-%s' %
+                                        self._uid_to_uri(uid))
                 str = self._module_toc_to_html(uid)
                 if progress_callback: progress_callback(filename, doc)
                 open(filename, 'w').write(str)
+
+    def _write_frames_index(self, directory, progress_callback, frombase=0):
+        """
+        Write the index for the frames-based table of contents.
+        @param frombase: True if this is the index file for the base
+            directory when we are generating both public and private
+            documentation.  In this case, all hyperlinks should be
+            changed to point into the C{public} subdirectory.
+        @type frombase: C{boolean}
+        """
+        top = self._toppage
+        if frombase and not top.startswith('http:') and not '/' in top:
+            top = 'public/%s' % top
+        filename = os.path.join(directory, 'index.html')
+        if progress_callback: progress_callback(filename, None)
+        prj_name = self._prj_name or "API Documentation"
+        frames = FRAMES_INDEX % (prj_name, top)
+        if frombase: frames = re.sub('src="toc', 'src="public/toc', frames)
+        open(filename, 'w').write(frames)
+        
+    def _write_redirect_index(self, directory, progress_callback, frombase=0):
+        """
+        Write an index.html file that redirects the user to the main
+        page.  When the frames-based table of contents is not
+        generated, this method is used to create index.html.
+        @param frombase: True if this is the index file for the base
+            directory when we are generating both public and private
+            documentation.  In this case, all hyperlinks should be
+            changed to point into the C{public} subdirectory.
+        @type frombase: C{boolean}
+        """
+        filename = os.path.join(directory, 'index.html')
+        top = self._toppage
+        
+        # When possible, just copy the file.  This isn't possible if
+        # top is an external link, or if it's the base index (since
+        # the links would point to the current directory).
+        if not frombase and not top.startswith('http:') and not '/' in top:
+            try:
+                import shutil
+                shutil.copy(top, filename)
+                return
+            except: pass
+
+        # If we can't symlink, then use a redirect page.
+        name = self._prj_name or 'this project'
+        if frombase and not top.startswith('http:') and not '/' in top:
+            top = 'public/%s' % top
+        open(filename, 'w').write(REDIRECT_INDEX % (top, top, name))
 
     def _write_help(self, filename):
         """
@@ -520,15 +581,14 @@ class HTMLFormatter:
             else:
                 raise IOError("Can't find help file: %r" % self._helpfile)
         else:
-            if self._text_prj_name == 'API Documentation':
-                thisprj = 'this project'
-            else: thisprj = '<b>%s</b>' % self._text_prj_name
+            if self._prj_name: thisprj = '<b>%s</b>' % self._prj_name
+            else: thisprj = 'this project'
             help = HTML_HELP % {'this_project':thisprj}
         
         # Write the help file.
         helpfile = open(filename, 'w')
-        helpfile.write(self._header('Help')+self._navbar('epydoc-help', 1)+
-                       help+self._navbar('epydoc-help', 0)+self._footer())
+        helpfile.write(self._header('Help')+self._navbar('help', 1)+
+                       help+self._navbar('help', 0)+self._footer())
         helpfile.close()
         
     def _write_css(self, filename):
@@ -586,14 +646,17 @@ class HTMLFormatter:
         # Write the header & navigation bar.
         str = self._header(uid.name())
         str += self._navbar(uid, 1)
+        if uid.is_package(): str += self._start_of('Package Description')
+        else: str += self._start_of('Module Description')
+            
+        # Write the breadcrumb trail.
+        breadcrumbs = self._breadcrumbs(uid)
+        if not breadcrumbs: str += '<h2>'
+        else: str += '<h2><font size="-1">\n%s\n</font><br>\n' % breadcrumbs
 
         # Write the module's name.
-        if uid.is_package():
-            str += self._start_of('Package Description')
-            str += '<h2>Package '+uid.name()+'</h2>\n\n'
-        else:
-            str += self._start_of('Module Description')
-            str += '<h2>Module '+uid.name()+'</h2>\n\n'
+        if uid.is_package(): str += 'Package '+uid.name()+'</h2>\n\n'
+        else: str += 'Module '+uid.name()+'</h2>\n\n'
 
         # Write the module's description.
         if doc.descr():
@@ -658,12 +721,14 @@ class HTMLFormatter:
         # Write the header & navigation bar.
         str = self._header(uid.name())
         str += self._navbar(uid, 1)
-
-        # Write the class's module and its name.
         str += self._start_of('Class Description')
-        str += '<h2><font size="-1">\n'
-        str += self._uid_to_href(uid.module(), code=0)
-        str += '</font><br>\n' 
+
+        # Write the breadcrumb trail.
+        breadcrumbs = self._breadcrumbs(uid)
+        if not breadcrumbs: str += '<h2>'
+        else: str += '<h2><font size="-1">\n%s\n</font><br>\n' % breadcrumbs
+
+        # Write the class's name
         str += 'Class ' + uid.shortname()+'</h2>\n\n'
 
         # Write the base class tree
@@ -735,7 +800,7 @@ class HTMLFormatter:
         """
         # Header and navigation bar
         str = self._header('Module and Class Hierarchies')
-        str += self._navbar('epydoc-tree', 1)
+        str += self._navbar('trees', 1)
 
         # Module hierarchy
         str += self._start_of('Module Hierarchy')
@@ -748,7 +813,7 @@ class HTMLFormatter:
         str += self._class_tree()
 
         # Navigation bar and footer
-        str += self._navbar('epydoc-tree')
+        str += self._navbar('trees')
         str += self._footer()
         return str
 
@@ -765,7 +830,7 @@ class HTMLFormatter:
         """
         # Header and navigation bar.
         out.write(self._header('Index'))
-        out.write(self._navbar('epydoc-index', 1))
+        out.write(self._navbar('indices', 1))
         out.write('<br>\n')
 
         # Term index
@@ -816,7 +881,7 @@ class HTMLFormatter:
             out.write('</table>\n' +  '<br>\n')
 
         # Navigation bar and footer.
-        out.write(self._navbar('epydoc-index'))
+        out.write(self._navbar('indices'))
         out.write(self._footer())
 
     def _toc_to_html(self):
@@ -836,27 +901,27 @@ class HTMLFormatter:
 
         # Class table of contents (all classes/exceptions)
         str += ('<a target="moduleFrame" href="%s">%s</a><br>\n' %
-                ('epydoc-project-toc.html', 'Everything'))
+                ('toc-everything.html', 'Everything'))
 
         # Package table of contents (individual packages)
         str += self._start_of('Packages')
         str += '<br><font size="+1"><b>Packages</b></font><br>\n'
         for uid in uids:
             if uid.is_package():
-                str += ('<a target="moduleFrame" href="%s-mtoc.html">'+
-                         '%s</a><br>\n') % (uid, uid)
+                str += ('<a target="moduleFrame" href="toc-%s">'+
+                        '%s</a><br>\n') % (self._uid_to_uri(uid), uid)
 
         # Module table of contents (individual modules)
         str += self._start_of('Modules')
         str += '<br><font size="+1"><b>Modules</b></font><br>\n'
         for uid in uids:
             if uid.is_module() and not uid.is_package():
-                str += ('<a target="moduleFrame" href="%s-mtoc.html">'+
-                        '%s</a><br>\n') % (uid, uid)
+                str += ('<a target="moduleFrame" href="toc-%s">'+
+                        '%s</a><br>\n') % (self._uid_to_uri(uid), uid)
                 
         # The private/public link.
         str += '\n<br><hr>\n'
-        str += self._public_private_link('epydoc-toc')
+        str += self._public_private_link('toc')
         
         return str + '\n</body>\n</html>\n'
 
@@ -896,7 +961,7 @@ class HTMLFormatter:
         str += self._toc_var_section('All&nbsp;Variables', vars)
         
         str += '\n<hr>\n'
-        str += self._public_private_link('epydoc-project-toc')
+        str += self._public_private_link('toc-everything')
         return str + '\n</body>\n</html>\n'
 
     def _module_toc_to_html(self, uid):
@@ -959,112 +1024,65 @@ class HTMLFormatter:
         str += ' cellpadding="0" bgcolor="#a0c0ff" cellspacing="0">\n'
         str += '  <tr valign="center">\n'
 
-        I = ' '*4 # indentation
+        # The "Top" link
+        if self._toppage in ('trees.html', 'indices.html',
+                              'help.html'):
+            pass # We already have a link for these.
+        elif (isinstance(where, UID) and
+            self._uid_to_uri(where) == self._toppage):
+            str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
+            str += '&nbsp;&nbsp;Top&nbsp;&nbsp;&nbsp;</th>\n'
+        else:
+            str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;<a '
+            str += 'class="navbar" href="%s">Top</a>' % self._toppage
+            str += '&nbsp;&nbsp;&nbsp;</th>\n' 
 
-        # Make sure that "package" and "parent" take up the same
-        # amount of room, so the navbar looks the same on different
-        # pages..
-        WIDTH = ''
-        #if self._package is None: WIDTH=''
-        #else: WIDTH='width="20%"'
-        
-        # The "Go to Package" link
-        if self._package is None: pass
-        elif isinstance(where, UID) and where.is_package():
-            pkg = where.package()
-            if pkg is not None:
-                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += self._uid_to_href(pkg, 'Parent', 'navbar', 0)
-                str += '&nbsp;&nbsp;&nbsp;</th>\n'
-            else:
-                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
-                str += '&nbsp;Parent&nbsp;&nbsp;&nbsp;</th>\n'
-        elif isinstance(where, UID):
-            pkg = where.package()
-            if pkg is not None:
-                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-                str += self._uid_to_href(pkg, 'Package', 'navbar', 0)
-                str += '&nbsp;&nbsp;&nbsp;</th>\n'
-            else:
-                str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;'
-                str += '&nbsp;Package&nbsp;&nbsp;&nbsp;</th>\n'
-        elif isinstance(self._package, UID):
-            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(self._package, 'Package', 'navbar', 0)
-            str += '&nbsp;&nbsp;&nbsp;</th>\n'
-        else:
-            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += 'Package&nbsp;&nbsp;&nbsp;</th></b>\n'
-        
-        # The "Go to Module" link
-        if self._module is None: pass
-        elif isinstance(where, UID) and where.is_package():
-            str += I+'<th '+WIDTH+' bgcolor="#70b0f0" class="navselect">' 
-            str += '&nbsp;&nbsp;&nbsp;Package&nbsp;&nbsp;&nbsp;</th>\n'
-        elif isinstance(where, UID) and where.is_module():
-            str += I+'<th '+WIDTH+' bgcolor="#70b0f0" class="navselect">' 
-            str += '&nbsp;&nbsp;&nbsp;Module&nbsp;&nbsp;&nbsp;</th>\n'
-        elif isinstance(where, UID) and where.is_class():
-            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(where.module(), 'Module', 'navbar', 0)
-            str += '&nbsp;&nbsp;&nbsp;</th>\n'
-        elif isinstance(self._module, UID):
-            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += self._uid_to_href(self._module, 'Module', 'navbar', 0)
-            str += '&nbsp;&nbsp;&nbsp;</th>\n'
-        else:
-            str += I+'<th '+WIDTH+' class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += 'Module&nbsp;&nbsp;&nbsp;</th>\n'
-        
-        # The "Go to Class" link
-        if isinstance(where, UID) and where.is_class():
-            str += I+'<th bgcolor="#70b0f0" class="navselect">&nbsp;'
-            str += '&nbsp;&nbsp;Class&nbsp;&nbsp;&nbsp;</th>\n'
-        else:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;Class' 
-            str += '&nbsp;&nbsp;&nbsp;</th>\n'
-
-        # The "Go to Tree" link
-        if where == 'epydoc-tree':
-            str += I+'<th bgcolor="#70b0f0" class="navselect">&nbsp;'
+        # The "Tree" link
+        if where == 'trees':
+            str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
             str += '&nbsp;&nbsp;Trees&nbsp;&nbsp;&nbsp;</th>\n'
         else:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += '<a class="navbar" href="epydoc-tree.html">Trees</a>'
+            str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += '<a class="navbar" href="trees.html">Trees</a>'
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
 
-        # The "Go to Index" link
-        if where == 'epydoc-index':
-            str += I+'<th bgcolor="#70b0f0" class="navselect">&nbsp;'
+        # The "Index" link
+        if where == 'indices':
+            str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
             str += '&nbsp;&nbsp;Index&nbsp;&nbsp;&nbsp;</th>\n'
         else:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += '<a class="navbar" href="epydoc-index.html">Index</a>'
+            str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += '<a class="navbar" href="indices.html">Index</a>'
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
 
-        # The "Go to Help" link
-        if where == 'epydoc-help':
-            str += I+'<th bgcolor="#70b0f0" class="navselect">&nbsp;'
+        # The "Help" link
+        if where == 'help':
+            str += '    <th bgcolor="#70b0f0" class="navselect">&nbsp;'
             str += '&nbsp;&nbsp;Help&nbsp;&nbsp;&nbsp;</th>\n'
         else:
-            str += I+'<th class="navbar">&nbsp;&nbsp;&nbsp;'
-            str += '<a class="navbar" href="epydoc-help.html">Help</a>'
+            str += '    <th class="navbar">&nbsp;&nbsp;&nbsp;'
+            str += '<a class="navbar" href="help.html">Help</a>'
             str += '&nbsp;&nbsp;&nbsp;</th>\n'
 
-        str += I+'<td width="100%"></td>\n'
-        str += I+'<th class="navbar">'
-        if self._prj_name:
+        # The homepage link.
+        #str += '    <td width="100%"></td>\n'
+        if self._prj_link:
+            str += '    <th class="navbar" align="right" width="100%">\n'
+            str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
+            str += '      <tr><th class="navbar" align="center">\n        '
             if self._prj_url:
-                str += ('<a class="navbar" target="_top" href="%s">%s</a>' %
-                          (self._prj_url, self._prj_name))
+                str += ('<a class="navbar" target="_top" href="%s">\n' %
+                        self._prj_url)
+                str += '        %s</a>' % self._prj_link
             else:
-                str += self._prj_name
-
-        str += '</th>\n  </tr>\n</table>\n'
+                str += self._prj_link
+            str += '\n      </th></tr></table>\n'
+            str += '    </th>\n'
+        str += '  </tr>\n</table>\n'
 
         # Frames and public/private link
         if top and (self._create_private_docs or self._create_frames):
-            str += '<table width="100%"><tr>\n'
+            str += '<table width="100%" cellpadding="0" cellspacing="0"><tr>\n'
             if self._create_frames:
                 str += '  <td>%s</td>\n' % self._frames_link(where)
             str += '  <td width="100%"></td>\n'
@@ -1077,7 +1095,7 @@ class HTMLFormatter:
     def _frames_link(self, where):
         if isinstance(where, UID): uri = self._uid_to_uri(where)
         else: uri = where+'.html'
-        return ('<font size="-2">[<a href="epydoc-frames.html"'+
+        return ('<font size="-2">[<a href="index.html"'+
                 'target="_top">frames</a>&nbsp;|&nbsp;<a href="'+uri+
                 '" target="_top">no&nbsp;frames</a>]</font>')
     
@@ -2115,12 +2133,89 @@ class HTMLFormatter:
         for piece in str.split('.'):
             if piece[:1] == '_' and piece[-1:] != '_': return 1
         return 0
+
+    def _breadcrumbs(self, uid):
+        """
+        @return: The HTML code for a series of links to the parents of
+            C{uid}.
+        @rtype: C{string}
+        """
+        uid = uid.parent()
+        crumbs = []
+        while uid is not None:
+            crumbs.append(self._uid_to_href(uid, uid.shortname(), code=0))
+            uid = uid.parent()
+        crumbs.reverse()
+        return '.'.join(crumbs)
+
+    def _find_toppage(self, pagename):
+        """
+        Find the top page for the API documentation.  This page is
+        used as the default page shown in the main frame, when frames
+        are used.  When frames are not used, a redirect page is
+        created from C{index.html} to the top page.
+
+        @param pagename: The name of the page, as specified by the
+            keyword argument C{toppage} to the constructor.
+        @type pagename: C{string}
+        @return: The URL of the top page.
+        @rtype: C{string}
+        """
+        # If the toppage is unspecified, find an appropriate page.
+        if not pagename:
+            top = self._find_toplevel()
+            if top: return self._uid_to_uri(top)
+            else: return 'trees.html'
+
+        # If it's a URL, then use it directly.
+        if pagename.startswith('http:'):
+            return pagename
+
+        # Look for it in the docmap.
+        for uid in self._docmap.keys():
+            if pagename == uid.name():
+                if uid.is_module() or uid.is_class():
+                    return self._uid_to_uri(uid)
+                else:
+                    estr = ('Warning: Specified top page object %s' % uid
+                            + ' is not a module\n         or a class.')
+                    if sys.stderr.softspace: print >>sys.stderr
+                    print >>sys.stderr, estr
+                    return self._find_toppage(None)
+                
+        # Try importing it as a module.
+        try:
+            uid = make_uid(import_module(pagename))
+            if self._docmap.has_key(uid):
+                return self._uid_to_uri(uid)
+            else:
+                estr = ('Warning: Specified top page object %s' % uid
+                        + ' is not documented.')
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, estr
+                return self._find_toppage(None)
+        except: pass
+
+        # Is it a special page name?  Note that these could, in
+        # principle, be shadowed by modules or classes named "html"
+        # contained in modules named "index" etc.
+        if pagename in ('indices.html', 'help.html',
+                        'trees.html'):
+            return pagename
+
+        # We didn't find anything.
+        estr = ('Warning: Unable to find the specified toppage %s.'
+                % pagename)
+        if sys.stderr.softspace: print >>sys.stderr
+        print >>sys.stderr, estr
+        return self._find_toppage(None)
     
     def _find_toplevel(self):
         """
-        Try to find a unique module/package for this set of docs.
-        Update the member variables L{_package} and L{_module} to
-        contain the top-level module/package.
+        @return: The UID of the top-level module or package, or
+
+            C{None} if there is no top-level module or package.
+        @rtype: L{UID} or C{None}
         """
         modules = []
         packages = []
@@ -2131,21 +2226,20 @@ class HTMLFormatter:
                 packages.append(uid)
 
         # Is there a unique module?
-        if len(modules) == 0: self._module = None
-        elif len(modules) == 1: self._module = modules[0]
-        else: self._module = 'multiple'
-
+        if len(packages) == 0 and len(modules) == 1:
+            return modules[0]
+        
         # Is there a unique (top-level) package?
-        if len(packages) == 0: self._package = None
+        if len(packages) == 0: return None
         else:
-            self._package = 'multiple'
             for pkg in packages:
-                toplevel = 1
-                for p2 in packages:
-                    if pkg != p2 and not p2.descendant_of(pkg):
-                        toplevel = 0
-                if toplevel:
-                    self._package = pkg
+                for pkg2 in packages:
+                    if pkg is pkg2: continue
+                    if not pkg2.descendant_of(pkg): break
+                else: return pkg
+
+        # There is no top-level object.
+        return None
 
     def _cmp_name(self, name1, name2):
         """
@@ -2272,7 +2366,7 @@ class HTMLFormatter:
             name.
         @rtype: C{string}
         """
-        return HEADER % (name, 'epydoc.css')
+        return HEADER % name
                
     def _footer(self):
         """
@@ -2416,13 +2510,21 @@ class HTMLFormatter:
         @param uid: A unique identifier for the object.
         @type uid: L{UID}
         """
-        name = uid.name()
-        if uid.is_routine() or uid.is_variable():
-            dot = name.rindex('.')
-            return '%s.html#%s' % (name[:dot], name[dot+1:])
+        if uid.is_module():
+            return 'm-%s.html' % uid.name()
+        elif uid.is_class():
+            return 'c-%s.html' % uid.name()
         else:
-            return '%s.html' % name
-
+            parent = uid.parent()
+            if parent is None:
+                raise ValueError("Cannot find URI for uid %s" % uid)
+            elif parent.is_module():
+                return 'm-%s.html#%s' % (parent.name(), uid.shortname())
+            elif parent.is_class():
+                return 'c-%s.html#%s' % (parent.name(), uid.shortname())
+            else:
+                raise ValueError("Cannot find URI for uid %s" % uid)
+            
     def _documented(self, uid):
         """
         @return: True if the given UID is documented by the
