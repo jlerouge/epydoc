@@ -6,7 +6,8 @@
 # $Id$
 #
 
-""" Epydoc parser for U{Javadoc<http://java.sun.com/j2se/javadoc/>}
+"""
+Epydoc parser for U{Javadoc<http://java.sun.com/j2se/javadoc/>}
 docstrings.  Javadoc is an HTML-based markup language that was
 developed for documenting Java APIs with inline comments.  It consists
 of raw HTML, augmented by Javadoc tags.  There are two types of
