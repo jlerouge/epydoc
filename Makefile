@@ -77,13 +77,14 @@ local: .html.up2date
 checkdocs:
 	epydoc --check ${PY_SRC}
 
-.html.up2date: .refdocs.up2date .examples.up2date \
+.html.up2date: .refdocs.up2date .examples.up2date .pdf.up2date \
 		doc/epydoc-man.html doc/epydocgui-man.html ${DOCS}
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
 	cp -r ${API} ${WEBDIR}
 	cp -r ${EXAMPLES} ${WEBDIR}
+	cp ${LATEX}/api.pdf ${WEBDIR}/epydoc.pdf
 	touch .html.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
