@@ -39,7 +39,7 @@ produce API documentation using the following steps:
        latex, man
 @group Testing Modules: checker, test
 
-@order: cli, gui, uid, objdoc, imports, epytext, html, css, help,
+@sort: cli, gui, uid, objdoc, imports, epytext, html, css, help,
        colorize, latex, man
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
