@@ -22,7 +22,7 @@ import pprint
 
 # epydoc imports
 import epydoc
-import epydoc.epytext as epytext
+import epydoc.markup as markup
 from epydoc.uid import UID, Link, findUID, make_uid
 from epydoc.imports import import_module
 from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
@@ -45,7 +45,7 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
-\usepackage{makeidx, multirow, longtable, tocbibind}
+\usepackage{makeidx, multirow, longtable, tocbibind, amssymb}
 \begin{document}
 
 \setlength{\parindent}{0ex}
@@ -73,54 +73,6 @@ _SECTIONS = ['\\part{%s}', '\\chapter{%s}', '\\section{%s}',
 _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
                  '\\subsection*{%s}', '\\subsubsection*{%s}',
                  '\\textbf{%s}']
-
-SYMBOL_TO_LATEX = {
-    # Symbols
-    '<-': r'\leftarrow', '->': r'\rightarrow',
-    '^': r'\uparrow', 'v': r'\downarrow',
-
-    # Greek letters
-    'alpha': r'\alpha', 'beta': r'\beta', 'gamma': r'\gamma',
-    'delta': r'\delta', 'epsilon': r'\epsilon', 'zeta': r'\zeta',  
-    'eta': r'\eta', 'theta': r'\theta', 'iota': r'\iota', 
-    'kappa': r'\kappa', 'lambda': r'\lambda', 'mu': r'\mu',  
-    'nu': r'\nu', 'xi': r'\xi', 'omicon': r'\omicon',  
-    'pi': r'\pi', 'rho': r'\rho', 'sigma': r'\sigma',  
-    'tau': r'\tau', 'upsilon': r'\upsilon', 'phi': r'\phi',  
-    'chi': r'\chi', 'psi': r'\psi', 'omega': r'\omega',
-    'Alpha': r'\Alpha', 'Beta': r'\Beta', 'Gamma': r'\Gamma',
-    'Delta': r'\Delta', 'Epsilon': r'\Epsilon', 'Zeta': r'\Zeta',  
-    'Eta': r'\Eta', 'Theta': r'\Theta', 'Iota': r'\Iota', 
-    'Kappa': r'\Kappa', 'Lambda': r'\Lambda', 'Mu': r'\Mu',  
-    'Nu': r'\Nu', 'Xi': r'\Xi', 'Omicon': r'\Omicon',  
-    'Pi': r'\Pi', 'Rho': r'\Rho', 'Sigma': r'\Sigma',  
-    'Tau': r'\Tau', 'Upsilon': r'\Upsilon', 'Phi': r'\Phi',  
-    'Chi': r'\Chi', 'Psi': r'\Psi', 'Omega': r'\Omega',
-
-    # HTML character entities
-    'larr': r'\leftarrow', 'rarr': r'\rightarrow',
-    'uarr': r'\uparrow', 'darr': r'\downarrow',
-    'harr': r'\leftrightarrow', 'crarr': r'\hookleftarrow',
-    'lArr': r'\Leftarrow', 'rArr': r'\Rightarrow',
-    'uArr': r'\Uparrow', 'dArr': r'\Downarrow',
-    'hArr': r'\Leftrightarrow', 'copy': r'\textcopyright', 
-    'times': r'\times', 'forall': r'\forall',
-    'exist': r'\exists', 'part': r'\partial',
-    'empty': r'\emptyset', 'isin': r'\in', 'notin': r'\notin',
-    'ni': r'\ni', 'prod': r'\prod', 'sum': r'\sum',
-    'prop': r'\propto', 'infin': r'\infty', 'ang': r'\angle',
-    'and': r'\wedge', 'or': r'\vee', 'cap': r'\cap', 'cup': r'\cup',
-    'int': r'\int', 'there4': r'\therefore', 'sim': r'\sim',
-    'cong': r'\cong', 'asymp': r'\approx', 'ne': r'\ne',
-    'equiv': r'\equiv', 'le': r'\le', 'ge': r'\ge',
-    'sub': r'\subset', 'sup': r'\subset', 'nsub': r'\nsubset',
-    'sube': r'\subseteq', 'supe': r'\supseteq', 'oplus': r'\oplus',
-    'otimes': r'\otimes', 'perp': r'\perp',
-
-    # Alternate (long) names
-    'infinity': r'\infty', 'integral': r'\int', 'product': r'\prod',
-    '<=': r'\le', '>=': r'\ge',
-    }
 
 ##################################################
 ## Documentation -> Latex Conversion
@@ -374,7 +326,7 @@ class LatexFormatter:
 
         # The module's description.
         if doc.descr():
-            str += self._dom_to_latex(doc.descr())
+            str += self._docstring_to_latex(doc.descr())
 
         # Add version, author, warnings, requirements, notes, etc.
         str += self._standard_fields(doc)
@@ -432,7 +384,7 @@ class LatexFormatter:
 
         # The class's description
         if doc.descr():
-            str += self._dom_to_latex(doc.descr())
+            str += self._docstring_to_latex(doc.descr())
         
         # Add version, author, warnings, requirements, notes, etc.
         str += self._standard_fields(doc)
@@ -579,7 +531,7 @@ class LatexFormatter:
 
         if pdoc.descr():
             str += '\\raggedright '
-            str += self._dom_to_latex(pdoc.descr(), 10).strip()
+            str += self._docstring_to_latex(pdoc.descr(), 10).strip()
         str += '&\\\\\n'
         str += '\\cline{1-2}\n'
         return str
@@ -639,7 +591,8 @@ class LatexFormatter:
             str += self._var_list_line(var, container)
         if self._inheritance == 'listed' and container.is_class():
             str += self._inheritance_list_line(variables, container)
-        str += groupstr + '\\end{longtable}\n\n'
+        str += groupstr
+        str += '\\end{longtable}\n\n'
         return str
     
     def _var_list_line(self, var, container):
@@ -659,7 +612,7 @@ class LatexFormatter:
                 str += self._pprint_var_value(var, 90)
             if var.descr(): str += '\n\n'
         if var.descr():
-            str += self._dom_to_latex(var.descr(), 10).strip()
+            str += self._docstring_to_latex(var.descr(), 10).strip()
         str += '&\\\\\n'
         str += '\\cline{1-2}\n'
         return str
@@ -696,7 +649,7 @@ class LatexFormatter:
             if not group: continue
             functions = [f for f in functions if f not in group]
             # Print a header within the table
-            groupstr += self._sectionstar(groupname, seclevel+1)
+            groupstr += '\n%s\\large{%s}\n' % (_HRULE, groupname)
             # Add the lines for each func
             for link in group:
                 groupstr += self._func_list_box(link, cls)
@@ -738,12 +691,8 @@ class LatexFormatter:
         foverrides = fdoc.overrides()
 
         # Try to find a documented ancestor.
-        inhdoc = fdoc
-        inherit_docs = 0
-        while (not inhdoc.documented() and inhdoc.matches_override() and
-               self._docmap.has_key(inhdoc.overrides())):
-            inherit_docs = 1
-            inhdoc = self._docmap[inhdoc.overrides()]
+        inhdoc = self._docmap.documented_ancestor(func) or fdoc
+        inherit_docs = (inhdoc is not fdoc)
 
         if inherit and self._inheritance == 'listed': return ''
 
@@ -779,7 +728,7 @@ class LatexFormatter:
 
         # Description
         if fdescr:
-            str += self._dom_to_latex(fdescr, 4)
+            str += self._docstring_to_latex(fdescr, 4)
             str += '    \\vspace{1ex}\n\n'
 
         # Parameters
@@ -792,9 +741,9 @@ class LatexFormatter:
                 pname = self._text_to_latex(param.name())
                 str += (' '*10+'\\item[' + pname + ']\n\n')
                 if param.descr():
-                    str += self._dom_to_latex(param.descr(), 10)
+                    str += self._docstring_to_latex(param.descr(), 10)
                 if param.type():
-                    ptype = self._dom_to_latex(param.type(), 12).strip()
+                    ptype = self._docstring_to_latex(param.type(), 12).strip()
                     str += ' '*12+'\\textit{(type=%s)}\n\n' % ptype
             str += '        \\end{Ventry}\n\n'
             str += ' '*6+'\\end{quote}\n\n'
@@ -805,12 +754,12 @@ class LatexFormatter:
             str += ' '*6+'\\textbf{Return Value}\n'
             str += ' '*6+'\\begin{quote}\n'
             if freturn.descr():
-                str += self._dom_to_latex(freturn.descr(), 6)
+                str += self._docstring_to_latex(freturn.descr(), 6)
                 if freturn.type():
-                    rtype = self._dom_to_latex(freturn.type(), 6).strip()
+                    rtype = self._docstring_to_latex(freturn.type(), 6).strip()
                     str += ' '*6+'\\textit{(type=%s)}\n\n' % rtype
             elif freturn.type():
-                str += self._dom_to_latex(freturn.type(), 6)
+                str += self._docstring_to_latex(freturn.type(), 6)
             str += ' '*6+'\\end{quote}\n\n'
             str += '    \\vspace{1ex}\n\n'
 
@@ -822,7 +771,7 @@ class LatexFormatter:
             for fraise in fraises:
                 str += '          '
                 str += '\\item[\\texttt{'+fraise.name()+'}]\n\n'
-                str += self._dom_to_latex(fraise.descr(), 10)
+                str += self._docstring_to_latex(fraise.descr(), 10)
             str += '        \\end{description}\n\n'
             str += ' '*6+'\\end{quote}\n\n'
             str += '    \\vspace{1ex}\n\n'
@@ -893,7 +842,7 @@ class LatexFormatter:
 
         if not inh_dict: return ''
 
-        str = '\\begin{boxedminipage}{\\textwidth}\n'
+        str = ''#'\\begin{boxedminipage}{\\textwidth}\n'
         inh_items = inh_dict.items()
         inh_items.sort(lambda a,b: cmp(a[0], b[0]))
         for (base, obj_links) in inh_items:
@@ -904,7 +853,7 @@ class LatexFormatter:
                 str += self._text_to_latex(link.name())
                 str += ',\n'
             str = str[:-2] + '\n    \\\\\n'
-        return str[:-7] + '\\end{boxedminipage}\n'
+        return str[:-7] #+ '\\end{boxedminipage}\n'
 
     def _inheritance_list_line(self, links, cls):
         # Group the objects by defining class
@@ -939,94 +888,21 @@ class LatexFormatter:
     #////////////////////////////////////////////////////////////
     # Docstring -> LaTeX Conversion
     #////////////////////////////////////////////////////////////
-    
-    def _dom_to_latex(self, tree, indent=0, breakany=0):
-        """
-        @param breakany: Insert hyphenation marks, so that LaTeX can
-        break the resulting string at any point.  This is useful for
-        small boxes (e.g., the type box in the variable list table).
-        """
-        if isinstance(tree, xml.dom.minidom.Document):
-            tree = tree.childNodes[0]
-        return self._dom_to_latex_helper(tree, indent, 0, breakany)
 
-    def _dom_to_latex_helper(self, tree, indent, seclevel, breakany):
-        if isinstance(tree, xml.dom.minidom.Text):
-            return self._text_to_latex(tree.data, 0, breakany)
+    class LatexDocstringLinker(markup.DocstringLinker):
+        def translate_indexterm(self, indexterm):
+            indexstr = re.sub(r'["!|@]', r'"\1', indexterm.to_latex(self))
+            return ('\\index{%s}\\textit{%s}' % (indexstr, indexstr))
+        def translate_identifier_xref(self, identifier, label=None):
+            if label is None: label = markup.plaintext_to_latex(identifier)
+            return '\\texttt{%s}' % label
+    _docstring_linker = LatexDocstringLinker()
 
-        if tree.tagName == 'section': seclevel += 1
+    def _docstring_to_latex(self, docstring, indent=0, breakany=0):
+        if docstring is None: return ''
+        return docstring.to_latex(self._docstring_linker, indent=indent,
+                                  hyperref=self._hyperref)
     
-        # Figure out the child indent level.
-        if tree.tagName == 'epytext': cindent = indent
-        cindent = indent + 2
-        children = [self._dom_to_latex_helper(c, cindent, seclevel, breakany)
-                    for c in tree.childNodes]
-        childstr = ''.join(children)
-    
-        if tree.tagName == 'para':
-            return epytext.wordwrap(childstr, indent)+'\n'
-        elif tree.tagName == 'code':
-            return '\\texttt{%s}' % childstr
-        elif tree.tagName == 'uri':
-            if len(children) != 2: raise ValueError('Bad URI ')
-            if self._hyperref:
-                # ~ and # should not be escaped in the URI.
-                uri = tree.childNodes[1].childNodes[0].data
-                uri = uri.replace('{\\textasciitilde}', '~')
-                uri = uri.replace('\\#', '#')
-                if children[0] == children[1]:
-                    return '\\href{%s}{\\textit{%s}}' % (uri, children[1])
-                else:
-                    return ('%s\\footnote{\\href{%s}{%s}}' %
-                            (children[0], uri, children[1]))
-            else:
-                if children[0] == children[1]:
-                    return '\\textit{%s}' % children[1]
-                else:
-                    return '%s\\footnote{%s}' % (children[0], children[1])
-        elif tree.tagName == 'link':
-            if len(children) != 2: raise ValueError('Bad Link')
-            return '\\texttt{%s}' % children[1]
-        elif tree.tagName == 'italic':
-            return '\\textit{%s}' % childstr
-        elif tree.tagName == 'math':
-            return '\\textit{%s}' % childstr
-        elif tree.tagName == 'indexed':
-            # Quote characters for makeindex.
-            indexstr = re.sub(r'["!|@]', r'"\1', childstr)
-            return ('\\index{%s}\\textit{%s}' % (indexstr, childstr))
-        elif tree.tagName == 'bold':
-            return '\\textbf{%s}' % childstr
-        elif tree.tagName == 'li':
-            return indent*' ' + '\\item ' + childstr.lstrip()
-        elif tree.tagName == 'heading':
-            return ' '*(indent-2) + '(section) %s\n\n' % childstr
-        elif tree.tagName == 'doctestblock':
-            return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
-        elif tree.tagName == 'literalblock':
-            return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
-        elif tree.tagName == 'fieldlist':
-            return indent*' '+'{omitted fieldlist}\n'
-        elif tree.tagName == 'olist':
-            return (' '*indent + '\\begin{enumerate}\n\n' + 
-                    ' '*indent + '\\setlength{\\parskip}{0.5ex}\n' +
-                    childstr +
-                    ' '*indent + '\\end{enumerate}\n\n')
-        elif tree.tagName == 'ulist':
-            return (' '*indent + '\\begin{itemize}\n' +
-                    ' '*indent + '\\setlength{\\parskip}{0.6ex}\n' +
-                    childstr +
-                    ' '*indent + '\\end{itemize}\n\n')
-        elif tree.tagName == 'symbol':
-            symbol = tree.childNodes[0].data
-            if SYMBOL_TO_LATEX.has_key(symbol):
-                return r'\(%s\)' % SYMBOL_TO_LATEX[symbol]
-            else:
-                return '[??]'
-        else:
-            # Assume that anything else can be passed through.
-            return childstr
-
     #////////////////////////////////////////////////////////////
     # Base class trees
     #////////////////////////////////////////////////////////////
@@ -1424,7 +1300,7 @@ class LatexFormatter:
         for field in doc.fields():
             values = doc.field_values(field)
             if not values: continue
-            items = [self._dom_to_latex(v) for v in values]
+            items = [self._docstring_to_latex(v) for v in values]
             str += self._descrlist(items, field.singular,
                                    field.plural, field.short)
             
@@ -1480,12 +1356,12 @@ class LatexFormatter:
                 doc = self._docmap[doc.overrides()]
 
         if descr != None:
-            str = self._dom_to_latex(epytext.summary(descr)).strip()
+            str = self._docstring_to_latex(descr.summary()).strip()
             return str
         elif (isinstance(doc, FuncDoc) and
               doc.returns().descr() is not None):
-            summary = epytext.summary(doc.returns().descr())
-            summary = self._dom_to_latex(summary).strip()
+            summary = doc.returns().descr().summary()
+            summary = self._docstring_to_latex(summary).strip()
             summary = summary[:1].lower() + summary[1:]
             return ('Return '+ summary)
         else:
