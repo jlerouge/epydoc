@@ -101,7 +101,7 @@ def cli():
     options['modules'] = muids = []
     for m in modules:
         try:
-            muids.append(make_uid(*args))
+            muids.append(make_uid(m))
         except:
             if sys.stderr.softspace: print >>sys.stderr
             print >>sys.stderr, 'Failed to create a UID for %s' % m
