@@ -1004,6 +1004,8 @@ class ClassDoc(ObjDoc):
         self._methods = []
         self._cvariables = []
         self._ivariables = []
+        self._staticmethods = []
+        self._classmethods = []
 
         try:
             items = [(f, getattr(cls, f)) for f in dir(cls)]
@@ -1025,6 +1027,18 @@ class ClassDoc(ObjDoc):
             if vuid is None: continue
             # Don't do anything for modules.
             if vuid.is_module(): continue
+
+            # Try to categorize it as a static/class method.
+            try:
+                if not cls.__dict__.has_key(field): pass
+                elif type(cls.__dict__[field]) == staticmethod:
+                    self._staticmethods.append(Link(field, vuid))
+                    continue
+                elif type(cls.__dict__[field]) == classmethod:
+                    self._classmethods.append(Link(field, vuid))
+                    continue
+            except NameError:
+                pass # We're in Python 2.0 or 2.1
 
             # Is it a method?  
             if vuid.is_routine():
@@ -1197,6 +1211,22 @@ class ClassDoc(ObjDoc):
         """
         return self._methods
     
+    def classmethods(self):
+        """
+        @return: A list of all class methods defined by the class
+            documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._classmethods
+    
+    def staticmethods(self):
+        """
+        @return: A list of all static methods defined by the class
+            documented by this C{ClassDoc}.
+        @rtype: C{list} of L{Link}
+        """
+        return self._staticmethods
+    
     def cvariables(self):
         """
         @return: A list of all class variables defined by the class
@@ -1308,7 +1338,7 @@ class FuncDoc(ObjDoc):
     # side of conservatism in detecting signatures.
     _SIGNATURE_RE = re.compile(
         # Class name (for builtin methods)
-        r'^\s*((?P<class>\w+)\.)?' +
+        r'^\s*((?P<self>\w+)\.)?' +
         
         # The function name (must match exactly)
         r'(?P<func>\w+)' +
@@ -1318,10 +1348,10 @@ class FuncDoc(ObjDoc):
         r'(\s*\[?\s*,\s*\]?\s*[\w\-\.]+(=.+?)?)*\]*)?)\s*\)' +
         
         # The return value (optional)
-        r'(\s*->\s*(?P<return>\S.*))?'+
+        r'(\s*(->|<=+>)\s*(?P<return>\S.*?))?'+
         
         # The end marker
-        r'\s*(\n|\s+--\s+|$)')
+        r'\s*(\n|\s+--\s+|$|\.\s|\.\n)')
         
     def _init_builtin_signature(self, func):
         """
@@ -1344,6 +1374,11 @@ class FuncDoc(ObjDoc):
         if m and m.group('func') == func.__name__:
             params = m.group('params')
             rtype = m.group('return')
+            selfparam = m.group('self')
+            
+            if selfparam and not rtype: 
+                self._vararg_param = Param('...')
+                return
             
             # Extract the parameters from the signature.
             if params:
@@ -1370,17 +1405,33 @@ class FuncDoc(ObjDoc):
                         self._vararg_param = Param(name[1:], default=default)
                     else:
                         self._params.append(Param(name, default=default))
-            # Extract the return type from the signature
+
+            # Extract the return type/value from the signature
             if rtype:
-                self._return.set_type(epytext.parse_as_para(rtype))
+                if selfparam:
+                    self._return.set_descr(epytext.parse_as_para(rtype))
+                else:
+                    self._return.set_type(epytext.parse_as_para(rtype))
+
+            # Add the self parameter, if it was specified.
+            if selfparam:
+                self._params.insert(0, Param(selfparam))
 
             # Remove the signature from the description.
             text = self._descr.childNodes[0].childNodes[0].childNodes[0]
             text.data = FuncDoc._SIGNATURE_RE.sub('', text.data, 1)
+            if (text.data == '' and len(self._descr.childNodes) == 1 and
+                len(self._descr.childNodes[0].childNodes) == 1 and
+                len(self._descr.childNodes[0].childNodes[0].childNodes) == 1):
+                # We dispensed of all documentation.
+                self._descr = None
+                
         else:
+            # We couldn't parse the signature.
             self._vararg_param = Param('...')
 
-        # What do we do with documented parameters?
+        # What do we do with documented parameters?  Esp. if we just
+        # got "..." for the argument spec.
         ## If they specified parameters, use them. ??
         ## What about ordering??
         #if self._tmp_param or self._tmp_type:
@@ -1390,8 +1441,8 @@ class FuncDoc(ObjDoc):
         #    for (name, type_descr) in self._tmp_type.items():
         #        if not vars.has_key(name): vars[name] = Param(name)
         #        vars[name].set_type(type_descr)
-        #    self._params = 
-
+        #    self._params =
+        
     def _init_signature(self, func):
         # Get the function's signature
         (args, vararg, kwarg, defaults) = inspect.getargspec(func)
@@ -1764,8 +1815,11 @@ class DocMap(UserDict.UserDict):
                 elif vuid.is_routine():
                     self.add(val)
         elif objID.is_class():
-            try: items = obj.__dict__.items()
-            except AttributeError: items = []
+            try:
+                items = [(f, getattr(obj, f)) for f in dir(obj)]
+            except:
+                try: items = obj.__dict__.items()
+                except AttributeError: items = []
             for (field, val) in items:
                 # Convert functions to methods.  (Since we're getting
                 # values via __dict__)
