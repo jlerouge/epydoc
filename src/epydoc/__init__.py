@@ -19,13 +19,15 @@ the form of HTML pages.
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
 
-__version__ = 0.2
-
-__all__ = [
+__version__ = '1.0'
+__author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
+__epydoc_sort__ = [
     'objdoc',
     'epytext',
     'uid',
     'html',
+    'css',
     'checker',
     'cli',
+    'gui',
     ]
