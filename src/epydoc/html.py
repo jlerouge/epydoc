@@ -8,6 +8,9 @@
 
 """
 Documentation=>HTML converter.
+
+This now uses CSS files.  If you want to use your own CSS file, just
+overwrite the one produced by epydoc.
 """
 
 ##################################################
@@ -15,6 +18,69 @@ Documentation=>HTML converter.
 ##################################################
 
 WARN_MISSING = 0
+
+CSS_FILE1 = """
+/* Body color */ 
+body              { background: #ffffff; color: #000000; } 
+ 
+/* Tables */ 
+table             { background: #ffffff; color: #000000; } 
+tr.summary, tr.details, tr.index 
+                  { background: #70b0f0; color: #000000;  
+                    text-align: left; font-size: 120%; } 
+ 
+/* Navigation bar */ 
+table.navbar      { background: #a0c0ff; color: #000000;
+                    border: 2px groove #c0d0d0; }
+th.navbar         { background: #a0c0ff; color: #000000; font-size: 110%; } 
+th.navselect      { background: #70b0ff; color: #000000; font-size: 110%; } 
+ 
+/* Links */ 
+a:link            { background: transparent; color: #0000ff; }  
+a:visited         { background: transparent; color: #204080; }  
+a.navbar:link     { background: transparent; color: #0000ff; }  
+a.navbar:visited  { background: transparent; color: #204080; }  
+"""
+
+# An alternate CSS file.
+CSS_FILE2 = """
+/* Body color */ 
+body              { background: #8098a0; color: #000000; } 
+ 
+/* Tables */ 
+table             { background: #ffffff; color: #000000; } 
+tr.summary        { background: #c0d0d0; color: #000000;
+                    text-align: left; font-size: 120%; } 
+tr.details        { background: #c0d0d0; color: #000000;
+                    text-align: center; font-size: 120%; }
+tr.index          { background: #c0d0d0; color: #000000;
+                    text-align: center; font-size: 120%; } 
+ 
+/* Navigation bar */ 
+table.navbar      { background: #607880; color: #b8d0d0;
+                    border: 2px groove #c0d0d0; }
+th.navbar         { background: #607880; color: #8098a0;
+                    font-weight: normal; } 
+th.navselect      { background: #8098a0; color: #000000;
+                    font-weight: normal; } 
+ 
+/* Links */ 
+a:link            { background: transparent; color: #104060; }  
+a:visited         { background: transparent; color: #082840; }  
+a.navbar:link     { background: transparent; color: #b8d0d0;
+                    text-decoration: none; }  
+a.navbar:visited  { background: transparent; color: #b8d0d0;
+                    text-decoration: none; }  
+"""
+
+CSS_FILE = CSS_FILE1
+
+# Expects (navbar, navbar):
+HELP = """
+    <H2> Help </H2>
+
+    <p> (No help available) </p>
+"""
 
 ##################################################
 ## Imports
@@ -72,7 +138,7 @@ class HTML_Doc:
     @type _SPECIAL_METHODS: C{dictionary} from C{string} to C{string}
     """
     
-    def __init__(self, docmap, pkg_name='', show_private=1):
+    def __init__(self, docmap, **kwargs):
         """
         Construct a new HTML outputter, using the given
         C{Documentation} object.
@@ -87,20 +153,41 @@ class HTML_Doc:
         @type show_private: C{boolean}
         """
         self._docmap = docmap
-        self._show_private = show_private
-        self._pkg_name = pkg_name
+        self._show_private = kwargs.get('show_private', 0)
+        self._pkg_name = kwargs.get('pkg_name', '')
+        self._css = kwargs.get('css', CSS_FILE)
+        self._pkg_url = kwargs.get('pkg_url', None)
+        self._find_toplevel()
 
-        # Try to find a unique module/package for this set of docs.
-        # This is used by the navbar.
-        self._module = None
-        self._package = None
+    def _find_toplevel(self):
+        """
+        Try to find a unique module/package for this set of docs.
+        This is used by the navbar.
+        """
+        modules = []
+        packages = []
         for (uid, doc) in self._docmap.items():
             if not isinstance(doc, ModuleDoc): continue
-            if self._module is None: self._module = uid
-            else: self._module = "multiple"
+            modules.append(uid)
             if doc.ispackage():
-                if self._package is None: self._package = uid
-                else: self._package = "multiple"
+                packages.append(uid)
+
+        # Is there a unique module?
+        if len(modules) == 0: self._module = None
+        elif len(modules) == 1: self._module = modules[0]
+        else: self._module = 'multiple'
+
+        # Is there a unique (top-level) package?
+        if len(packages) == 0: self._package = None
+        else:
+            self._package = 'multiple'
+            for pkg in packages:
+                toplevel = 1
+                for p2 in packages:
+                    if pkg != p2 and not p2.descendant_of(pkg):
+                        toplevel = 0
+                if toplevel:
+                    self._package = pkg
 
     def write(self, directory, verbose=1):
         """## Write the documentation to the given directory."""
@@ -128,6 +215,21 @@ class HTML_Doc:
                 elif verbose>1: print 'Writing docs for class:  ', n
                 str = self._class_to_html(n)
                 open(directory+`n`+'.html', 'w').write(str)
+
+        # Write the CSS file & help file
+        self._write_css(directory)
+        self._write_help(directory)
+
+    def _write_css(self, directory):
+        cssfile = open(os.path.join(directory, 'epydoc.css'), 'w')
+        cssfile.write(self._css)
+        cssfile.close()
+
+    def _write_help(self, directory):
+        helpfile = open(os.path.join(directory, 'help.html'), 'w')
+        navbar = self._navbar('help')
+        helpfile.write(self._header('Help')+navbar+HELP+navbar+self._footer())
+        helpfile.close()
         
     ##--------------------------
     ## INTERNALS
@@ -177,10 +279,15 @@ class HTML_Doc:
         if isinstance(name, UID):
             print 'Warning: use name, not uid'
             name = name.name()
-        return '<HTML>\n<HEAD>\n<TITLE>' + name + \
-               "</TITLE>\n</HEAD>\n<BODY bgcolor='white' "+\
-               "text='black' link='blue' "+\
-               "vlink='#204080' alink='#204080'>"
+        return """
+<HTML>
+  <HEAD>
+    <TITLE> %s</TITLE>
+    <link rel=\"stylesheet\" href=\"epydoc.css\" type=\"text/css\">
+  </HEAD>
+  <BODY bgcolor='white' text='black' link='blue' vlink='#204080'
+        alink='#204080'>
+""" % name
                
     def _footer(self):
         'Return an HTML footer'
@@ -190,7 +297,8 @@ class HTML_Doc:
                'Generated by Epydoc on '+date+'.<BR>\n'+\
                'Epydoc is currently under development.  For '+\
                'information on the status of Epydoc, contact '+\
-               '<A HREF="mailto:ed@loper.org">ed@loper.org</A>.'+\
+               '<A HREF="mailto:edloper@gradient.cis.upenn.edu">'+\
+               'edloper@gradient.cis.upenn.edu</A>.'+\
                '</FONT>\n\n</BODY>\n</HTML>\n'
     
     def _seealso(self, seealso):
@@ -409,20 +517,20 @@ class HTML_Doc:
         return '\n<!-- =========== START OF '+string.upper(heading)+\
                ' =========== -->\n'
     
-    def _table_header(self, heading):
+    def _table_header(self, heading, css_class):
         'Return a header for an HTML table'
         return self._start_of(heading)+\
                '<TABLE BORDER="1" CELLPADDING="3" ' +\
                'CELLSPACING="0" WIDTH="100%" BGCOLOR="white">\n' +\
-               '<TR BGCOLOR="#70b0f0">\n'+\
-               '<TD COLSPAN=2><FONT SIZE="+2">\n<B>' + heading + \
-               '</B></FONT></TD></TR>\n'
+               '<TR BGCOLOR="#70b0f0" CLASS="'+css_class+'">\n'+\
+               '<TH COLSPAN=2>\n' + heading + \
+               '</TH></TR>\n'
     
     def _class_summary(self, classes, heading='Class Summary'):
         'Return a summary of the classes in a module'
         classes = self._sort(classes)
         if len(classes) == 0: return ''
-        str = self._table_header(heading)
+        str = self._table_header(heading, 'summary')
 
         for link in classes:
             cname = link.name()
@@ -441,7 +549,7 @@ class HTML_Doc:
         class or module."""
         functions = self._sort(functions)
         if len(functions) == 0: return ''
-        str = self._table_header(heading)+'</TABLE>'
+        str = self._table_header(heading, 'details')+'</TABLE>'
 
         for link in functions:
             fname = link.name()
@@ -474,7 +582,7 @@ class HTML_Doc:
             if pstr == '(': pstr = '()'
             else: pstr = pstr[:-2]+')'
             
-            str += '<A NAME="'+fname+'">\n'
+            str += '<A NAME="'+fname+'"/>\n'
             if HTML_Doc._SPECIAL_METHODS.has_key(fname):
                 str += '<H3><I>'+\
                       HTML_Doc._SPECIAL_METHODS[fname]+'</I></H3>\n'
@@ -572,7 +680,7 @@ class HTML_Doc:
         class or module."""
         variables = self._sort(variables)
         if len(variables) == 0: return ''
-        str = self._table_header(heading)+'</TABLE>'
+        str = self._table_header(heading, 'details')+'</TABLE>'
 
         numvars = 0
         for var in variables:
@@ -582,7 +690,7 @@ class HTML_Doc:
             
             vname = var.name()
 
-            str += '<A NAME="'+vname+'">\n'
+            str += '<A NAME="'+vname+'"/>\n'
             str += '<H3>'+vname+'</H3>\n'
             str += '<DL>\n'
 
@@ -613,7 +721,7 @@ class HTML_Doc:
         'Return a summary of the functions in a class or module'
         functions = self._sort(functions)
         if len(functions) == 0: return ''
-        str = self._table_header(heading)
+        str = self._table_header(heading, 'summary')
         
         for link in functions:
             func = link.target()
@@ -656,7 +764,7 @@ class HTML_Doc:
         'Return a summary of the variables in a class or module'
         variables = self._sort(variables)
         if len(variables) == 0: return ''
-        str = self._table_header(heading)
+        str = self._table_header(heading, 'summary')
 
         for var in variables:
             vname = var.name()
@@ -684,100 +792,104 @@ class HTML_Doc:
         """
         @param where: What page the navbar is being displayed on..
         """
-        str = self._start_of('Navbar') + \
-              '<TABLE BORDER="0" WIDTH="100%" '+\
-              'CELLPADDING="0" BGCOLOR="WHITE" CELLSPACING="0">\n'+\
-              '<TR>\n<TD COLSPAN=2 BGCOLOR="#a0c0ff">\n'+\
-              '<TABLE BORDER="0" CELLPADDING="0" CELLSPACING="1">\n'+\
-              '  <TR ALIGN="center" VALIGN="top">\n'
-        
+        str = self._start_of('Navbar')
+        str += '<TABLE CLASS="navbar" BORDER="0" WIDTH="100%"'
+        str += ' CELLPADDING="0" BGCOLOR="#a0c0ff" CELLSPACING="0">\n'
+        str += '  <TR>\n'
+        str += '    <TD WIDTH="100%">\n'
+        str += '      <TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">\n'
+        str += '        <TR VALIGN="top">\n'
+
+        I = '          ' # indentation
         # Go to Package
         if self._package is None: pass
         elif where in ('class', 'module'):
             pkg = uid.package()
             if pkg is not None:
-                str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                      '<A HREF="'+`pkg`+'.html">'+\
-                      'Package</A>'+\
-                      '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+                str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                      '<A CLASS="navbar" HREF="'+`pkg`+'.html">'+\
+                      'Package</A>&nbsp;&nbsp;&nbsp;</TH>\n'
             else:
-                str += '  <TD>&nbsp;&nbsp;&nbsp;'+\
-                      '<B><FONT SIZE="+1">Package' +\
-                      '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+                str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                       'Package&nbsp;&nbsp;&nbsp;</TH>\n'
         elif where=='package':
-            str += '  <TD BGCOLOR="#70b0f0">&nbsp;&nbsp;&nbsp;'+\
-                  '<B><FONT SIZE="+1">Package' +\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">'+\
+                   '&nbsp;&nbsp;&nbsp;'+\
+                   'Package&nbsp;&nbsp;&nbsp;</TH>\n'
         elif isinstance(self._package, UID):
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                   '<A HREF="'+`self._package`+'.html">'+\
-                   'Package</A>'+\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                   '<A CLASS="navbar" HREF="'+`self._package`+'.html">'+\
+                   'Package</A>&nbsp;&nbsp;&nbsp;</TH>\n'
         elif 'multiple' == self._package:
-            str += '  <TD>&nbsp;&nbsp;&nbsp;'+\
-                  '<B><FONT SIZE="+1">Package' +\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD></B>\n'
-            
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                  'Package&nbsp;&nbsp;&nbsp;</TH></B>\n'
         
         # Go to Module
         if self._module is None: pass
         elif where=='class':
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                  '<A HREF="'+`uid.module()`+'.html">'+\
-                  'Module</A>'+\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                  '<A CLASS="navbar" HREF="'+`uid.module()`+'.html">'+\
+                  'Module</A>&nbsp;&nbsp;&nbsp;</TH>\n'
         elif where=='module':
-            str += '  <TD BGCOLOR="#70b0f0">&nbsp;&nbsp;&nbsp;'+\
-                  '<B><FONT SIZE="+1">Module' +\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">&nbsp;' +\
+                   '&nbsp;&nbsp;Module&nbsp;&nbsp;&nbsp;</TH>\n'
         elif isinstance(self._module, UID):
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                  '<A HREF="'+`self._module`+'.html">'+\
-                  'Module</A>'+\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                  '<A CLASS="navbar" HREF="'+`self._module`+'.html">'+\
+                  'Module</A>&nbsp;&nbsp;&nbsp;</TH>\n'
         elif 'multiple' == self._module:
-            str += '  <TD>&nbsp;&nbsp;&nbsp;'+\
-                  '<B><FONT SIZE="+1">Module' +\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD></B>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                  'Module&nbsp;&nbsp;&nbsp;</TH></B>\n'
         
         # Go to Class
         if where == 'class':
-            str += '  <TD BGCOLOR="#70b0f0">&nbsp;&nbsp;&nbsp;'+\
-                  '<B><FONT SIZE="+1">Class' +\
-                  '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">&nbsp;'+\
+                   '&nbsp;&nbsp;Class&nbsp;&nbsp;&nbsp;</TH>\n'
         else:
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">Class' +\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;Class' +\
+                   '&nbsp;&nbsp;&nbsp;</TH>\n'
 
         # Go to Tree
         if where == 'tree':
-            str += '  <TD BGCOLOR="#70b0f0">&nbsp;&nbsp;&nbsp;'+\
-                   '<B><FONT SIZE="+1">Trees'+\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">&nbsp;'+\
+                   '&nbsp;&nbsp;Trees&nbsp;&nbsp;&nbsp;</TH>\n'
         else:
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                   '<A HREF="tree.html">Trees</A>'+\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                   '<A CLASS="navbar" HREF="tree.html">Trees</A>'+\
+                   '&nbsp;&nbsp;&nbsp;</TH>\n'
 
         # Go to Index
         if where == 'index':
-            str += '  <TD BGCOLOR="#70b0f0">&nbsp;&nbsp;&nbsp;'+\
-                   '<B><FONT SIZE="+1">Index'+\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">&nbsp;'+\
+                   '&nbsp;&nbsp;Index&nbsp;&nbsp;&nbsp;</TH>\n'
         else:
-            str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-                   '<A HREF="term_index.html">Index</A>'+\
-                   '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                   '<A CLASS="navbar" HREF="term_index.html">Index</A>'+\
+                   '&nbsp;&nbsp;&nbsp;</TH>\n'
 
         # Go to Help
-        str += '  <TD>&nbsp;&nbsp;&nbsp;<B><FONT SIZE="+1">'+\
-               '<A HREF="help.html">Help</A>'+\
-               '</FONT></B>&nbsp;&nbsp;&nbsp;</TD>\n'
+        if where == 'help':
+            str += I+'<TH BGCOLOR="#70b0f0" CLASS="navselect">&nbsp;'+\
+                   '&nbsp;&nbsp;Help&nbsp;&nbsp;&nbsp;</TH>\n'
+        else:
+            str += I+'<TH CLASS="navbar">&nbsp;&nbsp;&nbsp;'+\
+                   '<A CLASS="navbar" HREF="help.html">Help</A>'+\
+                   '&nbsp;&nbsp;&nbsp;</TH>\n'
 
-        str += '  </TR>\n</TABLE>\n</TD>\n'
-        str += '<TD ALIGN="right" VALIGN="top" ROWSPAN=3>'+\
-               '<B>'+self._pkg_name+'</B>\n'+\
-               '</TD>\n</TR>\n</TABLE>\n'
+        str += '        </TR>\n      </TABLE>\n    </TD>\n'
+        str += '    <TD>\n'
+        str += '      <TABLE BORDER="0" CELLPADDING="0" CELLSPACING="0">\n'
+        str += '        <TR VALIGN="top">\n'
+        str += '          <TH CLASS="navbar">'
+        if self._pkg_name:
+            if self._pkg_url:
+                str += ('<A CLASS="navbar" HREF="%s">%s</A>' %
+                          (self._pkg_url, self._pkg_name))
+            else:
+                str += I+self._pkg_name
+
+        str += '</TH>\n        </TR>\n'
+        str += '      </TABLE>\n    </TD>\n  </TR>\n</TABLE>\n'
         return str
 
     def _module_to_html(self, uid):
@@ -788,7 +900,7 @@ class HTML_Doc:
         else: moduletype = 'module'
         
         str = self._header(`uid`)
-        str += self._navbar(moduletype, uid)+'<HR>'
+        str += self._navbar(moduletype, uid)
 
         if moduletype == 'package':
             str += self._start_of('Package Description')
@@ -812,7 +924,7 @@ class HTML_Doc:
         str += self._func_details(doc.functions(), None)
         str += self._var_details(doc.variables())
         
-        str += self._navbar(moduletype, uid)+'<HR>'
+        str += self._navbar(moduletype, uid)
         return str + self._footer()
 
     def _class_to_html(self, uid):
@@ -823,7 +935,7 @@ class HTML_Doc:
         
         # Name & summary
         str = self._header(`uid`)
-        str += self._navbar('class', uid)+'<HR>'
+        str += self._navbar('class', uid)
         str += self._start_of('Class Description')
         
         str += '<H2><FONT SIZE="-1">\n'+modname+'</FONT></BR>\n' + \
@@ -858,18 +970,18 @@ class HTML_Doc:
         str += self._var_details(doc.cvariables(), \
                                       'Class Variable Details')
         
-        str += self._navbar('class', uid)+'<HR>\n'
+        str += self._navbar('class', uid)
         return str + self._footer()
 
     def _tree_to_html(self):
         str = self._header('Class Hierarchy')
-        str += self._navbar('tree') + '<HR>'
+        str += self._navbar('tree') 
         str += self._start_of('Class Hierarchy')
         str += '<H2>Module Hierarchy</H2>\n'
         str += self._module_tree()
         str += '<H2>Class Hierarchy</H2>\n'
         str += self._class_tree()
-        str += '<HR>\n' + self._navbar('tree') + '<HR>\n'
+        str += self._navbar('tree')
         str += self._footer()
         return str
 
@@ -904,10 +1016,10 @@ class HTML_Doc:
 
     def _index_to_html(self):
         str = self._header('Index')
-        str += self._navbar('index') + '<HR>\n'
+        str += self._navbar('index') + '<br/>\n'
         str += self._start_of('Index')
 
-        str += self._table_header('Index')
+        str += self._table_header('Index', 'index')
         index = self._extract_index().items()
         index.sort()
         for (term, sources) in index:
@@ -918,8 +1030,8 @@ class HTML_Doc:
                 str += '<I><A href="' + target + '">'
                 str += source + '</A></I>, '
             str = str[:-2] + '</TR></TD>\n'
-        str += '</TABLE>\n'
+        str += '</TABLE>\n' +  '<br/>\n'
         
-        str += '<HR>\n' + self._navbar('index') + '<HR>\n'
+        str += self._navbar('index')
         str += self._footer()
         return str
