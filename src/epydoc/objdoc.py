@@ -1827,7 +1827,7 @@ class DocMap(UserDict.UserDict):
                 self.add(link.target().value())
             for var in doc.cvariables():
                 if var.uid().is_class():
-                    self.add(var.value())
+                    self.add(var.uid().value())
                     
             # Make sure all bases are added.
             if self._document_bases:
