@@ -46,27 +46,13 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Add a '@kwarg' field for documenting **kwarg parameters?
-  - synonyms: @kwarg, @kwargument, @kwparam, @kwparameter,
-    @keywordarg, @keywordparam, etc.?  @keyword?
-@todo 2.0: Improve ModuleDoc._find_imported_variables (params?)
-@todo 2.0: Improve uid.findUID
-@todo 2.0: Fix _find_override (A defines x, B inherits, C inherits,
-    C overrides x?)
+@todo 2.0: Fix comments for javadoc & rst.
+@todo 2.0: Improve ModuleDoc._find_imported_variables?  (slow?)
+@todo 2.0: Improve uid.findUID any more?
 @todo 2.0: Optimization
   - optimize epytext?
-@todo 2.0: check things like name of css file earlier (before
-    building all objdocs?)
-
-@todo 2.0?: regexps for @group and @sort? :)
-    - so you could say '@group accessors: get_*'
-    - or '@group accessors: get_.*' ??
-  How to do this??
 @todo 2.0?: Handle '@param a,b'?  (where should they be listed?)
-@todo 2.0?: Other @param or @extraparm type things?
     
-@todo 3.0: Create a better default top_page than trees.html.
-@todo 3.0: Add the man-page style outputter. (epyman)
 @todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}:
     - C{ObjDoc}s will contain info about objects, but not gather it.
     - An C{inspection} module will gather info via inspection.
@@ -77,6 +63,8 @@ produce API documentation using the following steps:
       using a links and a dictionary?  Are non-directed cycles a
       problem?  Interaction of the access hierarchy (a.b.c) and
       the base class hierarchy?  What does pydoc do?
+@todo 3.0: Create a better default top_page than trees.html.
+@todo 3.0: Add the man-page style outputter. (epyman)
 @todo 3.0: Docstring inheritance for overridden properties.
 
 @license: IBM Open Source License
