@@ -456,10 +456,9 @@ class ModuleDoc(ObjDoc):
                 except:
                     print 'ouch', val
                     continue
-                
 
             # Add the field to the appropriate place.
-            if type(val) in (_FunctionType, _BuiltinFunctionType):
+            if type(val) == _FunctionType:
                 self._functions.append(Link(field, UID(val)))
             elif type(val) == _ClassType:
                 self._classes.append(Link(field, UID(val)))
@@ -914,7 +913,7 @@ class FuncDoc(ObjDoc):
 
         # If we're a method, extract the underlying function.
         cls = None
-        if type(func) in (_MethodType, _BuiltinMethodType):
+        if type(func) == _MethodType:
             cls = func.im_class
             func = func.im_func
 
