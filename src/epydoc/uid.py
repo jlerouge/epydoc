@@ -70,12 +70,13 @@ except:
 # Zope extension class types
 try:
     from ExtensionClass import PythonMethodType as _ZopeMethodType
-    from ExtensionClass import ExtensionMethodType as _ZopeFunctionType
-    from ExtensionClass import ExtensionClass as _ZopeType
+    from ExtensionClass import ExtensionMethodType as _ZopeCMethodType
+    from ExtensionClass import ExtensionClass as _ExtensionClass
+    _ZopeType = type(_ExtensionClass)
 except:
-    _ZopeType = types.ClassType
-    _ZopeMethodType = types.MethodType
-    _ZopeFunctionType = types.FunctionType
+    _ZopeType = None
+    _ZopeMethodType = None
+    _ZopeCMethodType = None
 
 ##################################################
 ## Table of Contents
@@ -195,6 +196,14 @@ class UID:
         @rtype: C{boolean}
         """
         raise NotImplementedError()
+
+    def is_type(self):
+        """
+        @return: True if this is the UID for a type.
+        @rtype: C{boolean}
+        """
+        raise NotImplementedError()
+
 
     def is_function(self):
         """
@@ -425,21 +434,24 @@ class ObjectUID(UID):
     # The following methods figure out the object type by examining
     # self._obj.  Docstrings are defined in UID.
     def is_module(self): return type(self._obj) is _ModuleType
-    def is_function(self): return (type(self._obj) in
-                                   (_FunctionType, _ZopeFunctionType))
+    def is_function(self): return type(self._obj) is _FunctionType
     def is_method(self): return (type(self._obj) in
-                                 (_MethodType, _ZopeMethodType))
+                                 (_MethodType, _ZopeMethodType,
+                                  _ZopeCMethodType))
     def is_package(self): return (type(self._obj) is _ModuleType and
                                   hasattr(self._obj, '__path__'))
     def is_class(self):
         return ((type(self._obj) in (_ClassType, _ZopeType)) or
+                isinstance(self._obj, _TypeType))
+    def is_type(self):
+        return (type(self._obj) is _ZopeType or
                 isinstance(self._obj, _TypeType))
     def is_routine(self):
         return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
                                    _MethodType, _BuiltinMethodType,
                                    _WrapperDescriptorType,
                                    _MethodDescriptorType,
-                                   _ZopeMethodType, _ZopeFunctionType)
+                                   _ZopeMethodType, _ZopeCMethodType)
     def is_builtin_function(self): 
         return (type(self._obj) is _BuiltinFunctionType and
                 self._obj.__self__ is None)
@@ -481,14 +493,14 @@ class ObjectUID(UID):
                     return '%s.%s' % ('ExtensionClass', objname)
                 else:
                     raise ValueError, 'Malformed Zope base class!'
-        elif typ in (_FunctionType, _ZopeFunctionType):
-            if objname[0] == '<':
+        elif typ is _FunctionType:
+            if objname[:1] == '<':
                 return '%s.unknown-%s' % (self.module(), id(obj))
             else:
                 return '%s.%s' % (self.module(), objname)
-        elif (typ in (_MethodType, _ZopeMethodType) or
+        elif (typ in (_MethodType, _ZopeMethodType, _ZopeCMethodType) or
               (typ is _BuiltinMethodType and obj.__self__ is not None)):
-            if objname[0] == '<':
+            if objname[:1] == '<':
                 return '%s.unknown-%s' % (self.module(), id(obj))
             else:
                 return '%s.%s' % (self.cls(), objname)
@@ -512,7 +524,7 @@ class ObjectUID(UID):
     def cls(self):
         if not hasattr(self, '_cls'):
             obj = self._obj
-            if type(obj) in (_MethodType, _ZopeMethodType):
+            if type(obj) in (_MethodType, _ZopeMethodType, _ZopeCMethodType):
                 self._cls = ObjectUID(obj.im_class)
             elif (type(obj) is _BuiltinMethodType and
                   obj.__self__ is not None):
@@ -538,15 +550,16 @@ class ObjectUID(UID):
                         self._module = ObjectUID(import_module(obj.__module__))
                     else:
                         # We have a non-wrapped base C Class.
-                        if hasattr(obj, '__doc__') and objname == obj.__doc__:
+                        if (hasattr(obj, '__doc__') and
+                            hasattr(obj, '__name__') and
+                            obj.__name__ == obj.__doc__):
                             return ObjectUID(import_module('ExtensionClass'))
                         else:
                             raise ValueError, 'Malformed Zope base class!'
-                elif typ in (_FunctionType, _ZopeFunctionType):
+                elif typ is _FunctionType:
                     self._module = ObjectUID(_find_function_module(obj))
-                elif typ in (_MethodType, _ZopeMethodType):
-                    module = import_module(obj.im_class.__module__)
-                    self._module = ObjectUID(module)
+                elif typ in (_MethodType, _ZopeMethodType, _ZopeCMethodType):
+                    self._module = ObjectUID(obj.im_class).module()
                 elif typ is _BuiltinFunctionType and obj.__self__ is None:
                     module = _find_builtin_obj_module(obj)
                     if module is None: self._module = None
@@ -676,6 +689,7 @@ class RelativeUID(UID):
     def is_staticmethod(self): return 0
     def is_package(self): return 0
     def is_class(self): return 0
+    def is_type(self): return 0
     def is_builtin_function(self): return 0
     def is_builtin_method(self): return 0
     def is_routine(self): return 0
@@ -749,10 +763,10 @@ def make_uid(object, base_uid=None, shortname=None):
                         _FunctionType, _MethodType,
                         _WrapperDescriptorType,
                         _MethodDescriptorType, _ZopeType, 
-                        _ZopeMethodType, _ZopeFunctionType) or
+                        _ZopeMethodType, _ZopeCMethodType) or
         isinstance(object, _TypeType)):
         # If we've already seen this object, return its UID.
-        if type(object) in (_MethodType, _ZopeMethodType):
+        if type(object) in (_MethodType, _ZopeMethodType, _ZopeCMethodType):
             key = (id(object.im_func), id(object.im_class))
         else: key = id(object)
         uid = _object_uids.get(key)
@@ -1098,26 +1112,6 @@ def findUID(name, container=None, docmap=None):
                 if uid: return uid
             except: pass
 
-#     # Is it an field of a class in a module?  The module part of the
-#     # name may be relative to the containing module, or any of its
-#     # ancestors.
-#     modcomponents = container_name.split('.')
-#     components = name.split('.')
-#     for i in range(len(modcomponents)-1, -1, -1):
-#         for j in range(len(components)-1, -1, -1):
-#             try:
-#                 modname = '.'.join(modcomponents[:i]+components[:j])
-#                 objname = '.'.join(components[j:-1])
-#                 obj = getattr(import_module(modname), objname)
-#                 obj_uid = make_uid(obj)
-#                 fieldname = components[-1]
-#                 mod = import_module(modname)
-#                 var = _find_variable_in(fieldname, obj_uid, docmap)
-#                 if var is not None: return var
-#                 field = getattr(obj, fieldname)
-#                 return make_uid(field, obj_uid, fieldname)
-#             except: pass
-
     # If the name starts with 'self.', then try leaving that off.
     if name.startswith('self.'):
         return findUID(name[5:], original_container, docmap)
@@ -1146,7 +1140,9 @@ def _find_object_in_module(name, module, docmap):
             obj_parent = obj
             obj_name = component
             try: obj = getattr(obj, component)
-            except: raise KeyError()
+            except:
+                try: obj = obj.__getattribute__(obj, component)
+                except: return None
         obj_uid = make_uid(obj)
                 
         # Is it a variable in obj?
@@ -1154,9 +1150,13 @@ def _find_object_in_module(name, module, docmap):
         if var is not None: return var
 
         # Is it an object in obj?
-        try: return make_uid(getattr(obj, components[-1]),
-                             obj_uid, components[-1])
+        try: obj = getattr(obj, component)
+        except:
+            try: obj = obj.__getattribute__(obj, component)
+            except: return None
+        try: return make_uid(obj, obj_uid, components[-1])
         except: return None
+        
     except KeyError: return None
 
 def _find_variable_in(name, container, docmap):
