@@ -46,19 +46,19 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo 2.0: Finish/fix new markup language framework
-  - latex
-  - javadoc
-  - rst
-@todo 2.0: Better field splitting for rst (parameters, etc)
 @todo 2.0: Groups for function parameters (eg Input/Output)
-@todo 2.0: Create a better default top_page than trees.html
-@todo 2.0: Improve ModuleDoc._find_imported_variables.
+@todo 2.0: Improve ModuleDoc._find_imported_variables (params?)
 @todo 2.0: Improve uid.findUID
-
-@todo 2.1: Modify L{epydoc.html} to write directly to streams,
-           rather than building up strings.
+@todo 2.0: Optimization
+  - how much does inheritance=listed speed it up?
+  - how much does epytext slow it down?
+  - Modify L{epydoc.html} to write directly to streams, rather than
+    building up strings.  Take two streams, public & private, and
+    do them concurrently.  For docstrings, only redo the to_html for
+    public if it contained any links to private objects (add to
+    HTMLDocstringLinker to check that).
     
+@todo 3.0: Create a better default top_page than trees.html.
 @todo 3.0: Add the man-page style outputter. (epyman)
 @todo 3.0: Refactor L{epydoc.objdoc.ObjDoc}:
     - C{ObjDoc}s will contain info about objects, but not gather it.
@@ -111,3 +111,4 @@ __contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
 #   - document __extra_epydoc_fields__ and @newfield
 #   - Add a faq?
 #   - @summary
+
