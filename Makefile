@@ -27,21 +27,18 @@ all: usage
 
 usage:
 	@echo "Usage:"
-	@echo "  make web"
-	@echo "  make refdocs"
-	@echo "  make checkdoc"
-	@echo "  make distributions"
+	@echo "  make webpage -- build the webpage and copy it to sourceforge"
+	@echo "  make refdocs -- build the API reference docs"
+	@echo "  make checkdoc -- check the documentation completeness"
+	@echo "  make distributions -- build the distributions"
+	@echo "  make clean -- remove all built files"
+
+clean:
+	$(MAKE) -C src clean
+	rm -rf ${WEBDIR} ${API} ${EXAMPLES}
 
 distributions:
 	$(MAKE) -C src distributions
-
-.html.up2date: refdocs examples distributions
-	rm -rf ${WEBDIR}
-	mkdir -p ${WEBDIR}
-	cp -r ${DOCS} ${WEBDIR}
-	cp -r ${API} ${WEBDIR}
-	cp -r ${EXAMPLES} ${WEBDIR}
-	cp -r src/dist/epydoc* ${WEBDIR}
 
 web: xfer
 webpage: xfer
@@ -53,6 +50,14 @@ local: .html.up2date
 
 checkdocs:
 	epydoc --check ${PY_SRC}
+
+.html.up2date: refdocs examples distributions
+	rm -rf ${WEBDIR}
+	mkdir -p ${WEBDIR}
+	cp -r ${DOCS} ${WEBDIR}
+	cp -r ${API} ${WEBDIR}
+	cp -r ${EXAMPLES} ${WEBDIR}
+	cp -r src/dist/epydoc* ${WEBDIR}
 
 refdocs: .up2date.refdocs
 .up2date.refdocs: ${PY_SRC}
