@@ -489,7 +489,7 @@ class DocParser:
     #: A pattern matcher used to find C{classmethod} and
     #: C{staticmethod} wrapper functions on the right-hand side
     #: of assignment statements.
-    WRAPPER_PATTERN = compile_ast_matcher("""
+    __WRAPPER_PATTERN = compile_ast_matcher("""
         (testlist (test (and_test (not_test (comparison (expr
          (xor_expr (and_expr (shift_expr (arith_expr (term (factor
           (power (atom NAME:funcname)
@@ -512,7 +512,7 @@ class DocParser:
         """
         # If the RHS is a classmethod or staticmethod wrapper, then
         # create a ClassMethodDoc/StaticMethodDoc
-        match, vars2 = self.WRAPPER_PATTERN.match(rhs)
+        match, vars2 = self.__WRAPPER_PATTERN.match(rhs)
         if match:
             arg_dotted_name = self.ast_to_dotted_name(vars2['arg'])
             arg_valuedoc = self.lookup_dotted_name(arg_dotted_name)
@@ -888,7 +888,7 @@ class DocParser:
     # Docstring Extraction
     #////////////////////////////////////////////////////////////
      
-    _STRING_STMT_PATTERN = compile_ast_matcher("""
+    __STRING_STMT_PATTERN = compile_ast_matcher("""
         (stmt (simple_stmt (small_stmt (expr_stmt (testlist (test
           (and_test (not_test (comparison (expr (xor_expr (and_expr
             (shift_expr (arith_expr (term (factor (power (atom
@@ -916,8 +916,8 @@ class DocParser:
             # suite: NEWLINE INDENT stmt+ DEDENT
             first_stmt = suite[3]
 
-        # Match it against _STRING_STMT_PATTERN
-        match, stmtvars = self._STRING_STMT_PATTERN.match(first_stmt)
+        # Match it against __STRING_STMT_PATTERN
+        match, stmtvars = self.__STRING_STMT_PATTERN.match(first_stmt)
         if match: return eval(stmtvars['stringval'])
         else: return None
             
@@ -929,7 +929,7 @@ class DocParser:
         @rtype: C{string} or C{None}
         """
         if i+1 < len(stmts):
-            match, vars = self._STRING_STMT_PATTERN.match(stmts[i+1])
+            match, vars = self.__STRING_STMT_PATTERN.match(stmts[i+1])
             if match: return eval(vars['stringval'])
         return None
 
@@ -1005,7 +1005,7 @@ class DocParser:
     # Identifier extraction
     #////////////////////////////////////////////////////////////
 
-    LHS_PATTERN = compile_ast_matcher("""
+    __LHS_PATTERN = compile_ast_matcher("""
         (test (and_test (not_test (comparison (expr (xor_expr
          (and_expr (shift_expr (arith_expr (term (factor 
           (power (atom...):atom (trailer DOT NAME)*):power)))))))))))""")
@@ -1016,7 +1016,7 @@ class DocParser:
 
         # Traverse the testlist, looking for variables.
         for test in testlist[1:]:
-            match, vars = self.LHS_PATTERN.match(test)
+            match, vars = self.__LHS_PATTERN.match(test)
             if match:
                 atom = vars['atom']
                 
@@ -1031,7 +1031,7 @@ class DocParser:
 
         return names
      
-    DOTTED_NAME_PATTERN = compile_ast_matcher("""
+    __DOTTED_NAME_PATTERN = compile_ast_matcher("""
         (power (atom NAME:varname) (trailer DOT NAME)*:trailers)""")
 
     def ast_to_dotted_name(self, ast):
@@ -1045,7 +1045,7 @@ class DocParser:
 
     def _power_to_dotted_name(self, power_node):
         assert power_node[0] == symbol.power
-        match, vars = self.DOTTED_NAME_PATTERN.match(power_node)
+        match, vars = self.__DOTTED_NAME_PATTERN.match(power_node)
         if not match: return None
         atom = vars['varname']
         trailers = [t[2][1] for t in vars['trailers']]
