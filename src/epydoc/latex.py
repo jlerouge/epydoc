@@ -739,7 +739,7 @@ class LatexFormatter:
         # Use the inherited docs for everything but the signature.
         fdoc = inhdoc
 
-        if fdoc.documented():
+        if fdoc.has_docstring():
             str += '    \\vspace{-1.5ex}\n\n'
             str += '    \\rule{\\textwidth}{0.5\\fboxrule}\n'
         
@@ -1371,7 +1371,7 @@ class LatexFormatter:
 
         # Try to find a documented ancestor.
         if isinstance(doc, FuncDoc):
-            while (not doc.documented() and doc.matches_override() and
+            while (not doc.has_docstring() and doc.matches_override() and
                    self._docmap.has_key(doc.overrides())):
                 doc = self._docmap[doc.overrides()]
 
