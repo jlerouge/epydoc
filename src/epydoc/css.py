@@ -144,7 +144,7 @@ tr.summary         { background: #c0e0e0; color: #000000;
 tr.details, tr.index
                    { background: #c0e0e0; color: #000000;
                      text-align: center; font-size: 120%; }
-tr.group           { background: #c8e0e8; color: #000000;
+tr.group           { background: #bad8e0; color: #000000;
                      text-align: left; font-size: 120%; } 
 
 /* Documentation page titles */
@@ -247,7 +247,7 @@ tr.summary         { background: #dcf4fc; color: #000000;
 tr.details, tr.index
                    { background: #dcf4fc; color: #000000;
                      text-align: center; font-size: 120%; }
-tr.group           { background: #c8e0e8; color: #000000;
+tr.group           { background: #bad8e0; color: #000000;
                      text-align: left; font-size: 120%; } 
 
 /* Documentation page titles */
