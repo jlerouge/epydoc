@@ -194,11 +194,15 @@ class DocChecker:
             documentation for the objects to be checked.
         @type docmap: L{DocMap<objdoc.DocMap>}
         """
-        docs = []
-        self._docs = docmap.values()
         self._docmap = docmap
-        f = lambda d1,d2:cmp(d1.uid().name(), d2.uid().name())
-        self._docs.sort(f)
+        
+        # Sort & filter the documentation from the docmap.
+        docs = docmap.items()
+        docs.sort()
+        self._docs = [d for (u,d) in docs if u.is_module() or
+                docmap.has_key(u.module())]
+
+        # Initialize instance variables
         self._checks = 0
         self._last_warn = None
         self._out = sys.stdout
@@ -364,7 +368,7 @@ class DocChecker:
         if not self._check_name_publicity(var.name()): return
         if var.name() == 'return':
             if (var.type() and
-                var.type().to_plaintext().strip().lower() == 'none'):
+                var.type().to_plaintext(None).strip().lower() == 'none'):
                 return
         if (self._checks & DocChecker.DESCR) and (not var.descr()):
             self._warn('No descr', name+'.'+var.name())
@@ -382,8 +386,8 @@ class DocChecker:
         """
         name = doc.uid().name()
         if not self._check_name_publicity(name): return
-        if doc != self._docmap.documented_ancestor(doc.uid()): return
-
+        if (doc.uid().is_any_method() and 
+            doc != self._docmap.documented_ancestor(doc.uid())): return
         if (self._checks & DocChecker.FUNC and
             not doc.has_docstring() and
             doc.uid().shortname() not in _NO_DOCS):
