@@ -36,20 +36,20 @@ install files. </p>
 <div class="screen"><pre>
 <code class="prompt">[/tmp]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-1.0.noarch.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-1.1.noarch.rpm</code>
 </pre></div></li>
 
 <li> Once epydoc is installed, you can delete the RPM file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-1.0.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-1.1.rpm</code>
 </pre></div> </li>
 </ol>
 
 <h2> Installing from the Windows Installer </h2>
 
 <ol>
-  <li> Download and run <code>epydoc-1.0.win32.exe</code>. </li>
+  <li> Download and run <code>epydoc-1.1.win32.exe</code>. </li>
   <li> Follow the on-screen instructions.  Epydoc will be installed in
   the <code>epydoc</code> subdirectory of your Python installation
   directory (typically <code>C:\Python22\</code>). </li>
@@ -61,51 +61,104 @@ Password:
   scripts to more convenient locations (such as your desktop or start
   menu). </li>
   <li> Once epydoc is installed, you can delete
-  <code>epydoc-1.0.win32.exe</code>. </li>
+  <code>epydoc-1.1.win32.exe</code>. </li>
 </ol>
 
-<h2> Installing from the Source Distribution </h2>
+<h2> Installing from the Source Distribution (using make)</h2>
 
 <ol>
   <li> Download an epydoc source distribution
   to a directory of your choice, and uncompress it.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://epydoc.sf.net/epydoc-1.0.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-1.0.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-1.0.tar</code>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://epydoc.sf.net/epydoc-1.1.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-1.1.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-1.1.tar</code>
 </pre></div></li>
 
-  <li> Use the <code>setup.py</code> script in the
-  <code>eydoc-1.0/</code> directory to install epydoc. 
+  <li> Use "<code>make install</code>" in the <code>eydoc-1.1/</code>
+  directory to install epydoc.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-1.0/</code>
-<code class="prompt">[/tmp/epydoc-1.0]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-1.1/</code>
+<code class="prompt">[/tmp/epydoc-1.1]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-1.0]#</code> <code class="user">python setup.py install</code>
+<code class="prompt">[/tmp/epydoc-1.1]#</code> <code class="user">make install</code>
 running install
 running build
 <i>[...]</i>
 copying build/scripts/epydoc -> /usr/bin
 changing mode of /usr/bin/epydoc to 100775
-<code class="prompt">[/tmp/epydoc-1.0]#</code> <code class="user">cd ..</code>
+</pre></div></li>
+
+<li> If you'd like to keep a local copy of the documentation, then use
+"<code>make installdocs</code>".  By default, this will install the
+documentation to <code>/usr/share/doc/</code> and the man pages to
+<code>/usr/share/man/</code>.  If you would prefer to install
+documentation to different directories (such as
+<code>/usr/lib/doc</code>), then edit the <code>MAN</code> and
+<code>DOC</code> variables at the top of <code>Makefile</code> before
+running "<code>make installdocs</code>".
+
+<div class="screen"><pre>
+<code class="prompt">[/tmp/epydoc-1.1]#</code> <code class="user">make installdocs</code>
+</pre></div></li>
+
+<li> Once epydoc is installed, you can delete the installation
+directory and the source distribution file.
+
+<div class="screen"><pre>
+<code class="prompt">[/tmp/epydoc-1.1]#</code> <code class="user">cd ..</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-1.1</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-1.1.tar</code>
+</pre></div> </li>
+</ol>
+
+<h2> Installing from the Source Distribution (without make)</h2>
+
+<ol>
+  <li> Download an epydoc source distribution
+  to a directory of your choice, and uncompress it.
+
+<div class="screen"><pre>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://epydoc.sf.net/epydoc-1.1.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-1.1.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-1.1.tar</code>
+</pre></div></li>
+
+  <li> Use the <code>setup.py</code> script in the
+  <code>eydoc-1.1/</code> directory to install epydoc. 
+
+<div class="screen"><pre>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-1.1/</code>
+<code class="prompt">[/tmp/epydoc-1.1]$</code> <code class="user">su</code>
+Password:
+<code class="prompt">[/tmp/epydoc-1.1]#</code> <code class="user">python setup.py install</code>
+running install
+running build
+<i>[...]</i>
+copying build/scripts/epydoc -> /usr/bin
+changing mode of /usr/bin/epydoc to 100775
+<code class="prompt">[/tmp/epydoc-1.1]#</code> <code class="user">cd ..</code>
 <code class="prompt">[/tmp]#</code>
 </pre></div></li>
 
 <li> If you'd like to keep a local copy of the documentation, then
-copy it to a permanant location, such as <code>/usr/doc/</code>.
+copy it to a permanant location, such as <code>/usr/share/doc/</code>.
+You may also want to copy the man pages to a permanat location, such
+as <code>/usr/share/man/</code>.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-1.0/doc/ /usr/doc/epydoc/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-1.1/doc/ /usr/share/doc/epydoc/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp epydoc-1.1/man/* /usr/share/man/</code>
 </pre></div> </li>
 
 <li> Once epydoc is installed, you can delete the installation
 directory and the source distribution file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-1.0</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-1.0.tar</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-1.1</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-1.1.tar</code>
 </pre></div> </li>
 </ol>
 
@@ -130,7 +183,7 @@ directory and the source distribution file.
 </table>
 
 <font size="-1">
-<!-- hhmts start --> Last modified: Wed Sep 25 16:49:34 EDT 2002 <!-- hhmts end -->
+<!-- hhmts start --> Last modified: Wed Oct 30 18:19:26 EST 2002 <!-- hhmts end -->
 </font>
 </body>
 </html>
