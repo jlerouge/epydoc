@@ -63,13 +63,14 @@ def _find_module_from_filename(filename):
     """
     # Normalize the filename
     filename = os.path.normpath(os.path.abspath(filename))
-    
-    # Extract the module name and the base directory.
-    name = re.sub(r'/?__init__\.py.?$', '', filename)
-    name = re.sub(r'\.py.?$', '', name)
-    name = re.sub(r'\.so$', '', name)
-    name = re.sub(r'/$', '', name)
-    (basedir, module) = os.path.split(name)
+
+    if os.path.isdir(filename):
+        (basedir, module) = os.path.split(filename)
+    else:
+        (basedir, file) = os.path.split(filename)
+        (module, ext) = os.path.splitext(file)
+        if module == '__init__':
+            (basedir, module) = os.path.split(basedir)
     
     # If there's a package, then find its base directory.
     if os.path.exists(os.path.join(basedir, '__init__.py')):
@@ -122,27 +123,21 @@ def import_module(name):
     # sys to old_sys).  
     sys.stdin = sys.stdout = sys.stderr = _dev_null
 
-    # Remove any "command-line arguments"
+    # Remove any command-line arguments
     sys.argv = ['(imported)']
 
     try:
         # If they gave us a file name, then convert it to a module
         # name, and update the path appropriately.
-        if '/' in name or re.search('\.py[cow]?$|\.so$', name):
+        if '/' in name or re.search('\.[pP][yY][cCoOwW]?$|\.[sS][oO]$', name):
             if not os.path.exists(name):
                 raise ImportError('%r does not exist' % name)
                 return None
             (basedir, name) = _find_module_from_filename(name)
 
-            # Make sure that the package is on the path.
+            # Make sure that the module is on the path.
             sys.path = [basedir] + sys.path
             
-            ## Just in case, make sure that the interediate package
-            ## directories are all on the path too.
-            #for pkg in name.split('.')[:-1]:
-            #    basedir = os.path.join(basedir, pkg)
-            #    sys.path.insert(1, basedir)
-
         # Make sure that we have a valid name
         if not re.match(r'^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$', name):
             raise ImportError('Bad module name %r' % name)
