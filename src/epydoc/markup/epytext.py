@@ -372,10 +372,12 @@ def _add_section(heading_token, stack, indent_stack, errors, warnings):
     stack[heading_token.level+2:] = []
     indent_stack[heading_token.level+2:] = []
 
+    # Colorize the heading
+    head = _colorize(heading_token, errors, warnings, 'heading')
+
     # Add the section's and heading's DOM elements.
     sec = Element("section")
     stack[-1].appendChild(sec)
-    head = heading_token.to_dom()
     stack.append(sec)
     sec.appendChild(head)
     indent_stack.append(None)
@@ -938,7 +940,7 @@ def _tokenize(str, warnings):
 _BRACE_RE = re.compile('{|}')
 _TARGET_RE = re.compile('^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
 
-def _colorize(token, errors, warnings=None):
+def _colorize(token, errors, warnings=None, tagName='para'):
     """
     Given a string containing the contents of a paragraph, produce a
     DOM C{Element} encoding that paragraph.  Colorized regions are
@@ -953,6 +955,10 @@ def _colorize(token, errors, warnings=None):
         will be appended to this list.  To ignore warnings, use a
         value of None.
     @type warnings: C{list} of C{string}
+
+    @param tagName: The element tag for the DOM C{Element} that should
+        be generated.
+    @type tagName: C{string}
     
     @return: a DOM C{Element} encoding the given paragraph.
     @returntype: C{Element}
@@ -965,7 +971,7 @@ def _colorize(token, errors, warnings=None):
     # the text currently being analyzed.  New elements are pushed when 
     # "{" is encountered, and old elements are popped when "}" is
     # encountered. 
-    stack = [Element('para')]
+    stack = [Element(tagName)]
 
     # This is just used to make error-reporting friendlier.  It's a
     # stack parallel to "stack" containing the index of each element's 
@@ -1025,13 +1031,13 @@ def _colorize(token, errors, warnings=None):
                     estr = "Invalid escape"
                     errors.append(ColorizingError(estr, token, end))
                 else:
-                    # Single-character escape.
-                    if len(stack[-1].childNodes[0].data) == 1:
-                        escp = stack[-1].childNodes[0].data
+                    if _ESCAPES.has_key(stack[-1].childNodes[0].data):
+                        escp = _ESCAPES[stack[-1].childNodes[0].data]
                         stack[-2].removeChild(stack[-1])
                         stack[-2].appendChild(Text(escp))
-                    elif _ESCAPES.has_key(stack[-1].childNodes[0].data):
-                        escp = _ESCAPES[stack[-1].childNodes[0].data]
+                    # Single-character escape.
+                    elif len(stack[-1].childNodes[0].data) == 1:
+                        escp = stack[-1].childNodes[0].data
                         stack[-2].removeChild(stack[-1])
                         stack[-2].appendChild(Text(escp))
                     else:
@@ -1096,8 +1102,8 @@ def _colorize_link(link, token, end, warnings, errors):
 
     # Clean up the target.  For URIs, assume http if they don't
     # specify (no relative urls)
+    target = re.sub(r'\s', '', target)
     if link.tagName=='uri':
-        target = re.sub(r'\s', '', target)
         if not re.match(r'\w+:', target):
             target = 'http://'+target
     elif link.tagName=='link':
@@ -1170,8 +1176,10 @@ def to_epytext(tree, indent=0, seclevel=0):
         else: bullet = '-'
         return indent*' '+ bullet + ' ' + childstr.lstrip()
     elif tree.tagName == 'heading':
+        str = re.sub('\0', 'E{lb}',childstr)
+        str = re.sub('\1', 'E{rb}', str)
         uline = len(childstr)*_HEADING_CHARS[seclevel-1]
-        return (indent-2)*' ' + childstr + '\n' + (indent-2)*' '+uline+'\n'
+        return (indent-2)*' ' + str + '\n' + (indent-2)*' '+uline+'\n'
     elif tree.tagName == 'doctestblock':
         str = re.sub('\0', '{', childstr)
         str = re.sub('\1', '}', str)
@@ -1312,8 +1320,10 @@ def to_debug(tree, indent=4, seclevel=0):
     elif tree.tagName in ('olist', 'ulist'):
         return 'LIST>|'+(indent-4)*' '+childstr[indent+2:]
     elif tree.tagName == 'heading':
+        str = re.sub('\0', 'E{lb}', childstr)
+        str = re.sub('\1', 'E{rb}', str)
         uline = len(childstr)*_HEADING_CHARS[seclevel-1]
-        return ('SEC'+`seclevel`+'>|'+(indent-8)*' ' + childstr + '\n' +
+        return ('SEC'+`seclevel`+'>|'+(indent-8)*' ' + str + '\n' +
                 '     |'+(indent-8)*' ' + uline + '\n')
     elif tree.tagName == 'doctestblock':
         str = re.sub('\0', '{', childstr)
