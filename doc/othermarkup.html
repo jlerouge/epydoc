@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title>Alternate Markup Languages</title>
+<link rel="stylesheet" href="epydoc.css" type="text/css"/>
+</head>
+<!-- $Id$ -->
+<body>
+
+<h1>Alternate Markup Languages</h1>
+
+<p> Epydoc's default markup language is <a
+href="epytext.html">epytext</a>, a lightweight markup language that's
+easy to write and to understand. But if epytext is not powerful enough
+for you, or doesn't suit your needs, epydoc also supports three
+alternate markup languages: </p>
+
+<ul>
+  <li><b><a href="http://docutils.sourceforge.net/rst.html"
+  >ReStructuredText</a></b> is an "easy-to-read,
+  what-you-see-is-what-you-get plaintext markup syntax."  It is more
+  powerful than epytext (e.g., it includes markup for tables and
+  footnotes); but it is also more complex, and sometimes harder to
+  read.</li>
+  
+  <li><b><a href="http://java.sun.com/j2se/javadoc/"
+  >JavaDoc</a></b> is a documentation markup language that was
+  developed for Java.  It consists of HTML, augmented by a set of
+  special fields, which are marked with tags.  Most (but not all)
+  JavaDoc tags are supported by Epydoc. </li>
+  
+  <li><b>Plaintext</b> docstrings are rendered verbatim (preserving
+  whitespace).</li>
+</ul>
+
+<p> To specify the markup language for a module, you should define a
+module-level string variable <code>__docformat__</code>, containing
+the name of the module's markup language.  The name of the markup
+language may optionally be followed y a language code (such as
+<code>en</code> for English). </p>
+
+<p> To change the default markup language from epytext to another
+markup language, use the <code>--docformat</code> option when running
+epydoc.  For example, the following command generates API
+documentation for the existing regular expression package
+<code>re</code>, which uses plaintext markup: </p>
+
+<div class="screen"><pre>
+<code class="prompt">[epydoc]$</code> epydoc --docformat plaintext re
+</pre></div>
+
+<h2>ReStructuredText</h2>
+
+<p> ReStructuredText is a markup language that was developed in
+conjunction with <a
+href="http://docutils.sourceforge.net">Docutils</a>.  In order to
+parse ReStructuredText docstrings, Docutils 0.3 or higher must be
+installed.  If Docutils is not installed, then ReStructuredText
+docstrings will be rendered as plaintet.  Docutils can be downloaded
+from the <a
+href="http://sourceforge.net/project/showfiles.php?group_id=38414">Docutils
+SourceForge page</a>. </p>
+
+<p> Epydoc currently supports only HTML output for ReStructuredText
+docstrings; all other output formats will display ReStructruedText
+docstrings as plaintext. </p>
+
+<p> The set of fields 
+
+<h3> Fields </h3>
+
+<h2>JavaDoc</h2>
+
+
+<!--<a
+href="http://docutils.sourceforge.net/rst.html">ReStructuredText</a>,
+<a href="http://java.sun.com/j2se/javadoc/">JavaDoc</a>, and
+plaintext. </p>-->
+
+<!--
+<table>
+  <tr><td><a href="http://docutils.sourceforge.net/rst.html"
+  >ReStructuredText</a></td><td> is an "easy-to-read,
+  what-you-see-is-what-you-get plaintext markup syntax."  It is more
+  powerful than epytext (e.g., it includes markup for tables and
+  footnotes); but it is also more complex, and sometimes harder to read
+  as plaintext. </td></tr>
+  <tr><td><a href="http://java.sun.com/j2se/javadoc/"
+  >JavaDoc</a></td><td> is a documentation markup language that was
+  developed for Java.  It consists of HTML, augmented by a set of
+  special fields, which are marked with tags.  Most (but not all) tags
+  are supported by Epydoc. </b></td></tr>
+  <tr><td>plaintext</td><td> docstrings are rendered exactly as they look
+  in the source code. </td></tr>
+</table> -->
+
+
+<table width="100%" class="navbox" cellpadding="1" cellspacing="0">
+  <tr>
+  <td align="center" width="16.6%">
+    <a class="nav" href="index.html">[Epydoc]</a></td>
+  <td align="center" width="16.6%">
+    <a class="nav" href="installing.html">[Installing]</a></td>
+  <td align="center" width="16.6%">
+    <a class="nav" href="using.html">[Using]</a></td>
+  <td align="center" width="16.6%">
+    <a class="nav" href="epytext.html">[Epytext]</a></td>
+  <td align="center" width="16.6%">
+    <a class="nav" href="http://www.cis.upenn.edu/~edloper/">[Author]</a></td>
+  <td align="center" width="16.6%">
+    <a href="http://sourceforge.net/projects/epydoc"> 
+    <img src="sflogo.png" 
+    width="88" height="26" border="0" alt="SourceForge"
+    align="top"/></a></td>
+    </tr>
+</table>
+
+<font size="-1">
+<!-- hhmts start --> Last modified: Thu Jul  3 15:29:24 EDT 2003 <!-- hhmts end -->
+</font>
+</body>
+</html>
