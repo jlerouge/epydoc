@@ -21,7 +21,7 @@ Usage::
     -n NAME, --name NAME      The documented project's name.
     -u URL, --url URL         The documented project's url.
     -c SHEET, --css SHEET     CSS stylesheet for HTML files.
-    -t PAGE, --toppage PAGE   The top page for the documentation.
+    -t PAGE, --top PAGE       The top page for the documentation.
     --navlink HTML            HTML code for the navbar's homepage link.
     --private-css SHEET       CSS stylesheet for private objects.
     --help-file FILE          HTML body for the help page.
@@ -143,7 +143,7 @@ def _parse_args():
         Currently, the following configuration parameters are set:
         C{target}, C{modules}, C{verbosity}, C{prj_name}, C{check},
         C{check_private}, C{show_imports}, C{frames}, C{private},
-        C{quiet}, C{debug}, C{toppage}, and C{docformat}.
+        C{quiet}, C{debug}, C{top}, and C{docformat}.
     @rtype: C{None}
     """
     # Default values.
@@ -151,7 +151,7 @@ def _parse_args():
                'prj_name':'', 'check':0, 'check_private':0,
                'show_imports':0, 'frames':1, 'private':1,
                'quiet':0, 'debug':0, 'docformat':None,
-               'toppage':None}
+               'top':None}
 
     # Get the command-line arguments, using getopts.
     shortopts = 'c:fh:n:o:t:u:Vvpq?:'
@@ -160,8 +160,8 @@ def _parse_args():
                 'private-css= private_css= quiet show-imports '+
                 'show_imports css= no_private no-private name= '+
                 'builtins no-frames no_frames debug docformat= '+
-                'doc-format= doc_format= toppage= top_page= '+
-                'top-page= navlink= nav_link= nav-link=').split()
+                'doc-format= doc_format= top=  navlink= nav_link= '+
+                'nav-link=').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -196,8 +196,7 @@ def _parse_args():
         elif opt in ('--quiet', '-q'): options['quiet'] -= 3
         elif opt in ('--show-imports', '--show_imports'):
             options['show_imports'] = 1
-        elif opt in ('-t', '--toppage', '--top-page', '--top_page'):
-            options['toppage'] = val
+        elif opt in ('-t', '--top'): options['top'] = val
         elif opt in ('--url', '-u'): options['prj_url']=val
         elif opt in ('--verbose', '-v'): options['verbosity'] += 1
         elif opt in ('--version', '-V'): _version()
@@ -207,7 +206,17 @@ def _parse_args():
         else:
             _usage()
 
+    # Check that the options all preceed the filenames.
+    for m in modules:
+        if m == '-': break
+        elif m[0:1] == '-':
+            estr = 'options must preceed modules'
+            print >>sys.stderr, ('%s; run "%s -h" for usage' %
+                                 (estr,os.path.basename(sys.argv[0])))
+            sys.exit(1)
+        
     # Make sure we got some modules.
+    modules = [m for m in modules if m != '-']
     if len(modules) == 0:
         print >>sys.stderr, ('no modules specified; run "%s -h" for usage' %
                              os.path.basename(sys.argv[0]))
