@@ -28,7 +28,7 @@ Usage::
     --no-frames               Do not use frames, by default.
     --no-private              Do not document private objects.
     --show-imports            Include lists of importes.
-    --docformat=FORMAT        Set the default value for __docformat__.
+    --docformat FORMAT        Set the default value for __docformat__.
     --builtins                Add all builtin modules to MODULES.
     -v, --verbose             Display a progress bar.
     -vv, -vvv, -vvvv          Produce sucessively more verbose output.
