@@ -7,20 +7,8 @@
 # $Id$
 #
 
-r"""
-
-Documentation formatter that produces A single LaTeX document
-containing the API documentation.
-
-Individual classes and modules are documented in separate files, and
-included via C{"\include"} directives.  This makes it easy to include
-the documentation for specific classes and modules as chapters of
-other LaTeX documents.
-
-Files:
-  - 
-
-This module is under development.
+"""
+Documentation to LaTeX converter.
 """
 __docformat__ = 'epytext en'
 
@@ -44,12 +32,11 @@ from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 ## CONSTANTS
 ##################################################
 
-# Once I'm done, check which pacakges I actually use.
+# (Once I'm done, check which pacakges I actually use.)
 _LATEX_HEADER = r"""
 \documentclass{article}
 \usepackage{fullpage, alltt, parskip, fancyheadings, boxedminipage}
 \usepackage{makeidx, multirow, longtable}
-\makeindex
 \begin{document}
 
 \setlength{\parindent}{0ex}
@@ -84,32 +71,95 @@ _STARSECTIONS = ['\\part*{%s}', '\\chapter*{%s}', '\\section*{%s}',
 
 class LatexFormatter:
     """
+    Documentation to LaTeX converter.  The API documentation produced
+    by C{LatexFormatter} consists of a single LaTeX document, divided
+    into several different files.  In particular, C{LatexFormatter}
+    generates the following files:
+    
+      - X{api.tex}: The top-level LaTeX file.  This file imports the
+        other files, to create a single unified document.  This is the
+        file that you should run C{latex} on.
+      - X{I{module}-module.tex}: The API documentation for a module.
+        I{module} is the complete dotted name of the module, such as
+        sys or epydoc.epytext.
+      - X{I{class}-class.tex}: The API documentation for a class,
+        exception, or type.  I{class} is the complete dotted name of
+        the class, such as epydoc.epytext.Token or array.ArrayType.
+        These class documentation files are only created if the
+        C{list_classes_separately} option is used; otherwise, the
+        documentation for each class is included in its module's
+        documentation file.
+
+    The methods C{write_module} and C{write_class} used to generate
+    individual module and class documentation LaTeX files.  These
+    files can then be included as chapters or sections of other LaTeX
+    documents (with C{"\\include"}).  When using these methods, you
+    may wish to disable the C{crossref} option, which will turn off
+    crossreferencing betweeen modules and classes, since some of these
+    crossreference links will be broken if you only include some of
+    the API documentation as chapters or sections of your document.
+
+    @ivar _docmap: The documentation map, encoding the objects that
+        should be documented.
     @ivar _show_private: Whether to include show private objects in
     the documentation.
     """
+    
     def __init__(self, docmap, **kwargs):
+        """
+        Construct a new LaTeX formatter, using the given documentation map.
+        @param docmap: The documentation to output.
+        @type docmap: L{DocMap}
+        @param kwargs: Keyword arguments:
+            - C{prj_name}: The name of the project.  Defaults to
+              none.  (type=C{string})
+            - C{private}: Whether to create documentation for private
+              objects.  By default, private objects are documented.
+              (type=C{boolean})
+            - C{crossref}: Whether to create crossreference links
+              between classes and modules.  By default, crossreference
+              links are created.  (type=C{boolean})
+            - C{index}: Whether to generate an index.  If you generate
+              an index, you will need to run C{makeindex} to make the
+              C{.idx} file.  By default, an index is generated.
+              (type=C{boolean})
+            - C{list_classes_separately}: Whether to list classes in
+              separate chapters, or to include them as sections of
+              their modules' chapters.  By default, they are not listed
+              separately.  (type=C{boolean})
+        """
         self._docmap = docmap
 
         # Process keyword arguments
         self._show_private = kwargs.get('private', 0)
-        self._prj_name = kwargs.get('prj_name', 0)
+        self._prj_name = kwargs.get('prj_name', None)
+        self._crossref = kwargs.get('crossref', 1)
+        self._index = kwargs.get('index', 1)
         self._top_section = 2
-        self._list_classes_separately = 0
+        self._list_classes_separately=kwargs.get('list_classes_separately',0)
         self._index_functions = 1
+        self._hyperref = 1
         
-    def dvi(self, directory):
-        self.write(directory)
-        oldpath = os.path.abspath(os.curdir)
-        os.chdir(directory)
-        ## DEBUG
-        #return
-        print 'RUNNING LaTeX'
-        os.system('latex api.tex')
-        os.system('makeindex api.idx')
-        os.system('latex api.tex')
-        os.chdir(oldpath)
+    def write(self, directory=None, progress_callback=None):
+        """
+        Write the API documentation for the entire project to the
+        given directory.
 
-    def write(self, directory):
+        @type directory: C{string}
+        @param directory: The directory to which output should be
+            written.  If no directory is specified, output will be
+            written to the current directory.  If the directory does
+            not exist, it will be created.
+        @type progress_callback: C{function}
+        @param progress_callback: A callback function that is called
+            before each file is written, with the name of the created
+            file.
+        @rtype: C{None}
+        @raise OSError: If C{directory} cannot be created,
+        @raise OSError: If any file cannot be created or written to.
+        """
+        if not directory: directory = os.curdir
+        
         # Create dest directory, if necessary
         if not os.path.isdir(directory):
             if os.path.exists(directory):
@@ -121,15 +171,65 @@ class LatexFormatter:
             if uid.is_module():
                 filename = os.path.join(directory, ('%s-module.tex' %
                                                     uid.name()))
+                if progress_callback: progress_callback(filename)
                 open(filename, 'w').write(self._module_to_latex(uid))
             elif uid.is_class() and self._list_classes_separately:
                 filename = os.path.join(directory, ('%s-class.tex' %
                                                     uid.name()))
+                if progress_callback: progress_callback(filename)
                 open(filename, 'w').write(self._class_to_latex(uid))
 
         # Write the top-level file.
         filename = os.path.join(directory, 'api.tex')
+        if progress_callback: progress_callback(filename)
         open(filename, 'w').write(self._topfile())
+
+    def write_module(self, uid, filename):
+        """
+        Write the API documentation for the given module to
+        C{filename}.
+        @param uid: The unique identifier of the module to document.
+        @type uid: L{UID}
+        @param filename: The name of the file to write the
+            documentation to.
+        @type filename: C{string}
+        @raise OSError: If C{directory} cannot be created,
+        @raise OSError: If any file cannot be created or written to.
+        @raise ValueError: If C{uid} is not the identifier for a module.
+        """
+        if not uid.is_module():
+            raise ValueError('%s is not a module' % uid)
+        open(filename, 'w').write(self._module_to_latex(uid))
+
+    def write_class(self, uid, filename):
+        """
+        Write the API documentation for the given class to
+        C{filename}.
+        @param uid: The unique identifier of the class to document.
+        @type uid: L{UID}
+        @param filename: The name of the file to write the
+            documentation to.
+        @type filename: C{string}
+        @raise OSError: If C{directory} cannot be created,
+        @raise OSError: If any file cannot be created or written to.
+        @raise ValueError: If C{uid} is not the identifier for a class.
+        """
+        if not uid.is_class():
+            raise ValueError('%s is not a class' % uid)
+        open(filename, 'w').write(self._class_to_latex(uid))
+
+    def num_files(self):
+        """
+        @return: The number of files that this C{LatexFormatter} will
+            generate.
+        @rtype: C{int}
+        """
+        n = 1
+        for uid in self._docmap.keys():
+            if uid.is_private() and not self._show_private: continue
+            if uid.is_module(): n += 1
+            elif uid.is_class() and self._list_classes_separately: n += 1
+        return n
         
     #////////////////////////////////////////////////////////////
     # Main Doc File
@@ -141,8 +241,26 @@ class LatexFormatter:
         str += self._start_of('Header')
         str += _LATEX_HEADER + '\n'
 
+        if self._index:
+            str = re.sub(r'(\\begin{document})', '\\makeindex\n\\1', str)
+
+        if self._hyperref:
+            hyperref = (r'\\usepackage[usenames]{color}\n' +
+                        r'\\definecolor{darkblue}{rgb}{0,0.05,0.35}\n' +
+                        r'\\usepackage[dvips, pagebackref, ' +
+                        'pdftitle={%s}, ' % (self._prj_name or '') +
+                        'pdfcreator={epydoc %s}, ' % epydoc.__version__ +
+                        'bookmarks=true, bookmarksopen=false, '+
+                        'pdfpagemode=UseOutlines, colorlinks=true, '+
+                        'linkcolor=black, anchorcolor=black, '+
+                        'citecolor=black, filecolor=black, '+
+                        'menucolor=black, pagecolor=black, '+
+                        'urlcolor=darkblue]{hyperref}\n')
+            str = re.sub(r'(\\begin{document})',
+                         hyperref + '\\1', str)
+
         str += self._start_of('Title')
-        str += '\\title{%s}\n' % self._text_to_latex(self._prj_name)
+        str += '\\title{%s}\n' % self._text_to_latex(self._prj_name, 1)
         str += '\\author{API Documentation}\n'
         str += '\\maketitle\n'
         
@@ -181,12 +299,12 @@ class LatexFormatter:
         # Start the chapter.
         str = self._header(uid)
         str += self._start_of('Module Description')
-        str += '    ' + self._index(uid, 'start')
-        str += '    \\label{%s}\n' % uid.name().replace('_', '-')
+        str += '    ' + self._indexterm(uid, 'start')
         if uid.is_package():
             str += self._section('Package %s' % uid.name(), 0)
         else:
             str += self._section('Module %s' % uid.name(), 0)
+        str += '    \\label{%s}\n' % self._uid_to_label(uid)
 
         # The module's description.
         if doc.descr():
@@ -218,22 +336,32 @@ class LatexFormatter:
 
         # Class list. !! add summaries !!
         if self._list_classes_separately:
-            classes = self._filtersort_vars(doc.classes(), doc.sortorder())
+            classes = self._filtersort_links(doc.classes(), doc.sortorder())
             if classes:
                 str += self._start_of('Classes')
                 str += self._section('Classes', 1)
                 str += '\\begin{itemize}'
-                str += '  \\setlength{\\parskip}{0.6ex}'
-                for cls in doc.classes():
-                    str += ('\\item %s (Section~\\ref{%s})\n' %
-                            (self._text_to_latex(cls.target().name()),
-                             cls.target().name().replace('_', '-')))
+                str += '  \\setlength{\\parskip}{0ex}'
+                for link in classes:
+                    cname = link.name()
+                    cls = link.target()
+                    if not self._docmap.has_key(cls): continue
+                    cdoc = self._docmap[cls]
+                    str += '  ' + '\\item \\textbf{'
+                    str += self._text_to_latex(cname) + '}'
+                    if cdoc and cdoc.descr():
+                        str += ': %s\n' % self._summary(cdoc, cls.module())
+                    if self._crossref:
+                        str += ('\n  \\textit{(Section \\ref{%s}' %
+                                self._uid_to_label(cls))
+                        str += (', p.~\\pageref{%s})}\n\n' %
+                                self._uid_to_label(cls))
                 str += '\\end{itemize}'
                 
         # Function List
         str += self._func_list(doc.functions(), None)
 
-        # !! variable list !!
+        # Variable list.
         if doc.variables():
             str += self._var_list(doc.variables())
 
@@ -242,7 +370,7 @@ class LatexFormatter:
             for cls in doc.classes():
                 str += self._class_to_latex(cls.target())
         
-        str += '    ' + self._index(uid, 'end')
+        str += '    ' + self._indexterm(uid, 'end')
         return str
                 
     def _class_to_latex(self, uid):
@@ -252,8 +380,7 @@ class LatexFormatter:
         # Start the chapter.
         str = ''
         if self._list_classes_separately: str += self._header(uid)
-        str += '    ' + self._index(uid, 'start')
-        str += '    \\label{%s}\n' % uid.name().replace('_', '-')
+        str += '    ' + self._indexterm(uid, 'start')
         str += self._start_of('Class Description')
         if self._list_classes_separately:
             seclevel = 0
@@ -261,6 +388,7 @@ class LatexFormatter:
         else:
             seclevel = 1
             str += self._section('Class %s' % uid.shortname(), seclevel)
+        str += '    \\label{%s}\n' % self._uid_to_label(uid)
 
         # The class base tree.
         if doc.bases():
@@ -310,7 +438,7 @@ class LatexFormatter:
                                   'Class Variables', seclevel+1)
 
         # End mark for the class's index entry.
-        str += '    ' + self._index(uid, 'end')
+        str += '    ' + self._indexterm(uid, 'end')
         
         return str
 
@@ -334,7 +462,7 @@ class LatexFormatter:
         # multiple pages in a happy way).
         str += '\\cline{1-2} '
         str += '\\centering \\textbf{Name} & '
-        str += '\\centering \\textbf{Description/Value}& \\\\\n'
+        str += '\\centering \\textbf{Description}& \\\\\n'
         str += '\\cline{1-2}\n'
         str += '\\endhead'
         str += '\\cline{1-2}'
@@ -346,31 +474,31 @@ class LatexFormatter:
 
         for var in variables:
             str += '\\raggedright '
-            name = re.sub('(.)', r'\1\-', var.name())
-            str += name.replace('_', r'\_') + ' & '
+            str += self._text_to_latex(var.name(), 1, 1) + ' & '
 
+            if var.descr() or var.has_value():
+                str += '\\raggedright '
+            if var.has_value():
+                str += '\\textbf{Value:} \n'
+                if var.descr():
+                    str += self._pprint_var_value(var, 40)
+                else:
+                    str += self._pprint_var_value(var, 90)
+                if var.descr(): str += '\n\n'
             if var.descr():
-                str += '\\raggedright '
                 str += self._dom_to_latex(var.descr(), 10).strip()
-            elif var.has_value():
-                str += '\\raggedright '
-                str += self._pprint_var_value(var)
             str += '&\\\\\n'
             str += '\\cline{1-2}\n'
 
         str += '\\end{longtable}\n\n'
         return str
     
-    def _pprint_var_value(self, var):
-        MAXWIDTH = 100 # Roughly 2 lines.
+    def _pprint_var_value(self, var, maxwidth=100):
         val = var.uid().value()
         try:
             val = `val`
-            if len(val) > MAXWIDTH: val = val[:MAXWIDTH-3] + '...'
-            val = re.sub('(.)', '\\1\1', val)
-            val = self._text_to_latex(val)
-            val = val.replace('\1', r'\-')
-            val = val.replace(' ', '~')
+            if len(val) > maxwidth: val = val[:maxwidth-3] + '...'
+            val = self._text_to_latex(val, 1, 1)
         except: val = '...'
         return '\\texttt{%s}' % val
     
@@ -416,12 +544,14 @@ class LatexFormatter:
                 inherit_docs = 1
                 inhdoc = self._docmap[inhdoc.overrides()]
 
+            # nb: this gives the containing section, not a reference
+            # directly to the function.
             if not inherit:
-                str += '    \\label{%s}\n' % func.name().replace('_', '-')
+                str += '    \\label{%s}\n' % self._uid_to_label(func)
             
             numfuncs += 1
             fsig = self._func_signature(fname, fdoc)
-            str += '    ' + self._index(func)
+            str += '    ' + self._indexterm(func)
             str += '    \\vspace{0.5ex}\n\n'
             str += '    \\begin{boxedminipage}{\\textwidth}\n\n'
             str += '    %s\n\n' % fsig
@@ -528,7 +658,8 @@ class LatexFormatter:
         return str
     
     def _func_signature(self, fname, fdoc, show_defaults=1):
-        str = '\\textbf{%s}' % self._text_to_latex(fname)
+        str = '\\raggedright '
+        str += '\\textbf{%s}' % self._text_to_latex(fname)
         str += '('
         str += self._params_to_latex(fdoc.parameters(), show_defaults)
         
@@ -557,7 +688,8 @@ class LatexFormatter:
                     default = param.default()
                     if len(default) > 60:
                         default = default[:57]+'...'
-                    str += '=\\texttt{%s}' % self._text_to_latex(default)
+                    str += ('=\\texttt{%s}' %
+                            self._text_to_latex(default, 1, 1))
                 str += ', '
         return str
 
@@ -577,11 +709,7 @@ class LatexFormatter:
 
     def _dom_to_latex_helper(self, tree, indent, seclevel, breakany):
         if isinstance(tree, xml.dom.minidom.Text):
-            if breakany: 
-                data = re.sub('([^ ])', '\\1\1', tree.data)
-                return self._text_to_latex(data).replace('\1', r'\-')
-            else:
-                return self._text_to_latex(tree.data)
+            return self._text_to_latex(tree.data, 0, breakany)
 
         if tree.tagName == 'section': seclevel += 1
     
@@ -598,10 +726,21 @@ class LatexFormatter:
             return '\\texttt{%s}' % childstr
         elif tree.tagName == 'uri':
             if len(children) != 2: raise ValueError('Bad URI ')
-            elif children[0] == children[1]:
-                return '\\textit{%s}' % children[1]
+            if self._hyperref:
+                # ~ and # should not be escaped in the URI.
+                uri = tree.childNodes[1].childNodes[0].data
+                uri = uri.replace('{\\textasciitilde}', '~')
+                uri = uri.replace('\\#', '#')
+                if children[0] == children[1]:
+                    return '\\href{%s}{\\textit{%s}}' % (uri, children[1])
+                else:
+                    return ('%s\\footnote{\\href{%s}{%s}}' %
+                            (children[0], uri, children[1]))
             else:
-                return '%s\\footnote{%s}' % (children[0], children[1])
+                if children[0] == children[1]:
+                    return '\\textit{%s}' % children[1]
+                else:
+                    return '%s\\footnote{%s}' % (children[0], children[1])
         elif tree.tagName == 'link':
             if len(children) != 2: raise ValueError('Bad Link')
             return '\\texttt{%s}' % children[1]
@@ -615,7 +754,6 @@ class LatexFormatter:
             return ('\\index{%s}\\textit{%s}' % (indexstr, childstr))
         elif tree.tagName == 'bold':
             return '\\textbf{%s}' % childstr
-        
         elif tree.tagName == 'li':
             return indent*' ' + '\\item ' + childstr.lstrip()
         elif tree.tagName == 'heading':
@@ -623,7 +761,6 @@ class LatexFormatter:
         elif tree.tagName == 'doctestblock':
             return '\\begin{alltt}\n%s\n\\end{alltt}\n\n' % childstr
         elif tree.tagName == 'literalblock':
-            # BUT: escaping!!
             return '\\begin{alltt}\n%s\n\\end{alltt}\n\n' % childstr
         elif tree.tagName == 'fieldlist':
             return indent*' '+'{omitted fieldlist}\n'
@@ -724,13 +861,16 @@ class LatexFormatter:
 
         doc = self._docmap.get(uid, None)
         str = ' '*depth + '\\item \\textbf{'
-        str += uid.shortname()+'}'
+        str += self._text_to_latex(uid.shortname()) +'}'
         if doc and doc.descr():
-            str += ': \\textit{' + self._summary(doc, uid) + '}'
-        str += '\n'
+            str += ': %s\n' % self._summary(doc, uid)
+        if self._crossref:
+            str += ('\n  \\textit{(Section \\ref{%s}' %
+                    self._uid_to_label(uid))
+            str += ', p.~\\pageref{%s})}\n\n' % self._uid_to_label(uid)
         if doc and doc.ispackage() and doc.modules():
             str += ' '*depth + '  \\begin{itemize}\n'
-            str += ' '*depth + '\\setlength{\\parskip}{0.6ex}'
+            str += ' '*depth + '\\setlength{\\parskip}{0ex}'
             modules = [l.target() for l in 
                        self._filtersort_links(doc.modules(), doc.sortorder())]
             for module in modules:
@@ -745,7 +885,7 @@ class LatexFormatter:
         @rtype: C{string}
         """
         str = '\\begin{itemize}\n'
-        str += '\\setlength{\\parskip}{0.6ex}'
+        str += '\\setlength{\\parskip}{0ex}'
         uids = self._filtersort_uids(self._docmap.keys())
         #docs.sort(lambda a,b: cmp(a[0], b[0]))
         # Find all top-level packages. (what about top-level
@@ -765,9 +905,10 @@ class LatexFormatter:
         @rtype: C{string}
         """
         if len(modules) == 0: return ''
-        str = '\\textbf{Modules}\n'
+        str = self._start_of('Modules')
+        str += self._section('Modules', 1)
         str += '\\begin{itemize}\n'
-        str += '\\setlength{\\parskip}{0.6ex}'
+        str += '\\setlength{\\parskip}{0ex}'
         modules = self._filtersort_links(modules, sortorder)
         
         for link in modules:
@@ -778,7 +919,8 @@ class LatexFormatter:
     # Helpers
     #////////////////////////////////////////////////////////////
 
-    def _index(self, uid, pos='only'):
+    def _indexterm(self, uid, pos='only'):
+        if not self._index: return ''
         if uid.is_routine() and not self._index_functions: return ''
 
         str = ''
@@ -797,15 +939,23 @@ class LatexFormatter:
         else:
             raise AssertionError('Bad index position %s' % pos)
 
-    def _text_to_latex(self, str):
+    def _text_to_latex(self, str, nbsp=0, breakany=0):
+        """
+        @param breakany: Insert hyphenation marks, so that LaTeX can
+        break the resulting string at any point.  This is useful for
+        small boxes (e.g., the type box in the variable list table).
+        """
+        # These get converted to hyphenation points later
+        if breakany: str = re.sub('(.)', '\\1\1', str)
+
         # These get converted to \textbackslash later.
         str = str.replace('\\', '\0')
-        
+
+        # Expand tabs
+        str = str.expandtabs()
+
         # These elements need to be backslashed.
         str = re.sub(r'([#$&%_\${}])', r'\\\1', str)
-
-        # These elements need to be in math mode.
-        #str = re.sub('([<>|])', r'\\(\1\\)', str)
 
         # These elements have special names.
         str = str.replace('|', '{\\textbar}')
@@ -814,6 +964,12 @@ class LatexFormatter:
         str = str.replace('^', '{\\textasciicircum}')
         str = str.replace('~', '{\\textasciitilde}')
         str = str.replace('\0', r'{\textbackslash}')
+
+        # replace spaces with non-breaking spaces
+        if nbsp: str = str.replace(' ', '~')
+
+        # Convert \1's to hyphenation points.
+        if breakany: str = str.replace('\1', r'\-')
         
         return str
 
@@ -852,6 +1008,9 @@ class LatexFormatter:
         str += ((72-len(section_name))/2)*' ' + '%%\n'
         str += 75*'%' + '\n\n'
         return str
+
+    def _uid_to_label(self, uid):
+        return uid.name().replace('.', ':')
                 
     def _cmp_name(self, name1, name2):
         """
@@ -1076,16 +1235,3 @@ class LatexFormatter:
         else:
             return ''
             #return '&nbsp;'
-
-if __name__ == '__main__':
-    docmap = DocMap(document_bases=1)
-
-    uids = [findUID(name) for name in sys.argv[1:]]
-    uids = [uid for uid in uids if uid is not None]
-    for uid in uids:
-        print 'add', uid
-        docmap.add(uid.value())
-
-    formatter = LatexFormatter(docmap)
-    formatter.dvi('latex_test')
-
