@@ -2388,7 +2388,7 @@ class FuncDoc(ObjDoc):
                     if param is None:
                         warnings.append('@%s for unknown parameter %s' %
                                         (tag, name))
-                    if param.descr() is not None:
+                    elif param.descr() is not None:
                         warnings.append('Redefinition of parameter %s' % name)
                         param.set_descr(None)
                 params = [p for p in params if p is not None]
