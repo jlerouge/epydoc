@@ -17,9 +17,10 @@ crossreferencing between C{ObjDoc}s.
 @see: L{epydoc.objdoc}
 """
 
-import inspect, sys, os.path, new, re
+import inspect, sys, os.path, new, re, types
 from types import ModuleType as _ModuleType
 from types import ClassType as _ClassType
+from types import TypeType as _TypeType
 from types import FunctionType as _FunctionType
 from types import BuiltinFunctionType as _BuiltinFunctionType
 from types import BuiltinMethodType as _BuiltinMethodType
@@ -54,7 +55,7 @@ class UID:
         """
         
         # Special case: create a UID from just a name.
-        if type(obj) == _StringType:
+        if type(obj) is _StringType:
             self._obj = self._typ = self._id = None
             self._name = obj
             return
@@ -62,21 +63,24 @@ class UID:
         self._id = id(obj)
         self._obj = obj
         
-        if type(obj) == _ModuleType:
+        if type(obj) is _ModuleType:
             self._name = obj.__name__
             
-        elif type(obj) == _ClassType:
-            self._name = (obj.__module__+'.'+obj.__name__)
-                          
-        elif type(obj) == _FunctionType:
-            self._name = (_find_function_module(obj).__name__+'.'+
-                          obj.__name__)
-                          
-        elif type(obj) == _MethodType:
-            self._name = (obj.im_class.__module__+'.'+
-                          obj.im_class.__name__+'.'+
-                          obj.__name__)
+        elif type(obj) is _ClassType:
+            self._name = '%s.%s' % (obj.__module__, obj.__name__)
 
+        elif type(obj) is _FunctionType:
+            self._name = '%s.%s' % (_find_function_module(obj).__name__,
+                                    obj.__name__)
+                          
+        elif type(obj) is _MethodType:
+            self._name = '%s.%s.%s' % (obj.im_class.__module__,
+                                       obj.im_class.__name__,
+                                       obj.__name__)
+
+        elif isinstance(obj, _TypeType) and hasattr(obj, '__module__'):
+            self._name = '%s.%s' % (obj.__module__, obj.__name__)
+            
         else:
             # Last resort: use object's internal id.
             try:
@@ -134,20 +138,20 @@ class UID:
         
         if descendant.is_method():
             if ancestor.is_class():
-                if descendant.cls() == ancestor: return 1
+                if descendant.cls() is ancestor: return 1
                 else: return 0
             else: descendant = descendant.cls()
 
         if descendant.is_class() or descendant.is_function():
             if ancestor.is_module():
-                if descendant.module() == ancestor: return 1
+                if descendant.module() is ancestor: return 1
                 else: return 0
             else: descendant = descendant.module()
 
         if not ancestor.is_package(): return 0
 
         while descendant is not None and descendant.is_module():
-            if descendant.package() == ancestor: return 1
+            if descendant.package() is ancestor: return 1
             else: descendant = descendant.package()
 
         return 0
@@ -158,7 +162,7 @@ class UID:
             identified by this UID.
         @rtype: L{UID}
         """
-        if type(self._obj) == _MethodType: 
+        if type(self._obj) is _MethodType: 
             return UID(self._obj.im_class)
         else:
             raise TypeError()
@@ -169,11 +173,14 @@ class UID:
             identified by this UID.
         @rtype: L{UID}
         """
-        if type(self._obj) == _MethodType:
+        if type(self._obj) is _MethodType:
             return UID(sys.modules[self._obj.im_class.__module__])
-        elif type(self._obj) == _ClassType:
+        elif type(self._obj) is _ClassType:
             return UID(sys.modules[self._obj.__module__])
-        elif type(self._obj) in (_FunctionType,):
+        elif (isinstance(self._obj, _TypeType) and
+              hasattr(self._obj, '__module__')):
+            return UID(sys.modules[self._obj.__module__])
+        elif type(self._obj) is _FunctionType:
             return UID(_find_function_module(self._obj))
         else:
             raise TypeError()
@@ -184,11 +191,14 @@ class UID:
             identified by this UID.
         @rtype: L{UID}
         """
-        if type(self._obj) == _ModuleType:
+        if type(self._obj) is _ModuleType:
             dot = self._name.rfind('.')
             if dot < 0: return None
             return UID(sys.modules[self._name[:dot]])
         elif type(self._obj) in (_MethodType, _ClassType):
+            return self.module().package()
+        elif (isinstance(self._obj, _TypeType) and
+              hasattr(self._obj, '__module__')):
             return self.module().package()
         else:
             raise TypeError()
@@ -198,35 +208,51 @@ class UID:
         @return: True if this is the UID for a function.
         @rtype: C{boolean}
         """
-        return type(self._obj) in (_FunctionType,)
+        return type(self._obj) is _FunctionType
 
+    def is_builtin_function(self):
+        """
+        @return: True if this is the UID for a builtin function.
+        @rtype: C{boolean}
+        """
+        return type(self._obj) is _BuiltinFunctionType
+    
+    def is_builtin_method(self):
+        """
+        @return: True if this is the UID for a builtin method.
+        @rtype: C{boolean}
+        """
+        return type(self._obj) is _BuiltinMethodType
+    
     def is_class(self):
         """
         @return: True if this is the UID for a class.
         @rtype: C{boolean}
         """
-        return type(self._obj) == _ClassType
+        return ((type(self._obj) is _ClassType) or
+                (isinstance(self._obj, _TypeType) and
+                 hasattr(self._obj, '__module__')))
 
     def is_method(self):
         """
         @return: True if this is the UID for a method.
         @rtype: C{boolean}
         """
-        return type(self._obj) == _MethodType
+        return type(self._obj) is _MethodType
 
     def is_module(self):
         """
         @return: True if this is the UID for a module.
         @rtype: C{boolean}
         """
-        return type(self._obj) == _ModuleType
+        return type(self._obj) is _ModuleType
 
     def is_package(self):
         """
         @return: True if this is the UID for a package.
         @rtype: C{boolean}
         """
-        return (type(self._obj) == _ModuleType and
+        return (type(self._obj) is _ModuleType and
                 hasattr(self._obj, '__path__'))
 
 class Link:
@@ -313,7 +339,7 @@ def _find_function_module(func):
     # itself).  In particular, if a module gets loaded twice, using
     # two different names for the same file, then this helps.
     for module in sys.modules.values():
-        if module == None: continue
+        if module is None: continue
         if func.func_globals is module.__dict__:
             return module
     raise ValueError("Couldn't the find module for the function %s" %
@@ -354,11 +380,28 @@ def _makeuid(obj):
     @type obj: any
     """
     if type(obj) in (_FunctionType, _BuiltinFunctionType,
-                     _MethodType, _BuiltinMethodType,
+                      _MethodType, _BuiltinMethodType,
                      _ClassType, _ModuleType):
+        return UID(obj)
+    elif isinstance(obj, _TypeType) and hasattr(obj, '__module__'):
         return UID(obj)
     else:
         return None
+
+def _namedModule(name):
+    """
+    @return: The module with the given fully qualified name.  
+    @rtype: C{module}
+    @raise ImportError: If there is no module with the given name. 
+    """
+    return __import__(name, None, None, 1)
+
+def _namedObject(name):
+    """Get a fully named module-global object.
+    """
+    classSplit = name.split('.')
+    module = _namedModule('.'.join(classSplit[:-1]))
+    return getattr(module, classSplit[-1])
 
 def findUID(name, container, docmap=None):
     """
@@ -418,8 +461,7 @@ def findUID(name, container, docmap=None):
     for i in range(len(modcomponents)-1, -1, -1):
         try:
             modname = '.'.join(modcomponents[:i]+[name])
-            exec('import %s as obj' % modname)
-            return(_makeuid(obj))
+            return(_makeuid(_namedModule(modname)))
         except: pass
         
     # Is it an object in a module?  The module part of the name may be
@@ -430,10 +472,10 @@ def findUID(name, container, docmap=None):
             try:
                 modname = '.'.join(modcomponents[:i]+components[:j])
                 objname = '.'.join(components[j:])
-                exec('import %s as mod' % modname)
+                mod = _namedModule(modname)
                 if _is_variable_in(name, UID(mod), docmap):
                     return UID('%s.%s' % (container, name))
-                exec('from %s import %s as obj' % (modname, objname))
+                obj = _namedObject(modname + '.' + objname)
                 return _makeuid(obj)
             except: pass
 
