@@ -19,18 +19,26 @@ the form of HTML pages.
 @author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
 """
 
+# General info
 __version__ = '1.0'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
+
+# Copyright/license info
 __copyright__ = '(C) 2002 Edward Loper'
 __license__ = 'IBM Open Source License'
-__epydoc_sort__ = [
-    'objdoc',
-    'epytext',
-    'uid',
-    'html',
-    'css',
-    'checker',
-    'cli',
-    'gui',
-    ]
+
+# Contributors to epydoc (in alpha order by last name)
+__contributors__ = ['Glyph Lefkowitz <glyph@twistedmatrix.com>',
+                    'Edward Loper <edloper@gradient.cis.upenn.edu>',
+                    'Bruce Mitchener <bruce@cubik.org>']
+
+# Sort order
+__epydoc_sort__ = ['objdoc',
+                   'epytext',
+                   'uid',
+                   'html',
+                   'css',
+                   'checker',
+                   'cli',
+                   'gui']
