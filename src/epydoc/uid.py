@@ -71,14 +71,36 @@ class UID:
 
     @ivar _name: This UID's globally unique name.
     @type _name: C{string}
+    @ivar _public: Whether this is a public or private object.
+    @type _public: C{boolean}
 
     @cvariable _ids: A dictionary mapping from names to Python
         identifiers (as returned by C{id}).  This dictionary is used
         to ensure that all UIDs are given globally unique names.
     @type _ids: C{dictionary} from C{string} to C{int}
     """
-    def __init__(self):
-        raise NotImplementedError("UID is an abstract base class")
+    def __init__(self, name):
+        self._name = name
+
+        # Check if we're public or private.  Note: the order of these
+        # checks is significant.
+        
+        # First, check if the parent is private.
+        parent = self.parent()
+        if parent and not parent._public:
+            self._public = 0
+            
+        # Next, check the __all__ variable.
+        if (parent and parent.is_module() and
+            hasattr(parent._obj, '__all__')):
+            try: self._public = (self.shortname() in parent._obj.__all__)
+            except: pass
+            
+        # Finally, check the short name.
+        else:
+            shortname = self.shortname()
+            self._public = (shortname[:1] == '_' and
+                            shortname[-1:] != '_')
 
     #//////////////////////////////////////////////////
     # UID Name & Value
@@ -105,7 +127,8 @@ class UID:
             definining the object.  For example, the UID for this
             class has the name C{'UID'}.
         """
-        return self._name.split('.')[-1]
+        # Note that this works right even if rfind returns -1:
+        return self._name[self._name.rfind('.')+1:]
 
     def value(self):
         """
@@ -191,6 +214,22 @@ class UID:
         """
         raise NotImplementedError()
 
+    def is_public(self):
+        """
+        @return: True if this object and all of its ancestor objects
+            are public.
+              - An object whose parent is a module that defines
+                the C{__all__} variable is public if and only if it is
+                contained in C{__all__}.  If C{__all__} is not a
+                list, or if any error occurs while accessing
+                C{__all__}, then it is ignored.
+              - All other objects are public if and only if their
+                (short) name does not begins with a single underscore, 
+                or ends with an underscore.
+        @rtype: C{boolean}
+        """
+        return self._public
+
     def is_private(self):
         """
         @return: True if this is a private object, or if any of its
@@ -205,29 +244,7 @@ class UID:
                 does not end with an underscore.
         @rtype: C{boolean}
         """
-        if not hasattr(self, '_private'):
-            # Note: the order of these checks is significant.
-            shortname = self.shortname()
-
-            # First, check if the parent is private.
-            parent = self.parent()
-            if parent and parent.is_private():
-                self._private = 1
-                return 1
-            
-            # Next, check the __all__ variable.
-            if (parent and parent.is_module() and
-                hasattr(parent._obj, '__all__')):
-                try:
-                    self._private = (shortname not in parent._obj.__all__)
-                    return self._private
-                except: pass
-
-            # Finally, check the short name.
-            self._private = (shortname[:1] == '_' and
-                             shortname[-1:] != '_')
-
-        return self._private
+        return not self._public
 
     #//////////////////////////////////////////////////
     # Ancestors & Descendants
@@ -339,10 +356,11 @@ class ObjectUID(UID):
             self._id = id(object.im_func)
         else:
             self._id = id(object)
-        self._name = self._findname()
 
-        # Note that this works right even if rfind return -1:
-        self._shortname = self._name[self._name.rfind('.')+1:]
+        name = self._findname()
+        # Note that this works right even if rfind returns -1:
+        self._shortname = name[name.rfind('.')+1:]
+        UID.__init__(self, name)
 
     # The value of an ObjectUID is the object that was used to
     # construct the UID.
@@ -386,34 +404,45 @@ class ObjectUID(UID):
     def name(self): return self._name
     
     def _findname(self):
-        typ = type(self._obj)
+        obj = self._obj
+        typ = type(obj)
+        objname = obj.__name__
+        
         if typ is _ModuleType:
             if self.package():
-                shortname = self._obj.__name__.split('.')[-1]
+                shortname = objname.split('.')[-1]
                 return '%s.%s' % (self.package(), shortname)
             else:
-                return self._obj.__name__
-        elif typ is _ClassType or typ is _FunctionType:
-            return '%s.%s' % (self.module(), self._obj.__name__)
+                return objname
+        elif typ is _ClassType:
+            return '%s.%s' % (self.module(), objname)
+        elif typ is _FunctionType:
+            if objname[0] == '<':
+                return '%s.unknown-%s' % (self.module(), id(obj))
+            else:
+                return '%s.%s' % (self.module(), objname)
         elif typ is _MethodType or (typ is _BuiltinMethodType and
-                                    self._obj.__self__ is not None):
-            return '%s.%s' % (self.cls(), self._obj.__name__)
-        elif (isinstance(self._obj, _TypeType) and
-              hasattr(self._obj, '__module__')):
-            return '%s.%s' % (self.module(), self._obj.__name__)
-        elif (isinstance(self._obj, _TypeType) or
+                                    obj.__self__ is not None):
+            if objname[0] == '<':
+                return '%s.unknown-%s' % (self.module(), id(obj))
+            else:
+                return '%s.%s' % (self.cls(), objname)
+        elif (isinstance(obj, _TypeType) and
+              hasattr(obj, '__module__')):
+            return '%s.%s' % (self.module(), objname)
+        elif (isinstance(obj, _TypeType) or
               (typ is _BuiltinFunctionType and
-               self._obj.__self__ is None)):
+               obj.__self__ is None)):
             module = self.module()
             if module is None:
-                return '__unknown__.%s' % self._obj.__name__
+                return '__unknown__.%s' % objname
             else:
-                name = _find_name_in(self._obj, self.module()._obj)
+                name = _find_name_in(obj, self.module()._obj)
                 return '%s.%s' % (self.module(), name)
         elif typ in (_WrapperDescriptorType, _MethodDescriptorType):
-            return '%s.%s' % (self.cls(), self._obj.__name__)
+            return '%s.%s' % (self.cls(), objname)
         else:
-            raise ValueError("Can't find name for %r" % self._obj)
+            raise ValueError("Can't find name for %r" % obj)
         
     def cls(self):
         if not hasattr(self, '_cls'):
@@ -559,7 +588,7 @@ class RelativeUID(UID):
         self._base = base_uid
         self._shortname = shortname
         self._value = value
-        self._name = '%s.%s' % (self._base._name, self._shortname)
+        UID.__init__(self, '%s.%s' % (self._base._name, self._shortname))
 
     def value(self): return self._value
 
@@ -648,7 +677,8 @@ def make_uid(object, base_uid=None, shortname=None):
                         _MethodDescriptorType) or
         isinstance(object, _TypeType)):
         # If we've already seen this object, return its UID.
-        if type(object) is _MethodType: key = id(object.im_func)
+        if type(object) is _MethodType:
+            key = (id(object.im_func), id(object.im_class))
         else: key = id(object)
         try: return _object_uids[key]
         except: pass
@@ -781,6 +811,14 @@ class Link:
         @rtype: C{boolean}
         """
         return self._target.is_private()
+
+    def is_public(self):
+        """
+        @return: True if this link points to a public object.  This
+            is equivalant to C{self.target().is_public()}.
+        @rtype: C{boolean}
+        """
+        return self._target.is_public()
 
     def __cmp__(self, other):
         if not isinstance(other, Link): return -1
