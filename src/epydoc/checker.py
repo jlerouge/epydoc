@@ -146,6 +146,10 @@ class DocChecker:
     def _check_var(self, var, name):
         if not self._check_name_publicity(name): return
         if var == None: return
+        if var.name() == 'return':
+            if (var.type() and
+                epytext.to_plaintext(var.type()).strip().lower() == 'none'):
+                return
         if (self._checks & DocChecker.DESCR) and (not var.descr()):
             print 'Warning -- No descr    ', name+'.'+var.name()
         if (self._checks & DocChecker.TYPE) and (not var.type()):
