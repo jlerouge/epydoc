@@ -97,6 +97,7 @@ Supported features:
 
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
+@type SCRWIDTH: C{int}
 """
 
 # Replace "index" entity with "indexed"?
@@ -140,10 +141,6 @@ _COLORIZING_TAGS = {
 # Which tags can use "link syntax" (e.g., U{Python<www.python.org>})?
 _LINK_COLORIZING_TAGS = ['link', 'uri']
 
-# Should we use Bruce Mitchener's link syntax
-# (e.g., U{Python|www.python.org}) instead of standard link syntax?
-_VBAR_LINK_SYNTAX = 0
-
 ##################################################
 ## Helpers
 ##################################################
@@ -172,6 +169,13 @@ def summary(tree):
     """
     Given a DOM tree representing formatted documentation, return a
     new DOM tree containing the documentation's first sentence.
+
+    @param tree: A DOM tree representing formatted documentation, as
+        produced by L{parse}.
+    @type tree: C{xml.dom.minidom.Element}
+    @return: A DOM tree containing the first sentence of the
+        documentation.
+    @rtype: C{xml.dom.minidom.Element}
     """
     # Find the first paragraph.
     children = [tree]
@@ -188,8 +192,7 @@ def summary(tree):
     parachildren = children[0].childNodes
     summary = Element('epytext')
     for parachild in parachildren:
-        if (isinstance(parachild, Text) and
-            '.' in parachild.data):
+        if (isinstance(parachild, Text) and '.' in parachild.data):
             dotloc = parachild.data.find('.')
             summary.appendChild(Text(parachild.data[:dotloc+1]))
             return summary
@@ -205,7 +208,7 @@ def parse(str, errors = None, warnings = None):
     """
     Return a DOM tree encoding the contents of an epytext string.
     Any errors or warnings generated during parsing will be stored in
-    the C{errors} and C{warnings} parameters.  
+    the C{errors} and C{warnings} parameters.
 
     @param str: The epytext string to parse.
     @type str: C{string}
@@ -380,9 +383,11 @@ def _add_section(heading_token, stack, indent_stack, errors, warnings):
     indent_stack.append(None)
         
 def _add_list(bullet_token, stack, indent_stack, errors, warnings):
-    """Add a new list item or field to the DOM tree, with the given
+    """
+    Add a new list item or field to the DOM tree, with the given
     bullet or field tag.  When necessary, create the associated
-    list."""
+    list.
+    """
     # Determine what type of bullet it is.
     if bullet_token.contents[-1] == '-':
         list_type = 'ulist'
@@ -493,10 +498,15 @@ class Token:
         heading; C{None}, otherwise.  Valid heading levels are 0, 1,
         and 2.
 
+    @type PARA: C{string}
     @cvar PARA: The C{tag} value for paragraph C{Token}s.
+    @type LBLOCK: C{string}
     @cvar LBLOCK: The C{tag} value for literal C{Token}s.
+    @type DTBLOCK: C{string}
     @cvar DTBLOCK: The C{tag} value for doctest C{Token}s.
+    @type HEADING: C{string}
     @cvar HEADING: The C{tag} value for heading C{Token}s.
+    @type BULLET: C{string}
     @cvar BULLET: The C{tag} value for bullet C{Token}s.  This C{tag}
         value is also used for field tag C{Token}s, since fields
         function syntactically the same as list items.
@@ -513,6 +523,7 @@ class Token:
         Create a new C{Token}.
 
         @param tag: The type of the new C{Token}.
+        @type tag: C{string}
         @param startline: The line on which the new C{Token} begins.
         @type startline: C{int}
         @param contents: The normalized contents of the new C{Token}.
@@ -910,10 +921,7 @@ def _tokenize(str, warnings):
 
 # Assorted regular expressions used for colorizing.
 _BRACE_RE = re.compile('{|}')
-if _VBAR_LINK_SYNTAX:
-    _URI_RE = re.compile(r'^(.*?)\s*\|([^|]+)$')
-else:
-    _URI_RE = re.compile('^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
+_TARGET_RE = re.compile('^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
 
 def _colorize(token, errors, warnings=None):
     """
@@ -1054,7 +1062,7 @@ def _colorize_link(link, token, end, warnings, errors):
         return
     
     # Did they provide an explicit URL?
-    match2 = _URI_RE.match(children[-1].data)
+    match2 = _TARGET_RE.match(children[-1].data)
     if match2:
         (text, uri) = match2.groups()
         children[-1].data = text
@@ -1089,43 +1097,52 @@ def _colorize_link(link, token, end, warnings, errors):
 ## Formatters
 ##################################################
 
-def index_to_anchor(str):
-    "Given a string, construct a name for an index anchor."
-    return "_index_"+re.sub("[^a-zA-Z0-9]", "_", str)
-
-def to_epytext(tree, indent=0, seclevel=0, **kwargs):
+def to_epytext(tree, indent=0, seclevel=0):
     """
     Convert a DOM tree encoding epytext back to an epytext string.
     This is the inverse operation from L{parse}.  I.e., assuming there
     are no errors, the following is true:
         - C{parse(to_epytext(tree)) == tree}
 
-    The inverse is true, except that whitespace and line wrapping may
-    be done differently:
-        - C{to_epytext(parse(str)) == str} (+/- whitespace)
+    The inverse is true, except that whitespace, line wrapping, and
+    character escaping may be done differently.
+        - C{to_epytext(parse(str)) == str} (approximately)
 
-    This still doesn't handle escape characters quite right..
+    @param tree: A DOM tree encoding of an epytext string.
+    @type tree: C{xml.dom.minidom.Element}
+    @param indent: The indentation for the string representation of
+        C{tree}.  Each line of the returned string will begin with
+        C{indent} space characters.
+    @type indent: C{int}
+    @param seclevel: The section level that C{tree} appears at.  This
+        is used to generate section headings.
+    @type seclevel: C{int}
+    @return: The epytext string corresponding to C{tree}.
+    @rtype: C{string}
     """
     if isinstance(tree, Text):
-        str = tree.data
-#         str = re.sub(r'\{', '\0', str)
-#         str = re.sub(r'\}', '\1', str)
-#         #str = re.sub(r'\.', 'E{.}', str)
-#         #str = re.sub(r'-', 'E{.}', str)
-#         str = re.sub('\0', 'E{lb}', str)
-#         str = re.sub('\1', 'E{rb}', str)
+        str = re.sub(r'\{', '\0', tree.data)
+        str = re.sub(r'\}', '\1', str)
         return str
 
-    if tree.tagName in ('epytext', 'ulist', 'olist', 'fieldlist'): indent -= 2
+    if tree.tagName == 'epytext': indent -= 2
+    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     if tree.tagName == 'section': seclevel += 1
     children = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
 
     # Clean up for literal blocks (add the double "::" back)
-    childstr = re.sub(':(\s*)\0', '::\\1', childstr)
+    childstr = re.sub(':(\s*)\2', '::\\1', childstr)
 
     if tree.tagName == 'para':
-        return wordwrap(childstr, indent)+'\n'
+        str = wordwrap(childstr, indent)+'\n'
+        str = re.sub(r'((^|\n)\s*\d+)\.', r'\1E{.}', str)
+        str = re.sub(r'((^|\n)\s*)-', r'\1E{-}', str)
+        str = re.sub(r'((^|\n)\s*)@', r'\1E{@}', str)
+        str = re.sub(r'::(\s*($|\n))', r'E{:}E{:}\1', str)
+        str = re.sub('\0', 'E{lb}', str)
+        str = re.sub('\1', 'E{rb}', str)
+        return str
     elif tree.tagName == 'li':
         bulletAttr = tree.getAttributeNode('bullet')
         if bulletAttr: bullet = bulletAttr.value
@@ -1133,13 +1150,17 @@ def to_epytext(tree, indent=0, seclevel=0, **kwargs):
         return indent*' '+ bullet + ' ' + childstr.lstrip()
     elif tree.tagName == 'heading':
         uline = len(childstr)*_HEADING_CHARS[seclevel-1]
-        return indent*' ' + childstr + '\n' + indent*' '+uline+'\n'
+        return (indent-2)*' ' + childstr + '\n' + (indent-2)*' '+uline+'\n'
     elif tree.tagName == 'doctestblock':
-        lines = [indent*' '+line for line in childstr.split('\n')]
+        str = re.sub('\0', '{', childstr)
+        str = re.sub('\1', '}', str)
+        lines = ['  '+indent*' '+line for line in str.split('\n')]
         return '\n'.join(lines) + '\n\n'
     elif tree.tagName == 'literalblock':
-        lines = [(indent+1)*' '+line for line in childstr.split('\n')]
-        return '\0' + '\n'.join(lines) + '\n\n'
+        str = re.sub('\0', '{', childstr)
+        str = re.sub('\1', '}', str)
+        lines = [(indent+1)*' '+line for line in str.split('\n')]
+        return '\2' + '\n'.join(lines) + '\n\n'
     elif tree.tagName == 'field':
         if (len(tree.childNodes) > 1 and
             tree.childNodes[1].tagName == 'arg'):
@@ -1160,15 +1181,28 @@ def to_epytext(tree, indent=0, seclevel=0, **kwargs):
     raise ValueError('Unknown DOM element %r' % tree.tagName)
 
 def to_plaintext(tree, indent=0, seclevel=0):
-    """
-    Given the DOM tree for an epytext string (as
-    returned by L{parse}), return a string encoding it in plaintext.
-    This function is similar to L{to_epytext}; however, it prints
-    escaped characters in unescaped form, removes colorizing, etc...
+    """    
+    Convert a DOM tree encoding epytext to a string representation.
+    This representation is similar to the string generated by
+    C{to_epytext}, but C{to_plaintext} removes inline markup, prints
+    escaped characters in unescaped form, etc.
+
+    @param tree: A DOM tree encoding of an epytext string.
+    @type tree: C{xml.dom.minidom.Element}
+    @param indent: The indentation for the string representation of
+        C{tree}.  Each line of the returned string will begin with
+        C{indent} space characters.
+    @type indent: C{int}
+    @param seclevel: The section level that C{tree} appears at.  This
+        is used to generate section headings.
+    @type seclevel: C{int}
+    @return: The epytext string corresponding to C{tree}.
+    @rtype: C{string}
     """
     if isinstance(tree, Text): return tree.data
 
     if tree.tagName == 'epytext': indent -= 2
+    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     if tree.tagName == 'section': seclevel += 1
     children = [to_plaintext(c, indent+2, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
@@ -1190,7 +1224,7 @@ def to_plaintext(tree, indent=0, seclevel=0):
         lines = [(indent+2)*' '+line for line in childstr.split('\n')]
         return '\n'.join(lines) + '\n\n'
     elif tree.tagName == 'literalblock':
-        lines = [(indent+3)*' '+line for line in childstr.split('\n')]
+        lines = [(indent+1)*' '+line for line in childstr.split('\n')]
         return '\n'.join(lines) + '\n\n'
     elif tree.tagName in ('olist', 'ulist'):
         return childstr
@@ -1205,179 +1239,125 @@ def to_plaintext(tree, indent=0, seclevel=0):
         return childstr
 
 def to_debug(tree, indent=4, seclevel=0):
-    """
-    Given the DOM tree for an epytext string (as
-    returned by L{parse}), return a string encoding it in plaintext.
-    This function is similar to L{to_epytext}; however, it prints
-    escaped characters in unescaped form, removes colorizing, etc...
-    """
-    if isinstance(tree, Text): return tree.data
+    """    
+    Convert a DOM tree encoding epytext back to an epytext string,
+    annotated with extra debugging information.  This function is
+    similar to L{to_epytext}, but it adds explicit information about
+    where different blocks begin, along the left margin.
 
-    if tree.tagName in ('olist', 'ulist'): indent -= 2
+    @param tree: A DOM tree encoding of an epytext string.
+    @type tree: C{xml.dom.minidom.Element}
+    @param indent: The indentation for the string representation of
+        C{tree}.  Each line of the returned string will begin with
+        C{indent} space characters.
+    @type indent: C{int}
+    @param seclevel: The section level that C{tree} appears at.  This
+        is used to generate section headings.
+    @type seclevel: C{int}
+    @return: The epytext string corresponding to C{tree}.
+    @rtype: C{string}
+    """
+    if isinstance(tree, Text):
+        str = re.sub(r'\{', '\0', tree.data)
+        str = re.sub(r'\}', '\1', str)
+        return str
+
     if tree.tagName == 'section': seclevel += 1
+    if tree.tagName in ('ulist', 'olist', 'fieldlist'): indent -= 2
     children = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
     childstr = ''.join(children)
 
+    # Clean up for literal blocks (add the double "::" back)
+    childstr = re.sub(':( *\n     \|\n)\2', '::\\1', childstr)
+    #childstr = re.sub(':( *\n     \|\n LIT>\|)', '::\\1', childstr)
+
     if tree.tagName == 'para':
-        lines = ['     |'+l for l in
-                 wordwrap(childstr, indent-6).rstrip().split('\n')]
-        return '\n'.join(lines)+'\n'
+        str = wordwrap(childstr, indent-6, 69)+'\n'
+        str = re.sub(r'((^|\n)\s*\d+)\.', r'\1E{.}', str)
+        str = re.sub(r'((^|\n)\s*)-', r'\1E{-}', str)
+        str = re.sub(r'((^|\n)\s*)@', r'\1E{@}', str)
+        str = re.sub(r'::(\s*($|\n))', r'E{:}E{:}\1', str)
+        str = re.sub('\0', 'E{lb}', str)
+        str = re.sub('\1', 'E{rb}', str)
+        lines = str.rstrip().split('\n')
+        lines[0] = '   P>|' + lines[0]
+        lines[1:] = ['     |'+l for l in lines[1:]]
+        return '\n'.join(lines)+'\n     |\n'
     elif tree.tagName == 'li':
         bulletAttr = tree.getAttributeNode('bullet')
         if bulletAttr: bullet = bulletAttr.value
         else: bullet = '-'
-        return '  LI>|'+(indent-6)*' '+ bullet + ' ' + childstr[6:].lstrip()
+        return '  LI>|'+ (indent-6)*' '+ bullet + ' ' + childstr[6:].lstrip()
+    elif tree.tagName in ('olist', 'ulist'):
+        return 'LIST>|'+(indent-4)*' '+childstr[indent+2:]
     elif tree.tagName == 'heading':
         uline = len(childstr)*_HEADING_CHARS[seclevel-1]
-        return ('SEC'+`seclevel`+'>|'+(indent-6)*' ' + childstr + '\n' +
-                '     |'+(indent-6)*' ' + uline + '\n')
+        return ('SEC'+`seclevel`+'>|'+(indent-8)*' ' + childstr + '\n' +
+                '     |'+(indent-8)*' ' + uline + '\n')
     elif tree.tagName == 'doctestblock':
-        lines = ['DTST>|'+(indent-6)*' '+line for line in childstr.split('\n')]
-        return '\n'.join(lines) + '\n'
+        str = re.sub('\0', '{', childstr)
+        str = re.sub('\1', '}', str)
+        lines = ['     |'+(indent-4)*' '+line for line in str.split('\n')]
+        lines[0] = 'DTST>'+lines[0][5:]
+        return '\n'.join(lines) + '\n     |\n'
     elif tree.tagName == 'literalblock':
-        lines = [' LIT>|'+(indent-5)*' '+line for line in childstr.split('\n')]
-        return '\n'.join(lines) + '\n'
-    elif tree.tagName in ('olist', 'ulist'):
-        return 'LIST>|'+(indent-6)*' '+childstr[indent+2:]
+        str = re.sub('\0', '{', childstr)
+        str = re.sub('\1', '}', str)
+        lines = ['     |'+(indent-5)*' '+line for line in str.split('\n')]
+        lines[0] = ' LIT>'+lines[0][5:]
+        return '\2' + '\n'.join(lines) + '\n     |\n'
     elif tree.tagName == 'field':
         if (len(tree.childNodes) > 1 and
             tree.childNodes[1].tagName == 'arg'):
-            return (' FLD>|'+(indent-6)*' '+children[0]+'('+
+            return (indent*' '+children[0]+'('+
                     children[1]+'):\n'+''.join(children[2:]))
         else:
-            return (' FLD>|'+(indent-6)*' '+children[0]+':\n'+
+            return (indent*' '+children[0]+':\n'+
                     ''.join(children[1:]))
-    elif tree.tagName in ('fieldlist', 'tag', 'arg', 'epytext', 'section'):
+    elif tree.tagName == 'target':
+        return '<%s>' % childstr
+    elif tree.tagName in ('fieldlist', 'tag', 'arg', 'epytext',
+                          'section', 'olist', 'ulist', 'name'):
         return childstr
     else:
-        # Assume that anything else is colorizing.
-        return '<'+tree.tagName+'>'+childstr+'</'+tree.tagName+'>'
-
+        for (tag, name) in _COLORIZING_TAGS.items():
+            if name == tree.tagName:
+                return '%s{%s}' % (tag, childstr)
+    raise ValueError('Unknown DOM element %r' % tree.tagName)
 
 ##################################################
 ## Helper Functions
 ##################################################
 
-def wordwrap(in_str, indent=0, right=SCRWIDTH):
-    """Word-wrap the given string.  Indent the text C{indent} spaces
-    on the left, and assume a right margin of C{right}.  C{in_str}
-    should not contain any newlines."""
-    line_length = right-indent
-    out_str = ''
-    start = 0
-    while (start+line_length+1 < len(in_str)):
-        end = in_str.rfind(' ', start, start+line_length+1)
-        if end <= 0:
-            end = in_str.find(' ', start+1)
-        if end <= 0:
-            out_str += ' '*indent + in_str[start:len(in_str)] + '\n'
-            return out_str
-        out_str += ' '*indent + in_str[start:end] + '\n'
-        start = end+1
-    out_str += ' '*indent + in_str[start:len(in_str)] + '\n'
-    return out_str
-
-def to_debug2(elt, indent=0):
-    """Pretty-print a DOM representation... Used for debugging"""
-    if isinstance(elt, Element):
-        if elt.tagName == 'epytext':
-            str = ''
-            for child in elt.childNodes:
-                str += to_debug2(child, indent+2)
-            return str.rstrip()
-        elif elt.tagName in ('ulist', 'olist', 'fieldlist'):
-            li1 = to_debug2(elt.childNodes[0], indent+2)
-            ind = (indent-2)/4
-            str = ind*' '+'L>' + li1[ind+2:]
-            for child in elt.childNodes[1:]:
-                str += to_debug2(child, indent+2)
-            return str
-        elif elt.tagName == 'section':
-            str = ''
-            for child in elt.childNodes:
-                str += to_debug2(child, indent+2)
-            return str
-        elif elt.tagName == 'li':
-            str = indent*' '+'- '
-            if elt.childNodes:
-                str += to_debug2(elt.childNodes[0], 0)
-            else:
-                str += '\n'
-            if len(str) > (SCRWIDTH-10): str = str[:SCRWIDTH-13]+'...\n'
-            for child in elt.childNodes[1:]:
-                str += to_debug2(child, indent+2)
-            return str
-        elif elt.tagName == 'para':
-            str = indent*' ' + 'P>'
-            for child in elt.childNodes:
-                str += to_debug2(child)
-            if len(str) > (SCRWIDTH-10): str = str[:SCRWIDTH-13]+'...'
-            return str + '\n'
-        elif elt.tagName == 'heading':
-            return ((indent-2)*' ' + 'SECTION: ' + 
-                    to_debug2(elt.childNodes[0]) + '\n')
-        elif elt.tagName == 'literalblock':
-            lines = elt.childNodes[0].data.split('\n')
-            str = ''
-            for line in lines:
-                str += indent*' ' + 'LIT>' + line + '\n'
-            return str
-        elif elt.tagName == 'doctestblock':
-            lines = elt.childNodes[0].data.split('\n')
-            str = ''
-            for line in lines:
-                str += indent*' ' + 'DTB>' + line + '\n'
-            return str
-        elif elt.tagName == 'field':
-            str = indent*' '+ elt.childNodes[0].childNodes[0].data
-            if (len(elt.childNodes) > 1 and
-                elt.childNodes[1].tagName == 'arg'):
-                str += '(' + elt.childNodes[1].childNodes[0].data
-                str += '):\n'
-                for child in elt.childNodes[2:]:
-                    str += to_debug2(child, indent+2)
-            else:
-                str += ':\n'
-                for child in elt.childNodes[1:]:
-                    str += to_debug2(child, indent+2)
-            return str
-        else: #if elt.tagName in ('code', 'bold', 'italic'):
-            str = ''
-            for child in elt.childNodes:
-                str += ('<'+elt.tagName[0].upper()+'>'+
-                        to_debug2(child)+'</'+elt.tagName[0].upper()+'>')
-            return str
-#        else:
-#            return '??'+elt.tagName+'??\n'
-    elif isinstance(elt, Text):
-        return elt.data
-
-def to_dent(str):
+def wordwrap(str, indent=0, right=SCRWIDTH):
     """
-    Replace leading whitespace with INDENTS (») and DEDENTS («).  This 
-    really has nothing to do with anything right now, but may be used
-    for an EBNF implementation of epytext at some point.. I had no
-    better place to put it.
+    Word-wrap the given string.  All sequences of whitespace are
+    converted into spaces, and the string is broken up into lines,
+    where each line begins with C{indent} spaces, followed by one or
+    more (space-deliniated) words whose length is less than
+    C{right-indent}.  If a word is longer than C{right-indent}
+    characters, then it is put on its own line.
+
+    @param str: The string that should be word-wrapped.
+    @type str: C{int}
+    @param indent: The left margin of the string.  C{indent} spaces
+        will be inserted at the beginning of every line.
+    @type indent: C{int}
+    @param right: The right margin of the string.
+    @type right: C{int}
+    @return: A word-wrapped version of C{str}.
+    @rtype: C{string}
     """
-    if str.find(chr(171)) >= 0 or str.find(chr(187)) >= 0:
-        raise SyntaxError('string already contains dents')
-    old_indent = 0
-    out = ''
-    for line in str.split('\n'):
-        lstrip_line = line.lstrip()
-        indent = len(line)-len(lstrip_line)
-        if lstrip_line == '':
-            out += '\n'
-            continue
-        while indent > old_indent:
-            out += chr(187)
-            old_indent += 1
-        while indent < old_indent:
-            out += chr(171)
-            old_indent -= 1
-        out += lstrip_line + '\n'
-        old_indent = indent
-    return out
+    words = str.split()
+    out_str = ' '*indent
+    charindex = 0
+    for word in words:
+        if charindex+len(word) > right and charindex > 0:
+            out_str += '\n' + ' '*indent
+            charindex = 0
+        out_str += word+' '
+        charindex += len(word)+1
+    return out_str.rstrip()+'\n'
 
 ##################################################
 ## Top-Level Wrapper function
@@ -1385,8 +1365,21 @@ def to_dent(str):
 
 def pparse(str, show_warnings=1, show_errors=1):
     """
-    \"Pretty-parse\" the string.
-    i.e., parse it and print out warnings and errors.
+    Pretty-parse the string.  This parses the string, and catches any
+    warnings or errors produced.  Any warnings and errors are
+    displayed, and the resulting DOM parse structure is returned.
+
+    @param str: The string to parse.
+    @type str: C{string}
+    @param show_warnings: Whether or not to display warnings generated
+        by parsing C{str}.
+    @type show_warnings: C{boolean}
+    @param show_errors: Whether or not to display errors generated
+        by parsing C{str}.
+    @type show_errors: C{boolean}
+    @return: a DOM tree encoding the contents of C{str}.
+    @rtype: C{xml.dom.minidom.Element}
+    @raise SyntaxError: If any fatal errors were encountered.
     """
     errors = []
     warnings = []
@@ -1394,8 +1387,7 @@ def pparse(str, show_warnings=1, show_errors=1):
     try:
         val = parse(str, errors, warnings)
     except:
-        if errors == []: raise
-        else: confused = 1
+        confused = 1
         
     if not show_warnings: warnings = []
     warnings.sort()
@@ -1414,12 +1406,10 @@ def pparse(str, show_warnings=1, show_errors=1):
         for error in errors:
             print error
         print '='*SCRWIDTH
-        if confused:
-            raise
-            print '(Confused by errors.  Bailing out...)'
-    if errors:
-        raise SyntaxError('Encountered Errors')
-    return val
+
+    if confused: raise
+    elif errors: raise SyntaxError('Encountered Errors')
+    else: return val
 
 ##################################################
 ## Warnings and Errors
@@ -1491,10 +1481,11 @@ class ParseError(Exception):
     def __cmp__(self, other):
         """
         Compare two C{ParseError}s, based on their line number.
-        Return -1 if C{self.linenum<other.linenum}; +1 if
-        C{self.linenum>other.linenum}; and 0 if
-        C{self.linenum==other.linenum}.  The return value is undefined
-        if C{other} is not a ParseError.
+          - Return -1 if C{self.linenum<other.linenum}
+          - Return +1 if C{self.linenum>other.linenum}
+          - Return 0 if C{self.linenum==other.linenum}.
+        The return value is undefined if C{other} is not a
+        ParseError.
 
         @rtype: C{int}
         """
@@ -1509,6 +1500,7 @@ class ParseError(Exception):
 
         @param typ: Either C{'Error'} or C{'Warning'}, depending on
             what the error should be referred to as.
+        @type typ: C{string}
         @return: a string representation of this C{ParseError}.
         @rtype: C{string}
         """
@@ -1523,6 +1515,17 @@ class TokenizationError(ParseError):
     @type line: C{string}
     """
     def __init__(self, descr, linenum, line):
+        """
+        Construct a new tokenization exception.
+        
+        @param descr: A short description of the error.
+        @type descr: C{string}
+        @param linenum: The line number within the docstring that the
+            error occured on.
+        @type linenum: C{int}
+        @param line: The line that the error occured on
+        @type line: C{string}
+        """
         self.descr = descr
         self.linenum = linenum + 1
         self.line = line
@@ -1541,6 +1544,14 @@ class StructuringError(ParseError):
     @type token: C{Token}
     """
     def __init__(self, descr, token):
+        """
+        Construct a new structuring exception.
+        
+        @param descr: A short description of the error.
+        @type descr: C{string}
+        @param token: The token where the error occured
+        @type token: L{Token}
+        """
         self.descr = descr
         self.token = token
         self.linenum = token.startline + 1
@@ -1560,8 +1571,20 @@ class ColorizingError(ParseError):
     @type token: C{Token}
     @ivar charnum: The index into the paragraph's contents of the
         character where the C{ColorizingError} occured.
+    @type charnum: C{int}
     """
     def __init__(self, descr, token, charnum):
+        """
+        Construct a new colorizing exception.
+        
+        @param descr: A short description of the error.
+        @type descr: C{string}
+        @param token: The token where the error occured
+        @type token: L{Token}
+        @param charnum: The character index of the position in
+            C{token} where the error occured.
+        @type charnum: C{int}
+        """
         self.descr = descr
         self.token = token
         self.charnum = charnum
@@ -1694,16 +1717,33 @@ test2 = \
 test3 = \
 """
   asdf - asdf
-  asdf
+  asdf -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
+  asdf -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  - 
 
   asdf
-  - asdf
+  E{-} asdf
 
   This is ugly: EE{lb}lbE{rb}
 
   So use a literal block::
       E{lb}
 
+  How about this: M{x
+  - y}.
+
+  Or you could wrap a dash like
+  E{-} this.
+
+  You can end a paragraph with two colons like thisE{:}E{:}
+
+  1E{.} It's a number that can start a paragraph with escapes.
+
+      >>> foogle
+      ... doogle
+      doo
+
+  Left brace is tha character C{E{lb}}.
+  {color} a{color}
 """
 
 ambig_test = \
@@ -1752,20 +1792,11 @@ Standard syntax:
 - Basic uri U{hello}.
 - Basic uri U{http://hello}.
 - With a name/target: U{name<target>}
+- With a name/target: U{name<zip:target>}
 - With a name/target: U{name<URI:target>}
 - With a name/target: U{name<URL:target>}
 - With a name/target: U{name  <URI:target>}
 - With a colorized name/target: L{I{italic} name<target>}
-"""
-
-test5="""
-Bruce's syntax:
-
-- Basic uri U{hello}.
-- Basic uri U{http://hello}.
-- With a name/target: U{name|target}
-- With a name/target: U{name|  target}
-- With a colorized name/target: L{I{italic} name|target}
 """
 
 #def profile_parse():
@@ -1783,14 +1814,15 @@ Bruce's syntax:
 #print to_plaintext(pparse(open("epytext.test").read(),1,1))
 #print pparse(open("epytext.test").read(),1,1).getElementsByTagName('field')
 if __name__ == '__main__':
-    if _VBAR_LINK_SYNTAX:
-        print to_plaintext(pparse(test5))
-    else:
-        print to_plaintext(pparse(test5))
+    #print '#'*75
+    #print to_epytext(pparse(test1))
+    #print '#'*75
+    #print to_plaintext(pparse(test3))
+    print to_debug(pparse(ambig_test))
+    #print '#'*75
     #print to_epytext(parse(test4))
     #print '='*50
     #print to_debug(parse(test1))
-#    print to_debug2(parse(test1))
     #print pparse(Token.__repr__.__doc__).toxml()
     #print to_html(pparse(test2, 0))
 #print to_dent(test2)
