@@ -2348,6 +2348,10 @@ class HTMLFormatter:
         # This takes care of converting > to &gt;, etc.:
         if isinstance(tree, xml.dom.minidom.Text): return tree.toxml()
 
+        # For raw html, just pass it through untouched (no toxml)
+        elif tree.tagName == 'rawhtml':
+            return ''.join([c.data for c in tree.childNodes])
+        
         if tree.tagName == 'epytext': indent -= 2
         if tree.tagName == 'section': seclevel += 1
     
@@ -2411,7 +2415,7 @@ class HTMLFormatter:
         elif tree.tagName == 'fieldlist':
             raise AssertionError("There should not be any field lists left")
         elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
-                              'name', 'target'):
+                              'name', 'target', 'html'):
             return childstr
         elif tree.tagName == 'symbol':
             return '&%s;' % childstr
