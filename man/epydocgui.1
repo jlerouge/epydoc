@@ -155,12 +155,11 @@ option is used, then no subdirectories are created, and the public
 documentation is written directly to the output directory.
 .\" ================== DIAGNOSTICS ====================
 .\" (this was copied from epydoc.1)
-.SH DIAGNOSTICS
-Errors are divided into five categories: import errors; epytext
-errors; epytext warnings; field warnings; and documentation generation
-errors.  Whenver epydoc encounters an error, it issues a warning
-message that describes the error, and attempts to continue generating
-documentation. 
+ivided into five categories: import errors; epytext
+errors; epytext warnings; field warnings; and inspection errors.
+Whenver epydoc encounters an error, it issues a warning message that
+describes the error, and attempts to continue generating
+documentation.
 .PP
 Import errors indicate that epydoc was unable to import a module.
 Import errors typically prevent epydoc from generating documentation
@@ -176,7 +175,10 @@ but
 is not a valid name for a Python module.
 .TP
 .BI "Could not find a UID for " link-target
- ...
+Epydoc was unable to find the object referred to by an inline link
+construction
+.RB ( "L{...}" ).
+This is usually caused by a typo in the link.
 .TP
 .BI "Could not import " module
 Epydoc attempted to import
@@ -225,6 +227,10 @@ is not at the end of a docstring.
 The heading is contianed in some other block structure (such as a
 list).
 .TP
+.B Improper doctest block indentation.
+The doctest block dedents past the indentation of its initial prompt
+line.
+.TP
 .B Improper heading indentation.
 The heading for a section is not left-aligned with the paragraphs in
 the section that contains it.
@@ -236,6 +242,14 @@ often generated when plaintext docstrings are parsed using epytext.
 .B Invalid escape.
 An unknown escape sequence was used with the inline escape construction
 .RB ( "E{...}" ).
+.TP
+.B Lists must be indented.
+An unindented line immediately following a paragraph starts with a
+list bullet.  Epydoc is not sure whether you meant to start a new list
+item, or meant for a paragraph to include a word that looks like a
+bullet.  If you intended the former, then indent the list.  If you
+intended the latter, then change the word-wrapping of the paragraph,
+or escape the first character of the word that looks like a bullet.
 .TP
 .B Unbalanced '{'.
 The docstring contains unbalanced braces.  Epytext requires that all
@@ -265,19 +279,6 @@ questionable or suspicious markup.  Epytext warnings do
 prevent the docstring in question from being parsed.  Epydoc can
 generate the following epytext warnings:
 .RS 4
-.TP
-.B Improper doctest block indentation.
-The doctest block dedents past the indentation of its initial prompt
-line.
-.TP
-.B Lists should be indented or separated.
-An unindented line immediately following a paragraph starts with a
-list bullet.  Epytext is not sure whether you meant to start a new
-list item, or meant for a paragraph to include a word that looks like
-a bullet.  If you intended the former, then indent the list, or
-separate it from the paragraph by a blank line.  If you intended the
-latter, then fix the word-wrapping of the paragraph, or escape the
-word that looks like a bullet.
 .TP
 .B Possible mal-formatted field item.
 Epytext detected a line that looks like a field item, but is not
@@ -325,7 +326,7 @@ caused by a typo in the variable name.
 A docstring contains a field with the unknown tag
 .IR tag .
 .TP
-.IB field " redefined."
+.BI "Redefinition of " field .
 Multiple field tags define the value of
 .I field
 in the same docstring, but
@@ -333,8 +334,10 @@ in the same docstring, but
 can only take a single value.
 .RE
 .PP
-Documentation generation errors are caused by..
-
+Inspection errors are generated if epydoc encounters problems while
+attempting to inspect the properties of a documented object.  Most of
+inspection errors do not prevent epydoc from documenting the object in
+question.  Epydoc can generate the following inspection errors:
 .RS 4
 .TP
 .BI "The parameters of " inhmethod " do not match " basemethod .
