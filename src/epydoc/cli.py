@@ -56,6 +56,34 @@ PROFILE=0
 ## Command-Line Interface
 ##################################################
 
+def cli():
+    """
+    Command line interface for epydoc.
+    
+    @rtype: C{None}
+    """
+    # Parse the command line arguments.
+    options = _parse_args()
+
+    # Import all the specified modules.
+    modules = _find_modules(options['modules'], options['verbosity'])
+
+    # Build their documentation
+    docmap = _make_docmap(modules, options)
+
+    # Perform the requested action.
+    if options['check']: _check(docmap, options)
+    elif options['latex']: _latex(docmap, options)
+    else: _html(docmap, options)
+
+    # Report any internal errors.
+    if _encountered_internal_error:
+        estr = ("An internal error occured.  To see the exception "+
+                "that caused the\n error, use the '--debug' option.")
+        print >>sys.stderr, '\n'+'!'*70
+        print >>sys.stderr, estr
+        print >>sys.stderr, '\n'+'!'*70
+
 _encountered_internal_error = 0
 def _internal_error(e=None):
     """
@@ -150,7 +178,8 @@ def _parse_args():
     options = {'target':'html', 'modules':[], 'verbosity':1,
                'prj_name':'', 'check':0, 'check_private':0,
                'show_imports':0, 'frames':1, 'private':1,
-               'debug':0, 'docformat':None, 'top':None}
+               'debug':0, 'docformat':None, 'top':None,
+               'latex':0}
                
 
     # Get the command-line arguments, using getopts.
@@ -161,7 +190,7 @@ def _parse_args():
                 'show_imports css= no_private no-private name= '+
                 'builtins no-frames no_frames noframes debug '+
                 'docformat= doc-format= doc_format= top=  navlink= '+
-                'nav_link= nav-link=').split()
+                'nav_link= nav-link= latex').split()
     try:
         (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
     except getopt.GetoptError, e:
@@ -186,6 +215,7 @@ def _parse_args():
         elif opt in ('--help', '-?', '--usage', '-h'): _help(val)
         elif opt in ('--helpfile', '--help-file', '--help_file'):
             options['help'] = val
+        elif opt in ('--latex',): options['latex']=1
         elif opt in ('--name', '-n'): options['prj_name']=val
         elif opt in ('--navlink', '--nav-link', '--nav_link'):
             options['prj_link'] = val
@@ -273,33 +303,6 @@ def _find_modules(module_names, verbosity):
 
     return modules
 
-def cli():
-    """
-    Command line interface for epydoc.
-    
-    @rtype: C{None}
-    """
-    # Parse the command line arguments.
-    options = _parse_args()
-
-    # Import all the specified modules.
-    modules = _find_modules(options['modules'], options['verbosity'])
-
-    # Build their documentation
-    docmap = _make_docmap(modules, options)
-
-    # Perform the requested action.
-    if options['check']: _check(docmap, options)
-    else: _html(docmap, options)
-
-    # Report any internal errors.
-    if _encountered_internal_error:
-        estr = ("An internal error occured.  To see the exception "+
-                "that caused the\n error, use the '--debug' option.")
-        print >>sys.stderr, '\n'+'!'*70
-        print >>sys.stderr, estr
-        print >>sys.stderr, '\n'+'!'*70
-
 def _make_docmap(modules, options):
     """
     Construct the documentation map for the given modules.
@@ -349,6 +352,29 @@ def _make_docmap(modules, options):
             else: _internal_error()
                 
     return d
+
+def _latex(docmap, options):
+    """
+    Create the LaTeX documentation for the objects in the given
+    documentation map.  
+
+    @param docmap: A documentation map containing the documentation
+        for the objects whose API documentation should be created.
+    @param options: Options from the command-line arguments.
+    @type options: C{dict}
+    """
+    from epydoc.latex import LatexFormatter
+
+    # Create the documenter, and figure out how many files it will
+    # generate.
+    htmldoc = LatexFormatter(docmap, **options)
+    num_files = 10
+        
+    # Write documentation.
+    if options['verbosity'] > 0:
+        print  >>sys.stderr, ('Writing API documentation (%d files) to %s.' %
+                              (num_files, options['target']))
+    htmldoc.dvi(options['target'])
 
 def _html(docmap, options):
     """
@@ -419,7 +445,7 @@ def _check(docmap, options):
     else:
         checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
                       DocChecker.DESCR_LAZY | DocChecker.TYPE)
-    
+           
 if __name__ == '__main__':
     if PROFILE:
         from profile import Profile
