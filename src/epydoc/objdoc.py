@@ -407,6 +407,7 @@ class ObjDoc:
         - X{seealsos}: A list of the object's see-also links
         - X{requires}: Requirements for using the object
         - X{warnings}: Warnings about the object
+        - X{notes}: Notes about the object
         - X{sortorder}: The object's sort order, as defined by its
           C{__epydoc_sort__} variable.
 
@@ -435,7 +436,6 @@ class ObjDoc:
     # The following field tags are currently under consideration:
     #     - @group: ...
     #     - @attention: ...
-    #     - @note: ...
     #     - @bug: ...
     #     - @depreciated: ...
     #     - @invariant: ...
@@ -464,6 +464,7 @@ class ObjDoc:
         self._descr = None
         self._requires = []
         self._warnings = []
+        self._notes = []
 
         # Initialize errors/warnings, and remember verbosity.
         self.__verbosity = verbosity
@@ -578,6 +579,14 @@ class ObjDoc:
         """
         return self._warnings
 
+    def notes(self):
+        """
+        @return: A list of notes about the object documented by
+        this C{ObjDoc}.
+        @rtype: C{list} of L{xml.dom.minidom.Element}
+        """
+        return self._notes
+
     def sortorder(self):
         """
         @return: The object's C{__epydoc_sort__} list.
@@ -616,6 +625,10 @@ class ObjDoc:
             if arg != None:
                 warnings.append(tag+' did not expect an argument')
             self._warnings.append(descr)
+        elif tag in ('note',):
+            if arg != None:
+                warnings.append(tag+' did not expect an argument')
+            self._notes.append(descr)
         else:
             warnings.append('Unknown field tag %r' %tag)
     
