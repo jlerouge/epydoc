@@ -22,6 +22,8 @@ the form of HTML pages.
 __version__ = '1.0'
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
+__copyright__ = '(C) 2002 Edward Loper'
+__license__ = 'IBM Open Source License'
 __epydoc_sort__ = [
     'objdoc',
     'epytext',
