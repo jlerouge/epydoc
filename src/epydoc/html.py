@@ -81,6 +81,14 @@ HEADER = '''<?xml version="1.0" encoding="iso-8859-1"?>
 <head>
   <title>%s</title>
   <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
+<script language="javascript">
+<!--
+function setFrame(url1, url2){
+    parent.frames[1].location.href = url1;
+    parent.frames[2].location.href = url2;
+}
+-->
+</script>
 </head>
 <body bgcolor="white" text="black" link="blue" vlink="#204080"
       alink="#204080">
@@ -105,10 +113,10 @@ FRAMES_INDEX = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN">
 </head>
 <frameset cols="20%%,80%%">
   <frameset rows="30%%,70%%">
-    <frame src="toc.html" name="moduleListFrame">
-    <frame src="toc-everything.html" name="moduleFrame">
+    <frame src="toc.html" name="moduleListFrame" id="moduleListFrame">
+    <frame src="toc-everything.html" name="moduleFrame" id="moduleFrame">
   </frameset>
-  <frame src="%s" name="mainFrame">
+  <frame src="%s" name="mainFrame" id="mainFrame">
 </frameset>
 </html>
 '''
@@ -1020,8 +1028,12 @@ class HTMLFormatter:
         public.write(str); private.write(str)
         for uid in uids:
             if uid.is_package():
-                str = ('<a target="moduleFrame" href="toc-%s">'+
-                       '%s</a><br />\n') % (self._uid_to_filename(uid), uid)
+                fname = self._uid_to_filename(uid)
+                str = (('<a target="moduleFrame" href="toc-%s" '+
+                        'onclick="'+
+                        'setFrame(\'toc-%s\', \'%s\');">'+
+                        '%s</a><br />\n') %
+                       (fname, fname, fname, uid))
                 private.write(str)
                 if uid.is_public(): public.write(str)
 
@@ -1031,8 +1043,12 @@ class HTMLFormatter:
         public.write(str); private.write(str)
         for uid in uids:
             if uid.is_module() and not uid.is_package():
-                str = ('<a target="moduleFrame" href="toc-%s">'+
-                       '%s</a><br />\n') % (self._uid_to_filename(uid), uid)
+                fname = self._uid_to_filename(uid)
+                str = (('<a target="moduleFrame" href="toc-%s" '+
+                        'onclick="'+
+                        'setFrame(\'toc-%s\', \'%s\');">'+
+                        '%s</a><br />\n') %
+                       (fname, fname, fname, uid))
                 private.write(str)
                 if uid.is_public(): public.write(str)
                 
