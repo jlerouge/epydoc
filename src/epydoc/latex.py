@@ -745,8 +745,6 @@ class LatexFormatter:
         
         fdescr=fdoc.descr()
         fparam = fdoc.parameter_list()[:]
-        if fdoc.vararg(): fparam.append(fdoc.vararg())
-        if fdoc.kwarg(): fparam.append(fdoc.kwarg())
         freturn = fdoc.returns()
         fraises = fdoc.raises()
         
