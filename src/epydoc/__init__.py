@@ -31,7 +31,7 @@ produce API documentation using the following steps:
      - L{epydoc.colorize} is used to colorize doctest blocks and
        regular expressions variable values.
 
-@author: U{Edward Loper<mailto:edloper@gradient.cis.upenn.edu>}
+@author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1, or Python 2.0 with
     U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
 @version: 1.1
@@ -39,6 +39,7 @@ produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 """
+__docformat__ = 'epytext en'
 
 # General info
 __version__ = '1.1'
@@ -61,29 +62,20 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
                    'checker']
 
 # To do for release 1.1:
-#   - add an option to specify the "top" object
+#   - add an option to specify the "top" object?
 #   - add escape characters to epytext??
-#   - add option: don't include vars and cvars that have no descr?
-#   - update gui to reflect changes in epydoc.
-#     - Add real argument processing, fix manpage
-#     - Add options: frames; private; imports; private css; help file
-#   - Add @note?  other tags?  look at doxygen?
-#   - Add "--docformat=?".  "=auto" will check the __docformat__
-#     option, defaulting to "plaintext."  Currently recognized doc
-#     formats are epytext and plaintext.  This comes from the module
-#     that defines the object, not the one that imports it!
-#   - html should write to files, rather than building up strings, esp
-#     for index and trees?
-#   - Support L{foo()}??
+#   - Add other field tags? (see ObjDoc)
 
 # To do after release 1.1:
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - option to turn off function doc inheritance?
 #     - add --check for doc inheritance?
+#   - Change html to write directly to files, instead of building up strings
+#      and then writing them.
+#   - add option: don't include vars and cvars that have no descr?
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
-#     distinguish them?  Use html names like module-curses.wrapper
-#     vs. function-curses.wrapper?  Ick.  Or just ignore it... :)
-    
+#     distinguish them?  Of course, we can't even *access* the module,
+#     since "import curses.wrapper" gives us a function. :-/
