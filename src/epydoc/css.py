@@ -21,7 +21,6 @@ Predefined CSS stylesheets for the HTML outputter (L{epydoc.html}).
       - C{black}: White on black, with blue highlights
       - C{grayscale}: Grayscale black on white.
       - C{none}: An empty stylesheet.
-      - C{empty}: Synonym for C{none}.
 """
 
 import re
@@ -223,6 +222,5 @@ STYLESHEETS = {
     'black': (_BLACK, "White on black, with blue highlights"),
     'grayscale': (_GRAYSCALE, "Grayscale black on white"),
     'default': (_WHITE, "Default stylesheet (=white)"),
-    'empty': ('', "An empty stylesheet"),
-    'none': ('', "An empty stylesheet (=empty)"),
+    'none': ('', "An empty stylesheet"),
     }
