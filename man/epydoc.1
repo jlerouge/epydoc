@@ -14,24 +14,24 @@ epydoc \- generate API documentation from Python docstrings
 .IR name ]
 .RB [ \-u
 .IR url ]
-.RB [ \-f ]
-.RB [ \-c
-.IR sheet ]
 .RB [ \-v ]
 .RB [ \-q ]
-.RB [ \-\-help\-file
-.IR file ]
-.RB [ \-\-no\-private ]
+.RB [ \-c
+.IR sheet ]
 .RB [ \-\-private\-css
 .IR sheet ]
+.RB [ \-\-no\-private ]
+.RB [ \-\-no\-frames ]
 .RB [ \-\-show\-imports ]
+.RB [ \-\-help\-file
+.IR file ]
 .RB [ \-\-builtins ]
 .IB modules ...
 .HP 7
 .B epydoc \-\-check
 .RB [ \-p ]
-.RB [ \-v ]
 .RB [ \-q ]
+.RB [ \-v ]
 .IB modules ...
 .HP 7
 .B epydoc \-h
@@ -65,8 +65,8 @@ parameter has a description and a type.
 .\" ================== OPTIONS ====================
 .SH OPTIONS
 Options are divided into three categories: documentation generation
-options; documentation checking options; and other options.  Options
-must always preceed the list of modules.
+options; documentation checking options; and other options.  All
+options must preceed the list of modules.
 .PP
 Documentation generation options:
 .RS 4
@@ -81,56 +81,63 @@ The filename for a package is its
 .B __init__.py
 file.
 .TP
-.BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
-The output directory for HTML files.  By default, HTML files are
-written to the
-.B html
-directory.
-.TP
-.BI "\-n " name ", \-\-name " name
-Project name (for HTML header/footer)
-.TP
-.BI "\-u " url ", \-\-url " url
-Project URL (for HTML header/footer)
-.TP
-.B \-f, \-\-frames
-Generate a frames\-based table of contents.
+.B \-\-builtins
+Add the builtin modules (as defined by sys.builtin_module_names) to
+the list of modules to document.
 .TP
 .BI "\-c " sheet ", \-\-css " sheet
-CSS stylesheet for HTML files.  If
+CSS stylesheet for HTML files containing public API documentation.  If
 .I sheet
 is a file, then the stylesheet is copied from that file; otherwise,
 .I sheet
 is taken to be the name of a built\-in stylesheet.  For a list of
 the built\-in stylesheets, run
-.BR "epydoc \-\-help css" .
-.TP
-.BI "\-\-private\-css " sheet
-CSS stylesheet for HTML files containing private API documentation.
-If
-.I sheet
-is a file, then the stylesheet is copied from that file;
-otherwise,
-.I sheet
-is taken to be the name of a built\-in stylesheet.  For a list of the
-built\-in stylesheets, run 
-.BR "epydoc \-\-help css" .
 .TP
 .BI "\-\-help\-file " file
 A file containing the body of the help page for the HTML output.
 Navigation bars will be added at the top and bottom of this help file.
 If no file is specified, then a default help file is used.
 .TP
+.BI "\-n " name ", \-\-name " name
+Project name (for HTML header/footer)
+.TP
+.B \-\-no\-frames
+Do not generate a frames\-based table of contents.
+.BR "epydoc \-\-help css" .
+If a CSS stylesheet is not specified, then the default stylesheet is
+used.
+.TP
 .B \-\-no\-private
 Do not produce documentation for private objects.
+.TP
+.BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
+The output directory for HTML files.  By default, HTML files are
+written to the
+.B html
+directory.
+.TP
+.BI "\-\-private\-css " sheet
+CSS stylesheet for HTML files containing private API documentation.
+If
+.I sheet
+is a file, then the stylesheet is copied from that file;
+otherwise, 
+.I sheet
+is taken to be the name of a built\-in stylesheet.  For a list of the
+built\-in stylesheets, run 
+.BR "epydoc \-\-help css" .
+If a CSS stylesheet is not specified, then epydoc uses the same
+stylesheet that it uses for public API documentation.
+.TP
+.B \-q, \-\-quiet
+Supress the generation of epytext warnings and errors.
 .TP
 .B \-\-show\-imports
 Include a list of the classes and functions that each module imports
 on the module documentation pages.
 .TP
-.B \-\-builtins
-Add the builtin modules (as defined by sys.builtin_module_names) to
-the list of modules to document.
+.BI "\-u " url ", \-\-url " url
+Project URL (for HTML header/footer)
 .TP
 .B \-v, \-\-verbose
 Produce verbose output.  In particular, this option displays progress
@@ -139,9 +146,6 @@ writes the documentation.
 .TP
 .B \-vv, \-vvv, \-vvvv
 Produce successively more verbose output.
-.TP
-.B \-q, \-\-quiet
-Supress the generation of epytext warnings and errors.
 .RE
 .PP
 Documentation checking options:
@@ -163,11 +167,11 @@ Perform completeness checks on the documentation.
 .B \-p
 Perform checks on private objects.
 .TP
-.B \-v, \-\-verbose
-Produce verbose output.
-.TP
 .B \-q
 Supress the generation of epytext warnings and errors.
+.TP
+.B \-v, \-\-verbose
+Produce verbose output.
 .RE
 .PP
 Other options:
@@ -222,8 +226,8 @@ The frames index file.  This file defines three frames: two frames on
 the left side of the window contain a table of contents, and the main
 frame on the right side of the window contains documentation pages.
 .B epydoc\-frames.html
-is only generated if the
-.B \-f
+is not generated if the
+.B \-\-no\-frames
 option is used to create a frames\-based table of contents.
 .TP
 .B epydoc\-toc.html
@@ -236,8 +240,8 @@ and the
 .IB module \-mtoc.html
 files.
 .B epydoc\-toc.html
-is only generated if the
-.B \-f
+is not generated if the
+.B \-\-no\-frames
 option is used to create a frames\-based table of contents.
 .TP
 .B epydoc\-project\-toc.html
@@ -247,8 +251,8 @@ in the lower\-left frame of
 and provides links to every class, type, exception, function, and
 variable defined by the project.
 .B epydoc\-project\-toc.html
-is only generated if the
-.B \-f
+is not generated if the
+.B \-\-no\-frames
 option is used to create a frames\-based table of contents.
 .TP
 .IB module \-mtoc.html
@@ -263,8 +267,8 @@ is the complete dotted name of the module, such as
 or
 .BR epydoc.epytext .
 .IB module \-mtoc.html
-is only generated if the
-.B \-f
+is not generated if the
+.B \-\-no\-frames
 option is used to create a frames\-based table of contents.
 .TP
 .B epydoc.css
@@ -295,14 +299,13 @@ as the project name, and
 .B http://epydoc.sf.net
 as the project URL.
 .TP
-.BR "epydoc \-o "api " \-f \-\-css " blue " \-\-private\-css " "green sys"
+.BR "epydoc \-o "api " \-\-css " blue " \-\-private\-css " "green sys"
 Generate API documentation for the
 .B sys
 module, and write the output to the
 .B api
-directory.  Include a frames\-based table of contents, and use
-different stylesheets for the public and private versions of the
-documentation.
+directory.  Use different stylesheets for the public and private
+versions of the documentation.
 .\" ================== EXIT STATUS ====================
 .SH EXIT STATUS
 .TP
