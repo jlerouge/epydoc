@@ -266,12 +266,11 @@ class UID:
     
     def is_class(self):
         """
-        @return: True if this is the UID for a class.
+        @return: True if this is the UID for a class or a type.
         @rtype: C{boolean}
         """
         return ((type(self._obj) is _ClassType) or
-                (isinstance(self._obj, _TypeType) and
-                 hasattr(self._obj, '__dict__')))
+                isinstance(self._obj, _TypeType))
 
     def is_method(self):
         """
