@@ -120,7 +120,12 @@ class UID:
             # internal id as a last resort.
             self._found_fullname = 0
             try:
+                # gimpfu.pdb.__name__ causes an uncatchable abort.
+                if type(obj).__name__ == 'pdb': raise ValueError()
+                
                 self._name = '%s-%s' % (obj.__name__, id(obj))
+            except SystemExit:
+                self._name = 'unknown-%s' % id(obj)
             except:
                 self._name = 'unknown-%s' % id(obj)
 
@@ -239,14 +244,25 @@ class UID:
         @return: True if this is the UID for a builtin function.
         @rtype: C{boolean}
         """
-        return type(self._obj) is _BuiltinFunctionType
+        return (type(self._obj) is _BuiltinFunctionType and
+                self._cls is None)
     
     def is_builtin_method(self):
         """
         @return: True if this is the UID for a builtin method.
         @rtype: C{boolean}
         """
-        return type(self._obj) is _BuiltinMethodType
+        return (type(self._obj) is _BuiltinMethodType and
+                self._cls is not None)
+
+    def is_routine(self):
+        """
+        @return: True if this is the UID for a function, a method, a
+            builtin function, or a builtin method.
+        @rtype: C{boolean}
+        """
+        return type(self._obj) in (_FunctionType, _BuiltinFunctionType,
+                                   _MethodType, _BuiltinMethodType)
     
     def is_class(self):
         """
@@ -522,7 +538,8 @@ def findUID(name, container, docmap=None):
     try:
         obj = module
         for component in components:
-            obj = obj.__dict__[component]
+            try: obj = obj.__dict__[component]
+            except: raise KeyError()
         return _makeuid(obj)
     except KeyError: pass
 
