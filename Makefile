@@ -55,13 +55,12 @@ local: .html.up2date
 checkdocs:
 	epydoc --check -v ${PY_SRC}
 
-.html.up2date: refdocs examples #distributions
+.html.up2date: refdocs examples doc/epydoc-man.html doc/epydocgui-man.html
 	rm -rf ${WEBDIR}
 	mkdir -p ${WEBDIR}
 	cp -r ${DOCS} ${WEBDIR}
 	cp -r ${API} ${WEBDIR}
 	cp -r ${EXAMPLES} ${WEBDIR}
-#	cp -r src/dist/epydoc* ${WEBDIR}
 
 # Use plaintext docformat by default.  But this is overridden by the
 # __docformat__ strings in each epydoc module.  (So just
@@ -82,6 +81,31 @@ examples: .examples.up2date
 	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
 	       --no-private --css blue ${EXAMPLES_SRC} sre
 	touch .examples.up2date
+
+# Generate the HTML version of the man page.  Note: The
+# post-processing clean-up that I do is probably *not* very portable.
+doc/epydoc-man.html: man/epydoc.1
+	wget http://localhost/cgi-bin/man2html?epydoc -O - \
+	     2>/dev/null \
+	     | sed 's/<\/HEAD><BODY>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD><BODY>/'\
+	     | sed '/<DD>/{s/<DD>//; :loop; n; b loop;}'\
+	     | sed '/<H1>/,/<HR>/{s/.*//;}'\
+	     | sed 's/\(<A NAME=".*">\)&nbsp;<\/A>/\1/'\
+	     | sed 's/<\/H2>/<\/H2><\/A>/'\
+	     | sed 's/"\/cgi-bin\/man2html?epydocgui+1"/"epydocgui-man.html"/'\
+	     | sed 's/<A HREF="\/cgi-bin\/man2html">man2html<\/A>/man2html/'\
+	     > doc/epydoc-man.html
+
+doc/epydocgui-man.html: man/epydocgui.1
+	wget http://localhost/cgi-bin/man2html?epydocgui -O - \
+	     2>/dev/null \
+	     | sed 's/<\/HEAD><BODY>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD><BODY>/'\
+	     | sed '/<H1>/,/<HR>/{s/.*//;}'\
+	     | sed 's/\(<A NAME=".*">\)&nbsp;<\/A>/\1/'\
+	     | sed 's/<\/H2>/<\/H2><\/A>/'\
+	     | sed 's/"\/cgi-bin\/man2html?epydoc+1"/"epydoc-man.html"/'\
+	     | sed 's/<A HREF="\/cgi-bin\/man2html">man2html<\/A>/man2html/'\
+	     > doc/epydocgui-man.html
 
 #//////////////////////////////////////////////////////////////////////
 # Build documentation for the Python Standard Library
