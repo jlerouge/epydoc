@@ -89,6 +89,7 @@ Description::
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
 """
+__docformat__ = 'epytext en'
 
 # To do:
 #   - convert tabs to spaces
@@ -1076,13 +1077,18 @@ def _colorize_link(doc, link, token, end, warnings, errors):
     for child in children:
         name_elt.appendChild(link.removeChild(child))
 
-    # Clean up the target.  For URIs, assume http if they don't
-    # specify (no relative urls)
+    # Clean up the target.  For URIs, assume http or mailto if they
+    # don't specify (no relative urls)
     target = re.sub(r'\s', '', target)
     if link.tagName=='uri':
         if not re.match(r'\w+:', target):
-            target = 'http://'+target
+            if re.match(r'\w+@(\w+)(\.\w+)*', target):
+                target = 'mailto:' + target
+            else:
+                target = 'http://'+target
     elif link.tagName=='link':
+        # Remove arg lists for functions (e.g., L{_colorize_link()})
+        target = re.sub(r'\(.*\)$', '', target)
         if not re.match(r'^[a-zA-Z_]\w*(\.[a-zA-Z_]\w*)*$', target):
             estr = "Bad link target."
             errors.append(ColorizingError(estr, token, end))
