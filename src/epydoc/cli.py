@@ -12,9 +12,9 @@
 Command-line interface for epydoc.
 
 Usage::
-    epydoc [-o DIR] [-n NAME] [-p] MODULE...
-    epydoc --check [-p] [-a] MODULE...
-    epydoc --usage
+    epydoc [-o DIR] [-n NAME] [-p] [--css SHEET] [-v] MODULE...
+    epydoc --check [-p] [-a] [-v] MODULE...
+    epydoc --help
     epydoc --version
 
     MODULE...
@@ -23,10 +23,7 @@ Usage::
         directory (i.e., you can't run epydoc within the package
         directory, using relative filenames).
         
-    --check
-        Perform completeness checks on the documentation
-
-    --usage, --help, -h, -?
+    --help, --usage, -h, -?
         Display this usage message.
 
     --version, -V
@@ -38,11 +35,20 @@ Usage::
     -n NAME, --name NAME
         Package name (for HTML header/footer)
 
-    --url, -u
+    -u URL, --url URL
         Package URL (for HTML header/footer)
 
+    --css SHEET
+        CSS stylesheet for HTML files.  If SHEET is a file, then the
+        stylesheet is copied from that file; otherwise, SHEET is taken
+        to be the name of a built-in stylesheet.  For a list of the
+        built-in stylesheets, run "epydoc --help css".
+        
+    --check
+        Perform completeness checks on the documentation
+
     -p
-        Show private objects (those that start with _)
+        Check private objects (those that start with _)
 
     -a
         Run all checks.
@@ -52,9 +58,6 @@ Usage::
 
     -vv, -vvv, -vvvv
         Produce successively more verbose output
-
-    -css2
-        Use alternate CSS file (for HTML)
 """
 
 import sys, os.path, re
@@ -64,23 +67,76 @@ import sys, os.path, re
 ##################################################
 
 def _usage(exit_code=-1):
+    """
+    Display a usage message.
+
+    @param exit_code: An exit status that will be passed to
+        C{sys.exit}.
+    @type exit_code: C{int}
+    @rtype: C{None}
+    """
     NAME = os.path.split(sys.argv[0])[-1]
     print __doc__[36:].replace('epydoc', NAME)
     sys.exit(exit_code)
 
+def _help(arg):
+    """
+    Display a speficied help message, and exit.
+
+    @param arg: The name of the help message to display.  Currently,
+        only C{"css"} and C{"usage"} are recognized.
+    @type arg: C{string}
+    @rtype: C{None}
+    """
+    if arg == 'css':
+        from epydoc.css import STYLESHEETS
+        print '\nThe following built-in stylesheets are available:'
+        names = STYLESHEETS.keys()
+        names.sort()
+        maxlen = max(*[len(name) for name in names])
+        format = '    %'+`-maxlen-1`+'s %s'
+        for name in names:
+            print format % (name, STYLESHEETS[name][1])
+    elif arg == 'usage':
+        _usage(0)
+    else:
+        _usage()
+    print
+    sys.exit(0)
+    
 def _version():
+    """
+    Display the version information, and exit.
+    
+    @rtype: C{None}
+    """
     import epydoc
     print "Epydoc version %s" % epydoc.__version__
     sys.exit(0)
 
-def _error(str):
-    print "%s Error: %s" % (os.path.split(sys.argv[0])[-1], str)
+def _error(message):
+    """
+    Display a specified error string, and exit.
+
+    @param message: The error message to display
+    @type message: C{string}
+    @rtype: C{None}
+    """
+    print "%s Error: %s" % (os.path.split(sys.argv[0])[-1], message)
     sys.exit(-1)
 
 def _parse_args():
     """
     Process the command line arguments; return a dictionary containing
     the relevant info.
+
+    @return: A dictionary mapping from configuration parameters to
+        values.  If a parameter is specified on the command line, then
+        that value is used; otherwise, a default value is used.
+        Currently, the following configuration parameters are set:
+        C{target}; C{modules}; C{verbosity}; C{pkg_name}; C{check};
+        C{show_private}; and C{check_all}.
+    @rtype: C{None}
     """
     # Default values.
     argvals = {'target':'html', 'modules':[], 'verbosity':0,
@@ -110,15 +166,19 @@ def _parse_args():
             elif arg in ('-vv', '-vvv', '-vvvv'):
                 argvals['verbosity'] += len(arg)-1
             elif arg in ('--help', '-?', '--usage', '-h'):
-                _usage(0)
+                if len(args) == 1: _help(args[0])
+                elif len(args) == 0: _usage(0)
+                else: _usage()
             elif arg in ('--check',):
                 argvals['check'] = 1
             elif arg in ('-p',):
                 argvals['show_private'] = 1
             elif arg in ('-a', '-check_all'):
                 argvals['check_all'] = 1
-            elif arg in ('-css',):
+            elif arg in ('--css',):
                 argvals['css'] = args.pop()
+                if argvals['css'] == 'help':
+                    _csshelp()
             else:
                 _usage()
         else:
@@ -129,7 +189,12 @@ def _parse_args():
 
 def _find_module_from_filename(filename,verbosity):
     """
-    Given a filename, import the corresponding module.
+    @return: The module contained in C{filename}.
+    @rtype: C{module}
+    @param filename: The filename that contains the module.
+    @type filename: C{int}
+    @param verbosity: Verbosity level for tracing output.
+    @type verbosity: C{int}
     """
     old_cwd = os.getcwd()
 
@@ -169,8 +234,13 @@ def _find_module_from_filename(filename,verbosity):
 
 def _find_modules(module_names, verbosity):
     """
-    Given a list of module names, return a list of modules.  Don't
-    include duplicates.  
+    @return: A list of the modules contained in the given files.
+        Duplicates are removed.
+    @rtype: C{list} of C{module}
+    @param module_names: The list of module filenames.
+    @type module_names: C{list} of C{string}
+    @param verbosity: Verbosity level for tracing output.
+    @type verbosity: C{int}
     """
     modules = []
     for name in module_names:
@@ -197,6 +267,8 @@ def _find_modules(module_names, verbosity):
 def cli():
     """
     Command line interface for epydoc.
+    
+    @rtype: C{None}
     """
     param = _parse_args()
 
@@ -204,7 +276,7 @@ def cli():
 
     # Wait to do imports, to make --usage faster.
     from epydoc.html import HTML_Doc
-    from epydoc.objdoc import Documentation
+    from epydoc.objdoc import DocMap
     from epydoc.checker import DocChecker
 
     # Create dest directory, if necessary
@@ -216,7 +288,7 @@ def cli():
             _error("%r is not a directory" % param['target'])
 
     # Build the documentation.
-    d = Documentation()
+    d = DocMap()
     for module in modules:
         if param['verbosity'] > 0: print 'Building docs for', module.__name__
         d.add(module)
@@ -226,28 +298,17 @@ def cli():
         if param['verbosity'] > 0: print 'Performing completeness checks'
         checker = DocChecker(d)
         if param['show_private']:
-            checker.check(DocChecker.MODULE | DocChecker.CLASS |
-                          DocChecker.FUNC | DocChecker.DESCR_LAZY |
-                          DocChecker.PUBLIC | DocChecker.PRIVATE)
-            checker.check(DocChecker.PARAM | DocChecker.VAR |
-                          DocChecker.IVAR | DocChecker.CVAR |
-                          DocChecker.RETURN | DocChecker.DESCR |
-                          DocChecker.TYPE | DocChecker.PUBLIC |
-                          DocChecker.PRIVATE)
+            checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
+                          DocChecker.PRIVATE | DocChecker.DESCR_LAZY | 
+                          DocChecker.TYPE)
         else:
-            checker.check(DocChecker.MODULE | DocChecker.CLASS |
-                          DocChecker.FUNC | DocChecker.DESCR_LAZY |
-                          DocChecker.PUBLIC)
-            checker.check(DocChecker.PARAM | DocChecker.VAR |
-                          DocChecker.IVAR | DocChecker.CVAR |
-                          DocChecker.RETURN | DocChecker.DESCR |
-                          DocChecker.TYPE | DocChecker.PUBLIC)
+            checker.check(DocChecker.ALL_T | DocChecker.PUBLIC | 
+                          DocChecker.DESCR_LAZY | DocChecker.TYPE)
     else:
         # Write documentation.
         if param['verbosity'] == 2: print 'Writing docs to', param['target'],
         elif param['verbosity'] > 0: print 'Writing docs to', param['target']
-        #if param.get('css', None) == 2: param['css'] = CSS_FILE2
-        else: css=None
+
         htmldoc = HTML_Doc(d, **param)
         htmldoc.write(param['target'], param['verbosity']-1)
         if param['verbosity'] > 1: print
