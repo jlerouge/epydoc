@@ -35,31 +35,24 @@ usage:
 distributions:
 	$(MAKE) -C src distributions
 
+.html.up2date: refdocs examples distributions
+	rm -rf ${WEBDIR}
+	mkdir -p ${WEBDIR}
+	cp -r ${DOCS} ${WEBDIR}
+	cp -r ${API} ${WEBDIR}
+	cp -r ${EXAMPLES} ${WEBDIR}
+	cp -r src/dist/epydoc* ${WEBDIR}
+
 web: xfer
 webpage: xfer
-xfer: refdocs examples
-	rm -rf ${WEBDIR}
-	mkdir -p ${WEBDIR}
-	cp -r ${DOCS} ${WEBDIR}
-	cp -r ${API} ${WEBDIR}
-	cp -r ${EXAMPLES} ${WEBDIR}
+xfer: .html.up2date
 	rsync -arzv -e ssh ${WEBDIR}/* $(HOST):$(DIR)
 
-examples: .up2date.examples
-.up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
-	rm -rf ${EXAMPLES}
-	mkdir -p ${EXAMPLES}
-	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
-	       -u http://epydoc.sourceforge.net --css blue
-	touch .up2date.examples
-
-local: refdocs examples
-	rm -rf ${WEBDIR}
-	mkdir -p ${WEBDIR}
-	cp -r ${DOCS} ${WEBDIR}
-	cp -r ${API} ${WEBDIR}
-	cp -r ${EXAMPLES} ${WEBDIR}
+local: .html.up2date
 	cp -r ${WEBDIR}/* /var/www/epydoc
+
+checkdocs:
+	epydoc --check ${PY_SRC}
 
 refdocs: .up2date.refdocs
 .up2date.refdocs: ${PY_SRC}
@@ -69,11 +62,10 @@ refdocs: .up2date.refdocs
 	       -u http://epydoc.sourceforge.net --css blue
 	touch .up2date.refdocs
 
-checkdocs:
-	epydoc --check ${PY_SRC}
-
-# This is basically just for testing..
-verbose:
-	epydoc ${PY_SRC} -o ${API} -n epydoc \
-	       -u http://epydoc.sf.net --css blue -vvv
-	touch .up2date.refdocs
+examples: .up2date.examples
+.up2date.examples: ${EXAMPLES_SRC} ${PY_SRC}
+	rm -rf ${EXAMPLES}
+	mkdir -p ${EXAMPLES}
+	epydoc ${EXAMPLES_SRC} sre -o ${EXAMPLES} -n epydoc \
+	       -u http://epydoc.sourceforge.net --css blue
+	touch .up2date.examples
