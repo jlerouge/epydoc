@@ -31,15 +31,18 @@ from epydoc.uid import UID, Link
 from epydoc.objdoc import ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 
-# The following functions never need descriptions, authors, or
+# The following methods may be undocumented:
+_NO_DOCS = ['__hash__', '__repr__', '__str__', '__cmp__']
+
+# The following methods never need descriptions, authors, or
 # versions:
 _NO_BASIC = ['__hash__', '__repr__', '__str__', '__cmp__']
 
-# The following functions never need return values:
+# The following methods never need return values:
 _NO_RETURN = ['__init__', '__hash__', '__repr__', '__str__',
               '__cmp__']
 
-# These don't need parameters documented
+# The following methods don't need parameters documented:
 _NO_PARAM = ['__cmp__']
 
 def _is_private(str):
@@ -328,7 +331,7 @@ class DocChecker:
             for v in doc.cvariables():
                 self._check_var(v, `doc.uid()`)
 
-    def _check_var(self, var, name):
+    def _check_var(self, var, name, check_type=1):
         """
         Run checks on the variable whose documentation is C{var} and
         whose name is C{name}.
@@ -337,6 +340,9 @@ class DocChecker:
         @type var: C{Var}
         @param name: The name of the variable to check.
         @type name: C{string}
+        @param check_type: Whether or not the variable's type should
+            be checked.  This is used to allow varargs and keyword
+            parameters to have no type specified.
         @rtype: C{None}
         """
         if not self._check_name_publicity(name): return
@@ -348,7 +354,8 @@ class DocChecker:
                 return
         if (self._checks & DocChecker.DESCR) and (not var.descr()):
             self._warn('No descr', name+'.'+var.name())
-        if (self._checks & DocChecker.TYPE) and (not var.type()):
+        if ((self._checks & DocChecker.TYPE) and (not var.type()) and
+            check_type):
             self._warn('No type', name+'.'+var.name())
             
     def _documented_ancestor(self, doc):
@@ -376,20 +383,27 @@ class DocChecker:
         @rtype: C{None}
         """
         if not self._check_name_publicity(`doc.uid()`): return
-        doc = self._documented_ancestor(doc)
+        if doc != self._documented_ancestor(doc): return
+        name = `doc.uid()`
+
+        if (self._checks & DocChecker.FUNC and
+            not doc.documented() and
+            doc.uid().shortname() not in _NO_DOCS):
+            self._warn('No docs', name)
+            return
         if (self._checks & DocChecker.FUNC and
             doc.uid().shortname() not in _NO_BASIC):
                 self._check_basic(doc)
         if (self._checks & DocChecker.RETURN and
             doc.uid().shortname() not in _NO_RETURN):
-                self._check_var(doc.returns(), `doc.uid()`)
+                self._check_var(doc.returns(), name)
         if (self._checks & DocChecker.PARAM and
             doc.uid().shortname() not in _NO_PARAM):
             if doc.uid().is_method():
                 for v in doc.parameters()[1:]:
-                    self._check_var(v, `doc.uid()`)
+                    self._check_var(v, name)
             else:
                 for v in doc.parameters():
-                    self._check_var(v, `doc.uid()`)
-            self._check_var(doc.vararg(), `doc.uid()`)
-            self._check_var(doc.kwarg(), `doc.uid()`)
+                    self._check_var(v, name)
+            self._check_var(doc.vararg(), name, 0)
+            self._check_var(doc.kwarg(), name, 0)
