@@ -665,14 +665,16 @@ def _find_builtin_obj_module(obj, show_warnings=1):
     if so_modules:
         if len(so_modules) > 1:
             if show_warnings:
-                print >>sys.stderr, ('\nWarning: '+`obj`+
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, ('Warning: '+`obj`+
                                  ' appears in multiple .so modules')
         module = so_modules[0]
     elif builtin_modules:
         if len(builtin_modules) > 1:
             print builtin_modules
             if show_warnings:
-                print >>sys.stderr, ('\nWarning: '+`obj`+
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, ('Warning: '+`obj`+
                                  ' appears in multiple builtin modules')
         module = builtin_modules[0]
     elif py_modules:
@@ -680,12 +682,14 @@ def _find_builtin_obj_module(obj, show_warnings=1):
         if types in py_modules: py_modules = [types]
         if len(py_modules) > 1:
             if show_warnings:
-                print >>sys.stderr, ('\nWarning: '+`obj`+
+                if sys.stderr.softspace: print >>sys.stderr
+                print >>sys.stderr, ('Warning: '+`obj`+
                                  ' appears in multiple .py modules')
         module = py_modules[0]
     else:
         if show_warnings:
-            print >>sys.stderr, ('\nWarning: could not find a '+
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, ('Warning: could not find a '+
                                  'module for %r' % obj)
         module = None
     _find_builtin_obj_module_cache[id(obj)] = module
