@@ -62,11 +62,14 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
                    'checker']
 
 # To do for release 1.1:
-#   - add an option to specify the "top" object?
-#   - add escape characters to epytext??
-#   - Add other field tags? (see ObjDoc)
+#   - add escape characters to epytext? (e.g. E{->})
 
 # To do after release 1.1:
+#   - switch to turn on/off inherited methods in the method summary
+#     list. (like the [frames/noframes] and [show/hide private] 
+#     switches?)
+#   - add @group (e.g. "@group accessors:")
+#   - Add other field tags?
 #   - better doc inheritence?
 #     - refactor inheritance
 #     - option to turn off function doc inheritance?
@@ -74,6 +77,8 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 #   - Change html to write directly to files, instead of building up strings
 #      and then writing them.
 #   - add option: don't include vars and cvars that have no descr?
+#   - create a better default top_page than trees.html
+#   - render package's module sublists as some kind of table?
 
 # Other issues
 #   - curses.wrapper names both a function and a module; how to
