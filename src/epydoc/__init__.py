@@ -58,8 +58,6 @@ __epydoc_sort__ = ['cli',
                    ]
 
 # To do:
-#   - improve support for builtin functions/modules [90% done]
-#   - support contained classes
 #   - better checks for private/public in _extract_index
 #   - change epytext field syntax
 #   - add escape characters to epytext
