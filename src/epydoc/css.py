@@ -65,6 +65,12 @@ h3.var-details    { background: transparent; color: #000000;
                   { background: transparent; color: #008060; }  
 .sig-default      { background: transparent; color: #602000; }  
 
+/* Navigation bar */ 
+table.navbar      { background: #a0c0ff; color: #000000;
+                    border: 2px groove #c0d0d0; }
+th.navbar         { background: #a0c0ff; color: #6090d0; font-size: 110% } 
+th.navselect      { background: #70b0ff; color: #000000; font-size: 110% } 
+
 /* Links */ 
 a:link            { background: transparent; color: #0000ff; }  
 a:visited         { background: transparent; color: #204080; }  
@@ -72,13 +78,6 @@ a.navbar:link     { background: transparent; color: #0000ff;
                     text-decoration: none; }  
 a.navbar:visited  { background: transparent; color: #204080; 
                     text-decoration: none; }  
-
-/* Navigation bar */ 
-table.navbar      { background: #a0c0ff; color: #000000;
-                    border: 2px groove #c0d0d0; }
-th.navbar         { background: #a0c0ff; color: #6090d0; font-size: 110% } 
-th.navselect      { background: #70b0ff; color: #000000; font-size: 110% } 
-
 """
 
 # Black on steel blue.
@@ -153,7 +152,11 @@ a.navbar:visited  { background: transparent; color: #b8d0d0;
 
 _COLOR_RE = re.compile(r'#(..)(..)(..)')
 
-def rv(match):
+def _rv(match):
+    """
+    Given a regexp match for a color, return the reverse-video version
+    of that color.
+    """
     str = '#'
     for color in match.groups():
         str += '%02x' % (255-int(color, 16))
@@ -163,7 +166,7 @@ def rv(match):
 _GREEN = _COLOR_RE.sub(r'#\1\3\2', _BLUE)
 
 # White-on-black, with blue highlights.
-_BLACK = _COLOR_RE.sub(r'#\3\2\1', _COLOR_RE.sub(rv, _WHITE))
+_BLACK = _COLOR_RE.sub(r'#\3\2\1', _COLOR_RE.sub(_rv, _WHITE))
 
 # Grayscale
 _GRAYSCALE = _COLOR_RE.sub(r'#\2\2\2', _WHITE)
