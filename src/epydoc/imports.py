@@ -26,8 +26,8 @@ def find_modules(dirname):
     @rtype: C{list} of C{string}
     @return: The filenames for the package in C{dirname}, its modules,
         and all of its descendant packages and modules.
-    @type C{dirname}: C{string}
-    @param C{dirname}: The directory name to search.
+    @type dirname: C{string}
+    @param dirname: The directory name to search.
     """
     if not os.path.isdir(dirname): return []
     found_init = 0
