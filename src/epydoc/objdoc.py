@@ -67,7 +67,8 @@ _KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
                      'return', 'returns', 'rtype', 'returntype',
                      'param', 'parameter', 'arg', 'argument',
                      'raise', 'raises', 'exception', 'except',
-                     'summary', 'keyword', 'kwarg', 'kwparam')
+                     'summary', 'keyword', 'kwarg', 'kwparam',
+                     'undocumented')
 
 ##################################################
 ## __docformat__
@@ -572,6 +573,10 @@ class ObjDoc:
         self._group2groupnum = {None: 0} # used to merge groups.
         self._regexp_groups = [] # (regexp, groupnum) pairs
 
+        # Undocumented fields.  These are declared with @undocumented,
+        # and filterd out by ObjDoc._sort().
+        self._undocumented = []
+
         # Initialize errors/warnings, and remember verbosity.
         self.__verbosity = verbosity
         self._parse_errors = []
@@ -632,10 +637,10 @@ class ObjDoc:
         if docstring is None: docstring = _getdoc(obj)
         if type(docstring) == types.StringType: docstring = docstring.strip()
         if docstring:
-            self._documented = 1
+            self._has_docstring = 1
             self.__parse_docstring(docstring)
         else:
-            self._documented = 0
+            self._has_docstring = 0
     
         # Sort the fields in the order specified by _fieldtypes.
         self._fields = [f for f in self._fieldtypes
@@ -651,7 +656,7 @@ class ObjDoc:
         docstring.
         @rtype: C{boolean}
         """
-        return self._documented
+        return self._has_docstring
             
     def uid(self):
         """
@@ -794,6 +799,14 @@ class ObjDoc:
         if not items: return items
         sortorder = self._sortorder
 
+        # Filter out anything that is declared as undocumented.
+        if self._undocumented:
+            for i in range(len(items)-1, -1, -1):
+                for regexp in self._undocumented:
+                    if regexp.match(items[i].name()):
+                        del items[i]
+                        continue
+
         # If an explicit sort order was given (via @sort), then
         # use it to sort the objects.
         so_items = []
@@ -901,6 +914,19 @@ class ObjDoc:
                 warnings.append(tag+' redefined.')
                 return
             self._summary = descr
+            return
+
+        if tag == 'undocumented':
+            if arg is not None:
+                warnings.append(tag+' did not expect an argument')
+                return
+            try: idents = _descr_to_identifiers(descr)
+            except ValueError, e:
+                warnings.append('Bad @undocumented list')
+                return
+            for ident in idents:
+                regexp = '^%s$' % ident.replace('*', '(.*)')
+                self._undocumented.append(re.compile(regexp))
             return
                 
         for field in self._fieldtypes:
