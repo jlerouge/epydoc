@@ -12,9 +12,7 @@
 PY_SRC = src/epydoc/
 PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
-DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) \
-       $(wildcard doc/*.png) $(wildcard doc/*.ps) \
-       $(wildcard doc/*.pdf)
+DOCS = $(wildcard doc/*)
 
 # What version of python to use?
 PYTHON = python2.3
