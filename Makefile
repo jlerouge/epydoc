@@ -68,8 +68,8 @@ refdocs: .refdocs.up2date
 	rm -rf ${API}
 	mkdir -p ${API}
 	epydoc -o ${API} -n epydoc -u http://epydoc.sourceforge.net \
-	       --css blue --private-css green -vv -f ${PY_SRC} \
-	       xml.dom.minidom
+	       --css blue --private-css green -v -f \
+	       ${PY_SRC} xml.dom.minidom
 	touch .refdocs.up2date
 
 examples: .examples.up2date
@@ -77,7 +77,7 @@ examples: .examples.up2date
 	rm -rf ${EXAMPLES}
 	mkdir -p ${EXAMPLES}
 	epydoc -o ${EXAMPLES} -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue -v ${EXAMPLES_SRC} sre
+	       --no-private --css blue ${EXAMPLES_SRC} sre
 	touch .examples.up2date
 
 #//////////////////////////////////////////////////////////////////////
