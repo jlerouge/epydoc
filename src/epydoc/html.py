@@ -131,51 +131,6 @@ SPECIAL_METHODS ={
     '__str__': 'Informal representation operator',
     }
 
-SYMBOL_TO_HTML = {
-    # Symbols
-    '<-': 'larr', '->': 'rarr', '^': 'uarr', 'v': 'darr',
-
-    # Greek letters
-    'alpha': 'alpha', 'beta': 'beta', 'gamma': 'gamma',
-    'delta': 'delta', 'epsilon': 'epsilon', 'zeta': 'zeta',  
-    'eta': 'eta', 'theta': 'theta', 'iota': 'iota', 
-    'kappa': 'kappa', 'lambda': 'lambda', 'mu': 'mu',  
-    'nu': 'nu', 'xi': 'xi', 'omicon': 'omicon',  
-    'pi': 'pi', 'rho': 'rho', 'sigma': 'sigma',  
-    'tau': 'tau', 'upsilon': 'upsilon', 'phi': 'phi',  
-    'chi': 'chi', 'psi': 'psi', 'omega': 'omega',
-    'Alpha': 'Alpha', 'Beta': 'Beta', 'Gamma': 'Gamma',
-    'Delta': 'Delta', 'Epsilon': 'Epsilon', 'Zeta': 'Zeta',  
-    'Eta': 'Eta', 'Theta': 'Theta', 'Iota': 'Iota', 
-    'Kappa': 'Kappa', 'Lambda': 'Lambda', 'Mu': 'Mu',  
-    'Nu': 'Nu', 'Xi': 'Xi', 'Omicon': 'Omicon',  
-    'Pi': 'Pi', 'Rho': 'Rho', 'Sigma': 'Sigma',  
-    'Tau': 'Tau', 'Upsilon': 'Upsilon', 'Phi': 'Phi',  
-    'Chi': 'Chi', 'Psi': 'Psi', 'Omega': 'Omega',
-
-    # HTML character entities
-    'larr': 'larr', 'rarr': 'rarr', 'uarr': 'uarr',
-    'darr': 'darr', 'harr': 'harr', 'crarr': 'crarr',
-    'lArr': 'lArr', 'rArr': 'rArr', 'uArr': 'uArr',
-    'dArr': 'dArr', 'hArr': 'hArr', 
-    'copy': 'copy', 'times': 'times', 'forall': 'forall',
-    'exist': 'exist', 'part': 'part',
-    'empty': 'empty', 'isin': 'isin', 'notin': 'notin',
-    'ni': 'ni', 'prod': 'prod', 'sum': 'sum',
-    'prop': 'prop', 'infin': 'infin', 'ang': 'ang',
-    'and': 'and', 'or': 'or', 'cap': 'cap', 'cup': 'cup',
-    'int': 'int', 'there4': 'there4', 'sim': 'sim',
-    'cong': 'cong', 'asymp': 'asymp', 'ne': 'ne',
-    'equiv': 'equiv', 'le': 'le', 'ge': 'ge',
-    'sub': 'sub', 'sup': 'sup', 'nsub': 'nsub',
-    'sube': 'sube', 'supe': 'supe', 'oplus': 'oplus',
-    'otimes': 'otimes', 'perp': 'perp',
-
-    # Alternate (long) names
-    'infinity': 'infin', 'integral': 'int', 'product': 'prod',
-    '<=': 'le', '>=': 'ge',
-    }
-
 ##################################################
 ## Imports
 ##################################################
@@ -186,14 +141,14 @@ import xml.dom.minidom
 
 # epydoc imports
 import epydoc
-import epydoc.epytext as epytext
+import epydoc.markup as markup
 from epydoc.uid import UID, Link, findUID, make_uid
 from epydoc.imports import import_module
 from epydoc.objdoc import DocMap, ModuleDoc, FuncDoc
 from epydoc.objdoc import ClassDoc, Var, Raise, ObjDoc
 from epydoc.css import STYLESHEETS
 from epydoc.help import HTML_HELP
-from epydoc.colorize import colorize_re, colorize_doctestblock
+from epydoc.colorize import colorize_re
 
 ##################################################
 ## Documentation -> HTML Conversion
@@ -443,7 +398,10 @@ class HTMLFormatter:
         """
         if not directory: directory = os.curdir
         self._show_private = 0
-        
+
+        # Keep track of failed xrefs, and report them at the end.
+        self._failed_xrefs = {}
+
         # Create dest directories, if necessary
         if not os.path.isdir(directory):
             if os.path.exists(directory):
@@ -484,6 +442,13 @@ class HTMLFormatter:
             self._epytext_cache = {}
             self._show_private = 0
             self._write(directory, progress_callback)
+
+        # Report any failed xrefs
+        if self._failed_xrefs:
+            if sys.stderr.softspace: print >>sys.stderr
+            print >>sys.stderr, 'Warning: Failed crossreference links: '
+            estr = ', '.join(self._failed_xrefs.keys())
+            print >>sys.stderr, markup.wordwrap(estr, indent=9)
 
     def _write(self, directory, progress_callback):
         """
@@ -725,7 +690,7 @@ class HTMLFormatter:
 
         # Write the module's description.
         if doc.descr():
-            str += self._dom_to_html(doc.descr(), uid) + '<hr/>\n'
+            str += self._docstring_to_html(doc.descr(), uid) + '<hr/>\n'
 
         # Add version, author, warnings, requirements, notes, etc.
         str += self._standard_fields(doc)
@@ -797,7 +762,7 @@ class HTMLFormatter:
 
         # Write the class's description
         if doc.descr():
-            str += '<hr/>\n' + self._dom_to_html(doc.descr(), uid)
+            str += '<hr/>\n' + self._docstring_to_html(doc.descr(), uid)
             str += '\n\n'
         str += '<hr/>\n\n'
 
@@ -889,18 +854,21 @@ class HTMLFormatter:
         out.write('<br />\n')
 
         # Term index
-        terms = self._extract_term_index().items()
-        if terms:
+        index_terms, index_links = self._extract_term_index()
+        if index_terms:
             out.write(self._start_of('Term Index'))
             out.write(self._table_header('Term Index', 'index'))
+            terms = index_terms.keys()
             terms.sort()
-            for (term, links) in terms:
-                str = '  <tr><td width="15%">'+term+'</td>\n    <td>'
-                links.sort()
-                for link in links:
+            for term in terms:
+                termtext = index_terms[term].to_plaintext(None)
+                str = '  <tr><td width="15%">'+termtext
+                str += '</td>\n    <td>'
+                index_links[term].sort()
+                for link in index_links[term]:
                     str += ('<i><a href="%s#%s">%s</a></i>, ' %
                             (self._uid_to_uri(link.target()),
-                             self._term_index_to_anchor(term), link.name()))
+                             term, link.name()))
                 out.write(str[:-2] + '</tr></td>\n')
             out.write('</table>\n' +  '<br />\n')
 
@@ -1431,7 +1399,7 @@ class HTMLFormatter:
         str = self._table_header(heading, 'summary')
         for link in classes:
             str += self._class_summary_line(link)
-        return str + '</table><br />\n\n'
+        return str + groupstr + '</table><br />\n\n'
 
     def _class_summary_line(self, link):
         cname = link.name()
@@ -1510,7 +1478,7 @@ class HTMLFormatter:
 
         rval = fdoc.returns()
         if rval.type():
-            rtype = self._dom_to_html(rval.type(), container, 8)
+            rtype = self._docstring_to_html(rval.type(), container, 8)
         else:
             rtype = '&nbsp;'
 
@@ -1585,12 +1553,8 @@ class HTMLFormatter:
             foverrides = fdoc.overrides()
 
             # Try to find a documented ancestor.
-            inhdoc = fdoc
-            inherit_docs = 0
-            while (not inhdoc.documented() and inhdoc.matches_override() and
-                   self._docmap.has_key(inhdoc.overrides())):
-                inherit_docs = 1
-                inhdoc = self._docmap[inhdoc.overrides()]
+            inhdoc = self._docmap.documented_ancestor(func) or fdoc
+            inherit_docs = (inhdoc is not fdoc)
 
             # If we couldn't find a documented ancestor, then we don't
             # have anything else to say.
@@ -1623,7 +1587,7 @@ class HTMLFormatter:
 
             # Description
             if fdescr:
-                str += self._dom_to_html(fdescr, container, 2)
+                str += self._docstring_to_html(fdescr, container, 2)
             str += '  <dl><dt></dt><dd>\n'
 
             # Parameters
@@ -1633,11 +1597,13 @@ class HTMLFormatter:
                     pname = param.name()
                     str += '      <dd><code><b>' + pname +'</b></code>'
                     if param.descr():
-                        pdescr = self._dom_to_html(param.descr(), container, 8)
+                        pdescr = self._docstring_to_html(param.descr(),
+                                                         container, 8)
                         str += ' -\n %s' % pdescr.rstrip()
                     str += '\n'
                     if param.type():
-                        ptype = self._dom_to_html(param.type(), container, 14)
+                        ptype = self._docstring_to_html(param.type(),
+                                                        container, 14)
                         str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % ptype.strip()
                     str += '      </dd>\n'
@@ -1647,13 +1613,16 @@ class HTMLFormatter:
             if freturn.descr() or freturn.type():
                 str += '    <dl><dt><b>Returns:</b></dt>\n      <dd>\n'
                 if freturn.descr():
-                    str += self._dom_to_html(freturn.descr(), container, 8)
+                    str += self._docstring_to_html(freturn.descr(),
+                                                   container, 8)
                     if freturn.type():
-                        rtype = self._dom_to_html(freturn.type(),container,14)
+                        rtype = self._docstring_to_html(freturn.type(),
+                                                        container,14)
                         str += '        <br /><i>'+('&nbsp;'*10)+'\n'
                         str += ' '*8+'(type=%s)</i>\n' % rtype.strip()
                 elif freturn.type():
-                    str += self._dom_to_html(freturn.type(), container, 8)
+                    str += self._docstring_to_html(freturn.type(),
+                                                   container, 8)
                 str += '      </dd>\n    </dl>\n'
 
             # Raises
@@ -1662,7 +1631,8 @@ class HTMLFormatter:
                 for fraise in fraises:
                     str += '      '
                     str += '<dd><code><b>'+fraise.name()+'</b></code> -\n'
-                    str += self._dom_to_html(fraise.descr(), container, 8)
+                    str += self._docstring_to_html(fraise.descr(),
+                                                   container, 8)
                     str +'      </dd>\n'
                 str += '    </dl>\n'
 
@@ -1788,12 +1758,12 @@ class HTMLFormatter:
 
         # Get the property's type, if it has one.
         if pdoc.type():
-            ptype = self._dom_to_html(pdoc.type(), container, 10).strip()
+            ptype = self._docstring_to_html(pdoc.type(), container, 10).strip()
         else: ptype = '&nbsp;'
 
         # Get the summary of the description.
         descrstr = self._summary(pdoc, container)
-        if descrstr != '&nbsp;': psum = ' - '+descrstr
+        if descrstr != '&nbsp;': psum = ': '+descrstr
         else: psum = ''
         
         str = '<tr><td align="right" valign="top" '
@@ -1833,7 +1803,7 @@ class HTMLFormatter:
             str += '<h3>'+pname+'</h3>\n'
 
             if pdoc.descr():
-                str += self._dom_to_html(pdoc.descr(), container)
+                str += self._docstring_to_html(pdoc.descr(), container)
 
             # Print the accessors for the property (fget=get property
             # value; fset=set value, and fdel=delete value).
@@ -1907,10 +1877,10 @@ class HTMLFormatter:
             
         vname = var.name()
         if var.type():
-            vtype = self._dom_to_html(var.type(), container, 10).strip()
+            vtype = self._docstring_to_html(var.type(), container, 10).strip()
         else: vtype = '&nbsp;'
         if var.descr():
-            vsum = ' - ' +self._summary(var, container)
+            vsum = ': ' +self._summary(var.descr(), container)
         else:
             title = self._var_value_tooltip(var)
             val = self._pprint_var_value(var, context='summary')
@@ -1926,7 +1896,7 @@ class HTMLFormatter:
             str += '<code><a name="%s">%s</a></code>' % (vname, vname)
         else:
             str += self._uid_to_href(var.uid(), vname)
-        str += '</b>\n  ' + vsum 
+        str += '</b>' + vsum 
         if (self._inheritance != 'grouped' and inherit):
             str += ('    <i>(Inherited from %s)</i>\n' %
                     self._uid_to_href(container, container.shortname()))
@@ -1977,14 +1947,14 @@ class HTMLFormatter:
                     continue
 
             if var.descr():
-                str += self._dom_to_html(var.descr(), container)
+                str += self._docstring_to_html(var.descr(), container)
                 
             if vtyp is not None or hasval:
                 str += '<dl>\n  <dt></dt>\n  <dd>\n    <dl>\n'
                 
             if vtyp:
                 str += '      <dt><b>Type:</b></dt>\n      <dd>\n' 
-                str += self._dom_to_html(vtyp, container)
+                str += self._docstring_to_html(vtyp, container)
                 str += '\n      </dd>\n'
 
             str += '<span title="%s">' % self._var_value_tooltip(var)
@@ -2132,36 +2102,24 @@ class HTMLFormatter:
     # Term index generation
     #////////////////////////////////////////////////////////////
     
-    def _get_term_index_items(self, tree, link, dict):
-        """
-        @param dict: in/out parameter. 
-        @rtype: C{None}
-        """
-        if isinstance(tree, xml.dom.minidom.Text): return
-        if isinstance(tree, xml.dom.minidom.Document):
-            self._get_term_index_items(tree.childNodes[0], link, dict)
-            return
-        if tree is None: return
-        elif tree.tagName != 'indexed':
-            # Look for index items in the child nodes.
-            for child in tree.childNodes:
-                self._get_term_index_items(child, link, dict)
-        else:
-            # We found an index item.
-            children = [self._dom_to_html(c) for c in tree.childNodes]
-            key = ''.join(children).lower().strip()
-            if dict.has_key(key):
-                dict[key].append(link)
-            else:
-                dict[key] = [link]
+    def _get_index_terms(self, parsed_docstring, link, terms, links):
+        if parsed_docstring is None: return
+        for term in parsed_docstring.index_terms():
+            key = self._term_index_to_anchor(term)
+            if not terms.has_key(key):
+                terms[key] = term
+                links[key] = []
+            links[key].append(link)
 
     def _extract_term_index(self):
         """
-        @return: A dictionary mapping from terms to lists of source
-            documents.
+        @return: Two dictionaries:
+          - the first maps keys to terms
+          - the second maks keys to lists of links
         @rtype: C{dictionary}
         """
-        index = {}
+        terms = {}
+        links = {}
         for (uid, doc) in self._docmap.items():
             if (not self._show_private) and uid.is_private():
                 continue
@@ -2175,33 +2133,33 @@ class HTMLFormatter:
 
             # Get index items from standard fields.
             for field in self._standard_field_values(doc):
-                self._get_term_index_items(field, link, index)
+                self._get_index_terms(field, link, terms, links)
             if doc.descr():
-                self._get_term_index_items(doc.descr(), link, index)
+                self._get_index_terms(doc.descr(), link, terms, links)
 
             # Get index items from object-specific fields.
             if isinstance(doc, ModuleDoc):
                 for var in doc.variables():
                     if ((not self._show_private) and var.uid().is_private()):
                         continue
-                    self._get_term_index_items(var.descr(), link, index)
-                    self._get_term_index_items(var.type(), link, index)
+                    self._get_index_terms(var.descr(), link, terms, links)
+                    self._get_index_terms(var.type(), link, terms, links)
             elif isinstance(doc, ClassDoc):
                 for var in doc.ivariables() + doc.cvariables():
                     if ((not self._show_private) and var.uid().is_private()):
                         continue
-                    self._get_term_index_items(var.descr(), link, index)
-                    self._get_term_index_items(var.type(), link, index)
+                    self._get_index_terms(var.descr(), link, terms, links)
+                    self._get_index_terms(var.type(), link, terms, links)
             elif isinstance(doc, FuncDoc):
                 extra_p = [v for v in [doc.vararg(), doc.kwarg(),
                                        doc.returns()] if v is not None]
                 for param in doc.parameter_list()+extra_p:
-                    self._get_term_index_items(param.descr(), link, index)
-                    self._get_term_index_items(param.type(), link, index)
+                    self._get_index_terms(param.descr(), link, terms, links)
+                    self._get_index_terms(param.type(), link, terms, links)
                 for fraise in doc.raises():
-                    self._get_term_index_items(fraise.descr(), link, index)
+                    self._get_index_terms(fraise.descr(), link, terms, links)
                     
-        return index
+        return terms, links
 
     #////////////////////////////////////////////////////////////
     # Identifier index generation
@@ -2353,140 +2311,44 @@ class HTMLFormatter:
     # Docstring -> HTML Conversion
     #////////////////////////////////////////////////////////////
 
-    def _term_index_to_anchor(self, str):
+    def _term_index_to_anchor(self, term):
         """
         Given the name of an inline index item, construct a URI anchor.
         These anchors are used to create links from the index page to each
         index item.
         """
         # Include "-" so we don't accidentally collide with the name
-        # of a python identifier. 
-        return "index-"+re.sub("[^a-zA-Z0-9]", "_", str)
-    
-    def _dom_to_html(self, tree, container=None, indent=0):
-        """
-        Given the DOM document for an epytext string (as returned by
-        L{epytext.parse}), return a string encoding it in HTML.  This
-        string does not include C{<html>} or C{<body>} tags.
-    
-        @param tree: The DOM document for an epytext string.
-        @type tree: C{xml.dom.minidom.Document}
-        @param container: The container in which to look up objects by name
-            (e.g., for link directives).
-        @type container: Python module
-        """
-        if isinstance(tree, xml.dom.minidom.Document):
-            tree = tree.childNodes[0]
-        if not self._epytext_cache.has_key( (tree, container) ):
-            html = self._dom_to_html_helper(tree, container, indent, 0)
-            self._epytext_cache[tree, container] = html
-        return self._epytext_cache[tree,container]
-    
-    def _dom_to_html_helper(self, tree, container, indent, seclevel):
-        """
-        Helper function for L{_dom_to_html}, that does the real work of
-        converting a DOM tree for an epytext string to HTML.
-    
-        @param tree: The DOM tree for an epytext string.
-        @type tree: L{xml.dom.minidom.Element}
-        @param container: The container in which to look up objects by name
-            (e.g., for link directives).
-        @type container: Python module
-        @param indent: The number of characters indentation that should be
-            used for HTML tags.
-        @type indent: C{int}
-        @param seclevel: The current section level.
-        @type seclevel: int
-        """
-        # This takes care of converting > to &gt;, etc.:
-        if isinstance(tree, xml.dom.minidom.Text): return tree.toxml()
+        # of a python identifier.
+        s = re.sub(r'\s\s+', '-', term.to_plaintext(None))
+        return "index-"+re.sub("[^a-zA-Z0-9]", "_", s)
 
-        # For raw html, just pass it through untouched (no toxml)
-        elif tree.tagName == 'rawhtml':
-            return ''.join([c.data for c in tree.childNodes])
-        
-        if tree.tagName == 'epytext': indent -= 2
-        if tree.tagName == 'section': seclevel += 1
-    
-        # Process the children first.
-        children = [self._dom_to_html_helper(c, container, indent+2, seclevel)
-                    for c in tree.childNodes]
-    
-        # Get rid of unnecessary <P>...</P> tags; they introduce extra
-        # space on most browsers that we don't want.
-        for i in range(len(children)-1):
-            if (not isinstance(tree.childNodes[i], xml.dom.minidom.Text) and
-                tree.childNodes[i].tagName == 'para' and
-                (isinstance(tree.childNodes[i+1], xml.dom.minidom.Text) or
-                 tree.childNodes[i+1].tagName != 'para')):
-                children[i] = ' '*(indent+2)+children[i][5+indent:-5]+'\n'
-        if (tree.hasChildNodes() and
-            not isinstance(tree.childNodes[-1], xml.dom.minidom.Text) and
-            tree.childNodes[-1].tagName == 'para'):
-            children[-1] = ' '*(indent+2)+children[-1][5+indent:-5]+'\n'
-    
-        # Construct the HTML string for the children.
-        childstr = ''.join(children)
-    
-        # Perform the approriate action for the DOM tree type.
-        if tree.tagName == 'para':
-            return epytext.wordwrap('<p>%s</p>' % childstr, indent)
-        elif tree.tagName == 'code':
-            return '<code>%s</code>' % childstr
-        elif tree.tagName == 'uri':
-            return '<a href="%s">%s</a>' % (children[1], children[0])
-        elif tree.tagName == 'link':
-            return self._dom_link_to_html(children[1], children[0],
-                                          container)
-        elif tree.tagName == 'italic':
-            return '<i>%s</i>' % childstr
-        elif tree.tagName == 'math':
-            return '<i class="math">%s</i>' % childstr
-        elif tree.tagName == 'indexed':
+    class _HTMLDocstringLinker(markup.DocstringLinker):
+        def __init__(self, docformatter, container):
+            self._docformatter = docformatter
+            self._container = container
+            self._docmap = docformatter._docmap
+        def translate_indexterm(self, indexterm):
+            key = self._docformatter._term_index_to_anchor(indexterm)
             return ('<a name="%s"></a><i class="indexterm">%s</i>' %
-                    (self._term_index_to_anchor(childstr), childstr))
-        elif tree.tagName == 'bold':
-            return '<b>%s</b>' % childstr
-        elif tree.tagName == 'ulist':
-            return '%s<ul>\n%s%s</ul>\n' % (indent*' ', childstr, indent*' ')
-        elif tree.tagName == 'olist':
-            startAttr = tree.getAttributeNode('start')
-            if startAttr: start = ' start="%s"' % startAttr.value
-            else: start = ''
-            return ('%s<ol%s>\n%s%s</ol>\n' %
-                    (indent*' ', start, childstr, indent*' '))
-        elif tree.tagName == 'li':
-            return indent*' '+'<li>\n%s%s</li>\n' % (childstr, indent*' ')
-        elif tree.tagName == 'heading':
-            return ('%s<h%s class="heading">%s</h%s>\n' %
-                    ((indent-2)*' ', seclevel, childstr, seclevel))
-        elif tree.tagName == 'literalblock':
-            return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
-        elif tree.tagName == 'doctestblock':
-            dtb = colorize_doctestblock(childstr.strip())
-            return '<pre class="doctestblock">\n%s</pre>\n' % dtb
-        elif tree.tagName == 'fieldlist':
-            raise AssertionError("There should not be any field lists left")
-        elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
-                              'name', 'target', 'html'):
-            return childstr
-        elif tree.tagName == 'symbol':
-            symbol = tree.childNodes[0].data
-            if SYMBOL_TO_HTML.has_key(symbol):
-                return '&%s;' % SYMBOL_TO_HTML[symbol]
-            else:
-                return '[??]'
-        else:
-            raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
-    
-    def _dom_link_to_html(self, target, name, container):
-        uid = findUID(target, container, self._docmap)
-        if uid is None:
-            if sys.stderr.softspace: print >>sys.stderr
-            print >>sys.stderr, ('Warning: could not find UID for '+
-                                 'L{%s} in %s' % (target, container))
-        return self._uid_to_href(uid, name, 'link')
-    
+                    (key, indexterm.to_html(self)))
+        def translate_identifier_xref(self, identifier, label=None):
+            if label is None: label = markup.plaintext_to_html(identifier)
+            uid = findUID(identifier, self._container, self._docmap)
+            if uid is None:
+                failure = identifier #'%s->%s' % (self._container, identifier)
+                self._docformatter._failed_xrefs[failure] = 1
+            return self._docformatter._uid_to_href(uid, label, 'link')
+            
+    def _docstring_to_html(self, docstring, container=None, indent=0):
+        """
+        @return: A string containing the HTML encoding for the given
+            C{ParsedDocstring}
+        @rtype: L{markup.ParsedDocstring}
+        """
+        if docstring is None: return ''
+        linker = self._HTMLDocstringLinker(self, container)
+        return docstring.to_html(linker, indent=indent)
+
     #////////////////////////////////////////////////////////////
     # Standard fields
     #////////////////////////////////////////////////////////////
@@ -2496,7 +2358,7 @@ class HTMLFormatter:
         @return: A list of epytext field values that includes all
         fields that are common to all L{ObjDoc}s.
         C{_standard_field_values} is used by L{_extract_term_index}.
-        @rtype: C{list} of L{xml.dom.minidom.Document}
+        @rtype: C{list} of L{markup.ParsedDocstring}
         """
         field_values = []
         for field in doc.fields():
@@ -2518,7 +2380,7 @@ class HTMLFormatter:
         for field in doc.fields():
             values = doc.field_values(field)
             if not values: continue
-            items = [self._dom_to_html(v, container) for v in values]
+            items = [self._docstring_to_html(v, container) for v in values]
             str += self._descrlist(items, field.singular,
                                    field.plural, field.short)
 
@@ -2807,27 +2669,22 @@ class HTMLFormatter:
             resolve links (E{L}{...}) in the epytext.
         @type container: L{uid.UID}
         """
-        descr = doc.descr()
-
-        # Try to find a documented ancestor.
+        # Try to find a documented ancestor
         if isinstance(doc, FuncDoc):
             while (not doc.documented() and doc.matches_override() and
                    self._docmap.has_key(doc.overrides())):
                 doc = self._docmap[doc.overrides()]
-
-        if descr != None:
-            summary = epytext.summary(descr)
-            str = self._dom_to_html(summary, container).strip()
-            if str == '': str = '&nbsp;'
-            return str
-        elif (isinstance(doc, FuncDoc) and
-              doc.returns().descr() is not None):
-            summary = epytext.summary(doc.returns().descr())
-            summary = self._dom_to_html(summary, container).strip()
-            summary = summary[:1].lower() + summary[1:]
-            return ('Return '+ summary)
-        else:
-            return '&nbsp;'
+                
+        summary = self._docstring_to_html(doc.summary(), container).strip()
+        if not summary:
+            if (isinstance(doc, FuncDoc) and
+                doc.returns().descr() is not None):
+                summary = doc.returns().descr().summary()
+                summary = self._docstring_to_html(summary, container).strip()
+                return 'Return '+summary[:1].lower() + summary[1:]
+            else:
+                return '&nbsp;'
+        return summary or '&nbsp;'
 
     def _imports(self, classes, excepts, functions, variables, sortorder):
         if not self._show_imports: return ''
