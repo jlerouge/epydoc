@@ -1360,7 +1360,6 @@ class HTMLFormatter:
             # If we don't have documentation for the function, then we
             # can't say anything about it.
             if not self._docmap.has_key(func): continue
-                
             fdoc = self._docmap[func]
             
             # Try to find a documented ancestor.
@@ -1383,10 +1382,16 @@ class HTMLFormatter:
             if inherit:
                 fsum += ('    <i>(inherited from %s)</i>\n' %
                          self._uid_to_href(container, container.shortname()))
+            #if not fdoc.documented():
+            #    fsum = '    <br /><i>(undocumented)</i>\n'
             str += '<tr><td align="right" valign="top" width="15%">'
-            str += '<font size="-1">'+rtype+'</font></td>\n  <td>'
-            str += self._func_signature(fname, fdoc, 1, 'summary-sig')
-            str += fsum+'</td></tr>\n'
+            str += '<font size="-1">'+rtype+'</font></td>\n  <td><code>'
+            if fdoc.documented():
+                str += self._func_signature(fname, fdoc, 1, 0, 'summary-sig')
+            else:
+                str += '<a name="%s"></a>' % fname
+                str += self._func_signature(fname, fdoc, 0, 0, 'summary-sig')
+            str += '</code>\n' + fsum + '</td></tr>\n'
         return str + '</table><br />\n\n'
 
     def _func_details(self, functions, cls, heading='Function Details'):
@@ -1401,6 +1406,7 @@ class HTMLFormatter:
         if len(functions) == 0: return ''
         str = self._table_header(heading, 'details')+'</table>\n'
 
+        numfuncs = 0
         for link in functions:
             fname = link.name()
             func = link.target()
@@ -1419,12 +1425,30 @@ class HTMLFormatter:
             # class's file.
             if inherit: continue
             
+            # If we don't have documentation for the function, then we
+            # can't say anything about it.
+            if not self._docmap.has_key(func): continue
+            fdoc = self._docmap[func]
+
+            # What does this method override?
+            foverrides = fdoc.overrides()
+
+            # Try to find a documented ancestor.
+            inhdoc = fdoc
+            inherit_docs = 0
+            while (not inhdoc.documented() and inhdoc.overrides() and
+                   self._docmap.has_key(inhdoc.overrides())):
+                inherit_docs = 1
+                inhdoc = self._docmap[inhdoc.overrides()]
+
+            # If we couldn't find a documented ancestor, then we don't
+            # have anything else to say.
+            if not inhdoc.documented(): continue
+
+            numfuncs += 1
             str += '\n<a name="'+fname+'"></a>\n'
             str += '<table width="100%" class="func-details"'
             str += ' bgcolor="#e0e0e0"><tr><td>\n'
-
-            if not self._docmap.has_key(func): continue
-            fdoc = self._docmap[func]
 
             #if SPECIAL_METHODS.has_key(fname):
             #    str += '  <h3 class="func-details"><i>'
@@ -1437,17 +1461,11 @@ class HTMLFormatter:
             if SPECIAL_METHODS.has_key(fname):
                 str += '    <br /><i>'
                 str += '(%s)</i>\n' % SPECIAL_METHODS[fname]
-            str += '  </h3>\n'           
+            str += '  </h3>\n'
 
-            foverrides = fdoc.overrides()
+            # Use the inherited docs for everything but the signature.
+            fdoc = inhdoc
 
-            # Try to find a documented ancestor.
-            inheritdoc = 0
-            while (not fdoc.documented() and fdoc.overrides() and
-                   self._docmap.has_key(fdoc.overrides())):
-                fdoc = self._docmap[fdoc.overrides()]
-                inheritdoc = 1
-                
             fdescr=fdoc.descr()
             fparam = fdoc.parameter_list()[:]
             if fdoc.vararg(): fparam.append(fdoc.vararg())
@@ -1508,7 +1526,7 @@ class HTMLFormatter:
             if foverrides:
                 str += '    <dl><dt><b>Overrides:</b></dt>\n'
                 str += '      <dd>'+self._uid_to_href(foverrides)
-                if inheritdoc:
+                if inherit_docs:
                     str += ' <i>(inherited documentation)</i>\n'
                 str += '</dd>\n    </dl>\n'
 
@@ -1535,10 +1553,13 @@ class HTMLFormatter:
             str += '  </dd></dl>\n'
             str += '</td></tr></table>\n'
 
+        if numfuncs == 0: return ''
+
         str += '<br />\n\n'
         return str
 
-    def _func_signature(self, fname, fdoc, link=0, css_class="sig"):
+    def _func_signature(self, fname, fdoc, link=0, show_defaults=1,
+                        css_class="sig"):
         """
         @return: The HTML code for the function signature of the
             function with the given name and documentation.
@@ -1549,13 +1570,14 @@ class HTMLFormatter:
         @param link: Whether to create a link from the function's name
             to its details description.
         """
-        str = '<code class=%s>' % css_class
-        if link: str += self._uid_to_href(fdoc.uid(), fname, css_class)
+        str = '<span class=%s>' % css_class
+        if link: str += self._uid_to_href(fdoc.uid(), fname, css_class+'-name')
         else: str += '<span class=%s-name>%s</span>' % (css_class, fname)
         
         PARAM_JOIN = ',\n'+' '*15
         str += '('
-        str += self._params_to_html(fdoc.parameters(), css_class, not link)
+        str += self._params_to_html(fdoc.parameters(), css_class,
+                                    show_defaults)
         if fdoc.vararg():
             vararg_name = fdoc.vararg().name()
             if vararg_name != '...': vararg_name = '*%s' % vararg_name
@@ -1566,7 +1588,7 @@ class HTMLFormatter:
                     (css_class, fdoc.kwarg().name(), PARAM_JOIN))
         if str[-1] != '(': str = str[:-len(PARAM_JOIN)]
 
-        return str + ')</code>'
+        return str + ')</span>'
 
     def _params_to_html(self, parameters, css_class, show_defaults):
         PARAM_JOIN = ',\n'+' '*15
@@ -1619,8 +1641,16 @@ class HTMLFormatter:
             else: vsum = ''
             str += '<tr><td align="right" valign="top" '
             str += 'width="15%"><font size="-1">'+vtype+'</font></td>\n'
-            str += '  <td><code><b><a href="#'+vname+'">'+vname
-            str += '</a></b></code>\n  ' + vsum + '</td></tr>\n'
+            str += '  <td><code><b>'
+
+            # If we don't have any info about it, then just list it in
+            # the summary (not the details).
+            if (var.descr() is None and var.type() is None and
+                not var.has_value()): 
+                str += '<a name="%s">%s</a>' % (vname, vname)
+            else:
+                str += '<a href="#%s">%s</a>' % (vname, vname)
+            str += '</b></code>\n  ' + vsum + '</td></tr>\n'
         return str + '</table><br />\n\n'
 
     def _var_details(self, variables, container, heading='Variable Details'):
