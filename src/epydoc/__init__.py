@@ -64,8 +64,17 @@ __epydoc_sort__ = ['cli', 'gui', 'imports',
 #   - add an option to specify the "top" object
 #   - add escape characters to epytext??
 #   - add option: don't include vars and cvars that have no descr?
-#   - update webpage
 #   - update gui to reflect changes in epydoc.
+#     - Add real argument processing, fix manpage
+#     - Add options: frames; private; imports; private css; help file
+#   - Add @note?  other tags?  look at doxygen?
+#   - Add "--docformat=?".  "=auto" will check the __docformat__
+#     option, defaulting to "plaintext."  Currently recognized doc
+#     formats are epytext and plaintext.  This comes from the module
+#     that defines the object, not the one that imports it!
+#   - html should write to files, rather than building up strings, esp
+#     for index and trees?
+#   - Support L{foo()}??
 
 # To do after release 1.1:
 #   - better doc inheritence?
