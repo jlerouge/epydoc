@@ -1,6 +1,6 @@
 import inspect, re, sys
-import apidoc; reload(apidoc)
 from apidoc import *
+#import apidoc; reload(apidoc); from apidoc import *
 from types import *
 
 class DocInspector:
@@ -14,11 +14,8 @@ class DocInspector:
     ===========
         - Override make_valuedoc.
         - Override inspect_value.
-        - Override add_module_child.
-        - Override add_class_child.
 
-    @group Subclassing Hooks: L{valuedoc_class}, L{inspector_method},
-        L{add_module_child}, L{add_class_child}
+    @group Subclassing Hooks: L{valuedoc_class}, L{inspector_method}
     """
     def __init__(self):
         """
@@ -41,7 +38,7 @@ class DocInspector:
     # Inspection Entry Points
     #////////////////////////////////////////////////////////////
 
-    def inspect(self, value):
+    def inspect(self, value, context=None):
         """
         @return: API documentation information for the given value.
         @rtype: L{ValueDoc}
@@ -56,7 +53,7 @@ class DocInspector:
         # If we have already seen this value, the get its ValueDoc
         # from our cache.  Otherwise, create a new ValueDoc for it
         # (and add it to the cache).
-        valuedoc = self.get_valuedoc(value)
+        valuedoc = self.get_valuedoc(value, context)
 
         # Get the value's canonical name (if it has one).
         dotted_name = self.get_canonical_name(value)
@@ -67,22 +64,22 @@ class DocInspector:
         self._inspected_values[pyid] = 1
 
         # Inspect the value, and return the completed ValueDoc.
-        inspector_method = self.inspector_method(value)
+        inspector_method = self.inspector_method(value, context)
         inspector_method(value, valuedoc)
         return valuedoc
 
-    def get_valuedoc(self, value):
+    def get_valuedoc(self, value, context=None):
         pyid = self.uid(value)
         valuedoc = self._valuedoc_cache.get(pyid)
         if valuedoc is None:
-            valuedoc_class = self.valuedoc_class(value)
+            valuedoc_class = self.valuedoc_class(value, context)
             valuedoc = valuedoc_class()
             valuedoc.value = value
             self._valuedoc_cache[pyid] = valuedoc
         return valuedoc
 
     # This can be overriden by subclasses.
-    def valuedoc_class(self, value):
+    def valuedoc_class(self, value, context=None):
         """
         @return: The L{ValueDoc} subclass that should be used to
         encode the given value.  The subclass must define a
@@ -94,15 +91,22 @@ class DocInspector:
             return ModuleDoc
         elif inspect.isclass(value):
             return ClassDoc
+        elif isinstance(context, ClassDoc) and inspect.isfunction(value):
+            return StaticMethodDoc
+        elif (isinstance(context, ClassDoc) and inspect.ismethod(value) and
+              value.im_self is not None and value.im_class is ClassType):
+            return ClassMethodDoc
+        elif isinstance(context, ClassDoc) and inspect.ismethod(value):
+            return InstanceMethodDoc
         elif inspect.isroutine(value):
-            return RoutineDoc
+            return FunctionDoc
         elif isinstance(value, property):
             return PropertyDoc
         else:
             return ValueDoc
 
     # This can be overriden by subclasses.
-    def inspector_method(self, value):
+    def inspector_method(self, value, context=None):
         """
         @return: A routine that should be used to inspect the given
         value.  This routine should accept two parameters, a value and
@@ -160,7 +164,7 @@ class DocInspector:
             package_name = str(dotted_name[:-1])
             package = sys.modules.get(package_name)
             if package is not None:
-                moduledoc.package = self.inspect(package)
+                moduledoc.package = self.inspect(package, context=moduledoc)
 
         # Add the module to its parent package's submodules list.
         if moduledoc.package is not None:
@@ -175,37 +179,22 @@ class DocInspector:
             # value if it's defined in this module.
             container = self.get_containing_module(child)
             if container != None and container == moduledoc.dotted_name:
-                child_val_doc = self.inspect(child)
+                child_val_doc = self.inspect(child, context=moduledoc)
                 child_var_doc = VariableDoc(child_name, child_val_doc)
                 child_var_doc.is_imported = 0
             elif container is None or moduledoc.dotted_name is None:
-                child_val_doc = self.inspect(child)
+                child_val_doc = self.inspect(child, context=moduledoc)
                 child_var_doc = VariableDoc(child_name, child_val_doc)
                 child_var_doc.is_imported = None # = unknown.
             else:
                 child_val_doc = self.get_valuedoc(child)
                 child_var_doc = VariableDoc(child_name, child_val_doc)
                 child_var_doc.is_imported = 1
-                
-            self.add_module_child(child_var_doc, moduledoc)
+
+            moduledoc.children[child_name] = child_var_doc
 
         # Reset the current module name to None.
         self._current_module = None
-
-    # Add everything (except modules) to the non-imported lists for
-    # now; we'll move the imported ones later, when we have more info.
-    # Note: this may be overgenerating documentation by a fair amount;
-    # will this be a speed problem?  If so, add checks here to see if
-    # the value is imported.
-    def add_module_child(self, variable, moduledoc):
-        if inspect.ismodule(variable.valuedoc.value):
-            moduledoc.modules.append(variable)
-        elif inspect.isclass(variable.valuedoc.value):
-            moduledoc.classes.append(variable)
-        elif inspect.isroutine(variable.valuedoc.value):
-            moduledoc.functions.append(variable)
-        else:
-            moduledoc.variables.append(variable)
 
     #////////////////////////////////////////////////////////////
     # Class Inspection
@@ -231,73 +220,54 @@ class DocInspector:
         # base calss's subclass lists.
         if hasattr(cls, '__bases__'):
             for base in cls.__bases__:
-                basedoc = self.inspect(base)
+                basedoc = self.inspect(base, context=classdoc)
                 classdoc.bases.append(basedoc)
                 basedoc.subclasses.append(classdoc)
 
         # Record the class's children.
         for child_name in dir(cls):
             if child_name in self.UNDOCUMENTED_CLASS_VARS: continue
-
-            child = self.get_class_child(cls, child_name)
-
-            child_var_doc = self.get_class_child(cls, child_name)
-
+            child_var_doc = self.get_class_child(cls, classdoc, child_name)
             if child_var_doc is not None:
-                self.add_class_child(child_var_doc, classdoc)
+                # Note: use child_var_doc.name instead of child_name,
+                # to handle private name mangling.
+                classdoc.children[child_var_doc.name] = child_var_doc
 
-    def get_class_child(self, cls, name):
-        #return getattr(cls, name)
-        # Look for it in the base order.
+    def get_class_child(self, cls, classdoc, name):
+        # Look for the requested object by searching the base order.
+        # This way, we get the object from the class that defines it.
+        # This is important e.g. to tell if an instance method is
+        # inherited or not.
         base_order = inspect.getmro(cls)
         for base in base_order:
             if not hasattr(base, '__dict__'): continue
             if base.__dict__.has_key(name):
-                #real_child = base.__dict__[child]
                 try: child = getattr(base, name)
                 except: child = base.__getattribute__(base, name)
-                
-                # Check if it's a class-private object.
+            
+                # If it's private and belongs to this class, then undo
+                # the private name mangling.  If it's private, and
+                # belongs to a base class, then don't list it at all.
                 private_prefix = '_%s__' % base.__name__
                 if name.startswith(private_prefix):
                     if base is base_order[0]:
-                        # If it's private and belongs to this class,
-                        # then undo the private name mangling.
                         name = name[len(private_prefix)-2:]
                     else:
-                        # If it's private, and belongs to a base
-                        # class, then don't list it at all.
                         return None
                     
                 # Create & return a VariableDoc for it.
-                return VariableDoc(name, self.inspect(child))
+                valuedoc = self.inspect(child, context=classdoc)
+                return VariableDoc(name, valuedoc)
 
-        # We couldn't find it; try some fallbacks.
-        try:
-            child = getattr(cls, name)
-            return VariableDoc(name, self.inspect(child))
-        except: pass
-        try:
-            child = cls.__getattribute__(cls, name)
-            return VariableDoc(name, self.inspect(child))
-        except: pass
-        return VariableDoc(name)
-
-    def add_class_child(self, variable, classdoc):
-        value = variable.valuedoc.value
-        if inspect.isclass(value):
-            classdoc.nested_classes.append(variable)
-        elif isinstance(value, property):
-            classdoc.properties.append(variable)
-        elif inspect.isfunction(value):
-            classdoc.static_methods.append(variable)
-        elif (inspect.ismethod(value) and value.im_self is not None and
-              value.im_class is ClassType):
-            classdoc.class_methods.append(variable)
-        elif inspect.ismethod(value):
-            classdoc.instance_methods.append(variable)
+        # If we couldn't find it, then try some fallbacks.
         else:
-            classdoc.class_variables.append(variable)
+            try:
+                try: child = getattr(cls, name)
+                except: child = cls.__getattribute__(cls, name)
+                valuedoc = self.inspect(child, context=classdoc)
+                return VariableDoc(name, valuedoc)
+            except:
+                return VariableDoc(name, ValueDoc())
 
     #////////////////////////////////////////////////////////////
     # Routine Inspection
@@ -331,8 +301,8 @@ class DocInspector:
         (args, vararg, kwarg, defaults) = inspect.getargspec(func)
 
         # Try extracting a signature from the docstring.
-        # [XX] check for consistency??
         if self.parse_function_signature(func, funcdoc):
+            # [XX] check for consistency??
             return
 
         # Add positional arguments.
@@ -501,7 +471,7 @@ class DocInspector:
             dotted_name = DottedName(class_name, value.__name__)
         elif inspect.ismethod(value):
             class_name = self.get_canonical_name(value.im_class)
-            if class_name is None: None
+            if class_name is None: return None
             dotted_name = DottedName(class_name, value.__name__)
         elif isinstance(value, FunctionType):
             module_name = self._find_function_module(value)
@@ -564,17 +534,17 @@ class DocInspector:
 ## TESTING
 ######################################################################
 
-import epydoc_test
-del sys.modules['epydoc_test']
-import epydoc_test
-inspector = DocInspector()
-#import re; inspector.inspect(re)
-val = inspector.inspect(epydoc_test)#.classes[0]
-#val = Inspector().inspect(list)
-print val.pp(depth=-1, exclude=['subclasses', 'bases', 'value',
-                                'is_alias'])
-                                                     
-#print Inspector().inspect(A)
+if __name__ == '__main__':
+    import epydoc_test
+    del sys.modules['epydoc_test']
+    import epydoc_test
+    inspector = DocInspector()
+    #import re; inspector.inspect(re)
+    val = inspector.inspect(epydoc_test)#.classes[0]
+    #val = Inspector().inspect(list)
+    print val.pp(depth=-1, exclude=['subclasses', 'bases', 'value',
+                                    'is_alias', 'name'])
+    #print Inspector().inspect(A)
         
 
    
