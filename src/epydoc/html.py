@@ -167,10 +167,10 @@ class HTML_Doc:
     @type docmap: L{DocMap}
     @ivar docmap: The documentation object, encoding the objects that
         should be documented.
-    @type _pkg_name: C{string}
-    @ivar _pkg_name: A name for the documentation (for the navbar).
-    @type _pkg_url: C{string}
-    @ivar _pkg_url: A URL for the documentation (for the navpar).
+    @type _prj_name: C{string}
+    @ivar _prj_name: A name for the documentation (for the navbar).
+    @type _prj_url: C{string}
+    @ivar _prj_url: A URL for the documentation (for the navpar).
     
     @ivar _module: The UID of the top-level module, if there is one.
         If there is more than one top-level module, then C{_module} is
@@ -201,10 +201,10 @@ class HTML_Doc:
         @param docmap: The documentation to output.
         @type docmap: L{DocMap}
         @param kwargs: Keyword arguments:
-            - C{pkg_name}: A name for the documentation (for the
+            - C{prj_name}: A name for the documentation (for the
               navbar).  This name can contain arbitrary HTML code
               (e.g., images or tables). (type=C{string})
-            - C{pkg_url}: A URL for the documentation (for the
+            - C{prj_url}: A URL for the documentation (for the
               navbar).  (type=C{string})
             - C{css}: The CSS stylesheet file.  If C{css} is a file,
               then its conents will be used.  Otherwise, if C{css} is
@@ -215,8 +215,8 @@ class HTML_Doc:
         self._docmap = docmap
 
         # Process keyword arguments.
-        self._pkg_name = kwargs.get('pkg_name', '')
-        self._pkg_url = kwargs.get('pkg_url', None)
+        self._prj_name = kwargs.get('prj_name', '')
+        self._prj_url = kwargs.get('prj_url', None)
         self._css = kwargs.get('css')
 
         # Find the top-level object (if any)
@@ -659,12 +659,12 @@ class HTML_Doc:
         str += '      <table border="0" cellpadding="0" cellspacing="0">\n'
         str += '        <tr valign="top">\n'
         str += '          <th class="navbar">'
-        if self._pkg_name:
-            if self._pkg_url:
+        if self._prj_name:
+            if self._prj_url:
                 str += ('<a class="navbar" href="%s">%s</a>' %
-                          (self._pkg_url, self._pkg_name))
+                          (self._prj_url, self._prj_name))
             else:
-                str += self._pkg_name
+                str += self._prj_name
 
         str += '</th>\n        </tr>\n'
         str += '      </table>\n    </td>\n  </tr>\n</table>\n'
