@@ -254,7 +254,7 @@ def _colorize_re(tree, noparen=0):
 
         elif op == sre_constants.SUBPATTERN:
             if args[0] is None:
-                str += '<span class="%s">(:</span>' % PAREN_TAG
+                str += '<span class="%s">(?:</span>' % PAREN_TAG
             elif type(args[0]) == type(0):
                 # This is cheating:
                 str += '<span class="%s">(</span>' % PAREN_TAG
