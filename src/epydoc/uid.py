@@ -305,11 +305,19 @@ def _find_function_module(func):
     """
     if not inspect.isfunction(func):
         raise TypeError("Expected a function")
+    if inspect.getmodule(func):
+        return inspect.getmodule(func)
+
+    # This fallback shouldn't usually be needed.  But it is needed in
+    # a couple special cases (including using epydoc to document
+    # itself).  In particular, if a module gets loaded twice, using
+    # two different names for the same file, then this helps.
     for module in sys.modules.values():
         if module == None: continue
-        if func.func_globals == module.__dict__:
+        if func.func_globals is module.__dict__:
             return module
-    raise ValueError("Couldn't the find module for this function")
+    raise ValueError("Couldn't the find module for the function %s" %
+                     func.func_name)
 
 def _is_variable_in(name, container, docmap):
     """
