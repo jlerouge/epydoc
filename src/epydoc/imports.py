@@ -40,6 +40,8 @@ def find_modules(dirname):
     for file in os.listdir(dirname):
         filepath = os.path.join(dirname, file)
         if os.path.isdir(filepath): dirs.append(filepath)
+        elif not re.match(r'\w+.py.?', file):
+            continue # Ignore things like ".#foo.py" or "a-b.py"
         elif file[-3:] == '.py':
             modules[file] = os.path.join(dirname, file)
             if file == '__init__.py': found_init = 1
