@@ -49,6 +49,8 @@ produce API documentation using the following steps:
 @todo 2.0: Groups for function parameters (eg Input/Output)
 @todo 2.0: Improve ModuleDoc._find_imported_variables (params?)
 @todo 2.0: Improve uid.findUID
+@todo 2.0: Fix _find_override (A defines x, B inherits, C inherits,
+  C overrides x?)
 @todo 2.0: Optimization
   - how much does inheritance=listed speed it up?
   - how much does epytext slow it down?
@@ -66,6 +68,10 @@ produce API documentation using the following steps:
     - A new C{parsing} module will provide an alternative, gathering
       info by parsing python files.
     - C{Var} will be replaced by C{VarDoc}, a subclass of C{ObjDoc}.
+    - Structure C{ObjDoc}s in a directed acyclic graph, rather than
+      using a links and a dictionary?  Are non-directed cycles a
+      problem?  Interaction of the access hierarchy (a.b.c) and
+      the base class hierarchy?  What does pydoc do?
 
 @bug: UIDs are not generated correctly for nested classes; and in
     general, nested classes are not well supported.  (E.g., they
