@@ -582,11 +582,15 @@ class ObjectUID(UID):
                 elif (isinstance(obj, _TypeType) and
                       hasattr(obj, '__module__')):
                     self._module = ObjectUID(import_module(obj.__module__))
-                    if (self._module is not None and
-                        obj not in self._module.value().__dict__.values()):
-                        # The __module__ attribute lied; try finding it ourselves.
-                        module = _find_builtin_obj_module(obj)
-                        if module is not None: self._module = ObjectUID(module)
+                    if self._module is not None:
+                        for val in self._module.value().__dict__.values():
+                            if val is obj: break
+                        else:
+                            # The __module__ attribute lied; try
+                            # finding it ourselves.
+                            module = _find_builtin_obj_module(obj)
+                            if module is not None:
+                                self._module = ObjectUID(module)
                 elif isinstance(obj, _TypeType):
                     module = _find_builtin_obj_module(obj)
                     if module is None: self._module = None
