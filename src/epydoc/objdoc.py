@@ -46,9 +46,10 @@ __docformat__ = 'epytext en'
 ##################################################
 
 import inspect, UserDict, string, new, re, sys, types
+import parser, symbol, token
 import xml.dom.minidom
 
-import epytext
+import epydoc.epytext as epytext
 from epydoc.uid import UID, Link, make_uid
 
 # Python 2.2 types
@@ -65,190 +66,16 @@ except:
 # unknown field tags, and field tags that were just used in a bad
 # context. 
 _KNOWN_FIELD_TAGS = ('var', 'variable', 'ivar', 'ivariable',
-                     'cvar', 'cvariable', 'type', 'group',
+                     'cvar', 'cvariable', 'type', 'group', 'sort',
                      'return', 'returns', 'rtype', 'returntype',
                      'param', 'parameter', 'arg', 'argument',
                      'raise', 'raises', 'exception', 'except')
 
 ##################################################
-## Helper Functions
-##################################################
-def _flatten(tree):
-    """
-    Recursively explore C{tree}, and return an in-order list of all
-    leaves.
-    
-    @return: An in-order list of the leaves of C{tree}.
-    @param tree: The tree whose leaves should be returned.  The tree
-        structure of C{tree} is represented by tuples and lists.  In
-        particular, every tuple or list contained in C{tree} is
-        considered a subtree; and any other element is considered a
-        leaf. 
-    @type tree: C{list} or C{tuple}
-    """
-    lst = []
-    for elt in tree:
-        if type(elt) in (type(()), type([])):
-            lst.extend(_flatten(elt))
-        else:
-            lst.append(elt)
-    return lst
-
-def _getdoc(obj):
-    """
-    Get the documentation string for an object.  This function is
-    similar to L{inspect.getdoc}.  In particular, it finds the minimum
-    indentation fromthe second line onwards, and removes that
-    indentation from each line.  But it also checks to make sure that
-    the docstring is actually a string (since some programs put other
-    data in the docstrings).
-
-    @param obj: The object whose documentation string should be returned.
-    @type obj: any
-    """
-    if ((not hasattr(obj, '__doc__')) or
-        type(obj.__doc__) is not types.StringType):
-        return None
-    else:
-        return inspect.getdoc(obj)
-
-def _find_docstring(uid):
-    """
-    @return: The file name and line number of the docstring for the
-        given object; or C{None} if the docstring cannot be found.
-        Line numbers are indexed from zero (i.e., the first line's
-        line number is 0).
-    @rtype: C{(string, int)} or C{(None, None)}
-    """
-    # This function is based on inspect.findsource; but I don't want
-    # to use that function directly, because it's not as smart about
-    # finding modules for objects (esp. functions).
-
-    # Get the filename of the source file.
-    object = uid.value()
-    try:
-        if uid.is_module(): muid = uid
-        else: muid = uid.module()
-        filename = muid.value().__file__
-    except: return (None, None)
-    if filename[-4:-1].lower() == '.py':
-        filename = filename[:-1]
-
-    # Read the source file's contents.
-    try: lines = open(filename).readlines()
-    except: return (None, None)
-
-    # Figure out the starting line number of the object
-    linenum = 0
-    if inspect.isclass(object):
-        pat = re.compile(r'^\s*class\s*%s\b' % object.__name__)
-        for linenum in range(len(lines)):
-            if pat.match(lines[linenum]): break
-        else: return (None, None)
-        linenum += 1
-    if inspect.ismethod(object): object = object.im_func
-    if inspect.isfunction(object): object = object.func_code
-    if inspect.istraceback(object): object = object.tb_frame
-    if inspect.isframe(object): object = object.f_code
-    if inspect.iscode(object):
-        if not hasattr(object, 'co_firstlineno'): return (None, None)
-        linenum = object.co_firstlineno
-
-    # Find the line number of the docstring.  Assume that it's the
-    # first non-blank line after the start of the object, since the
-    # docstring has to come first.
-    for linenum in range(linenum, len(lines)):
-        if lines[linenum].split('#', 1)[0].strip():
-            return (filename, linenum)
-
-    # We couldn't find a docstring line number.
-    return (None, None)
-
-_IDENTIFIER_LIST_REGEXP = re.compile(r'^([\w.]+[\s,:;]?\s*)*[\w.]+\s*$')
-def _descr_to_identifiers(descr):
-    """
-    Given the XML DOM tree for a fragment of epytext that contains a
-    list of identifiers, return a list of those identifier names.
-    This is used by fields such as C{@group} and C{@sort}, which expect
-    lists of identifiers as their values.
-
-    @rtype: C{list} of C{string}
-    @return: A list of the identifier names contained in C{descr}.
-    @param descr: The DOM tree for a fragment of epytext containing
-        a list of identifiers.  C{descr} must contain a single para
-        element, whose contents consist of a list of identifiers,
-        separated by spaces, commas, colons, or semicolons.  C{descr}
-        should not contain any inline markup.
-    @raise ValueError: If C{descr} does not contain a valid value (a
-        single paragraph with no in-line markup)
-    """
-    if len(descr.childNodes) != 1:
-        raise ValueError, 'Expected a single paragraph'
-    para = descr.childNodes[0]
-    if para.tagName != 'para':
-        raise ValueError, 'Expected a para; got a %s' % para.tagName
-    if len(para.childNodes) != 1:
-        raise ValueError, 'Colorization is not allowed'
-    idents = para.childNodes[0].data
-    if not _IDENTIFIER_LIST_REGEXP.match(idents):
-        raise ValueError, 'Bad Identifier list: %r' % idents
-    return re.split('[ :;,]+', idents)
-
-def _descr_to_docfield(arg, descr):
-    tags = [s.lower() for s in re.split('[ :;,]+', arg)]
-    
-    if len(descr.childNodes) != 1:
-        raise ValueError, 'Expected a single paragraph'
-    para = descr.childNodes[0]
-    if para.tagName != 'para':
-        raise ValueError, 'Expected a para; got a %s' % para.tagName
-    if len(para.childNodes) != 1:
-        raise ValueError, 'Colorization is not allowed'
-
-    args = re.split(' *[:;,]+ *', para.childNodes[0].data)
-    if len(args) == 0 or len(args) > 3:
-        raise ValueError, 'Wrong number of arguments'
-    singular = args[0]
-    if len(args) >= 2: plural = args[1]
-    else: plural = None
-    short = 0
-    if len(args) >= 3:
-        if args[2] == 'short': short = 1
-        else: raise ValueError('Bad arg 2 (expected "short")')
-    return DocField(tags, singular, plural, 1, short)
-
-def _dfs_bases(cls):
-    bases = [cls]
-    for base in cls.__bases__: bases += _dfs_bases(base)
-    return bases
-
-def _find_base_order(cls):
-    # Use new or old inheritance rules?
-    new_inheritance = (sys.hexversion >= 0x02020000)
-
-    # Depth-first search,
-    base_order = _dfs_bases(cls)
-
-    # Eliminate duplicates.  For old inheritance order, eliminate from
-    # front to back; for new inheritance order, eliminate back to front.
-    if new_inheritance: base_order.reverse()
-    i = 0
-    seen_bases = {}
-    while i < len(base_order):
-        if seen_bases.has_key(base_order[i]):
-            del base_order[i]
-        else:
-            seen_bases[base_order[i]] = 1
-            i += 1
-    if new_inheritance: base_order.reverse()
-
-    return base_order
-
-##################################################
 ## __docformat__
 ##################################################
 
-KNOWN_DOCFORMATS = ('plaintext', 'epytext', 'restructuredtext')
+KNOWN_DOCFORMATS = ('plaintext', 'epytext', 'restructuredtext', 'javadoc')
 DEFAULT_DOCFORMAT = 'epytext'
 def set_default_docformat(new_format):
     """
@@ -506,15 +333,16 @@ class DocField:
     """
     A documentation field for the object.
     """
-    def __init__(self, tags, singular, plural=None,
-                 multivalue=1, short=0):
+    def __init__(self, tags, label, plural=None,
+                 short=0, multivalue=1):
         if type(tags) in (type(()), type([])):
             self.tags = tuple(tags)
         elif type(tags) == type(''):
             self.tags = (tags,)
         else: raise TypeError('Bad tags: %s' % tags)
-        self.singular = singular
-        self.plural = plural
+        self.singular = label
+        if plural is None: self.plural = label
+        else: self.plural = plural
         self.multivalue = multivalue
         self.short = short
 
@@ -595,13 +423,13 @@ class ObjDoc:
         # Bibliographic Info
         DocField(['author', 'authors'], 'Author', 'Authors', short=1),
         DocField(['contact'], 'Contact', 'Contacts', short=1),
-        DocField(['org', 'organization'], 'Organization', 'Organizations'),
-        DocField(['(c)', 'copyright'], 'Copyright', multivalue=0),
+        DocField(['organization', 'org'], 'Organization', 'Organizations'),
+        DocField(['copyright', '(c)'], 'Copyright', multivalue=0),
         DocField(['license'], 'License', multivalue=0),
 
         # Various warnings etc.
         DocField(['bug'], 'Bug', 'Bugs'),
-        DocField(['warn', 'warning'], 'Warning', 'Warnings'),
+        DocField(['warning', 'warn'], 'Warning', 'Warnings'),
         DocField(['attention'], 'Attention'),
         DocField(['note'], 'Note', 'Notes'),
 
@@ -666,13 +494,17 @@ class ObjDoc:
         # Initialize fields.  Add any extra fields.
         self._fields = self.FIELDS[:]
         if module is not None:
-            try:
-                for field in module.value().__extra_epydoc_fields__:
+            try: extra_fields = module.value().__extra_epydoc_fields__
+            except: extra_fields = []
+            for field in extra_fields:
+                try:
                     if type(field) == type(''):
                         self._fields.append(DocField(field.lower(), field))
                     else:
                         self._fields.append(DocField(*field))
-            except: self._fields = self.FIELDS
+                except:
+                    estr = 'Bad extra epydoc field: %r' % field
+                    misc_warnings.append(estr)
 
         # Initialize the fields map.  This is where field values are
         # actually kept.
@@ -836,10 +668,13 @@ class ObjDoc:
 
         if self._docformat == 'epytext':
             pdoc = epytext.parse(docstring, parse_errors, parse_warnings)
+        elif self._docformat == 'javadoc':
+            import epydoc.javadoc as javadoc
+            pdoc = javadoc.parse(docstring, field_warnings)
         elif self._docformat == 'restructuredtext':
             already_imported = sys.modules.has_key('epydoc.rst')
             try:
-                import rst
+                import epydoc.rst as rst
                 pdoc = rst.parse(docstring)
             except ImportError:
                 if not already_imported:
@@ -1024,9 +859,10 @@ class ModuleDoc(ObjDoc):
         # Handle functions, classes, and variables.
         self._classes = []
         self._functions = []
+        self._variables = []
         self._imported_classes = []
         self._imported_functions = []
-        self._variables = []
+        self._imported_variables = []
         for (field, val) in mod.__dict__.items():
             vuid = make_uid(val, self._uid, field)
                 
@@ -1074,6 +910,10 @@ class ModuleDoc(ObjDoc):
             if typ is not None: del self._tmp_type[name]
             vuid = make_uid(None, self._uid, name)
             self._variables.append(Var(vuid, descr, typ, 0))
+
+        # Attempt to split variables into imported and non-imported.
+        # (Only possible if we can parse the module's .py file)
+        self._find_imported_variables()
 
         # Make sure we used all the type fields.
         if self._tmp_type != {}:
@@ -1161,6 +1001,99 @@ class ModuleDoc(ObjDoc):
                     self._field_warnings.append(estr)
 
     #////////////////////////////
+    #// Import Discovery
+    #////////////////////////////
+
+    _EXPR_STMT_PATTERN = (symbol.stmt,
+                         (symbol.simple_stmt,
+                          (symbol.small_stmt,
+                           ['expr_stmt']),
+                          (token.NEWLINE, '')))
+    _LHS_PATTERN = (symbol.test,
+             (symbol.and_test,
+              (symbol.not_test,
+               (symbol.comparison,
+                (symbol.expr,
+                 (symbol.xor_expr,
+                  (symbol.and_expr,
+                   (symbol.shift_expr,
+                    (symbol.arith_expr,
+                     (symbol.term,
+                      (symbol.factor,
+                       (symbol.power,
+                        ['lhs_atom']))))))))))))
+    
+    def _find_imported_variables(self):
+        """
+        If possible, read the module's python documentation, and try
+        to figure out which variables were imported.  To decide which
+        variables were imported, we use the following heuristic: if a
+        variable isn't defined in the lhs of a top-level statement,
+        then it's probably imported.  Note that this isn't 100%
+        effective.  E.g., if someone uses C{global}, uses a
+        C{try}/C{except} block, or directly modifies their modules'
+        C{__dict__}, then we'll be fooled.
+        """
+        # Get the filename of the module.
+        try: filename = self._uid.value().__file__
+        except: raise
+        if filename[-4:-1].lower() == '.py':
+            filename = filename[:-1]
+    
+        # Parse the module's source code.
+        try: ast = parser.suite(open(filename).read())
+        except: raise
+    
+        # Construct a list of defined variables.  To do this, we search
+        # the parse tree for statements of the form "a=b" or "a=b=c" or
+        # "a,b=c" or "(a,b)=c" or "[a,b]=c".
+        defined_variables = {}
+        for stmt in ast.totuple()[1:]:
+            dict = {}
+            if _ast_match(self._EXPR_STMT_PATTERN, stmt, dict)[0]:
+                expr_stmt = dict['expr_stmt']
+                for i in range(2, len(expr_stmt)):
+                    if expr_stmt[i] == (token.EQUAL, '='):
+                        lhs = expr_stmt[i-1]
+                        self._find_defined_vars(lhs, defined_variables)
+
+        # Go through our list of variables.  Move any variables that
+        # were *not* defined by a top-level statement to the
+        # imported_variables list.
+        for i in range(len(self._variables)-1,-1,-1):
+            if not defined_variables.has_key(self._variables[i].name()):
+                self._imported_variables.append(self._variables[i])
+                del self._variables[i]
+
+    def _find_defined_vars(self, lhs_testlist, defined_variables):
+        """
+        A helper function for L{_find_imported_variables}: for every
+        variable C{M{v}} set by the given left-hand-side of an
+        equation, set C{defined_variables[M{v}]=1}.
+
+        @param lhs_testlist: An AST tuple containing a C{testlist}
+            element from the left hand side of an equation.
+        @param defined_variables: The output dictionary.    
+        """
+        # First, make sure it's a testlist (or a listmaker, for things
+        # like [a,b] = 12)
+        if lhs_testlist[0] not in (symbol.testlist, symbol.listmaker): return
+    
+        # Traverse the AST, looking for variables.
+        dict = {}
+        for lhs_test in lhs_testlist[1:]:
+            if _ast_match(self._LHS_PATTERN, lhs_test, dict)[0]:
+                lhs_atom = dict['lhs_atom']
+                if lhs_atom[0] != symbol.atom: continue
+                for lhs in lhs_atom[1:]:
+                    if lhs[0] == token.NAME:
+                        # A variable on the LHS
+                        defined_variables[lhs[1]] = 1
+                    elif lhs[0] in (symbol.testlist, symbol.listmaker):
+                        # A tuple pattern on the LHS
+                        self._find_defined_vars(lhs, defined_variables)
+            
+    #////////////////////////////
     #// Accessors
     #////////////////////////////
 
@@ -1209,6 +1142,15 @@ class ModuleDoc(ObjDoc):
         @rtype: C{list} of L{Link}
         """
         return self._imported_classes
+
+    def imported_variables(self):
+        """
+        @return: A list of all variables contained in the
+            module/package documented by this C{ModuleDoc} that are
+            not defined by that module/package.
+        @rtype: C{list} of L{Var}
+        """
+        return self._imported_variables
     
     def package(self):
         """
@@ -2402,9 +2344,12 @@ class PropertyDoc(ObjDoc):
     """
     def __init__(self, uid, typ=None, verbosity=0):
         property = uid.value()
-        self._fget = make_uid(property.fget)
-        self._fset = make_uid(property.fset)
-        self._fdel = make_uid(property.fdel)
+        if property.fget is None: self._fget = None
+        else: self._fget = make_uid(property.fget)
+        if property.fset is None: self._fset = None
+        else: self._fset = make_uid(property.fset)
+        if property.fdel is None: self._fdel = None
+        else: self._fdel = make_uid(property.fdel)
         self._type = typ
         ObjDoc.__init__(self, uid, verbosity)
 
@@ -2701,3 +2646,218 @@ class DocMap(UserDict.UserDict):
 
     def __repr__(self):
         return '<Documentation: '+`len(self.data)`+' objects>'
+
+##################################################
+## Helper Functions
+##################################################
+def _flatten(tree):
+    """
+    Recursively explore C{tree}, and return an in-order list of all
+    leaves.
+    
+    @return: An in-order list of the leaves of C{tree}.
+    @param tree: The tree whose leaves should be returned.  The tree
+        structure of C{tree} is represented by tuples and lists.  In
+        particular, every tuple or list contained in C{tree} is
+        considered a subtree; and any other element is considered a
+        leaf. 
+    @type tree: C{list} or C{tuple}
+    """
+    lst = []
+    for elt in tree:
+        if type(elt) in (type(()), type([])):
+            lst.extend(_flatten(elt))
+        else:
+            lst.append(elt)
+    return lst
+
+def _getdoc(obj):
+    """
+    Get the documentation string for an object.  This function is
+    similar to L{inspect.getdoc}.  In particular, it finds the minimum
+    indentation fromthe second line onwards, and removes that
+    indentation from each line.  But it also checks to make sure that
+    the docstring is actually a string (since some programs put other
+    data in the docstrings).
+
+    @param obj: The object whose documentation string should be returned.
+    @type obj: any
+    """
+    if ((not hasattr(obj, '__doc__')) or
+        type(obj.__doc__) is not types.StringType):
+        return None
+    else:
+        return inspect.getdoc(obj)
+
+def _find_docstring(uid):
+    """
+    @return: The file name and line number of the docstring for the
+        given object; or C{None} if the docstring cannot be found.
+        Line numbers are indexed from zero (i.e., the first line's
+        line number is 0).
+    @rtype: C{(string, int)} or C{(None, None)}
+    """
+    # This function is based on inspect.findsource; but I don't want
+    # to use that function directly, because it's not as smart about
+    # finding modules for objects (esp. functions).
+
+    # Get the filename of the source file.
+    object = uid.value()
+    try:
+        if uid.is_module(): muid = uid
+        else: muid = uid.module()
+        filename = muid.value().__file__
+    except: return (None, None)
+    if filename[-4:-1].lower() == '.py':
+        filename = filename[:-1]
+
+    # Read the source file's contents.
+    try: lines = open(filename).readlines()
+    except: return (None, None)
+
+    # Figure out the starting line number of the object
+    linenum = 0
+    if inspect.isclass(object):
+        pat = re.compile(r'^\s*class\s*%s\b' % object.__name__)
+        for linenum in range(len(lines)):
+            if pat.match(lines[linenum]): break
+        else: return (None, None)
+        linenum += 1
+    if inspect.ismethod(object): object = object.im_func
+    if inspect.isfunction(object): object = object.func_code
+    if inspect.istraceback(object): object = object.tb_frame
+    if inspect.isframe(object): object = object.f_code
+    if inspect.iscode(object):
+        if not hasattr(object, 'co_firstlineno'): return (None, None)
+        linenum = object.co_firstlineno
+
+    # Find the line number of the docstring.  Assume that it's the
+    # first non-blank line after the start of the object, since the
+    # docstring has to come first.
+    for linenum in range(linenum, len(lines)):
+        if lines[linenum].split('#', 1)[0].strip():
+            return (filename, linenum)
+
+    # We couldn't find a docstring line number.
+    return (None, None)
+
+_IDENTIFIER_LIST_REGEXP = re.compile(r'^([\w.]+[\s,:;]?\s*)*[\w.]+\s*$')
+def _descr_to_identifiers(descr):
+    """
+    Given the XML DOM tree for a fragment of epytext that contains a
+    list of identifiers, return a list of those identifier names.
+    This is used by fields such as C{@group} and C{@sort}, which expect
+    lists of identifiers as their values.
+
+    @rtype: C{list} of C{string}
+    @return: A list of the identifier names contained in C{descr}.
+    @param descr: The DOM tree for a fragment of epytext containing
+        a list of identifiers.  C{descr} must contain a single para
+        element, whose contents consist of a list of identifiers,
+        separated by spaces, commas, colons, or semicolons.  C{descr}
+        should not contain any inline markup.
+    @raise ValueError: If C{descr} does not contain a valid value (a
+        single paragraph with no in-line markup)
+    """
+    if len(descr.childNodes) != 1:
+        raise ValueError, 'Expected a single paragraph'
+    para = descr.childNodes[0]
+    if para.tagName != 'para':
+        raise ValueError, 'Expected a para; got a %s' % para.tagName
+    if len(para.childNodes) != 1:
+        raise ValueError, 'Colorization is not allowed'
+    idents = para.childNodes[0].data
+    if not _IDENTIFIER_LIST_REGEXP.match(idents):
+        raise ValueError, 'Bad Identifier list: %r' % idents
+    return re.split('[ :;,]+', idents)
+
+def _descr_to_docfield(arg, descr):
+    tags = [s.lower() for s in re.split('[ :;,]+', arg)]
+    
+    if len(descr.childNodes) != 1:
+        raise ValueError, 'Expected a single paragraph'
+    para = descr.childNodes[0]
+    if para.tagName != 'para':
+        raise ValueError, 'Expected a para; got a %s' % para.tagName
+    if len(para.childNodes) != 1:
+        raise ValueError, 'Colorization is not allowed'
+
+    args = re.split(' *[:;,]+ *', para.childNodes[0].data)
+    if len(args) == 0 or len(args) > 3:
+        raise ValueError, 'Wrong number of arguments'
+    singular = args[0]
+    if len(args) >= 2: plural = args[1]
+    else: plural = None
+    short = 0
+    if len(args) >= 3:
+        if args[2] == 'short': short = 1
+        else: raise ValueError('Bad arg 2 (expected "short")')
+    return DocField(tags, singular, plural, short)
+
+def _dfs_bases(cls):
+    bases = [cls]
+    for base in cls.__bases__: bases += _dfs_bases(base)
+    return bases
+
+def _find_base_order(cls):
+    # Use new or old inheritance rules?
+    new_inheritance = (sys.hexversion >= 0x02020000)
+
+    # Depth-first search,
+    base_order = _dfs_bases(cls)
+
+    # Eliminate duplicates.  For old inheritance order, eliminate from
+    # front to back; for new inheritance order, eliminate back to front.
+    if new_inheritance: base_order.reverse()
+    i = 0
+    seen_bases = {}
+    while i < len(base_order):
+        if seen_bases.has_key(base_order[i]):
+            del base_order[i]
+        else:
+            seen_bases[base_order[i]] = 1
+            i += 1
+    if new_inheritance: base_order.reverse()
+
+    return base_order
+
+# Copied from http://www.python.org/doc/current/lib/node566.html
+def _ast_match(pattern, data, vars=None, indent=0):
+    """
+    Match C{data} to C{pattern}, with variable extraction.
+
+    The C{pattern} value may contain variables of the form
+    C{['M{varname}']} which are allowed to match anything.  The value
+    that is matched is returned as part of a dictionary which maps
+    'M{varname}' to the matched value.  'M{varname}' is not required
+    to be a string object, but using strings makes patterns and the
+    code which uses them more readable.
+
+    @return: two values -- a boolean indicating whether a match was
+    found and a dictionary mapping variable names to their associated
+    values.
+    
+    @param pattern:
+        Pattern to match against, possibly containing variables.
+
+    @param data:
+        Data to be checked and against which variables are extracted.
+
+    @param vars:
+        Dictionary of variables which have already been found.  If not
+        provided, an empty dictionary is created.
+    """
+    if vars is None:
+        vars = {}
+    if type(pattern) is types.ListType:       # 'variables' are ['varname']
+        vars[pattern[0]] = data
+        return 1, vars
+    if type(pattern) is not types.TupleType:
+        return (pattern == data), vars
+    if len(data) != len(pattern):
+        return 0, vars
+    for pattern, data in map(None, pattern, data):
+        same, vars = _ast_match(pattern, data, vars, indent+1)
+        if not same:
+            break
+    return same, vars
