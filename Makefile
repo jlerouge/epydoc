@@ -14,7 +14,7 @@ EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*.html) $(wildcard doc/*.css) $(wildcard doc/*.png)
 
 # What version of python to use?
-PYTHON = python2.2
+PYTHON = python2.3
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -181,14 +181,14 @@ doc/epydocgui-man.html: man/epydocgui.1
 ## Standard Library docs
 ##//////////////////////////////////////////////////////////////////////
 
-SLNAME = 'Python 2.2 Standard Library'
-SLURL = "http://www.python.org/doc/2.2/lib/lib.html"
-SLLINK = '<font size="-2">Python 2.2<br />Standard Library</font>'
-SLFILES = $(shell find /usr/lib/python2.2/ -name '*.py' -o -name '*.so' \
-	      |grep -v '/python2.2/config/' \
-	      |grep -v '/python2.2/lib-old/' \
-	      |grep -v '/python2.2/site-packages/' \
-              |grep -v '/__')
+SLNAME = 'Python 2.3 Standard Library'
+SLURL = "http://www.python.org/doc/2.3/lib/lib.html"
+SLFILES = $(shell find /usr/lib/python2.3/ -name '*.py' -o -name '*.so' \
+	      |grep -v '/python2.3/config/' \
+	      |grep -v '/python2.3/lib-old/' \
+	      |grep -v '/python2.3/site-packages/' \
+              |grep -v '/__' \
+              |grep -v 'python2.3/encodings/idna.py')
 export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die?
 stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: $(PY_SRC)
@@ -196,7 +196,7 @@ stdlib-html: .stdlib-html.up2date
 	mkdir -p $(HTML_STDLIB)
 	$(EPYDOC) -o $(HTML_STDLIB) -c white \
 	       -n $(SLNAME) -u $(SLURL) --docformat plaintext --debug \
-	       --show-imports --navlink $(SLLINK) --builtins $(SLFILES)
+	       --show-imports --builtins $(SLFILES)
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
@@ -227,7 +227,7 @@ docutils-html: .docutils-html.up2date
 	mkdir -p $(HTML)/docutils
 	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html \
 	        --docformat plaintext --ignore-param-mismatch \
-	        /usr/lib/python2.2/site-packages/docutils
+	        /usr/lib/python2.3/site-packages/docutils
 	touch .docutils-html.up2date
 
 docutils-pdf: .docutils-pdf.up2date
@@ -236,7 +236,7 @@ docutils-pdf: .docutils-pdf.up2date
 	mkdir -p $(LATEX)/docutils
 	$(EPYDOC) -o $(LATEX)/docutils -n 'Docutils' --pdf \
 	        --docformat plaintext --ignore-param-mismatch \
-	        /usr/lib/python2.2/site-packages/docutils
+	        /usr/lib/python2.3/site-packages/docutils
 	touch .docutils-pdf.up2date
 
 
