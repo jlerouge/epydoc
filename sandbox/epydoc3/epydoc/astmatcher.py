@@ -4,12 +4,12 @@ from types import *
 ######################################################################
 ## AST Matching
 ######################################################################
-# Move this to a different module?
+# Move this to a different module?  (maybe into docparser?)
 
 class ASTMatcher:
     DEBUG = 0
     
-    def __init__(self, sym=None, tok=None, toktext=None, children=None, 
+    def __init__(self, sym=None, tok=None, toktext=None, variables=None, 
                  varname=None, qmrk=0, star=0):
         if (sym is None) == (tok is None):
             raise ValueError, 'must specify sym or tok'
@@ -17,7 +17,7 @@ class ASTMatcher:
         self.tok = tok
         self.toktext = toktext
         self.varname = varname
-        self.children = children
+        self.variables = variables
         self.qmrk = qmrk
         self.star = star
 
@@ -68,18 +68,18 @@ class ASTMatcher:
                 if type(ast) is StringType or ast[0] != self.sym:
                     match = 0
             
-            # Check the children.
+            # Check the variables.
             if match:
                 i = 0 # The matcher child index.
                 j = 1 # The ast child index.
-                while i<len(self.children) and j<len(ast):
-                    matcher_child = self.children[i]
+                while i<len(self.variables) and j<len(ast):
+                    matcher_child = self.variables[i]
                     ast_child = ast[j]
 
                     # If matcher_child is None ('...'), then ignore
-                    # the remaining children.
+                    # the remaining variables.
                     if matcher_child is None:
-                        i = len(self.children)
+                        i = len(self.variables)
                         j = len(ast)
                         break
 
@@ -98,13 +98,13 @@ class ASTMatcher:
                             match = 0
                             break
                         
-                # Check that we matched all ast children.
+                # Check that we matched all ast variables.
                 if j != len(ast):
                     match = 0
 
-                # Check that we used all matcher children; and bind
-                # variables in any remaining star/qmrk children.
-                for matcher_child in self.children[i:]:
+                # Check that we used all matcher variables; and bind
+                # variables in any remaining star/qmrk variables.
+                for matcher_child in self.variables[i:]:
                     if matcher_child.star or matcher_child.qmrk:
                         matcher_child._bind(None, 0, vars)
                     else:
@@ -138,12 +138,12 @@ class ASTMatcher:
     def __repr__(self):
         if self.sym is not None:
             s = '(%s' % symbol.sym_name.get(self.sym, '')
-            if self.children is None:
+            if self.variables is None:
                 s += '...)'
-            elif self.children == []:
+            elif self.variables == []:
                 s += ')'
             else:
-                s += ' ' + ' '.join([`c` for c in self.children]) + ')'
+                s += ' ' + ' '.join([`c` for c in self.variables]) + ')'
         
         else:
             s = tokenize.tok_name[self.tok]
@@ -182,16 +182,19 @@ def compile_ast_matcher(pattern):
                 sym = -1
             else:
                 try: sym = getattr(symbol, sym_name)
-                except: _pattern_error(pattern, match.start('sym'),
-                                       'unknown symbol')
+                except:
+                    # hack for backwards compatibility:
+                    if sym_name == 'decorators': sym = 'py24sym'
+                    else: _pattern_error(pattern, match.start('sym'),
+                                         'unknown symbol')
                     
-            stack.append(ASTMatcher(sym=sym, children=[]))
+            stack.append(ASTMatcher(sym=sym, variables=[]))
 
         elif match.group('dots') is not None:
-            stack[-1].children.append(None)
+            stack[-1].variables.append(None)
 
         elif match.group('close') is not None:
-            if None in stack[-1].children[:-1]:
+            if None in stack[-1].variables[:-1]:
                 raise ValueError('Bad pattern: "..." must be the final elt')
 
             if len(stack) == 1:
@@ -199,7 +202,7 @@ def compile_ast_matcher(pattern):
                     _pattern_error(pattern, pos)
                 stack[0].pattern = pattern # Record the pattern
                 return stack[0]
-            stack[-2].children.append(stack.pop())
+            stack[-2].variables.append(stack.pop())
             
         elif match.group('tok') is not None:
             tok_name = match.group('tok')
@@ -207,23 +210,23 @@ def compile_ast_matcher(pattern):
             except: _pattern_error(pattern, match.start('tok'),
                                    'unknown token')
             tokmatcher = ASTMatcher(tok=tok)
-            stack[-1].children.append(tokmatcher)
+            stack[-1].variables.append(tokmatcher)
 
         elif match.group('toktext') is not None:
             toktext = match.group('toktext')[1:-1] # strip quotes.
             tokmatcher = ASTMatcher(tok=tokenize.NAME, toktext=toktext)
-            stack[-1].children.append(tokmatcher)
+            stack[-1].variables.append(tokmatcher)
 
         elif match.group('varname') is not None:
-            lastchild = stack[-1].children[-1]
+            lastchild = stack[-1].variables[-1]
             lastchild.varname = match.group('varname')
             
         elif match.group('mod') == '*':
-            lastchild = stack[-1].children[-1]
+            lastchild = stack[-1].variables[-1]
             lastchild.star = 1
             
         elif match.group('mod') == '?':
-            lastchild = stack[-1].children[-1]
+            lastchild = stack[-1].variables[-1]
             lastchild.qmrk = 1
 
         else:
@@ -233,4 +236,3 @@ def _pattern_error(pattern, pos, msg='Bad pattern string'):
     left = min(30, pos)
     raise ValueError('Bad pattern: %s\n  ..."%s"...\n      %s^' %
                      (msg, pattern[pos-left:pos+30], ' '*left))
-    

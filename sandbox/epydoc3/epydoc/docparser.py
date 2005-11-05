@@ -1,27 +1,30 @@
-"""
-API documentation extraction based on source code parsing.  The
-L{DocParser} class parses the source code from individual modules, and
-generates C{ModuleDocs} that contain their API documentation.
-"""
-
-######################################################################
-## Debugging
-######################################################################
-
-## path fun
-#import sys, random
-#sys.path.insert(0, '/home/edloper/data/programming/epydoc/sandbox/epydoc3')
+# epydoc -- Source code parsing
 #
-## Force reload of volatile modules:
-#import epydoc.astmatcher; reload(epydoc.astmatcher)
-#import epydoc.apidoc; reload(epydoc.apidoc)
-    
+# Copyright (C) 2005 Edward Loper
+# Author: Edward Loper <edloper@loper.org>
+# URL: <http://epydoc.sf.net>
+#
+# $Id$
+
+"""
+Extract API documentation about python objects by parsing their source
+code.
+
+L{DocParser} is a processing class that reads the Python source code
+for one or more modules, and uses it to create L{APIDoc} objects
+containing the API documentation for the variables and values defined
+in those modules.
+
+C{DocParser} can be subclassed to extend the set of source code
+constructions that it supports.
+"""
+
 ######################################################################
 ## Imports
 ######################################################################
 
 # Python source code parsing:
-import parser, symbol, token, tokenize
+import parser, symbol, token, tokenize, compiler
 # Finding modules:
 import imp
 # File services:
@@ -33,9 +36,6 @@ from epydoc.astmatcher import compile_ast_matcher
 # Type comparisons:
 from types import StringType, ListType, TupleType, IntType
 
-True = getattr(__builtins__, 'True', 1)   #: For backwards compatibility
-False = getattr(__builtins__, 'False', 0) #: For backwards compatibility
-
 ######################################################################
 ## Doc Parser
 ######################################################################
@@ -43,17 +43,40 @@ False = getattr(__builtins__, 'False', 0) #: For backwards compatibility
 class DocParser:
     """    
     An API documentation extractor based on source code parsing.
-    C{DocParser} parses the source code from individual modules, and
-    generates C{ModuleDocs} that contain their API documentation.
+    C{DocParser} reads and parses the Python source code for one or
+    more modules, and uses it to create L{APIDoc} objects containing
+    the API documentation for the variables and values defined in
+    those modules.
 
-    C{DocParser} extracts documentation from the following source code
+    C{DocParser} defines two methods that return L{APIDoc} objects for
+    a specified object:
+    
+      - L{find} - get the documentation for an object with a given
+        dotted name.
+      - L{parse} - get the documentation for a module with a given
+        filename.
+
+    Currently, C{DocParser} extracts documentation from the following
+    source code constructions:
+
+      - module docstring
+      - import statements
+      - class definition blocks
+      - function definition blocks
+      - assignment statements
+        - simple assignment statements
+        - assignment statements with multiple C{'='}s
+        - assignment statements with unpacked left-hand sides
+        - assignment statements that wrap a function in classmethod
+          or staticmethod.
+        - assignment to special variables __path__, __all__, and
+          __docformat__.
+      - delete statements
+
+    C{DocParser} does not yet support the following source code
     constructions:
     
-      - class definition blocks (C{class M{c}(...): ...})
-      - function definition blocks (C{def M{f}(...): ...})
-      - assignment statements, including assignment statements
-        with multiple left-hand sides and with complex left-hand
-        sides.
+      - assignment statements that create properties
 
     By default, C{DocParser} will expore the contents of top-level
     C{try} and C{if} blocks.  If desired, C{DocParser} can also
@@ -76,22 +99,14 @@ class DocParser:
         with a new handler that calls the original handler, and
         modifies its output.
 
-      - A subclass can override various helper methods to customize
-        the behavior of the handler methods.  Some likely candidates
-        are L{rhs_to_valuedoc}, ....
+      - A subclass can override various helper methods, such as
+        L{rhs_to_valuedoc}, to customize the behavior of the handler
+        methods.
 
-    @group Entry Point: parse
-    @group Parse Handler Methods: parse_import, parse_classdef,
-        parse_funcdef, parse_simple_assignment,
-        parse_complex_assignment, parse_multi_assignment, parse_try,
-        parse_if, parse_while, parse_for, parse_multi_stmt
-    @group Docstring Extraction: get_docstring, get_pseudo_docstring,
-        get_comment_docstring
-    @group Name Lookup: lookup_name, lookup_dotted_name
-    @group Identifier Parsing: testlist_to_dotted_names,
-        ast_to_dotted_name, _power_to_dotted_name
-
-    @group Configuration Constants: USE_NESTED_SCOPES, PARSE_*
+    @group Entry Points: find, parse
+    
+    @group Configuration Constants: PARSE_*, IMPORT_HANDLING,
+        IMPORT_STAR_HANDLING
     @group Dispatch Tables: STMT_PATTERNS
     @group AST Matchers: *_PATTERN
     """
@@ -132,13 +147,20 @@ class DocParser:
         """A cache of C{ModuleDoc}s that we've already created.  Dict
         from filename to ModuleDoc."""
 
+        self.docstring_info = {}
+        """A dictionary used to record the contents and line numbers
+        of docstrings, attribute docstrings, and comment docstrings
+        for the source tree that is currently being parsed.  This
+        dictionary's keys are python ids identifying nodes in the
+        parse tree; and its values are tuples C{(docstring, lineno)},
+        where C{docstring} is the docstring for that node; and
+        C{lineno} is the line number where that docstring begins.
+        """
+
     #////////////////////////////////////////////////////////////
     # Configuration Constants
     #////////////////////////////////////////////////////////////
 
-    USE_NESTED_SCOPES = True
-    """Should nested scopes be used for name lookup?"""
-    
     PARSE_TRY_BLOCKS = True
     """Should the contents of C{try} blocks be examined?"""
     PARSE_EXCEPT_BLOCKS = True
@@ -154,105 +176,307 @@ class DocParser:
     PARSE_FOR_BLOCKS = False
     """Should the contents of C{for} blocks be examined?"""
 
-    IMPORT_STAR_HANDLING = 'inspect'
-    """What should the C{DocParser} do when it encounters a 'C{from
-    M{m} import *}' statement?  Three options:
-      - C{'ignore'}: ignore it.
-      - C{'inspect'}: inspect it (using C{dir}) to find a list of
-        the identifiers that it exports.
-      - C{'parse'}: parse it (using C{DocParser.parse}) to find a
-        list of the identifiers that it exports.
-      """
-    
+    IMPORT_HANDLING = 'link'
+    """What should the C{DocParser} do when it encounters an import
+    statement?
+      - C{'link'}: Create valuedoc objects with imported_from pointers
+        to the source object.
+      - C{'parse'}: Parse the imported file, to find the actual
+        documentation for the imported object.  (This will fall back
+        to the 'link' behavior if the imported file can't be parsed,
+        e.g., if it's a builtin.)
+    """
+
+    IMPORT_STAR_HANDLING = 'parse'
+    """When C{DocParser} encounters a C{'from M{m} import *'}
+    statement, and is unable to parse C{M{m}} (either because
+    L{IMPORT_HANDLING}=C{'link'}, or because parsing failed), how
+    should it determine the list of identifiers expored by C{M{m}}?
+      - C{'ignore'}: ignore the import statement, and don't create
+        any new variables.
+      - C{'parse'}: parse it to find a list of the identifiers that it
+        exports.  (This will fall back to the 'ignore' behavior if the
+        imported file can't be parsed, e.g., if it's a builtin.)
+      - C{'inspect'}: import the module and inspect it (using C{dir})
+        to find a list of the identifiers that it exports.  (This will
+        fall back to the 'ignore' behavior if the imported file can't
+        be parsed, e.g., if it's a builtin.)
+    """
+
+    DEFAULT_DECORATOR_BEHAVIOR = 'passthrough'
+    """When C{DocParse} encounters an unknown decorator, what should
+    it do to the documentation of the decorated function?
+      - C{'passthrough'}: leave the function's documentation as-is.
+      - C{'erasedocs'}: replace the function's documentation with an
+        empty C{ValueDoc} object, reflecting the fact that we have no
+        knowledge about what value the decorator returns.
+    """
+
+    COMMENT_MARKER = '#: '
+    """The prefix used to mark comments that contain attribute
+    docstrings for variables."""
+
     #////////////////////////////////////////////////////////////
-    # Entry Point
+    # Entry point
     #////////////////////////////////////////////////////////////
 
-    def parse(self, filename):
+    def find(self, name):
+        """
+        Return a L{ValueDoc} object containing the API documentation
+        for the object with the given name.
+        """
+        name = DottedName(name)
+        
+        # Check if it's a builtin.
+        if (len(name) == 1 and
+            name[0] in self.builtins_moduledoc.variables):
+            var_doc = self.builtins_moduledoc.variables[name[0]]
+            return var_doc.value
+
+        # Otherwise, try importing it.
+        else:
+            return self._find(name)
+
+    def _find(self, name, package_doc=None):
+        """
+        Return the API documentaiton for the object whose name is
+        C{name}.  C{package_doc}, if specified, is the API
+        documentation for the package containing the named object.
+        """
+        # If we're inside a package, then find the package's path.
+        if package_doc is None:
+            path = None
+        else:
+            try:
+                path_ast = module_doc.variables['__path__'].value.ast
+                path = self.extract_string_list(path_ast)
+            except:
+                path = [os.path.split(package_doc.filename)[0]]
+
+        # The leftmost identifier in `name` should be a module or
+        # package on the given path; find it and parse it.
+        try: filename = self._get_filename(name[0], path)
+        except ImportError: raise ValueError('Could not find value')
+        module_doc = self.parse(filename, package_doc)
+
+        # If the name just has one identifier, then the module we just
+        # parsed is the object we're looking for; return it.
+        if len(name) == 1: return module_doc
+
+        # Otherwise, we're looking for something inside the module.
+        # First, check to see if it's in a variable.
+        if name[1] in module_doc.variables:
+            return self._find_in_namespace(DottedName(*name[1:]), module_doc)
+
+        # If not, then check to see if it's in a subpackage.
+        elif re.match(r'__init__.py\w?', os.path.split(filename)[1]):
+            return self._find(DottedName(*name[1:]), module_doc)
+
+        # If it's not in a variable or a subpackage, then we can't
+        # find it.
+        else:
+            raise ValueError('Could not find value')
+        
+    def _find_in_namespace(self, name, namespace_doc):
+        # Look up the variable in the namespace.
+        var_doc = namespace_doc.variables[name[0]]
+        if var_doc.value is UNKNOWN:
+            raise ValueError('Could not find value')
+        val_doc = var_doc.value
+
+        # If the variable's value was imported, then follow its
+        # alias link.
+        if val_doc.imported_from not in (None, UNKNOWN):
+            return self._find(DottedName(val_doc.imported_from, *name[1:]))
+
+        # Otherwise, if the name has one identifier, then this is the
+        # value we're looking for; return it.
+        elif len(name) == 1:
+            return val_doc
+
+        # Otherwise, if this value is a namespace, look inside it.
+        elif isinstance(val_doc, NamespaceDoc):
+            return self._find_in_namespace(DottedName(*name[1:]), val_doc)
+
+        # Otherwise, we ran into a dead end.
+        else:
+            raise ValueError('Could not find value')
+        
+    def _get_filename(self, identifier, path=None):
+        file, filename, (s,m,typ) = imp.find_module(identifier, path)
+        try: file.close()
+        except: pass
+
+        if typ == imp.PY_SOURCE:
+            return filename
+        elif typ == imp.PY_COMPILED:
+            # See if we can find a corresponding non-compiled version.
+            filename = re.sub('.py\w$', '.py', filename)
+            if not os.path.exists(filename):
+                raise ImportError, 'No Python source file found.'
+            return filename
+        elif typ == imp.PKG_DIRECTORY:
+            filename = os.path.join(filename, '__init__.py')
+            if not os.path.exists(filename):
+                filename = os.path.join(filename, '__init__.pyw')
+                if not os.path.exists(filename):
+                    raise ImportError, 'No package file found.'
+            return filename
+        elif typ == imp.C_BUILTIN:
+            raise ImportError, 'No Python source file for builtins.'
+        elif typ == imp.C_EXTENSION:
+            raise ImportError, 'No Python source file for c extensions.'
+        else:
+            raise ImportError, 'No Python source file found.'
+
+    #////////////////////////////////////////////////////////////
+    # Top level: Module parsing
+    #////////////////////////////////////////////////////////////
+
+    def parse(self, filename, package_doc=None):
         """
         Parse the given python module, and return a C{ModuleDoc}
-        containing its API documentation.
+        containing its API documentation.  If you want the module to
+        be treated as a member of a package, then you must specify
+        C{package_doc}.
         
         @param filename: The filename of the module to parse.
         @type filename: C{string}
         @rtype: L{ModuleDoc}
         """
-        print 'Parsing', filename
         # Check the cache, first.
         if self.moduledoc_cache.has_key(filename):
             return self.moduledoc_cache[filename]
-        
-        # Find the basedir of the package & the full module name.
-        (basedir, module_name) = _find_module_from_filename(filename)
 
-        # Create a new ModuleDoc for the module.
-        moduledoc = ModuleDoc(dotted_name=module_name)
-        self.moduledoc_cache[filename] = moduledoc
+        # debug:
+        import sys
+        print >>sys.stderr, 'parsing %r...' % filename
+
+        # Figure out the canonical name of the module we're parsing.
+        module_name, is_pkg = _get_module_name(filename, package_doc)
+
+        # Create a new ModuleDoc for the module, & add it to the cache.
+        module_doc = ModuleDoc(canonical_name=module_name, variables={},
+                               sort_spec=[],
+                               filename=filename, package=package_doc,
+                               is_package=is_pkg, submodules=[])
+        self.moduledoc_cache[filename] = module_doc
+
+        # Add this module to the parent package's list of submodules.
+        if package_doc is not None:
+            package_doc.submodules.append(module_doc)
 
         # Initialize the context & the parentdocs stack.
         old_context = self.context
         self.context = module_name
-        self.parentdocs.append(moduledoc)
+        self.parentdocs.append(module_doc)
         
-        # Read the source code & parse it into a syntax tree.
-        try:
-            # Read the source file, and fix up newlines.
-            source_code = open(filename).read()
-            ast = parser.suite(source_code.replace('\r\n','\n')+'\n')
-            # Parse the source file into a syntax tree.
-            ast = ast.tolist()
-            # Add comments to the syntax tree.
-            add_comments_to_ast(ast, filename)
-        except:
-            raise
-            return None # Couldn't parse it!
+        # Read the source file, and fix up newlines.
+        source_code = open(filename).read()
+        ast = parser.suite(source_code.replace('\r\n','\n')+'\n')
+        
+        # Parse the source file into a syntax tree.
+        ast = ast.tolist()
+        
+        # If there's an encoding-decl, then strip it.
+        if ast[0] == symbol.encoding_decl:
+            ast = ast[1]
+            
+        # Find docstrings in the syntax tree.  Record the old value of
+        # self.docstrings, in case we recursively call parse().
+        old_docstring_info = self.docstring_info
+        self.docstring_info = self.find_docstrings(ast, filename)
 
-        # Parse each statement in the (comment-agumented) syntax tree.
+        # Get the module's docstring.
+        docstring, lineno = self.docstring_info.get(id(ast), (None,None))
+        module_doc.docstring = docstring
+        module_doc.docstring_lineno = lineno
+
+        # Parse each statement in the syntax tree.
         self.process_suite(ast)
 
-        # Check for special variables
-        self.handle_special_module_vars(moduledoc)
+        # Handle any special variables (__path__, __docformat__, etc.)
+        self.handle_special_module_vars(module_doc, ast)
 
         # Restore the context & parentdocs stack (in case we were
         # called recursively).
-        assert self.parentdocs[-1] is moduledoc
+        assert self.parentdocs[-1] is module_doc
         self.parentdocs.pop()
         self.context = old_context
 
+        # Restore the old docstring info dictionary (in case we were
+        # called recursively).
+        self.docstring_info = old_docstring_info
+
         # Return the completed ModuleDoc
-        return moduledoc
+        return module_doc
 
-    __STRING_TESTLIST_PATTERN = compile_ast_matcher("""
-        (testlist (test (and_test (not_test (comparison (expr
-         (xor_expr (and_expr (shift_expr (arith_expr (term (factor
-          (power (atom STRING:stringval))))))))))))))""")
-    
-    def handle_special_module_vars(self, moduledoc):
-        docformat_ast = self._module_var_ast(moduledoc, '__docformat__')
-        if docformat_ast is not None:
-            match, vars = self.__STRING_TESTLIST_PATTERN.match(docformat_ast)
-            if match:
-                moduledoc.docformat = eval(vars['stringval'])
-        if moduledoc.children.has_key('__docformat__'):
-            del moduledoc.children['__docformat__']
+    def handle_special_module_vars(self, module_doc, ast):
+        """
+        Extract values from any special variables that are defined by
+        the module.  Currently, this looks for values for
+        C{__docformat__}, C{__all__}, and C{__path__}.
+        """
+        # If __docformat__ is defined, then extract its value.
+        ast = self._module_var_ast(module_doc, '__docformat__')
+        if ast is not None:
+            try: module_doc.docformat = self.extract_string(ast)
+            except ValueError: module_doc.docformat = None
+        if '__docformat__' in module_doc.variables:
+            self._del_variable(module_doc, '__docformat__')
 
-        public_names_ast = self._module_var_ast(moduledoc, '__all__')
-        if public_names_ast is not None:
-            pass # Extract lit of names!
-        if moduledoc.children.has_key('__all__'):
-            del moduledoc.children['__all__']
+        # If __all__ is defined, then extract its value.
+        ast = self._module_var_ast(module_doc, '__all__')
+        if ast is not None:
+            try:
+                public_names = Set(self.extract_string_list(ast))
+                for name, var_doc in module_doc.variables.items():
+                    var_doc.is_public = (name in public_names)
+            except ValueError: pass
+        if '__all__' in module_doc.variables:
+            self._del_variable(module_doc, '__all__')
+
+        # If __path__ is defined, then extract its value.  Otherwise,
+        # use the default value.
+        if module_doc.is_package:
+            module_doc.path = [os.path.split(module_doc.filename)[0]]
+            ast = self._module_var_ast(module_doc, '__path__')
+            if ast is not None:
+                try: module_doc.path = self.extract_string_list(ast)
+                except ValueError: raise #pass
+            if '__path__' in module_doc.variables:
+                self._del_variable(module_doc, '__path__')
                 
-    def _module_var_ast(self, moduledoc, name):
-        variabledoc = moduledoc.children.get(name)
-        if variabledoc is None: return None
-        valuedoc = variabledoc.valuedoc
-        if not isinstance(valuedoc, ValueDoc): return None
-        return valuedoc.ast
+    def _module_var_ast(self, module_doc, name):
+        """
+        If a variable named C{name} exists in C{module_doc}, and its
+        value has an ast, then return its ast.
+        """
+        var_doc = module_doc.variables.get(name)
+        if (var_doc is None or var_doc.value in (None, UNKNOWN) or
+            var_doc.value.ast is UNKNOWN):
+            return None
+        else:
+            return var_doc.value.ast
+
+    #////////////////////////////////////////////////////////////
+    # Token Eater
+    #////////////////////////////////////////////////////////////
+
+    def process(self, tokeniter):
+        pass
+
+    #////////////////////////////////////////////////////////////
+    # Line handler
+    #////////////////////////////////////////////////////////////
+
+
+    
 
     #////////////////////////////////////////////////////////////
     # Suite Processor
     #////////////////////////////////////////////////////////////
-    
+
     def process_suite(self, suite):
         """
         Process each statement of interest in the given suite.  In
@@ -261,12 +485,13 @@ class DocParser:
         matcher that matches the statement, call the corresponding
         handler method.
 
-        The handler method is called with parameters based on the
-        matcher's variables.  The handler is also given one additional
-        parameter, C{pseudo_docstring}: if the statement is
-        immediately followed by a string constant, then
-        C{pseudo_docstring} is the contents of that string constant;
-        otherwise, C{pseudo_docstring} is C{None}.
+        The handler method is called with keyword parameters based on
+        the matcher's variables.  The handler is also given one
+        additional parameter, C{docstring_info}, which contains a
+        tuple C{(docstring, lineno)}, where C{docstring} is the
+        statement's docstring, and C{docstring_lineno} is the line
+        number where the docstring begins.  If the statement does not
+        have a docstring, then C{docstring_info=(None,None)}.
     
         @param suite: A Python syntax tree containing the suite to be
             processed (as generated by L{parser.ast2list}).
@@ -274,18 +499,19 @@ class DocParser:
         @rtype: C{None}
         """
         assert suite[0] in (symbol.file_input, symbol.suite)
-        stmts = suite[1:]
-        for i in range(len(stmts)):
+        for stmt in suite[1:]:
             # Check if stmts[i] matches any of our statement patterns.
             for (name, matcher) in self.STMT_PATTERNS:
-                match, vars = matcher.match(stmts[i])
+                match, vars = matcher.match(stmt)
                 if match:
-                    # Check for a pseudo-docstring.
-                    docstring = self.get_pseudo_docstring(stmts, i)
+                    ds = self.docstring_info.get(id(stmt), (None, None))
                     # Delegate to the appropriate handler.
                     handler_method = getattr(self, name)
-                    handler_method(pseudo_docstring=docstring, **vars)
+                    handler_method(docstring_info=ds, **vars)
                     break
+
+            #else:
+            #    print pp_ast(stmts[i])
         
     #////////////////////////////////////////////////////////////
     # Statement Parsing Dispatch Table
@@ -302,24 +528,24 @@ class DocParser:
     #: first matcher that matches a statement, the corresponding
     #: handler is called, with parameters based on the matcher's
     #: variables.  The handler is given one additional parameter,
-    #: C{pseudo_docstring}: if the statement is immediately followed
-    #: by a string constant, then C{pseudo_docstring} is the contents
-    #: of that string constant; otherwise, C{pseudo_docstring} is
-    #: C{None}.
+    #: C{docstring_info}, which contains a tuple C{(docstring,
+    #: lineno)}, where C{docstring} is the statement's docstring, and
+    #: C{docstring_lineno} is the line number where the docstring
+    #: begins.  If the statement does not have a docstring, then
+    #: C{docstring_info=(None,None)}.
     #:
     #: If no matchers match a statement, then that statement is
     #: ignored.
     STMT_PATTERNS = [
-        # Import statement: "import foo"
         ('process_import', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (simple_stmt
               (small_stmt
-               (import_stmt NAME:cmd (...)*:names))
+               (import_stmt ...):ast)
               NEWLINE))""")),
         # Class definition: "class A(B): ..."
         ('process_classdef', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt (classdef
                 'class' NAME:classname
                 LPAR? (testlist...)?:bases RPAR?
@@ -327,333 +553,428 @@ class DocParser:
                 (suite ...):body)))""")),
         # Function definition: "def f(x): ..."
         ('process_funcdef', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt (funcdef
+                (decorators ...)?:decorators
                 'def' NAME:funcname
                 (parameters ...):parameters
                 COLON
                 (suite ...): body)))""")),
         # Simple assignment: "x=y" or "x.y=z"
         ('process_simple_assignment', compile_ast_matcher("""
-            (stmt COMMENT*:comments
+            (stmt 
              (simple_stmt (small_stmt (expr_stmt
               (testlist (test (and_test (not_test (comparison (expr
                (xor_expr (and_expr (shift_expr (arith_expr (term
                 (factor (power (atom NAME)
                                (trailer DOT NAME)*))))))))))))):lhs
-              EQUAL (...):rhs)) NEWLINE:nl_comment))""")),
+              EQUAL (...):rhs)) NEWLINE))""")),
         # Complex-LHS assignment: "(a,b)=c" or "[a,b]=c"
         ('process_complex_assignment', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (simple_stmt (small_stmt (expr_stmt
               (testlist...):lhs EQUAL (...):rhs)) NEWLINE))""")),
         # Multi assignment: "a=b=c"
         ('process_multi_assignment', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (simple_stmt (small_stmt (expr_stmt
               (testlist...):lhs EQUAL
               (...)*:rhs)) NEWLINE))""")),
-        # Try statement
+        # Try statement: "try: ..."
         ('process_try', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt
               (try_stmt 'try' COLON (suite ...):trysuite
               (...)*:rest)))""")),
-        # If-then statement
+        # If statement: "if x: ..."
         ('process_if', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt
-              (if_stmt 'if' (test ...) COLON (suite ...):ifsuite
-               'elif'? (test ...)? COLON? (suite ...)?:elifsuite
-               'else'? COLON? (suite ...)?:elsesuite)))""")),
-        # While statement
+              (if_stmt 'if' ...):ifstmt))""")),
+        # While statement: "while x: pass"
         ('process_while', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt
               (while_stmt 'while' (test ...) COLON (suite ...):whilesuite
                'else'? COLON? (suite ...)?:elsesuite)))""")),
-        # For statement
+        # For statement: "for x in [1,2,3]: pass"
         ('process_for', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (compound_stmt
               (for_stmt 'for' (exprlist...):loopvar 'in' 
                (testlist...) COLON (suite ...):forsuite
                'else'? COLON? (suite ...)?:elsesuite)))""")),
         # Semicolon-separated statements: "x=1; y=2"
         ('process_multi_stmt', compile_ast_matcher("""
-            (stmt COMMENT*
+            (stmt 
              (simple_stmt
               (small_stmt ...):stmt1
               SEMI
               (...)*:rest))""")),
+        # Delete statement: "del x"
+        ('process_del', compile_ast_matcher("""
+            (stmt 
+             (simple_stmt (small_stmt (del_stmt 'del'
+              (exprlist ...):exprlist)) NEWLINE))""")),
         ]
 
     #////////////////////////////////////////////////////////////
     # Parse Handler: Imports
     #////////////////////////////////////////////////////////////
 
-    def process_import(self, cmd, names, pseudo_docstring):
+    def process_import(self, ast, docstring_info):
         """
         The statement handler for import statements.  This handler
         adds a C{VariableDoc} to the parent C{APIDoc} for each name
-        that is created by importing.  These C{VariableDoc}s have
-        empty C{ValueDoc}s, and are marked as imported (i.e.,
-        C{L{is_imported<VariableDoc.is_imported>}=True}).
+        that is created by importing.
 
-        @param cmd: The import command (C{'from'} or C{'import'}
-        @param nams: The contents of the import statement, from
-            which the import names are taken.
-        @param pseudo_docstring: The pseudo-docstring for the
-            import statement (ignored).
+        @param cmd: The import command (C{'from'} or C{'import'})
+        @param names: The contents of the import statement, from
+            which the import names are taken.            
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
         # If we're not in a namespace, then ignore import statements.
         parentdoc = self.parentdocs[-1]
         if not isinstance(parentdoc, NamespaceDoc): return
 
-        # A dictionary from variable name to ValueDocProxy:
-        var_proxies = {}
+        # For Python 2.3:
+        if ast[1][0] == token.NAME: 
+            if ast[1][1] == 'from' and ast[2][1][1] == '__future__':
+                pass # ignore __future__ statements
+            elif ast[1][1] == 'from' and ast[-1][0] == token.STAR:
+                self._process_fromstar_import(ast[2])
+            elif ast[1][1] == 'from':
+                self._process_from_import(ast[2], ast[4:])
+            elif ast[1][1] == 'import':
+                self._process_simple_import(ast[2:])
 
-        # from module import *
-        if cmd == 'from' and names[-1][0] == token.STAR:
-            src = self.ast_to_dotted_name(names[0])
-            self._process_fromstar_import(src, var_proxies)
+        # For Python 2.4:
+        elif ast[1][0] == symbol.import_from:
+            ast = ast[1]
+            if ast[2][1][1] == '__future__':
+                pass # ignore future statements
+            elif ast[-1][0] == token.STAR:
+                self._process_fromstar_import(ast[2])
+            elif len(ast) == 7:
+                self._process_from_import(ast[2], ast[5][1:])
+            elif len(ast) == 5:
+                self._process_from_import(ast[2], ast[4][1:])
+            else:
+                raise ValueError, 'unexpected ast value'
+        elif ast[1][0] == symbol.import_name:
+            self._process_simple_import(ast[1][2][1:])
 
-        # from __future__ import ...
-        elif cmd == 'from' and names[0][1][1] == '__future__':
-            return # Ignore __future__ statements.
-
-        # import module1 [as name1], ...
-        elif cmd == 'import':
-            for name in names:
+    def _process_simple_import(self, names):
+        for name in names:
                 if name[0] == symbol.dotted_as_name:
                     # dotted_as_name: dotted_name
                     if len(name) == 2:
                         src = DottedName(name[1][1][1])
-                        var_proxies[name[1][1][1]] = ValueDocProxy(src)
+                        self._import_var(src)
                     # dotted_as_name: dotted_name 'as' NAME
                     elif len(name) == 4:
-                        src = self.ast_to_dotted_name(name[1])
-                        var_proxies[name[3][1]] = ValueDocProxy(src)
-                        
+                        src = self.extract_dotted_name(name[1])
+                        self._import_var_as(src, name[3][1])
+        
         # from module import name1 [as alias1], ...
-        elif (cmd == 'from' and names[-1][0] != token.STAR and
-              names[0][1][1] != '__future__'):
-            src = self.ast_to_dotted_name(names[0])
-            for name in names[2:]:
+    def _process_from_import(self, srcmod, names):
+        srcmod = self.extract_dotted_name(srcmod)
+        for name in names:
                 if name[0] == symbol.import_as_name:
                     # import_as_name: NAME
                     if len(name) == 2:
-                        src = DottedName(src, name[1][1])
-                        var_proxies[name[1][1]] = ValueDocProxy(src)
+                        src = DottedName(srcmod, name[1][1])
+                        self._import_var_as(src, name[1][1])
                     # import_as_name: import_name 'as' NAME
                     elif len(name) == 4:
-                        src = DottedName(src, name[1][1])
-                        var_proxies[name[3][1]] = ValueDocProxy(src)
+                        src = DottedName(srcmod, name[1][1])
+                        self._import_var_as(src, name[3][1])
                         
-        # Add all the variables we found.
-        for varname, valuedoc_proxy in var_proxies.items():
-            vardoc = VariableDoc(varname, valuedoc_proxy, is_alias=0,
-                                 is_imported=1)
-            parentdoc.children[varname] = vardoc
+    def _process_fromstar_import(self, src):
+        """
+        Handle a statement of the form:
+            >>> from <src> import *
 
-    def _process_fromstar_import(self, src, var_proxies):
-        if self.IMPORT_STAR_HANDLING == 'ignore':
-            return
+        If L{IMPORT_HANDLING} is C{'parse'}, then first try to parse
+        the module C{M{<src>}}, and copy all of its exported variables
+        to C{parentdoc}.
 
-        elif self.IMPORT_STAR_HANDLING == 'inspect':
-            m = __import__(str(src), {}, {}, [0])
-            if m is None:
-                return # [XX] We couldn't import it.
-            for name in self._get_exports_list(m):
-                var_proxies[name] = ValueDocProxy(DottedName(src, name))
-
-        elif self.IMPORT_STAR_HANDLING == 'parse':
-            filename = self.dotted_name_to_filename(src)
-            moduledoc = self.parse(filename)
-            if moduledoc.public_names is not None:
-                names = moduledoc.public_names
-            else:
-                names = moduledoc.children.keys()
-            for name in names:
-                var_proxies[name] = ValueDocProxy(DottedName(src, name))
-
-        else:
-            raise ValueError, 'Bad value for IMPORT_STAR_HANDLING'
-
-    def _get_exports_list(self, module):
-        try:
-            return list(module.__all__)
-        except AttributeError:
-            return [n for n in dir(module) if n[0] != '_']
-
-    # [XX] ouch.  Handling __path__ manipulation??
-    def dotted_name_to_filename(self, dotted_name):
-        # First, get the top-level file.
-        file, filename, (s,m,t) = imp.find_module(dotted_name[0])
-        # [XX] check that it's python, strip down to the .py file.
-        if len(dotted_name) == 1: return filename
+        Otherwise, try to determine the names of the variables
+        exported by C{M{<src>}}, and create a new variable for each
+        export, using proxy values (i.e., values with C{imported_from}
+        attributes pointing to the imported objects).  If
+        L{IMPORT_STAR_HANDLING} is C{'parse'}, then the list of
+        exports if found by parsing C{M{<src>}}; if it is
+        C{'inspect'}, then the list of exports is found by importing
+        and inspecting C{M{<src>}}.
+        """
+        parentdoc = self.parentdocs[-1]
+        src = self.extract_dotted_name(src)
         
-        # Package submodule handling...
-        #   1. parse the submodule
-        #   2. find the submodule's __path__
-        #   3. apply imp.find_module with new path
-        raise ValueError, 'not implemented yet'
+        # If src is package-local, then convert it to a global name.
+        src = self._global_name(src)
+        
+        if (self.IMPORT_HANDLING == 'parse' or
+            self.IMPORT_STAR_HANDLING == 'parse'):
+            try: module_doc = self._find(src)
+            except ValueError: module_doc = None
+            if isinstance(module_doc, ModuleDoc):
+                if self.IMPORT_HANDLING == 'parse':
+                    for name, imp_var in module_doc.variables.items():
+                        if imp_var.is_public:
+                            var_doc = VariableDoc(name=name, is_alias=False,
+                                                  value=imp_var.value,
+                                                  is_imported=True)
+                            self._set_variable(parentdoc, var_doc)
+                else:
+                    for name, imp_var in module_doc.variables.items():
+                        if imp_var.is_public:
+                            self._add_import_var(DottedName(src,name),
+                                                 name, parentdoc)
+                return
+
+        # If we got here, then either IMPORT_HANDLING='link' or we
+        # failed to parse the `src` module.
+        if self.IMPORT_STAR_HANDLING == 'inspect':
+            try: module = __import__(str(src), {}, {}, [0])
+            except: return # We couldn't import it.
+            if module is None: return # We couldn't import it.
+            if hasattr(module, '__all__'):
+                names = list(module.__all__)
+            else:
+                names = [n for n in dir(module) if not n.startswith('_')]
+            for name in names:
+                self._add_import_var(DottedName(src, name), name, parentdoc)
+
+    def _import_var(self, name):
+        """
+        Handle a statement of the form:
+            >>> import <name>
+
+        If L{IMPORT_HANDLING} is C{'parse'}, then first try to find
+        the value by parsing; and create an appropriate variable in
+        parentdoc.
+
+        Otherwise, create one or more variables using proxy values
+        (i.e., values with C{imported_from} attributes pointing to the
+        imported objects).  (More than one variable may be created for
+        cases like C{'import a.b'}, where we need to create a variable
+        C{'a'} in parentdoc containing a proxy module; and a variable
+        C{'b'} in the proxy module containing a proxy value.
+        """
+        # If name is package-local, then convert it to a global name.
+        name = self._global_name(name)
+        
+        if self.IMPORT_HANDLING == 'parse':
+            # Check to make sure that we can actually find the value.
+            try: val_doc = self._find(name)
+            except ValueError: val_doc = None
+            if val_doc is not None:
+                # We found it; but it's not the value itself we want to
+                # import, but the module containing it; so import that
+                # module and create a variable for it.
+                mod_doc = self._find(DottedName(name[0]))
+                var_doc = VariableDoc(name=name[0], value=mod_doc,
+                                      is_imported=True, is_alias=False)
+                self._set_variable(self.parentdocs[-1], var_doc)
+                return
+
+        # If we got here, then either IMPORT_HANDLING='link', or we
+        # did not successfully find the value's docs by parsing; use
+        # a variable with a proxy value.
+        
+        # Create any necessary intermediate proxy module values.
+        container = self.parentdocs[-1]
+        for i, identifier in enumerate(name[:-1]):
+            if (identifier not in container.variables or
+                not isinstance(container.variables[identifier], ModuleDoc)):
+                val_doc = NamespaceDoc(variables={}, sort_spec=[],
+                                       imported_from=name[:i+1])
+                var_doc = VariableDoc(name=identifier, value=val_doc,
+                                      is_imported=True, is_alias=False)
+                self._set_variable(container, var_doc)
+            container = container.variables[identifier].value
+
+        # Add the variable to the container.
+        self._add_import_var(name, name[-1], self.parentdocs[-1])
+
+    def _import_var_as(self, src, name):
+        """
+        Handle a statement of the form:
+            >>> from src import name
+            
+        If L{IMPORT_HANDLING} is C{'parse'}, then first try to find
+        the value by parsing; and create an appropriate variable in
+        parentdoc.
+
+        Otherwise, create a variables with a proxy value (i.e., a
+        value with C{imported_from} attributes pointing to the
+        imported object).
+        """
+        # If src is package-local, then convert it to a global name.
+        src = self._global_name(src)
+        
+        if self.IMPORT_HANDLING == 'parse':
+            # Parse the value and create a variable for it.
+            try: val_doc = self._find(src)
+            except ValueError: val_doc = None
+            if val_doc is not None:
+                var_doc = VariableDoc(name=name, value=val_doc,
+                                      is_imported=True, is_alias=False)
+                self._set_variable(self.parentdocs[-1], var_doc)
+                return
+
+        # If we got here, then either IMPORT_HANDLING='link', or we
+        # did not successfully find the value's docs by parsing; use a
+        # variable with a proxy value.
+        self._add_import_var(src, name, self.parentdocs[-1])
+
+    def _add_import_var(self, src, name, container):
+        """
+        Add a new variable named C{name} to C{container}, whose value
+        is a C{ValueDoc} with an C{imported_from=src}.
+        """
+        val_doc = ValueDoc(imported_from=src)
+        var_doc = VariableDoc(name=name, value=val_doc,
+                              is_imported=True, is_alias=False)
+        self._set_variable(container, var_doc)
+
+    def _global_name(self, name):
+        """
+        If the given name is package-local (relative to the current
+        context, as determined by L{self.parentdocs}), then convert it
+        to a global name.
+        """
+        # Find our module.
+        for i in range(len(self.parentdocs)-1, -1, -1):
+            if isinstance(self.parentdocs[i], ModuleDoc): break
+        module_doc = self.parentdocs[i]
+        if module_doc.is_package in (False, UNKNOWN):
+            return name
+        else:
+            try:
+                self._get_filename(name[0], module_doc.path)
+                return DottedName(module_doc.canonical_name, name)
+            except ImportError:
+                return name
 
     #////////////////////////////////////////////////////////////
     # Parse Handler: Simple Assignments
     #////////////////////////////////////////////////////////////
 
-    def process_simple_assignment(self, comments, lhs, rhs, nl_comment,
-                                  pseudo_docstring):
+    def process_simple_assignment(self, lhs, rhs, docstring_info):
         """
         The statement handler for assignment statements whose
         left-hand side is a single identifier.  The behavior of this
         handler depends on the contents of the assignment statement
         and the context:
 
-          - If the assignment statement occurs inside an __init__
-            function, and is documented by a pseudo-docstring or
-            comments, then the handler creates a new C{VariableDoc}
-            in the containing class and sets
+          - If the assignment statement occurs inside an __init__          
+            method, and has a docstring, then the handler creates a
+            new C{VariableDoc} in the containing class and sets
             C{L{is_instvar<VariableDoc.is_instvar>}=True}.
 
           - If the assignment's right-hand side is a single identifier
             with a known value, then the handler creates a new
             C{VariableDoc} in the containing namespace whose
-            C{valuedoc} is that value's documentation, and sets
+            C{val_doc} is that value's documentation, and sets
             C{L{is_alias<VariableDoc.is_alias>}=True}.
 
           - Otherwise, the handler creates a new C{VariableDoc} in the
             containing namespace, whose C{ValueDoc} is computed from
             the right-hand side by L{rhs_to_valuedoc}.
 
-        @param comments: The comments preceeding the assignment
-            statement (if any).
         @param lhs: The left-hand side of the assignment statement.
         @param rhs: The right-hand side of the assignment statement.
-        @param nl_comment: The comment on the same line as the
-            assignment statement (if any).
-        @param pseudo_docstring: The pseudo-docstring for the
-            assignment statement (if any).
+        @param docstring_info: Information about the statement's
+            docstring, encoded as a tuple C{(docstring, lineno)}.
         @rtype: C{None}
         """
         # The APIDoc for our container.
         parentdoc = self.parentdocs[-1]
 
-        is_alias = 0        # Is the variable an alias?
-        is_instvar = 0      # Is the variable an instance variable?
-        docstring = None    # What's the variable's docstring?
-        valuedoc = None     # What's the variable's value?
+        is_alias = False    # Is the variable an alias?
+        is_instvar = False  # Is the variable an instance variable?
+        val_doc = UNKNOWN   # What's the variable's value?
         
-        # Get the variable's docstring, if it has one.  Check for a
-        # pseudo-docstring first, and then look in its comments.
-        if pseudo_docstring is not None:
-            docstring = pseudo_docstring
-        else:
-            docstring = self.get_comment_docstring(comments, nl_comment)
-
         # Extract the var name from the left-hand side.  If the
         # left-hand side isn't a var name, then just return.
-        var_dotted_name = self.ast_to_dotted_name(lhs)
+        var_dotted_name = self.extract_dotted_name(lhs)
         if var_dotted_name is None: return
 
         # Inside __init__ functions, look for instance variables.
         if self._inside_init():
             # To be recorded, instance variables must have the form
             # "self.x", and must have a non-empty docstring.
-            if (docstring is None or len(var_dotted_name) != 2 or
-                len(parentdoc.args) == 0 or
-                var_dotted_name[0] != parentdoc.args[0].name):
+            if (docstring_info[0] is None or len(var_dotted_name) != 2 or
+                len(parentdoc.posargs) == 0 or
+                var_dotted_name[0] != parentdoc.posargs[0]):
                 return
-            valuedoc = ValueDoc(ast=rhs)
-            is_instvar = 1
+            
+            is_instvar = True
+            val_doc = ValueDoc()
             # Set parentdoc to the containing class.
             parentdoc = self.parentdocs[-2]
 
         # Outside __init__, ignore any assignment to a dotted name
         # with more than one identifier (e.g. "a.b.c").
-        if valuedoc is None and len(var_dotted_name) > 1: return
+        if not is_instvar and len(var_dotted_name) > 1: return
         varname = var_dotted_name[-1]
 
         # If the RHS is a single identifier that we have a value for,
         # then create an alias variable.
-        if valuedoc is None and rhs[0] == symbol.testlist:
-            rhs_dotted_name = self.ast_to_dotted_name(rhs)
+        if val_doc is UNKNOWN and rhs[0] == symbol.testlist:
+            rhs_dotted_name = self.extract_dotted_name(rhs)
             if rhs_dotted_name is not None:
-                valuedoc = self.lookup_dotted_name(rhs_dotted_name)
-                if valuedoc is not None:
-                    is_alias = 1
+                val_doc = self.lookup_value(rhs_dotted_name)
+                if val_doc is None:
+                    val_doc = UNKNOWN
+                else:
+                    is_alias = True
                 
-        # Otherwise, use rhs_to_valuedoc to find a valuedoc for rhs.
-        if valuedoc is None:
-            valuedoc = self.rhs_to_valuedoc(rhs)
+        # Otherwise, use rhs_to_valuedoc to find a val_doc for rhs.
+        if val_doc is UNKNOWN:
+            val_doc = self.rhs_to_valuedoc(rhs, varname)
 
         # Create the VariableDoc, and add it to its parent.
-        vardoc = VariableDoc(varname, valuedoc, is_imported=0,
-                             is_alias=is_alias, is_instvar=is_instvar,
-                             docstring=docstring)
-
+        var_doc = VariableDoc(name=varname, value=val_doc,
+                              docstring=docstring_info[0],
+                              docstring_lineno=docstring_info[1],
+                              is_imported=False, is_alias=is_alias, 
+                              is_instvar=is_instvar)
         if isinstance(parentdoc, NamespaceDoc):
-            parentdoc.add_child(vardoc)
+            self._set_variable(parentdoc, var_doc)
 
-    #: A pattern matcher used to find C{classmethod} and
-    #: C{staticmethod} wrapper functions on the right-hand side
-    #: of assignment statements.
-    __WRAPPER_PATTERN = compile_ast_matcher("""
-        (testlist (test (and_test (not_test (comparison (expr
-         (xor_expr (and_expr (shift_expr (arith_expr (term (factor
-          (power (atom NAME:funcname)
-           (trailer LPAR (arglist (argument (test (and_test (not_test
-            (comparison (expr (xor_expr (and_expr (shift_expr
-             (arith_expr (term (factor
-              (power (atom NAME) (trailer DOT NAME)*):arg)))))))))))))
-            RPAR))))))))))))))""")
-
-    def rhs_to_valuedoc(self, rhs):
+    def _inside_init(self):
         """
-        @return: A C{ValueDoc} giving the API documentation for the
-            object specified by the right-hand side of an assignment
-            statement.
-        @rtype: L{ValueDoc}
-        @param rhs: The Python syntax tree for the right-hand side
-            of the assignment statement (as generated by
-            L{parser.ast2list}).
-        @type rhs: C{list}
+        @return: True if the current context of the C{DocParser} is
+        the C{__init__} method of a class.
+        @rtype: C{bool}
         """
-        # If the RHS is a classmethod or staticmethod wrapper, then
-        # create a ClassMethodDoc/StaticMethodDoc
-        match, vars2 = self.__WRAPPER_PATTERN.match(rhs)
-        if match:
-            arg_dotted_name = self.ast_to_dotted_name(vars2['arg'])
-            arg_valuedoc = self.lookup_dotted_name(arg_dotted_name)
-            if (arg_valuedoc is not None and
-                isinstance(arg_valuedoc, RoutineDoc)):
-                if vars2['funcname'] == 'classmethod':
-                    return cm_doc_from_routine_doc(arg_valuedoc)
-                elif vars2['funcname'] == 'staticmethod':
-                    return sm_doc_from_routine_doc(arg_valuedoc)
-        
-        # Otherwise, it's a simple assignment
-        return ValueDoc(ast=rhs)
-
+        return (len(self.parentdocs)>=2 and 
+                isinstance(self.parentdocs[-2], ClassDoc) and
+                isinstance(self.parentdocs[-1], RoutineDoc) and
+                self.context[-1] == '__init__')
+    
     #////////////////////////////////////////////////////////////
     # Parse Handler: Complex Assignments
     #////////////////////////////////////////////////////////////
 
-    def process_complex_assignment(self, lhs, rhs, pseudo_docstring):
+    def process_complex_assignment(self, lhs, rhs, docstring_info):
         """
         The statement handler for assignment statements whose
         left-hand side is a single complex expression, such as a tuple
         or list.  This handler creates a new C{VariableDoc} in the
         containing namespace for each non-dotted variable name on the
-        left-hand side.  The pseudo-docstring and right-hand side are
+        left-hand side.  The docstring and right-hand side are
         ignored.
 
         @param lhs: The left-hand side of the assignment statement.
         @param rhs: The right-hand side of the assignment statement.
-        @param pseudo_docstring: The pseudo-docstring for the
-            assignment statement (ignored).
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         @todo: Try matching the left-hand side against the right-hand
             side; and if successful, create a suite containing
@@ -665,21 +986,22 @@ class DocParser:
         if not isinstance(parentdoc, NamespaceDoc): return
 
         # Convert the LHS into dotted names.
-        lhs = self.testlist_to_dotted_names(lhs)
+        try: lhs = self.extract_dotted_name_list(lhs)
+        except: return
 
-        # Otherwise, just create VariableDocs in the namespace.
+        # Create VariableDocs in the namespace.
         for dotted_name in flatten(lhs):
             if len(dotted_name) == 1:
                 varname = dotted_name[0]
-                vardoc = VariableDoc(varname, ValueDoc(),
+                var_doc = VariableDoc(name=varname, value=ValueDoc(),
                                      is_imported=False)
-                parentdoc.children[varname] = vardoc
+                self._set_variable(parentdoc, var_doc)
 
     #////////////////////////////////////////////////////////////
     # Parse Handler: Multi-Assignments
     #////////////////////////////////////////////////////////////
 
-    def process_multi_assignment(self, lhs, rhs, pseudo_docstring):
+    def process_multi_assignment(self, lhs, rhs, docstring_info):
         """
         The statement handler for assignment statements with multiple
         left-hand sides, such as C{x=y=2}.  This handler creates a
@@ -691,8 +1013,8 @@ class DocParser:
             statement.
         @param rhs: The remaining left-hand sides, and the final
             right-hand side.
-        @param pseudo_docstring: The pseudo-docstring for the
-            assignment statement (ignored).
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
         # Get a list of all the testlists.
@@ -714,15 +1036,15 @@ class DocParser:
     # Parse Handler: Control Blocks
     #////////////////////////////////////////////////////////////
 
-    def process_try(self, trysuite, rest, pseudo_docstring):
+    def process_try(self, trysuite, rest, docstring_info):
         """
         The statement handler for C{try} blocks.  This handler calls
         C{process_suite} on the suites contained by the C{try} block.
 
         @param trysuite: The contents of the C{try} block.
         @param rest: The contents of the C{finally/except/else} blocks.
-        @param pseudo_docstring: The pseudo-docstring for the
-            C{try} statement (ignored).
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
         if self.PARSE_TRY_BLOCKS:
@@ -735,27 +1057,27 @@ class DocParser:
                 if elt[0] == symbol.suite:
                     self.process_suite(elt)
     
-    def process_if(self, ifsuite, elifsuite, elsesuite, pseudo_docstring):
+    def process_if(self, ifstmt, docstring_info):
         """
         The statement handler for C{if} blocks.  This handler calls
         C{process_suite} on the suites contained by the C{if} block.
 
-        @param ifsuite: The contents of the C{if} block.
-        @param elifsuite: The contents of the C{elif} block.
-        @param elsesuite: The contents of the C{else} block.
-        @param pseudo_docstring: The pseudo-docstring for the
-            C{if} statement (ignored).
+        @param ifstmt: The contents of the C{if} block.
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
+        # The contents of ifstmt are::
+        #   'if' test COLON suite ('elif' test COLON suite)*
+        #                         ('else' test COLON suite)?
+        # We're interested in extracting the suites.
         if self.PARSE_IF_BLOCKS:
-            self.process_suite(ifsuite)
+            self.process_suite(ifstmt[4])
         if self.PARSE_ELSE_BLOCKS:
-            if elifsuite is not None:
-                self.process_suite(elifsuite)
-            if elsesuite is not None:
-                self.process_suite(elsesuite)
+            for i in range(8, len(ifstmt), 4):
+                self.process_suite(ifstmt[i])
 
-    def process_while(self, whilesuite, elsesuite, pseudo_docstring):
+    def process_while(self, whilesuite, elsesuite, docstring_info):
         """
         The statement handler for C{while} blocks.  This handler calls
         C{process_suite} on the suites contained by the C{while}
@@ -763,8 +1085,8 @@ class DocParser:
 
         @param whilesuite: The contents of the C{while} block.
         @param elsesuite: The contents of the C{else} block.
-        @param pseudo_docstring: The pseudo-docstring for the
-            C{while} statement (ignored).
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
         if self.PARSE_WHILE_BLOCKS:
@@ -772,7 +1094,7 @@ class DocParser:
             if elsesuite is not None:
                 self.process_suite(elsesuite)
         
-    def process_for(self, loopvar, forsuite, elsesuite, pseudo_docstring):
+    def process_for(self, loopvar, forsuite, elsesuite, docstring_info):
         """
         The statement handler for C{for} blocks.  This handler calls
         C{process_suite} on the suites contained by the C{for} block;
@@ -782,8 +1104,8 @@ class DocParser:
         @param loopvar: The loop variable.
         @param forsuite: The contents of the C{for} block.
         @param elsesuite: The contents of the C{else} block.
-        @param pseudo_docstring: The pseudo-docstring for the
-            C{for} statement (ignored).
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         @rtype: C{None}
         """
         # The APIDoc for our container.
@@ -795,19 +1117,19 @@ class DocParser:
                 self.process_suite(elsesuite)
                 
             # Create a VariableDoc for the loop variable.
-            loopvar_dotted_name = self.ast_to_dotted_name(loopvar)
-            if len(loopvar_dotted_name) == 1:
-                loopvar_name = loopvar_dotted_name[0]
-                vardoc = VariableDoc(loopvar_name, ValueDoc(),
-                                     is_imported=False)
-                if isinstance(parentdoc, NamespaceDoc):
-                    parentdoc.children[loopvar_name] = vardoc
+            if isinstance(parentdoc, NamespaceDoc):
+                loopvar_dotted_name = self.extract_dotted_name(loopvar)
+                if len(loopvar_dotted_name) == 1:
+                    loopvar_name = loopvar_dotted_name[0]
+                    var_doc = VariableDoc(name=loopvar_name, is_imported=False)
+                    self._set_variable(parentdoc, var_doc)
 
     #////////////////////////////////////////////////////////////
     # Parse Handler: Function Definitions
     #////////////////////////////////////////////////////////////
 
-    def process_funcdef(self, funcname, parameters, body, pseudo_docstring):
+    def process_funcdef(self, decorators, funcname, parameters,
+                        body, docstring_info):
         """
         The statement handler for function definition blocks.  This
         handler constructs the documentation for the function, and
@@ -818,71 +1140,124 @@ class DocParser:
         @param funcname: The name of the function.
         @param parameters: The function's parameter list.
         @param body: The function's body.
-        @param pseudo_docstring: The pseudo-docstring for the
-            function definition (ignored).
+        @param docstring_info: Information about the statement's
+            docstring, encoded as a tuple C{(docstring, lineno)}.
         @rtype: C{None}
         """
         # If we're not in a namespace, then ignore the funcdef.
         parentdoc = self.parentdocs[-1]
         if not isinstance(parentdoc, NamespaceDoc): return
-        
+
         # Create the function's RoutineDoc & VariableDoc.
-        if isinstance(self.parentdocs[-1], ClassDoc):
-            funcdoc = InstanceMethodDoc()
+        if isinstance(parentdoc, ClassDoc):
+            func_doc = InstanceMethodDoc()
         else:
-            funcdoc = RoutineDoc()
-        vardoc = VariableDoc(funcname, funcdoc, is_imported=False,
-                             is_alias=False)
+            func_doc = FunctionDoc()
+        var_doc = VariableDoc(name=funcname, value=func_doc,
+                              is_imported=False, is_alias=False)
 
         # Add the VariableDoc to our container.
-        parentdoc.add_child(vardoc)
+        self._set_variable(parentdoc, var_doc)
         
         # Add the function's parameters.
-        self._add_parameters(parameters, funcdoc)
+        self._add_parameters(parameters, func_doc)
 
         # Add the function's docstring.
-        funcdoc.docstring = self.get_docstring(body)
+        func_doc.docstring, func_doc.docstring_lineno = docstring_info
 
         # Add the function's canonical name
-        funcdoc.dotted_name = DottedName(self.context, funcname)
+        func_doc.canonical_name = DottedName(self.context, funcname)
         
         # Parse the suite (if we're in an __init__ method).
-        self.context = DottedName(self.context, funcname)
-        self.parentdocs.append(funcdoc)
-        if self._inside_init():
+        if isinstance(parentdoc, ClassDoc) and funcname == '__init__':
+            self.context = DottedName(self.context, funcname)
+            self.parentdocs.append(func_doc)
             self.process_suite(body)
-        self.context = DottedName(*self.context[:-1])
-        self.parentdocs.pop()
+            self.context = DottedName(*self.context[:-1])
+            self.parentdocs.pop()
 
-    def _add_parameters(self, parameters, funcdoc):
+        # Check for recognized decorators
+        if decorators is not None:
+            # Decorators are evaluated from bottom-to-top; so reverse
+            # the list.
+            decorators = decorators[1:]
+            decorators.reverse()
+            # Check each decorator to see if we know what to do with it.
+            for decorator in decorators:
+                decorator_name = self.extract_dotted_name(decorator[2])
+                if len(decorator) == 6:
+                    decorator_args = ()
+                elif len(decorator) > 6:
+                    decorator_args = decorator[4]
+                else:
+                    assert len(decorator) == 4
+                    decorator_args = None
+                func_doc = self.apply_decorator(func_doc, decorator_name,
+                                                decorator_args)
+                var_doc.value = func_doc
+                
+    def apply_decorator(self, func_doc, decorator_name, decorator_args):
         """
-        Set C{funcdoc}'s parameter fields (C{args}, C{vararg}, and
+        Return a C{RoutineDoc} specifying the API documentation for
+        the value produced by applying the given decorator to the
+        specified function.
+
+        @param func_doc: The API documentation for the function that
+            is being decorated.
+        @param decorator_name: The name of the decorator that is being
+            applied.
+        @type decorator_name: L{DottedName}
+        @param decorator_args: The ast for the arguments to the
+            decorator, if any.  If the decorator has no argument list,
+            then C{decorator_args} is C{None}.  If the decorator has
+            an empty argument list, then C{decorator_args} is C{()}.
+        """
+        if decorator_name == DottedName('staticmethod'):
+            return  StaticMethodDoc(**func_doc.__dict__)
+        elif decorator_name == DottedName('classmethod'):
+            return ClassMethodDoc(**func_doc.__dict__)
+        elif self.DEFAULT_DECORATOR_BEHAVIOR == 'passthrough':
+            return func_doc
+        elif self.DEFAULT_DECORATOR_BEHAVIOR == 'erasedocs':
+            return ValueDoc()
+
+    def _add_parameters(self, parameters, func_doc):
+        """
+        Set C{func_doc}'s parameter fields (C{args}, C{vararg}, and
         C{kwarg}) based on C{parameters}.
         
         @param parameters: The syntax tree for the function's
            parameter list (as generated by L{parser.ast2list}).
         """
+        # Set initial values.
+        func_doc.posargs = []
+        func_doc.posarg_defaults = []
+        func_doc.vararg = None
+        func_doc.kwarg = None
+        
         # parameters: '(' [varargslist] ')'
         if len(parameters) == 3: return
         varargslist = parameters[2]
 
         # Check for kwarg.
         if len(varargslist) > 3 and varargslist[-2][0] == token.DOUBLESTAR:
-            funcdoc.kwarg = ArgDoc(varargslist[-1][1])
+            func_doc.kwarg = varargslist[-1][1]
             del varargslist[-3:]
 
         # Check for vararg.
         if len(varargslist) > 3 and varargslist[-2][0] == token.STAR:
-            funcdoc.vararg = ArgDoc(varargslist[-1][1])
+            func_doc.vararg = varargslist[-1][1]
             del varargslist[-3:]
 
         # The rest should all be fpdef's.
-        funcdoc.args = []
         for elt in varargslist[1:]:
             if elt[0] == symbol.fpdef:
-                funcdoc.args.append(ArgDoc(self._fpdef_to_name(elt)))
+                name = self._fpdef_to_name(elt)
+                func_doc.posargs.append(name)
+                func_doc.posarg_defaults.append(None)
             elif elt[0] == symbol.test:
-                funcdoc.args[-1].default = ast_to_string(elt)
+                default = ValueDoc(ast=elt, repr=ast_to_string(elt, 'tight'))
+                func_doc.posarg_defaults[-1] = default
 
     def _fpdef_to_name(self, fpdef):
         """
@@ -900,22 +1275,11 @@ class DocParser:
             return tuple([self._fpdef_to_name(e) for e in fplist[1:]
                           if e[0] == symbol.fpdef])
 
-    def _inside_init(self):
-        """
-        @return: True if the current context of the C{DocParser} is
-        the C{__init__} method of a class.
-        @rtype: C{bool}
-        """
-        return (len(self.parentdocs)>=2 and 
-                isinstance(self.parentdocs[-2], ClassDoc) and
-                isinstance(self.parentdocs[-1], RoutineDoc) and
-                self.context[-1] == '__init__')
-    
     #////////////////////////////////////////////////////////////
     # Parse Handler: Class Definitions
     #////////////////////////////////////////////////////////////
 
-    def process_classdef(self, classname, bases, body, pseudo_docstring):
+    def process_classdef(self, classname, bases, body, docstring_info):
         """
         The statement handler for class definition blocks.  This
         handler constructs the documentation for the class, and adds
@@ -925,8 +1289,8 @@ class DocParser:
         @param classname: The name of the class
         @param bases: The class's base list
         @param body: The class's body
-        @param pseudo_docstring: The pseudo-docstring for the class
-            definition (ignored).
+        @param docstring_info: Information about the statement's
+            docstring, encoded as a tuple C{(docstring, lineno)}.
         @rtype: C{None}
         """
         # If we're not in a namespace, then ignore the classdef.
@@ -934,34 +1298,38 @@ class DocParser:
         if not isinstance(parentdoc, NamespaceDoc): return
         
         # Create the class's ClassDoc & VariableDoc.
-        classdoc = ClassDoc()
-        vardoc = VariableDoc(classname, classdoc, is_imported=False,
-                             is_alias=False)
+        classdoc = ClassDoc(local_variables={}, sort_spec=[],
+                            bases=[], subclasses=[])
+        var_doc = VariableDoc(name=classname, value=classdoc,
+                              is_imported=False, is_alias=False)
 
         # Add the VariableDoc to our container.
-        parentdoc.add_child(vardoc)
+        self._set_variable(parentdoc, var_doc)
 
         # Find our base classes.
         if bases is not None:
-            base_dotted_names = self.testlist_to_dotted_names(bases)
+            base_dotted_names = self.extract_dotted_name_list(bases)
             for base in base_dotted_names:
-                valuedoc = self.lookup_dotted_name(base)
-                if valuedoc is not None:
-                    classdoc.bases.append(valuedoc)
+                base_doc = self.lookup_value(base)
+                if base_doc is not None:
+                    classdoc.bases.append(base_doc)
                 else:
-                    # [XX] This is a significant problem.
-                    # Unknown base!
-                    classdoc.bases.append(ClassDoc())
+                    # [XX] This is a potentially significant problem?
+                    base_doc = ClassDoc(variables={}, sort_spec=[],
+                                        bases=[], subclasses=[],
+                                        imported_from = base)
+                    classdoc.bases.append(base_doc)
 
-        # Register ourselves as a subclass.
+        # Register ourselves as a subclass to our bases.
         for basedoc in classdoc.bases:
-            basedoc.subclasses.append(classdoc)
+            if isinstance(basedoc, ClassDoc):
+                basedoc.subclasses.append(classdoc)
         
         # Add the class's docstring.
-        classdoc.docstring = self.get_docstring(body)
+        classdoc.docstring, classdoc.docstring_lineno = docstring_info
         
         # Add the class's canonical name
-        classdoc.dotted_name = DottedName(self.context, classname)
+        classdoc.canonical_name = DottedName(self.context, classname)
         
         # Parse the suite.
         self.context = DottedName(self.context, classname)
@@ -969,12 +1337,12 @@ class DocParser:
         self.process_suite(body)
         self.context = DottedName(*self.context[:-1])
         self.parentdocs.pop()
-     
+
     #////////////////////////////////////////////////////////////
     # Parse Handler: Semicolon-Separated Statements
     #////////////////////////////////////////////////////////////
 
-    def process_multi_stmt(self, stmt1, rest, pseudo_docstring):
+    def process_multi_stmt(self, stmt1, rest, docstring_info):
         """
         The statement handler for a set of semicolon-separated
         statements, such as:
@@ -983,6 +1351,8 @@ class DocParser:
             
         This handler wraps the individual statements in a suite, and
         delegates to C{process_suite}.
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
         """
         # Get a list of the small-statements.
         small_stmts = [stmt1] + [s for s in rest
@@ -997,170 +1367,376 @@ class DocParser:
         self.process_suite(suite)
 
     #////////////////////////////////////////////////////////////
+    # Parse Handler: Delete Statements
+    #////////////////////////////////////////////////////////////
+     
+    def process_del(self, exprlist, docstring_info):
+        """
+        The statement handlere for delete statements.
+        @param docstring_info: Information about the statement's
+            docstring (ignored).
+        """
+        # If we're not in a namespace, then ignore del statements.
+        parentdoc = self.parentdocs[-1]
+        if not isinstance(parentdoc, NamespaceDoc): return
+
+        # Extract the list of identifiers to delete, and delete them.
+        try: names = flatten(self.extract_dotted_name_list(exprlist))
+        except ValueError: return
+        for name in names:
+            self._del_variable(parentdoc, name)
+
+    #////////////////////////////////////////////////////////////
+    # Variable Manipulation
+    #////////////////////////////////////////////////////////////
+
+    def _set_variable(self, namespace, var_doc):
+        # Choose which dictionary we'll be storing the variable in.
+        if not isinstance(namespace, NamespaceDoc):
+            return
+        elif isinstance(namespace, ClassDoc):
+            var_dict = namespace.local_variables
+        else:
+            var_dict = namespace.variables
+        # If we already have a variable with this name, then remove the
+        # old VariableDoc from the sort_spec list.
+        if var_doc.name in var_dict:
+            namespace.sort_spec.remove(var_doc.name)
+        # Add the variable to the namespace.
+        var_dict[var_doc.name] = var_doc
+        namespace.sort_spec.append(var_doc.name)
+        assert var_doc.container is UNKNOWN
+        var_doc.container = namespace
+
+    # need to handle things like 'del A.B.c'
+    def _del_variable(self, namespace, name):
+        if not isinstance(namespace, NamespaceDoc):
+            return
+        elif isinstance(namespace, ClassDoc):
+            var_dict = namespace.local_variables
+        else:
+            var_dict = namespace.variables
+
+        name = DottedName(name)
+        if name[0] in var_dict:
+            if len(name) == 1:
+                namespace.sort_spec.remove(name[0])
+                del var_dict[name[0]]
+            else:
+                self._del_variable(var_dict[name[0]], name[1:])
+                
+    #////////////////////////////////////////////////////////////
+    # Value Extraction
+    #////////////////////////////////////////////////////////////
+
+    #: A pattern matcher used to find C{classmethod} and
+    #: C{staticmethod} wrapper functions on the right-hand side
+    #: of assignment statements.
+    __WRAPPER_PATTERN = compile_ast_matcher("""
+        (testlist (test (and_test (not_test (comparison (expr
+         (xor_expr (and_expr (shift_expr (arith_expr (term (factor
+          (power (atom NAME:funcname)
+           (trailer LPAR (arglist (argument (test (and_test (not_test
+            (comparison (expr (xor_expr (and_expr (shift_expr
+             (arith_expr (term (factor
+              (power (atom NAME) (trailer DOT NAME)*):arg)))))))))))))
+            RPAR))))))))))))))""")
+
+    def rhs_to_valuedoc(self, rhs, varname):
+        """
+        @return: A C{ValueDoc} giving the API documentation for the
+            object specified by the right-hand side of an assignment
+            statement.
+        @rtype: L{ValueDoc}
+        @param rhs: The Python syntax tree for the right-hand side
+            of the assignment statement (as generated by
+            L{parser.ast2list}).
+        @type rhs: C{list}
+        """
+        # If the RHS is a classmethod or staticmethod wrapper, then
+        # create a ClassMethodDoc/StaticMethodDoc
+        match, vars2 = self.__WRAPPER_PATTERN.match(rhs)
+        if match:
+            arg_dotted_name = self.extract_dotted_name(vars2['arg'])
+            arg_valuedoc = self.lookup_value(arg_dotted_name)
+            if isinstance(arg_valuedoc, RoutineDoc):
+                # Figure out the canonical name for the value.
+                parent_name = self.parentdocs[-1].canonical_name
+                if parent_name is not UNKNOWN:
+                    rhs_canonical_name = DottedName(parent_name, varname)
+                else:
+                    rhs_canonical_name = None
+                # Wrap the routine in a classmethod/staticmethod.
+                if vars2['funcname'] == 'classmethod':
+                    cm_doc = ClassMethodDoc(**arg_valuedoc.__dict__)
+                    cm_doc.canonical_name = rhs_canonical_name
+                    return cm_doc
+                elif vars2['funcname'] == 'staticmethod':
+                    sm_doc = StaticMethodDoc(**arg_valuedoc.__dict__)
+                    sm_doc.canonical_name = rhs_canonical_name
+                    return sm_doc
+        
+        # Otherwise, it's a simple assignment
+        return ValueDoc(ast=rhs, repr=ast_to_string(rhs))
+
+    #////////////////////////////////////////////////////////////
     # Docstring Extraction
     #////////////////////////////////////////////////////////////
      
     __STRING_STMT_PATTERN = compile_ast_matcher("""
-        (stmt (simple_stmt (small_stmt (expr_stmt (testlist (test
-          (and_test (not_test (comparison (expr (xor_expr (and_expr
-            (shift_expr (arith_expr (term (factor (power (atom
+        (stmt COMMENT* (simple_stmt (small_stmt (expr_stmt (testlist 
+          (test (and_test (not_test (comparison (expr (xor_expr 
+            (and_expr (shift_expr (arith_expr (term (factor (power (atom
               STRING:stringval)))))))))))))))) NEWLINE))""")
     """A pattern matcher that matches a statement containing a single
-    string literal.  This pattern matcher is used to find docstrings
-    and pseudo-docstrings."""
+    string literal.  This pattern matcher is used to find docstrings."""
 
-    COMMENT_MARKER = '#: '
-    """The prefix used to mark comments that contain pseudo-docstrings
-    for variables."""
-
-    def get_docstring(self, suite):
+    def find_docstrings(self, ast, filename):
         """
-        @return: The docstring for the given suite.  I.e., if the
-        first statement in C{suite} is a string literal, then return
-        its contents; otherwise, return C{None}.
-        @rtype: C{string} or C{None}
+        Find all docstrings in a Python source file, including
+        attribute docstrings and comment docstrings.  In particular,
+        given a syntax tree and the name of the file that syntax tree
+        came from, return a dictionary that maps from python id's of
+        syntax tree nodes to tuples C{(docstring, lineno)}, where
+        C{docstring} is the docstring for that node, and C{lineno} is
+        the line number for that docstring.
         """
-        # Find the first statement in the suite.
-        if len(suite) == 2 and suite[1][0] == symbol.simple_stmt:
-            # suite: simple_stmt
-            first_stmt = (symbol.stmt, suite[1])
-        else:
-            # suite: NEWLINE INDENT stmt+ DEDENT
-            first_stmt = suite[3]
-
-        # Match it against __STRING_STMT_PATTERN
-        match, stmtvars = self.__STRING_STMT_PATTERN.match(first_stmt)
-        if match: return eval(stmtvars['stringval'])
-        else: return None
+        tokeniter = tokenize.generate_tokens(open(filename).readline)
+        docstrings = {}
+        self._find_docstrings_helper(ast, filename, tokeniter,
+                                     docstrings, [ast])
+        for key, (strings, lineno) in docstrings.items():
+            docstrings[key] = ('\n'.join(strings), lineno)
+        return docstrings
             
-    def get_pseudo_docstring(self, stmts, i):
-        """
-        @return: The pseudo-docstring for statement C{stmts[i]}, if it
-        has one.  I.e., if C{stmts[i+1]} is a string literal, then
-        return its contents; otherwise, return C{None}.
-        @rtype: C{string} or C{None}
-        """
-        if i+1 < len(stmts):
-            match, vars = self.__STRING_STMT_PATTERN.match(stmts[i+1])
-            if match: return eval(vars['stringval'])
-        return None
-
-    def get_comment_docstring(self, comments, nl_comment=''):
-        """
-        @return: The pseudo-docstring contained in a statement's
-            comments.  Each line of a pseudo-docstring comment must
-            begin with L{COMMENT_MARKER}.
-        @rtype: C{string}
-        @param comments: The comment lines preceeding the statement
-        @param nl_comment: The comment on the same line as the
-            statement (directly following it), or C{None} if there
-            is none.
-        """
-        # Discard any comments that are not marked with the comment
-        # marker.
-        for i in range(len(comments)-1, -1, -1):
-            if not comments[i].startswith(self.COMMENT_MARKER):
-                del comments[:i+1]
-                break
-
-        # Add the newline comment on.
-        if nl_comment.startswith(self.COMMENT_MARKER):
-            comments.append(nl_comment)
-
-        # If we didn't find anything, return None.
-        if not comments: return None
-
-        # Strip off the comment marker, and join them into one string.
-        cm_len = len(self.COMMENT_MARKER)
-        comments = [comment[cm_len:] for comment in comments]
-        return '\n'.join(comments)
+    def _find_docstrings_helper(self, ast, filename, tokeniter,
+                                docstrings, stmts):
+        if ast == '': return
+    
+        # If `ast` is a leaf in the syntax tree, then iterate through the
+        # tokens until we find one that matches the leaf.  Record any
+        # tokens that contain docstrings.
+        if isinstance(ast, str):
+            for typ,tok,start,end,line in tokeniter:
+                
+                # Is this token a docstring?
+                if (typ == token.STRING and stmts[-1] is not None and
+                    self.__STRING_STMT_PATTERN.match(stmts[-1])[0]):
+                    # This is safer than eval():
+                    s = compiler.parse(tok).getChildren()[0]
+                    docstrings.setdefault(id(stmts[-2]), ([],start[0]))
+                    docstrings[id(stmts[-2])][0].append(s)
+    
+                # Is this token a comment docstring?
+                if (typ == tokenize.COMMENT and stmts[-1] is not None and
+                    tok.startswith(self.COMMENT_MARKER)):
+                    s = tok[len(self.COMMENT_MARKER):].rstrip()
+                    docstrings.setdefault(id(stmts[-1]), ([],start[0]))
+                    docstrings[id(stmts[-1])][0].append(s)
+                        
+                if tok == ast: return
+    
+        # If `ast` is a non-leaf node, then explore its contents.
+        else:
+            if ast[0] == symbol.stmt: stmts.append(ast)
+            for child in ast[1:]:
+                self._find_docstrings_helper(child, filename, tokeniter, 
+                                             docstrings, stmts)
 
     #////////////////////////////////////////////////////////////
     # Name Lookup
     #////////////////////////////////////////////////////////////
 
-    def lookup_name(self, name):
+    def lookup_name(self, identifier):
         """
-        @rtype: L{ValueDoc}
-        """
-        assert type(name) == StringType
+        Find and return the documentation for the variable named by
+        the given identifier in the current namespace.
         
-        # Decide which namespaces to check.
-        if self.USE_NESTED_SCOPES:
-            namespaces = [self.builtins_moduledoc] + self.parentdocs
-        else:
-            namespaces = [self.builtins_moduledoc,
-                          self.parentdocs[0],
-                          self.parentdocs[-1]]
+        @rtype: L{VariableDoc} or C{None}
+        """
+        assert type(identifier) == StringType
+        
+        # Decide which namespaces to check.  Note that, even if we're
+        # in a version of python that uses nested scopes, it does not
+        # look at intermediate class blocks.  E.g:
+        #     >>> x = 1
+        #     >>> class A:
+        #     ...     x = 2
+        #     ...     class B:
+        #     ...         print x
+        #     1
+        namespaces = [self.builtins_moduledoc,
+                      self.parentdocs[0],
+                      self.parentdocs[-1]]
 
         # Check the namespaces, from closest to farthest.
         for i in range(len(namespaces)-1, -1, -1):
-            if isinstance(namespaces[i], NamespaceDoc):
-                if namespaces[i].children.has_key(name):
-                    return namespaces[i].children[name].valuedoc
+            # In classes, check local_variables.
+            if isinstance(namespaces[i], ClassDoc):
+                if namespaces[i].local_variables.has_key(identifier):
+                    return namespaces[i].local_variables[identifier]
+            # In modules, check variables.
+            elif isinstance(namespaces[i], NamespaceDoc):
+                if namespaces[i].variables.has_key(identifier):
+                    return namespaces[i].variables[identifier]
 
         # We didn't find it; return None.
         return None
 
-    def lookup_dotted_name(self, dotted_name):
+    def lookup_value(self, dotted_name):
         """
-        @rtype: L{ValueDoc}
+        Find and return the documentation for the value contained in
+        the variable with the given name in the current namespace.
         """
-        valuedoc = self.lookup_name(dotted_name[0])
+        var_doc = self.lookup_name(dotted_name[0])
+
         for i in range(1, len(dotted_name)):
-            # If we couldn't find a value, return none.
-            if valuedoc is None: return None
-            # If it's a proxy value, then return a proxy value formed
-            # by the base value and the remaining identifiers.
-            if isinstance(valuedoc, ValueDocProxy):
-                return ValueDocProxy(DottedName(valuedoc.dotted_name,
-                                                *dotted_name[i:]))
-            # If it's not a namespace, return none.
-            if not isinstance(valuedoc, NamespaceDoc): return None
-            # Look up the next name in the namespace.
-            valuedoc = valuedoc.children.get(dotted_name[i]).valuedoc
+            if var_doc is None: return None
             
-        return valuedoc
+            if var_doc.value.imported_from not in (UNKNOWN, None):
+                from_name = DottedName(var_doc.value.imported_from,
+                                       *dotted_name[i:])
+                return ValueDoc(imported_from=from_name)
+
+            if isinstance(var_doc.value, ClassDoc):
+                var_dict = var_doc.value.local_variables
+            elif isinstance(var_doc.value, NamespaceDoc):
+                var_dict = var_doc.value.variables
+            else:
+                return None
+
+            var_doc = var_dict.get(dotted_name[i])
+
+        if var_doc is None: return None
+        return var_doc.value
+
+    # [xx] not currently used by anything:
+    def lookup_variable(self, dotted_name):
+        """
+        Find and return the documentation for the variable with the
+        given name in the current namespace.
+        """
+        var_doc = self.lookup_name(dotted_name[0])
+        
+        for i in range(1, len(dotted_name)):
+            if var_doc is None: return None
+            if isinstance(var_doc.value, ClassDoc):
+                var_dict = var_doc.value.local_variables
+            elif isinstance(var_doc.value, NamespaceDoc):
+                var_dict = var_doc.value.variables
+            else:
+                return None
+
+            var_doc = var_dict.get(dotted_name[i])
+
+        return var_doc
 
     #////////////////////////////////////////////////////////////
-    # Identifier extraction
+    # Extracting values & identifiers from AST
     #////////////////////////////////////////////////////////////
 
-    __LHS_PATTERN = compile_ast_matcher("""
+    def eval_strval(self, strval):
+        # use compiler.parse, since it's safer than eval().
+        return compiler.parse(strval).getChildren()[0]
+
+    __TEST_ATOM_PATTERN = compile_ast_matcher("""
         (test (and_test (not_test (comparison (expr (xor_expr
          (and_expr (shift_expr (arith_expr (term (factor 
-          (power (atom...):atom (trailer DOT NAME)*):power)))))))))))""")
+          (power (atom ...):atom))))))))))))""")
 
-    def testlist_to_dotted_names(self, testlist):
-        assert testlist[0] in (symbol.testlist, symbol.listmaker)
-        names = []
+    __PAREN_PATTERN = compile_ast_matcher("""
+        (testlist (test (and_test (not_test (comparison (expr (xor_expr 
+         (and_expr (shift_expr (arith_expr (term (factor (power
+            (atom LPAR (testlist ...):contents RPAR))))))))))))))""")
 
-        # Traverse the testlist, looking for variables.
-        for test in testlist[1:]:
-            match, vars = self.__LHS_PATTERN.match(test)
+    def extract_list(self, ast, elt_handler):
+        testlist_gexp = getattr(symbol, 'testlist_gexp', -1)
+        if ast[0] not in (symbol.testlist, symbol.listmaker,
+                          testlist_gexp):
+            raise ValueError('Could not extract list')
+
+        # Does ast contain a tuple?
+        if (ast[0] in (symbol.testlist, testlist_gexp) and
+            len(ast) > 2):
+            return tuple(self._extract_list_items(ast, elt_handler))
+
+        # Does ast contain a list?
+        if ast[0] == symbol.listmaker:
+            if len(ast) > 2 and ast[2][0] == symbol.list_for:
+                raise ValueError('Could not extract list')
+            return self._extract_list_items(ast, elt_handler)
+
+        # Does ast contain parens for a tuple or brackets for a list?
+        match, vars = self.__TEST_ATOM_PATTERN.match(ast[1])
+        if match:
+            atom = vars['atom']
+            if len(atom) == 4 and atom[1][0] in (token.LSQB, token.LPAR):
+                return self.extract_list(atom[2], elt_handler)
+            elif len(atom) == 3 and atom[1][0] == token.LSQB:
+                return []
+            elif len(atom) == 3 and atom[1][0] == token.LPAR:
+                return ()
+            else:
+                return elt_handler(ast[1])
+
+        # Otherwise, fail.
+        raise ValueError('Could not extract list')
+
+    def _extract_list_items(self, ast, elt_handler):
+        testlist_gexp = getattr(symbol, 'testlist_gexp', -1)
+        assert ast[0] in (symbol.testlist, symbol.listmaker,
+                          testlist_gexp)
+        elts = []
+        for child in ast[1:]:
+            if child[0] == token.COMMA: continue
+            match, vars = self.__TEST_ATOM_PATTERN.match(child)
             if match:
                 atom = vars['atom']
-                
-                # Is it a name?
-                if atom[1][0] == token.NAME:
-                    names.append(self._power_to_dotted_name(vars['power']))
+                if (len(atom) == 4 and 
+                    atom[1][0] in (token.LSQB, token.LPAR)):
+                    elts.append(self.extract_list(atom[2], elt_handler))
+                else:
+                    elts.append(elt_handler(child))
+            else:
+                elts.append(elt_handler(child))
+        return elts
 
-                # Is it a sub-list or sub-tuple?
-                elif atom[1][0] in (token.LSQB, token.LPAR):
-                    testlist = atom[2]
-                    names.append(self.testlist_to_dotted_names(testlist))
+    def extract_string(self, ast):
+        # Walk down the syntax tree to symbol.atom.  If the tree
+        # branches or we get to a token first, then abort.
+        while ast[0] != symbol.atom:
+            if len(ast)!=2 or type(ast[1]) == StringType:
+                raise ValueError('ast does not contain a string')
+            ast = ast[1]
 
-        return names
-     
+        # If the atom doesn't contain a string, return None.
+        if ast[1][0] != token.STRING:
+            raise ValueError('ast does not contain a string')
+
+        # Otherwise, return the string.
+        return ''.join([self.eval_strval(tok[1]) for tok in ast[1:]])
+        
+    def extract_string_list(self, ast):
+        return self.extract_list(ast, self.extract_string)
+
+    def extract_dotted_name_list(self, ast):
+        # It might be a single name:
+        n = self.extract_dotted_name(ast)
+        if n is not None: return [n]
+        # Otherwise try a list:
+        return self.extract_list(ast, self.extract_dotted_name)
+
     __DOTTED_NAME_PATTERN = compile_ast_matcher("""
         (power (atom NAME:varname) (trailer DOT NAME)*:trailers)""")
-
-    def ast_to_dotted_name(self, ast):
-
+    def extract_dotted_name(self, ast):
+        """
+        Given an abstract syntax tree containing a single dotted name,
+        return a corresponding L{DottedName} object.  (If the given
+        ast does not contain a dotted name, return C{None}.)
+        """
         # Walk down the syntax tree to symbol.power or
         # symbol.dotted_name.  If the tree branches or we get to a
         # token first, then return None.
-        
         while ast[0] not in (symbol.power, symbol.dotted_name):
             if len(ast)!=2 or type(ast[1]) == StringType: return None
             ast = ast[1]
@@ -1169,73 +1745,48 @@ class DocParser:
             idents = [e[1] for e in ast[1:] if e[0] == token.NAME]
             return DottedName(*idents)
         else:
-            return self._power_to_dotted_name(ast)
-
-    def _power_to_dotted_name(self, power_node):
-        assert power_node[0] == symbol.power
-        match, vars = self.__DOTTED_NAME_PATTERN.match(power_node)
-        if not match: return None
-        atom = vars['varname']
-        trailers = [t[2][1] for t in vars['trailers']]
-        return DottedName(atom, *trailers)
+            match, vars = self.__DOTTED_NAME_PATTERN.match(ast)
+            if not match: return None
+            atom = vars['varname']
+            trailers = [t[2][1] for t in vars['trailers']]
+            return DottedName(atom, *trailers)
     
+
+
+
+
+
+
+
 ######################################################################
 ## Helper Functions
 ######################################################################
 
-def _find_module_from_filename(filename):
+def _get_module_name(filename, package_doc):
     """
-    Break a module/package filename into a base directory and a module
-    name.  C{_find_module_from_filename} checks directories in the
-    filename to see if they contain C{"__init__.py"} files; if they
-    do, then it assumes that the module is part of a package, and
-    returns the full module name.  For example, if C{filename} is
-    C{"/tmp/epydoc/imports.py"}, and the file
-    C{"/tmp/epydoc/__init__.py"} exists, then the base directory will
-    be C{"/tmp/"} and the module name will be C{"epydoc.imports"}.
-    
-    @return: A pair C{(basedir, module)}, where C{basedir} is the base
-        directory from which the module can be imported; and C{module}
-        is the name of the module itself.    
-    @rtype: C{(string, string)}
-
-    @param filename: The filename that contains the module.
-        C{filename} can be a directory (for a package); a C{.py} file;
-        a C{.pyc} file; a C{.pyo} file; or an C{.so} file.
-    @type filename: C{string}
+    Return (dotted_name, is_package)
     """
-    # Normalize the filename
-    filename = os.path.normpath(os.path.abspath(filename))
-
-    # Split the file into (basedir, module, ext), and check the extension.
-    (basedir, file) = os.path.split(filename)
-    (module, ext) = os.path.splitext(file)
-    if not (ext[-3:] == '.py' or ext[-4:-1] == '.py' or
-            ext[-3:] == '.so'):
-        raise ImportError('Error importing %r: ' % filename +
-                          'not a Python module')
-
-    # Is it a package?
-    if module == '__init__':
-        (basedir, module) = os.path.split(basedir)
-    
-    # If there's a package, then find its base directory.
-    if (os.path.exists(os.path.join(basedir, '__init__.py')) or
-        os.path.exists(os.path.join(basedir, '__init__.pyc')) or
-        os.path.exists(os.path.join(basedir, '__init__.pyw'))):
-        package = []
-        while os.path.exists(os.path.join(basedir, '__init__.py')):
-            (basedir,dir) = os.path.split(basedir)
-            if dir == '': break
-            package.append(dir)
-        package.reverse()
-        module = '.'.join(package+[module])
-
-    return (basedir, DottedName(module))
+    name = re.sub(r'.py\w?$', '', os.path.split(filename)[1])
+    if name == '__init__':
+        is_package = True
+        name = os.path.split(os.path.split(filename)[0])[1]
+    else:
+        is_package = False
+        
+    # [XX] if the module contains a script, then `name` may not
+    # necessarily be a valid identifier -- which will cause
+    # DottedName to raise an exception.  Is that what I want?
+    if package_doc is None:
+        return DottedName(name), is_package
+    else:
+        return DottedName(package_doc.canonical_name, name), is_package
 
 def pp_ast(ast, indent=''):
-    """
-    Display a Python syntax tree in a human-readable format.
+    r"""
+    Display a Python syntax tree in a human-readable format.  E.g.:
+
+    >>> print pp_ast(parser.suite('\ndel x\n').tolist())
+    
     @param ast: The syntax tree to display, enocded as nested lists
         or nested tuples.
     """
@@ -1258,19 +1809,20 @@ def flatten(lst, out=None):
     """
     if out is None: out = []
     for elt in lst:
-        if type(elt) is ListType:
+        if isinstance(elt, (list, tuple)):
             flatten(elt, out)
         else:
             out.append(elt)
     return out
 
-def ast_to_string(ast, indent=0, spacing='normal'):
+def ast_to_string(ast, spacing='normal', indent=0):
     """
     Given a Python parse tree, return a string that could be parsed to
     produce that tree.
-    @param ast: The Python syntax tree.
-    @param spacing: not implemented yet.  could be used to do 'tight'
-        spacing, which would be used for repr of default values.
+    @param ast: The Python syntax tree, enocded as nested lists or
+        nested tuples.
+    @param spacing: 'tight' or 'normal' -- determines how much space is
+        left between tokens (e.g., '1+2' vs '1 + 2').
     """
     if type(ast[0]) is IntType:
         ast = ast[1:]
@@ -1296,32 +1848,56 @@ def ast_to_string(ast, indent=0, spacing='normal'):
         elif elt[0] == tokenize.COMMENT:
             s += elt[1].rstrip() + '\n' + '    '*indent
         else:
-            s = _ast_string_join(s, ast_to_string(elt, indent))
+            s = _ast_string_join(s, ast_to_string(elt, spacing, indent),
+                                 spacing)
 
     return s
 
-def _ast_string_join(left, right):
+def _ast_string_join(left, right, spacing):
     if (right=='' or left=='' or
         left in '-`' or right in '}])`:' or
         right[0] in '.,' or left[-1] in '([{.\n ' or
         (right[0] == '(' and left[-1] not in ',=')):
         return '%s%s' % (left, right)
+    elif (spacing=='tight' and
+          left[-1] in '+-*/=,' or right[0] in '+-*/=,'):
+        return '%s%s' % (left, right)
     else:
         return '%s %s' % (left, right)
+
+# rename to augment_ast; add comments, and record line numbers.
+# where to record line numbers???
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def add_comments_to_ast(ast, filename):
     """
     Given a Python syntax tree and the filename of the file that it
     was generated from, insert COMMENT nodes into the tree.
     """
-    
     # Tokenize the given file.
     tokens = []
     def tokeneater(typ,tok,start,end,line,tokens=tokens):
+        print 'tokeneater', (typ, tok, start, end, line)
+        lineno = start[0]
+        print '  lineno', lineno
         tokens.append((typ,tok))
     tokenize.tokenize(open(filename).readline, tokeneater)
 
     # Reverse the tokens (so we can pop them off one at a time).
+    tokens.append((tokenize.NEWLINE, '\n'))
     tokens.reverse()
 
     # Call our helper function to do the real work.
@@ -1336,33 +1912,30 @@ def _add_comments_to_ast_helper(ast, reversed_tokens, stmt):
     if ast == '':
         return
     elif type(ast) is StringType:
-        while 1:
+        while reversed_tokens:
             # Find a token to match the ast leaf.
             typ,tok = reversed_tokens.pop()
             if tok == ast: break
             # Attatch comments to the enclosing statement node.
             if typ == tokenize.COMMENT and stmt is not None:
-                if tok[-1] == '\n': tok = tok[:-1]
+                if tok.endswith('\n'): tok = tok[:-1]
                 stmt.insert(-1, (tokenize.COMMENT, tok))
     else:
         # If we're entering a statement, update stmt.
         if ast[0] == symbol.stmt:
             stmt = ast
 
-        # Recurse to our children.
+        # Recurse to our variables.
         for child in ast[1:]:
             _add_comments_to_ast_helper(child, reversed_tokens, stmt)
 
-######################################################################
-## Testing
-######################################################################
+def main():
+    from docinspector import DocInspector
+    inspector = DocInspector()
+    parser = DocParser(inspector.inspect(__builtins__))
+
+    import sys
+    print parser.find(sys.argv[1])
 
 if __name__ == '__main__':
-    # Create a builtins moduledoc
-    try: builtins_doc
-    except:
-        import docinspector
-        builtins_doc = docinspector.DocInspector().inspect(__builtins__)
-    
-    print DocParser(builtins_doc).parse('epydoc_test.py').pp(depth=4,
-                       exclude=['subclasses'])
+    main()

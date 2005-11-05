@@ -1,12 +1,10 @@
+# epydoc
 #
-# epydoc package file
+# Copyright (C) 2005 Edward Loper
+# Author: Edward Loper <edloper@loper.org>
+# URL: <http://epydoc.sf.net>
 #
-# A python documentation Module
-# Edward Loper
-#
-# Created [01/30/01 05:18 PM]
 # $Id$
-#
 
 """
 Automatic Python reference documentation generator.  Epydoc processes
@@ -15,6 +13,43 @@ in the form of HTML pages.  Epydoc can be used via a command-line
 interface (L{epydoc.cli}) and a graphical interface (L{epydoc.gui}).
 Both interfaces let the user specify a set of modules to document, and
 produce API documentation using the following steps:
+
+Architecture graph::
+
+   Python object             Module source code
+         |                           |
+         V                           V
+  +--------------+             +-----------+
+  | DocInspector |             | DocParser |
+  +--------------+             +-----------+
+         |                           |
+         +---------+     +-----------+
+                   |     |
+                   V     V
+                +-----------+     Merges the output from DocParser
+                | DocMerger |     into the output from DocInspector.
+                +-----------+     
+                      |
+                      V
+               +------------+     Creates an index for the ValueDoc
+               | DocIndexer |     objects; and assigns canonical names
+               +------------+     to any ValueDocs that don't have them.
+                      |
+                      V
+             +-----------------+  Parses all docstrings, and
+             | DocstringParser |  processes all docstring fields.
+             +-----------------+
+                      |
+                      V
+              +--------------+    Handles documentation inheritance?
+              | DocInheriter |
+              +--------------+
+                      |
+                      V
+               +------------+     Outputs the APIDoc objects to
+               | DocWriters |     appropriate formats
+               +------------+
+
 
 [XX] Out of date:
 
