@@ -66,6 +66,7 @@ __docformat__ = 'epytext en'
 
 # Imports
 import re
+import sys
 from xml.dom.minidom import *
 
 from docutils.core import publish_string
@@ -176,9 +177,11 @@ class _EpydocReader(StandaloneReader):
         StandaloneReader.__init__(self)
         
     def new_document(self):
+        self.settings.stream = sys.stderr
+        self.settings.report_level = 10000
+        self.settings.halt_level = 10000
         document = new_document(self.source.source_path, self.settings)
         document.reporter.attach_observer(self.report)
-        document.reporter.set_conditions('', 10000, 10000, None)
         self._encoding = document.reporter.encoding
         self._error_handler = document.reporter.error_handler
         return document
