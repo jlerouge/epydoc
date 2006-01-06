@@ -307,7 +307,7 @@ class _SplitFieldsTranslator(NodeVisitor):
 
     def _add_field(self, tagname, arg, fbody):
         # Remove the superfluous paragraph in fields body
-        if fbody:
+        if tagname not in ('var', 'ivar', 'cvar') and fbody:
             fbody = fbody[0].children + fbody[1:]
 
         field_doc = self.document.copy()
