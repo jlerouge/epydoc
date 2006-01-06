@@ -68,7 +68,7 @@ __docformat__ = 'epytext en'
 ##################################################
 
 # Expects: name
-HEADER = '''<?xml version="1.0" encoding="iso-8859-1"?>
+HEADER = '''<?xml version="1.0" encoding="%s"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
           "DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -101,7 +101,7 @@ FOOTER = '''
 </html>
 '''
 # Expects: (name, mainFrame_src)
-FRAMES_INDEX = '''<?xml version="1.0" encoding="iso-8859-1"?>
+FRAMES_INDEX = '''<?xml version="1.0" encoding="%s"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
           "DTD/xhtml1-frameset.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -118,7 +118,7 @@ FRAMES_INDEX = '''<?xml version="1.0" encoding="iso-8859-1"?>
 </html>
 '''
 # Expects (url, url, name)
-REDIRECT_INDEX = '''<?xml version="1.0" encoding="iso-8859-1"?>
+REDIRECT_INDEX = '''<?xml version="1.0" encoding="%s"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
           "DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -361,6 +361,8 @@ class HTMLFormatter:
               end of their group; if C{inheritance='included'}, then
               inherited objects are mixed in with non-inherited
               objects.  The default is 'grouped'.
+        @type encoding: C{string}
+        @keyword encoding: The page encoding. Default is 'iso-8859-1'.
         """
         self._docmap = docmap
 
@@ -384,6 +386,7 @@ class HTMLFormatter:
         self._variable_tooltip_linelen = \
                          kwargs.get('variable_tooltip_linelength', 600)
         self._inheritance = kwargs.get('inheritance', 'grouped')
+        self._encoding = kwargs.get('encoding', 'iso-8859-1')
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
@@ -651,7 +654,7 @@ class HTMLFormatter:
 
         # Use a redirect if top is external, or if we faild to copy.
         name = self._prj_name or 'this project'
-        open(filename, 'w').write(REDIRECT_INDEX % (top, top, name))
+        open(filename, 'w').write(REDIRECT_INDEX % (self._encoding, top, top, name))
 
     def _write_css(self, directory, cssname):
         """
@@ -993,7 +996,7 @@ class HTMLFormatter:
         @param private: The output stream for the private version of the page.
         """
         prj_name = self._prj_name or "API Documentation"
-        str = FRAMES_INDEX % (prj_name, self._top_page)
+        str = FRAMES_INDEX % (self._encoding, prj_name, self._top_page)
         public.write(str); private.write(str)
 
     def _write_toc(self, public, private):
@@ -3043,7 +3046,7 @@ class HTMLFormatter:
             name.
         @rtype: C{string}
         """
-        return HEADER % name
+        return HEADER % (self._encoding, name)
                
     def _footer(self):
         """

@@ -30,6 +30,7 @@ Usage::
      -c SHEET, --css SHEET     CSS stylesheet for HTML files.
      --private-css SHEET       CSS stylesheet for private objects.
      --inheritance STYLE       The format for showing inherited objects.
+     --encoding ENCODING       Output encoding for HTML files (default: utf-8).
      -V, --version             Print the version of epydoc.
      -h, -?, --help, --usage   Display this usage message.
      -h TOPIC, --help TOPIC    Display information about TOPIC (docformat,
@@ -262,7 +263,7 @@ def _parse_args():
         C{target}, C{modules}, C{verbosity}, C{prj_name}, C{output},
         C{show_imports}, C{frames}, C{private}, C{debug}, C{top},
         C{list_classes_separately}, C{docformat}, C{inheritance},
-        C{autogen_vars}, and C{test}.
+        C{encoding}, C{autogen_vars}, and C{test}.
     @rtype: C{None}
     """
     # Default values.
@@ -271,6 +272,7 @@ def _parse_args():
                'show_imports':0, 'frames':1, 'private':None,
                'list_classes_separately': 0, 'debug':0,
                'docformat':None, 'top':None, 'inheritance': None,
+               'encoding': 'utf-8',
                'ignore_param_mismatch': 0, 'alphabetical': 1}
 
     # Get the command-line arguments, using getopts.
@@ -286,7 +288,7 @@ def _parse_args():
                 'target= version verbose '+
                 'navlink= nav_link= nav-link= '+
                 'command-line-order command_line_order '+
-                'inheritance= inheritence= '+
+                'inheritance= inheritence= encoding= '+
                 'ignore_param_mismatch ignore-param-mismatch '+
                 'test= tests= checks=').split()
     try:
@@ -321,6 +323,8 @@ def _parse_args():
             options['ignore_param_mismatch'] = 1
         elif opt in ('--inheritance', '--inheritence'):
             options['inheritance']=val.lower()
+        elif opt in ('--encoding',):
+            options['encoding']=val
         elif opt in ('--latex',): options['action']='latex'
         elif opt in ('--name', '-n'): options['prj_name']=val
         elif opt in ('--navlink', '--nav-link', '--nav_link'):
@@ -470,8 +474,9 @@ def _make_docmap(modules, options):
     document_autogen_vars = 1
     inheritance_groups = (options['inheritance'] == 'grouped')
     inherit_groups = (options['inheritance'] != 'grouped')
+    output_encoding = options['encoding']
     d = DocMap(verbosity, document_bases, document_autogen_vars,
-               inheritance_groups, inherit_groups)
+               inheritance_groups, inherit_groups, output_encoding)
     if options['verbosity'] > 0:
         print  >>sys.stderr, ('Building API documentation for %d modules.'
                               % len(modules))

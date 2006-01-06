@@ -554,7 +554,8 @@ class ObjDoc:
         # Future Work
         DocField(['todo'], 'To Do'),
         ]
-    def __init__(self, uid, verbosity=0, docstring=None):
+    def __init__(self, uid, verbosity=0, docstring=None, 
+                 output_encoding='iso-8859-1'):
         """
         Create the documentation for the given object.
         
@@ -565,6 +566,8 @@ class ObjDoc:
             numbers produce more verbose output; negative numbers
             supress warnings and errors.
         @type verbosity: C{int}
+        @param output_encoding: Encoding for output text.
+        @type verbosity: C{string}
         """
         obj = uid.value()
         self._uid = uid
@@ -656,7 +659,7 @@ class ObjDoc:
         if type(docstring) == types.StringType: docstring = docstring.strip()
         if docstring:
             self._has_docstring = 1
-            self.__parse_docstring(docstring)
+            self.__parse_docstring(docstring, output_encoding)
         else:
             self._has_docstring = 0
     
@@ -1080,9 +1083,10 @@ class ObjDoc:
     #// Private
     #////////////////////////////
 
-    def __parse_docstring(self, docstring):
+    def __parse_docstring(self, docstring, output_encoding='iso-8859-1'):
         errors = []
-        parsed_docstring = markup.parse(docstring, self._docformat, errors)
+        parsed_docstring = markup.parse(docstring, self._docformat, errors,
+                                        output_encoding=output_encoding)
         descr, fields = parsed_docstring.split_fields(errors)
         self._descr = descr
 
@@ -1155,14 +1159,14 @@ class ModuleDoc(ObjDoc):
     @ivar _modules: A list of all modules conained in the package
         (package only).
     """
-    def __init__(self, uid, verbosity=0):
+    def __init__(self, uid, verbosity=0, output_encoding='iso-8859-1'):
         mod = uid.value()
 
         # Variables:
         self._tmp_var = {}
         self._tmp_type = {}
 
-        ObjDoc.__init__(self, uid, verbosity)
+        ObjDoc.__init__(self, uid, verbosity, output_encoding=output_encoding)
 
         # If mod is a package, then it will contain a __path__
         if mod.__dict__.has_key('__path__'): self._modules = []
@@ -1577,7 +1581,7 @@ class ClassDoc(ObjDoc):
     @type _bases: C{list} of L{Link}
     @ivar _bases: A list of the identifiers of this class's bases.
     """
-    def __init__(self, uid, verbosity=0):
+    def __init__(self, uid, verbosity=0, output_encoding='iso-8859-1'):
         cls = uid.value()
 
         # Variables:
@@ -1586,7 +1590,7 @@ class ClassDoc(ObjDoc):
         self._tmp_type = {}
         self._property_type = {}
 
-        ObjDoc.__init__(self, uid, verbosity)
+        ObjDoc.__init__(self, uid, verbosity, output_encoding=output_encoding)
 
         # Handle methods & class variables
         self._methods = []
@@ -2198,7 +2202,7 @@ class FuncDoc(ObjDoc):
     """
     _param_mismatches = []
 
-    def __init__(self, uid, verbosity=0):
+    def __init__(self, uid, verbosity=0, output_encoding='iso-8859-1'):
         func = uid.value()
         
         #self._tmp_param = {}
@@ -2222,7 +2226,8 @@ class FuncDoc(ObjDoc):
             self._tmp_param[param.name()] = param
 
         # Parse the docstring.
-        ObjDoc.__init__(self, uid, verbosity, docstring)
+        ObjDoc.__init__(self, uid, verbosity, docstring, 
+                        output_encoding=output_encoding)
 
         # Deal with any extra types for @keyword args
         for (name, typ) in self._tmp_extra_type.items():
@@ -2765,7 +2770,8 @@ class PropertyDoc(ObjDoc):
 
     @group Accessors: type, fget, fset, fdel
     """
-    def __init__(self, uid, typ=None, verbosity=0):
+    def __init__(self, uid, typ=None, verbosity=0, 
+                 output_encoding='iso-8859-1'):
         property = uid.value()
         cls = uid.cls()
         if property.fget is None: self._fget = None
@@ -2775,7 +2781,7 @@ class PropertyDoc(ObjDoc):
         if property.fdel is None: self._fdel = None
         else: self._fdel = self._make_uid(property.fdel, cls, 'fdel')
         self._type = typ
-        ObjDoc.__init__(self, uid, verbosity)
+        ObjDoc.__init__(self, uid, verbosity, output_encoding=output_encoding)
 
         # Print out any errors/warnings that we encountered.
         self._print_errors()
@@ -2884,7 +2890,7 @@ class DocMap(UserDict.UserDict):
     
     def __init__(self, verbosity=0, document_bases=1,
                  document_autogen_vars=1, inheritance_groups=0,
-                 inherit_groups=1):
+                 inherit_groups=1, output_encoding='iso-8859-1'):
         """
         Create a new empty documentation map.
 
@@ -2905,12 +2911,15 @@ class DocMap(UserDict.UserDict):
         @type inherit_groups: C{boolean}
         @param inherit_groups: If true, then inherit groups from the
             base ancestors.
+        @type output_encoding: C{string}
+        @param output_encoding: The output text encoding.
         """
         self._verbosity = verbosity
         self._document_bases = document_bases
         self._document_autogen_vars = document_autogen_vars
         self._inheritance_groups = inheritance_groups
         self._inherit_groups = inherit_groups
+        self._output_encoding = output_encoding
         self.data = {} # UID -> ObjDoc
         self._class_children = {} # UID -> list of UID
         self._package_children = {} # UID -> list of UID
@@ -2947,7 +2956,8 @@ class DocMap(UserDict.UserDict):
             print >>sys.stderr, '    Building docs for %s' % objID
         
         if objID.is_module():
-            self.data[objID] = ModuleDoc(objID, self._verbosity)
+            self.data[objID] = ModuleDoc(objID, self._verbosity, 
+                                         self._output_encoding)
             child_modules = self._package_children.get(objID, [])
             if child_modules:
                 self.data[objID].add_modules(child_modules)
@@ -2963,7 +2973,8 @@ class DocMap(UserDict.UserDict):
                 self.data[objID].remove_autogenerated_variables()
 
         elif objID.is_class():
-            self.data[objID] = ClassDoc(objID, self._verbosity)
+            self.data[objID] = ClassDoc(objID, self._verbosity, 
+                                        self._output_encoding)
             child_classes = self._class_children.get(objID, [])
             self.data[objID].add_subclasses(child_classes)
             try: bases = obj.__bases__
@@ -2982,15 +2993,18 @@ class DocMap(UserDict.UserDict):
                     self._class_children[baseID] = [obj]
 
         elif objID.is_function() or objID.is_method():
-            self.data[objID] = FuncDoc(objID, self._verbosity)
+            self.data[objID] = FuncDoc(objID, self._verbosity,
+                                       self._output_encoding)
         elif objID.is_routine():
-            self.data[objID] = FuncDoc(objID, self._verbosity)
+            self.data[objID] = FuncDoc(objID, self._verbosity,
+                                       self._output_encoding)
         elif objID.is_property():
             # Does the class specify a type for the property?
             clsdoc = self.data[objID.parent()]
             typ = clsdoc.property_type(objID)
 
-            self.data[objID] = PropertyDoc(objID, typ, self._verbosity)
+            self.data[objID] = PropertyDoc(objID, typ, self._verbosity, 
+                                           self._output_encoding)
 
     def add(self, obj):
         """

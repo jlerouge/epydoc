@@ -108,10 +108,12 @@ def parse_docstring(docstring, errors, **options):
         Currently, no extra options are defined.
     @rtype: L{ParsedDocstring}
     """
+    output_encoding = options.get('output_encoding', 'iso-8859-1')
     writer = _DocumentPseudoWriter()
     reader = _EpydocReader(errors) # Outputs errors to the list.
+    from docutils.frontend import OptionParser
     publish_string(docstring, writer=writer, reader=reader)
-    return ParsedRstDocstring(writer.document)
+    return ParsedRstDocstring(writer.document, output_encoding)
 
 class ParsedRstDocstring(ParsedDocstring):
     """
@@ -123,21 +125,23 @@ class ParsedRstDocstring(ParsedDocstring):
         docstring.
     @type _document: L{docutils.nodes.document}
     """
-    def __init__(self, document):
+    def __init__(self, document, output_encoding):
         """
         @type document: L{docutils.nodes.document}
         """
         self._document = document
+        self._output_encoding = output_encoding
 
     def split_fields(self, errors=None):
         # Inherit docs
-        visitor = _SplitFieldsTranslator(self._document, errors)
+        visitor = _SplitFieldsTranslator(
+            self._document, errors, output_encoding=self._output_encoding)
         self._document.walk(visitor)
         return self, visitor.fields
 
     def summary(self):
         # Inherit docs
-        visitor = _SummaryExtractor(self._document)
+        visitor = _SummaryExtractor(self._document, self._output_encoding)
         self._document.walk(visitor)
         return visitor.summary
 
@@ -153,7 +157,7 @@ class ParsedRstDocstring(ParsedDocstring):
         # Inherit docs
         visitor = _EpydocHTMLTranslator(self._document, docstring_linker)
         self._document.walkabout(visitor)
-        return ''.join(visitor.body)
+        return ''.join(visitor.body).encode(self._output_encoding)
 
     def to_latex(self, docstring_linker, **options):
         # Inherit docs
@@ -165,7 +169,8 @@ class ParsedRstDocstring(ParsedDocstring):
         # This is should be replaced by something better:
         return self._document.astext() 
 
-    def __repr__(self): return '<ParsedRstDocstring: ...>'
+    def __repr__(self):
+        return '<ParsedRstDocstring: ... at 0x%08X>' % id(self)
 
 class _EpydocReader(StandaloneReader):
     """
@@ -220,9 +225,10 @@ class _SummaryExtractor(NodeVisitor):
     A docutils node visitor that extracts the first sentence from
     the first paragraph in a document.
     """
-    def __init__(self, document):
+    def __init__(self, document, output_encoding):
         NodeVisitor.__init__(self, document)
         self.summary = None
+        self._output_encoding = output_encoding
         
     def visit_document(self, node):
         self.summary = None
@@ -242,7 +248,7 @@ class _SummaryExtractor(NodeVisitor):
             
         summary_doc = self.document.copy()
         summary_doc.children = summary_pieces
-        self.summary = ParsedRstDocstring(summary_doc)
+        self.summary = ParsedRstDocstring(summary_doc, self._output_encoding)
 
     def unknown_visit(self, node):
         'Ignore all unknown nodes'
@@ -255,11 +261,12 @@ class _SplitFieldsTranslator(NodeVisitor):
     @ivar fields: The fields of the most recently walked document.
     @type fields: C{list} of L{Field<markup.Field>}
     """
-    def __init__(self, document, errors):
+    def __init__(self, document, errors, output_encoding):
         NodeVisitor.__init__(self, document)
         self._errors = errors
         self.fields = []
         self._newfields = {}
+        self._output_encoding = output_encoding
 
     def visit_document(self, node):
         self.fields = []
@@ -269,7 +276,9 @@ class _SplitFieldsTranslator(NodeVisitor):
         node.parent.remove(node)
 
         # Extract the field name & optional argument
-        tag = node.children[0].astext().split(None, 1)
+        tag = node.children[0].astext()    \
+            .encode(self._output_encoding) \
+            .split(None, 1)
         tagname = tag[0]
         if len(tag)>1: arg = tag[1]
         else: arg = None
@@ -299,7 +308,7 @@ class _SplitFieldsTranslator(NodeVisitor):
     def _add_field(self, tagname, arg, fbody):
         field_doc = self.document.copy()
         for child in fbody: field_doc.append(child)
-        field_pdoc = ParsedRstDocstring(field_doc)
+        field_pdoc = ParsedRstDocstring(field_doc, self._output_encoding)
         self.fields.append(Field(tagname, arg, field_pdoc))
             
     def visit_field_list(self, node):
