@@ -306,6 +306,10 @@ class _SplitFieldsTranslator(NodeVisitor):
         self._add_field(tagname, arg, fbody)
 
     def _add_field(self, tagname, arg, fbody):
+        # Remove the superfluous paragraph in fields body
+        if fbody:
+            fbody = fbody[0].children + fbody[1:]
+
         field_doc = self.document.copy()
         for child in fbody: field_doc.append(child)
         field_pdoc = ParsedRstDocstring(field_doc, self._output_encoding)
