@@ -111,7 +111,6 @@ def parse_docstring(docstring, errors, **options):
     output_encoding = options.get('output_encoding', 'iso-8859-1')
     writer = _DocumentPseudoWriter()
     reader = _EpydocReader(errors) # Outputs errors to the list.
-    from docutils.frontend import OptionParser
     publish_string(docstring, writer=writer, reader=reader)
     return ParsedRstDocstring(writer.document, output_encoding)
 
@@ -313,6 +312,7 @@ class _SplitFieldsTranslator(NodeVisitor):
         field_doc = self.document.copy()
         for child in fbody: field_doc.append(child)
         field_pdoc = ParsedRstDocstring(field_doc, self._output_encoding)
+        if isinstance(arg, unicode): arg = arg.encode(self._output_encoding)
         self.fields.append(Field(tagname, arg, field_pdoc))
             
     def visit_field_list(self, node):
