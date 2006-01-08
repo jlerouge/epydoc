@@ -809,6 +809,9 @@ def make_uid(object, base_uid=None, shortname=None):
             uid = StaticMethodUID(object, base_uid, shortname)
         elif type(object) is _ClassMethodType:
             uid = ClassMethodUID(object, base_uid, shortname)
+        elif inspect.isdatadescriptor(object) \
+        and type(object).__name__ == 'member_descriptor':
+            uid = PropertyUID(object, base_uid, shortname)
         else:
             uid = VariableUID(object, base_uid, shortname)
         _variable_uids[key] = uid

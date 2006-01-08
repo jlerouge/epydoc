@@ -1608,7 +1608,8 @@ class ClassDoc(ObjDoc):
         except: fields = []
         for field in fields:
             # Don't do anything for these special variables:
-            if field in ('__doc__', '__module__', '__dict__', '__weakref__'):
+            if field in ('__doc__', '__module__', '__dict__', '__weakref__',
+                         '__slots__'):
                 continue
 
             # Find the class that defines the field; and get the value
@@ -1645,6 +1646,12 @@ class ClassDoc(ObjDoc):
                     self._classmethods.append(vlink)
                     continue
                 elif isinstance(rawval, property):
+                    vuid = make_uid(rawval, container, linkname)
+                    vlink = Link(linkname, vuid)
+                    self._properties.append(vlink)
+                    continue
+                elif inspect.isdatadescriptor(rawval) \
+                and type(rawval).__name__ == 'member_descriptor':
                     vuid = make_uid(rawval, container, linkname)
                     vlink = Link(linkname, vuid)
                     self._properties.append(vlink)
@@ -2774,12 +2781,17 @@ class PropertyDoc(ObjDoc):
                  output_encoding='iso-8859-1'):
         property = uid.value()
         cls = uid.cls()
-        if property.fget is None: self._fget = None
-        else: self._fget = self._make_uid(property.fget, cls, 'fget')
-        if property.fset is None: self._fset = None
-        else: self._fset = self._make_uid(property.fset, cls, 'fset')
-        if property.fdel is None: self._fdel = None
-        else: self._fdel = self._make_uid(property.fdel, cls, 'fdel')
+        # property can also be a data descriptor
+        if type(property) is _PropertyType:
+            if property.fget is None: self._fget = None
+            else: self._fget = self._make_uid(property.fget, cls, 'fget')
+            if property.fset is None: self._fset = None
+            else: self._fset = self._make_uid(property.fset, cls, 'fset')
+            if property.fdel is None: self._fdel = None
+            else: self._fdel = self._make_uid(property.fdel, cls, 'fdel')
+        else:
+            self._fget = self._fset = self._fdel = None
+            
         self._type = typ
         ObjDoc.__init__(self, uid, verbosity, output_encoding=output_encoding)
 
