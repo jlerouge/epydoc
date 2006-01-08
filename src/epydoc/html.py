@@ -153,6 +153,7 @@ SPECIAL_METHODS ={
     '__len__': 'Length operator',
     '__cmp__': 'Comparison operator',
     '__eq__': 'Equality operator',
+    '__ne__': 'Inequality operator',
     '__in__': 'Containership operator',
     '__gt__': 'Greater-than operator',
     '__lt__': 'Less-than operator',
@@ -163,6 +164,7 @@ SPECIAL_METHODS ={
     '__contains__': 'In operator',
     '__nonzero__': 'Boolean test operator',
     '__str__': 'Informal representation operator',
+    '__int__': 'Integer cast operator',
     }
 
 ##################################################
