@@ -968,6 +968,9 @@ class HTMLFormatter:
                     descr = 'Method'
                 elif uid.is_function() or uid.is_builtin_function():
                     descr = 'Function'
+                else:
+                    # Member descriptors end here.
+                    descr = type(uid.value()).__name__
                 puid = uid.parent()
                 if puid:
                     if puid.is_package(): descr +=' in package '
