@@ -4,13 +4,13 @@
 Questa è una prova.
 
 :var `pippo`: L'amico di Topolino è.
-    Lui si che è un amico.
-    
+    Lui si che è un amico. Non pensa agli €€€.
+
 :bug:
     Thus bug is serious.
-    
+
     Really, it is.
-    
+
     Terribly.
 """
 
@@ -18,23 +18,23 @@ pippo = 10
 
 def testfun(a, b, c):
     """Test function.
-    
+
     Docstring is long.
-    
+
     :param `a`: Un tizio
     :type `a`: `string`
     :return: Un caio
     :rtype: `string`
     """
     pass
-    
+
 class Botto(Exception):
     """Capita quando uno fa il botto."""
     pass
-    
+
 class Test(object):
     """Unà classé dì tést
-    
+
     :ivar p: Anything
     :cvar q: Anythong else
     :IVariables:
@@ -44,15 +44,15 @@ class Test(object):
     """
     q = 10
     sezione_id=None
-    
+
     z = property(fget=lambda x: 10, doc="Zeta è zeta!")
-        
+
     def __init__(self):
         self.p = 20
-        
+
     def x(y):
         """A dummy fun.
-        
+
         :param y: Sarà düra!
         :type y: `string`
         :return: Nò sò.
@@ -60,17 +60,17 @@ class Test(object):
         :exception `KaBum`: Il Botto.
         :organization: PiroSoftware c.n.f.
         :todo: boheccheneso?
-        
+
             e comunque, menefotto.
-            
+
         """
         pass
 
 class WithSlots(object):
     """Class with slots.
-    
+
     This class has two instance variables. They are trated as properties.
-    
+
     :ivar a: Prop1
     :ivar b: Prop2
     """
@@ -78,4 +78,3 @@ class WithSlots(object):
     def __init__(self):
         self.a = 10
         self.b = 20
-        

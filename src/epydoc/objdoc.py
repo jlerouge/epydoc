@@ -43,7 +43,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ##################################################
 
-import inspect, UserDict, string, new, re, sys, types
+import inspect, UserDict, string, new, re, sys, types, os
 import parser, symbol, token
 
 import epydoc.markup as markup
@@ -654,9 +654,14 @@ class ObjDoc:
             self._misc_warnings.append(estr)
             self._docformat = 'plaintext'
 
+        # Detect input encoding
+        encoding = _get_input_encoding(uid)
+
         # If there's a doc string, parse it.
         if docstring is None: docstring = _getdoc(obj)
-        if type(docstring) == types.StringType: docstring = docstring.strip()
+        if type(docstring) in types.StringTypes:
+            docstring = docstring.strip().decode(encoding)
+
         if docstring:
             self._has_docstring = 1
             self.__parse_docstring(docstring, output_encoding)
@@ -3418,10 +3423,29 @@ def _getdoc(obj):
     @type obj: any
     """
     if ((not hasattr(obj, '__doc__')) or
-        type(obj.__doc__) is not types.StringType):
+        type(obj.__doc__) not in types.StringTypes):
         return None
     else:
         return inspect.getdoc(obj)
+
+def _get_source_filename(uid):
+    """
+    @return: The source file name of the given object; or C{None} if
+        it cannot be found.
+    @rtype: C{string} or C{None}
+    """
+    object = uid.value()
+    try:
+        if uid.is_module(): muid = uid
+        else: muid = uid.module()
+        filename = muid.value().__file__
+    except: return None
+
+    if filename[-4:-1].lower() == '.py':
+        filename = filename[:-1]
+
+    if os.path.isfile(filename): return filename
+    else: return None
 
 def _find_docstring(uid):
     """
@@ -3436,14 +3460,8 @@ def _find_docstring(uid):
     # finding modules for objects (esp. functions).
 
     # Get the filename of the source file.
-    object = uid.value()
-    try:
-        if uid.is_module(): muid = uid
-        else: muid = uid.module()
-        filename = muid.value().__file__
-    except: return (None, None)
-    if filename[-4:-1].lower() == '.py':
-        filename = filename[:-1]
+    filename = _get_source_filename(uid)
+    if not filename: return (None, None)
 
     # Read the source file's contents.
     try: lines = open(filename).readlines()
@@ -3474,6 +3492,34 @@ def _find_docstring(uid):
 
     # We couldn't find a docstring line number.
     return (None, None)
+
+_INPUT_ENCODING_REGEXP = re.compile(r'coding[:=]\s*([-\w.]+)')
+_input_encoding_cache = { None: 'ascii' }
+def _get_input_encoding(uid):
+    """
+    @return: The input encoding of the given object; if it cannot be
+        determined, return 'ascii'.
+    @rtype: C{string}
+    """
+    filename = _get_source_filename(uid)
+    enc = _input_encoding_cache.get(filename) # None hits the cache
+    if enc is not None: return enc
+
+    enc = 'ascii'
+    try:
+        f = open(filename)
+        src = '%s%s' % (f.readline(), f.readline())
+        m = _INPUT_ENCODING_REGEXP.search(src)
+        if m:
+            enc = m.group(1)
+        elif src.startswith('\xef\xbb\xbf'): # utf-8 BOM
+            enc = 'utf-8'
+
+    except:
+        pass
+
+    _input_encoding_cache[filename] = enc
+    return enc
 
 _IDENTIFIER_LIST_REGEXP = re.compile(r'^[\w.\*]+([\s,:;]\s*[\w.\*]+)*$')
 def _descr_to_identifiers(descr):
