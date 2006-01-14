@@ -85,14 +85,16 @@ import sys, os.path, re, getopt
 try: import ZODB
 except: pass
 
-def cli():
+def cli(argv=None):
     """
     Command line interface for epydoc.
     
+    @param argv: Command line argument. If C{None}, use the true command line.
+    @type argv: C{list} or C{None}
     @rtype: C{None}
     """
     # Parse the command line arguments.
-    options = _parse_args()
+    options = _parse_args(argv)
 
     # Import all the specified modules.
     modules = _import(options['modules'], options['verbosity'])
@@ -251,11 +253,13 @@ def _check_css(cssname):
     print >>sys.stderr, '\nError: CSS file %s not found\n' % cssname
     sys.exit(1)
 
-def _parse_args():
+def _parse_args(argv=None):
     """
     Process the command line arguments; return a dictionary containing
     the relevant info.
 
+    @param argv: Command line. If C{None}, use C{sys.argv[1:]}.
+    @type argv: C{list}
     @return: A dictionary mapping from configuration parameters to
         values.  If a parameter is specified on the command line, then
         that value is used; otherwise, a default value is used.
@@ -266,6 +270,8 @@ def _parse_args():
         C{encoding}, C{autogen_vars}, and C{test}.
     @rtype: C{None}
     """
+    if argv is None: argv = sys.argv[1:]
+    
     # Default values.
     options = {'target':None, 'modules':[], 'verbosity':1,
                'prj_name':'', 'action':'html', 'tests':{'basic':1},
@@ -292,7 +298,7 @@ def _parse_args():
                 'ignore_param_mismatch ignore-param-mismatch '+
                 'test= tests= checks=').split()
     try:
-        (opts, modules) = getopt.getopt(sys.argv[1:], shortopts, longopts)
+        (opts, modules) = getopt.getopt(argv, shortopts, longopts)
     except getopt.GetoptError, e:
         if e.opt in ('h', '?', 'help', 'usage'): _usage(0)
         print >>sys.stderr, ('%s; run "%s -h" for usage' %
