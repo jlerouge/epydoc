@@ -135,6 +135,7 @@ REDIRECT_INDEX = '''<?xml version="1.0" encoding="%s"?>
 
 # Names for the __special__ methods.
 SPECIAL_METHODS ={
+    '__new__': 'Instance creation method',
     '__init__': 'Constructor',
     '__del__': 'Destructor',
     '__add__': 'Addition operator',
@@ -143,6 +144,7 @@ SPECIAL_METHODS ={
     '__or__': 'Or operator',
     '__repr__': 'Representation operator',
     '__call__': 'Call operator',
+    '__iter__': 'Iteration protocol support',
     '__getattr__': 'Qualification operator',
     '__getitem__': 'Indexing operator',
     '__setitem__': 'Index assignment operator',
@@ -165,6 +167,7 @@ SPECIAL_METHODS ={
     '__nonzero__': 'Boolean test operator',
     '__str__': 'Informal representation operator',
     '__int__': 'Integer cast operator',
+    '__float__': 'Floating point cast operator',
     }
 
 ##################################################
