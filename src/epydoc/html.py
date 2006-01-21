@@ -3087,7 +3087,7 @@ class HTMLFormatter:
                 return 'Return '+summary[:1].lower() + summary[1:]
             else:
                 return '&nbsp;'
-        # Hack: ignore CVS $Id$ tags.
+        # Hack: ignore CVS $ Id $ tags.
         summary = re.sub(r'\$[Ii][Dd]:[^\$]*\$', '', summary).strip()
         return summary or '&nbsp;'
 
