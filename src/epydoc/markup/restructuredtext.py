@@ -417,7 +417,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
     def visit_document(self, node): pass
     def depart_document(self, node): pass
         
-    def starttag(self, node, tagname, suffix='\n', infix='', **attributes):
+    def starttag(self, node, tagname, suffix='\n', **attributes):
         """
         This modified version of starttag makes a few changes to HTML
         tags, to prevent them from conflicting with epydoc.  In particular:
@@ -442,5 +442,4 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         if re.match(r'^h\d+$', tagname):
             attributes['class'] = 'heading'
         
-        return HTMLTranslator.starttag(self, node, tagname, suffix,
-                                       infix, **attributes)
+        return HTMLTranslator.starttag(self, node, tagname, suffix, **attributes)
