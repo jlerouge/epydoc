@@ -2654,6 +2654,9 @@ class HTMLFormatter:
             try: vstr = markup.plaintext_to_html(repr(val))
             except: vstr = '...'
 
+        if isinstance(vstr, unicode):
+            vstr = vstr.encode(self._encoding)        
+
         # For the summary table, just return the value; don't
         # bother to word-wrap.
         if not multiline:

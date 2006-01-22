@@ -82,6 +82,12 @@ class HtmlEncodingTestCase(unittest.TestCase):
             "--encoding iso-8859-1",
             get_file("input", "editordine.py")))
 
+    def test_var_values(self):
+        """Epydoc doesn't choke with non-ascii chars in var values."""
+        self.assertEqual(0, self.spawn(
+            "--docformat restructuredtext",
+            get_file("input", "var_values.py")))
+
 def testsuite():
     return unittest.TestSuite([ unittest.makeSuite(globals()[k])
         for k in globals().keys() if k.endswith('TestCase') ])
