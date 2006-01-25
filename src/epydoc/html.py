@@ -1376,7 +1376,7 @@ class HTMLFormatter:
         crumbs.reverse()
         str = '      <span class="breadcrumbs">\n        '
         str += ' ::\n        '.join(crumbs)
-        str += '\n      </span><br />\n'
+        str += '\n      </span>\n'
         return str
 
     #////////////////////////////////////////////////////////////
