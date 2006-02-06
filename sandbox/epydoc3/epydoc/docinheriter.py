@@ -8,6 +8,10 @@
 
 from epydoc.apidoc import *
 
+# [XX] should we add the new variables to the docindex?? hm..  But
+# then this wouldn't just be direct children, could potentailly be
+# lots and lots of stuff..
+
 # [xx] should inheriting make new variables, or copy the vardoc
 # objects??  probably make new ones?
 class DocInheriter:
