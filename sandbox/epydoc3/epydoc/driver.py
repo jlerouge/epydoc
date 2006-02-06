@@ -24,7 +24,6 @@ def build_docs(names, inspect=True, parse=True):
     parsedocs = []
     inspectdocs = []
     for name in names:
-        print 'GETTING DOCS', name
         if parse:
             parsedocs.append(parser.find(name))
         else:
@@ -79,6 +78,15 @@ def build_docs(names, inspect=True, parse=True):
     # Inheritance.
     inheriter.inherit(docindex)
 
+    # debug:
+    for n,v in docindex.items():
+        if n!=v.canonical_name: continue
+        if isinstance(v, NamespaceDoc):
+            for var in v.variables.values():
+                assert var.container == v
+            for var in v.sorted_variables:
+                assert var.container == v
+
     #print docindex[DottedName('epydoc.apidoc.APIDoc')].pp(exclude='canonical_container')
     return docindex
 
@@ -90,11 +98,11 @@ def help(names):
     parse = True
     
     #inspect = False
-    parse = False
+    #parse = False
 
     docindex = build_docs(names, inspect=inspect, parse=parse)
 
-    #print docindex[DottedName(name)]
+    print docindex[DottedName(names[0])]
     writer = HTMLWriter(docindex)
     def progress(s):
         print 'Writing %s...' % s
