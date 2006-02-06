@@ -22,7 +22,7 @@ I could potentially add:
 But I doubt it's worth it.
 
 """
-import re, os
+import re, os, sys, codecs
 from epydoc.apidoc import *
 from epydoc.docstringparser import DocstringParser
 import time, epydoc, epydoc.markup
@@ -303,8 +303,9 @@ class HTMLWriter:
                 names = self._failed_xrefs[identifier].keys()
                 names.sort()
                 estr += '    - %s' % identifier
-                if len(names)==1 and len(identifier)+len(str(name))+14 < 70:
-                    estr += ' (from %s)\n' % names[0].name()
+                if (len(names)==1 and len(identifier)+
+                    len(str(names[0]))+14 < 70):
+                    estr += ' (from %s)\n' % names[0]
                 else:
                     estr += '\n'
                     for name in names:
@@ -318,7 +319,7 @@ class HTMLWriter:
         if progress_callback: progress_callback(filename)
         
         path = os.path.join(directory, filename)
-        f = open(path, 'w')
+        f = codecs.open(path, 'w', 'ascii', errors='xmlcharrefreplace')
         write_func(f.write, *args)
         f.close()
 
@@ -362,9 +363,11 @@ class HTMLWriter:
 
         # If the module has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
-            out(self.description(doc.descr, longname, 2)+'\n<hr />\n\n')
+            out(self.description(doc.descr, doc, 2)+'<br /><br />\n\n')
 
         # Write any standarad metadata (todo, author, etc.)
+        if doc.metadata is not UNKNOWN and doc.metadata:
+            out('<hr />\n')
         self.write_standard_fields(out, doc)
 
         # If it's a package, then list the modules it contains.
@@ -436,9 +439,11 @@ class HTMLWriter:
         
         # If the class has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
-            out(self.description(doc.descr, longname, 2)+'\n<hr />\n\n')
+            out(self.description(doc.descr, doc, 2)+'<br /><br />\n\n')
 
         # Write any standarad metadata (todo, author, etc.)
+        if doc.metadata is not UNKNOWN and doc.metadata:
+            out('<hr />\n')
         self.write_standard_fields(out, doc)
 
         # Write summary tables describing the variables that the
@@ -698,7 +703,10 @@ class HTMLWriter:
         for doc in self.docset:
             name = doc.canonical_name
             if self.url(doc) is None: continue
-            identifiers.append( (str(name).lower(), name, doc) )
+            key = name[-1].lower()
+            key = (key[:1] in 'abcdefghijklmnopqrstuvwxyz' and 1 or -1, key)
+            identifiers.append( (key, name, doc) )
+            
         identifiers.sort()
         if identifiers:
             self.write_identifier_index(out, identifiers)
@@ -706,48 +714,59 @@ class HTMLWriter:
         # Footer material.
         self.write_navbar(out, 'indices')
         self.write_footer(out, 'Index')
-        
+
+    write_identifier_index_header = compile_template(
+        """
+        write_identifier_index_header(self, out)
+        """,
+        '''
+        <!-- ==================== IDENTIFIER INDEX ==================== -->
+        <table class="index" border="1" cellpadding="3"
+               cellspacing="0" width="100%" bgcolor="white">
+        <tr bgcolor="#70b0f0" class="index"><th colspan="2">
+          <table border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr><td>Identifier&nbsp;Index</td>
+              <td width="100%" align="right"> [
+                <a href="#_">_</a>
+        # for c in "abcdefghijklmnopqrstuvwxyz":
+                <a href="#$c$">$c$</a>
+        # #endfor
+              ] </td>
+            </tr></table>
+        </th></tr>
+        ''')
+    
     write_identifier_index = compile_template(
         """
         write_identifier_index(self, out, index)
         """,
         '''
-        # self.write_table_header(out, "index", "Identifier Index")
+        # #self.write_table_header(out, "index", "Identifier Index")
+        # self.write_identifier_index_header(out)
+        # letters = "_abcdefghijklmnopqrstuvwxyz"
         # for sortkey, name, doc in index:
           <tr><td width="15%">
-        #   if isinstance(doc, ModuleDoc) and doc.is_package:
-                Package $self.href(doc, name[-1])$
-        #   elif isinstance(doc, ModuleDoc):
-                Module $self.href(doc, name[-1])$
-        #   elif isinstance(doc, ClassDoc):
-                Class $self.href(doc, name[-1])$
-        #   elif isinstance(doc, MethodDoc):
-                Method $self.href(doc, name[-1])$
-        #   elif isinstance(doc, FunctionDoc):
-                Function $self.href(doc, name[-1])$
-        #   else:
-                Variable $self.href(doc, name[-1])$
-        #   #endif
-        #   container_name = name.container()
-        #   container = self.docindex.get(container_name)
-        #   if isinstance(container, ModuleDoc) and container.is_package:
-                in package $self.href(container, container_name)$
-        #   elif isinstance(container, ModuleDoc):
-                in module $self.href(container, container_name)$
-        #   elif isinstance(container, ClassDoc):
-                in class $self.href(container, container_name)$
-        #   #endif
+        #     if (letters and letters[0] == "_" or
+        #         letters[0] <= name[-1][:1].lower()):
+                  <a name="$letters[0]$"></a>
+        #             letters = letters[1:]
+        #     #endif
+                $self.href(doc, name[-1])$
               </td>
-              <td>
-        #   if doc.summary not in (None, UNKNOWN):
-                $self.description(doc.summary, doc, 8)$
-        #   else:
-                &nbsp;
-        #   #endif
+              <td>$self.doc_kind(doc)$
+        #     container_name = name.container()
+        #     container = self.docindex.get(container_name)
+        #     if container is not None:
+                  in $self.doc_kind(container)$ $self.href(container)$
+        #     #endif
               </td>
           </tr>
         # #endfor
-        </table><br />
+        </table>
+        # for letter in letters:
+        <a name="$letter$"></a>
+        # #endfor
+        <br />
         ''')
 
     write_term_index = compile_template(
@@ -847,13 +866,13 @@ class HTMLWriter:
 
         # Footer material.
         out('<hr />\n')
-        out(self.PRIVATE_LINK)
+        out(self.PRIVATE_LINK+'\n')
         self.write_footer(out, short=True)
 
     PRIVATE_LINK = '''
     <span class="options">[<a href="javascript: void(0);" class="privatelink"
     onclick="toggle_private();">hide private</a>]</span>
-    '''.strip()+'\n'
+    '''.strip()
         
     def write_module_toc(self, out, doc):
         """
@@ -872,10 +891,14 @@ class HTMLWriter:
         
         # Footer material.
         out('<hr />\n')
-        out(self.PRIVATE_LINK)
+        out(self.PRIVATE_LINK+'\n')
         self.write_footer(out, short=True)
 
         return # [XX]
+
+
+
+    
         # Split classes into classes & exceptions.
         doc = self._docmap[uid]
         (classes,excepts) = self._split_classes(doc.classes())
@@ -922,7 +945,7 @@ class HTMLWriter:
         """,
         # /------------------------- Template -------------------------\
         '''
-        <?xml version="1.0" encoding="iso-8859-1"?>
+        <?xml version="1.0" encoding="ascii"?>
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
                   "DTD/xhtml1-transitional.dtd">
         <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
@@ -1196,15 +1219,7 @@ class HTMLWriter:
             #crumbs.insert(0, self._dotted_name_to_href(name, label, code=0))
         
     def _crumb(self, doc):
-        name = doc.canonical_name
-        if isinstance(doc, ModuleDoc) and doc.is_package is True:
-            return 'Package&nbsp;%s' % name[-1]
-        elif isinstance(doc, ModuleDoc):
-            return 'Module&nbsp;%s' % name[-1]
-        elif isinstance(doc, ClassDoc):
-            return 'Class&nbsp;%s' % name[-1]
-        else:
-            return name[-1]
+        return '%s&nbsp;%s' % (self.doc_kind(doc), doc.canonical_name[-1])
 
     #////////////////////////////////////////////////////////////
     # 3.5. Summary Tables
@@ -1271,6 +1286,7 @@ class HTMLWriter:
                 self.write_summary_line(out, var_doc, doc)
             out(self.TABLE_FOOTER)
             out('</div>\n')
+            out('%s<br />\n' % self.PRIVATE_LINK)
 
         out('<br />\n')
 
@@ -2088,15 +2104,62 @@ class HTMLWriter:
         return '<a href="%s"%s>%s</a>' % (url, css, label)
 
     def description(self, parsed_docstring, where=None, indent=0):
+        assert isinstance(where, (APIDoc, type(None)))
         if parsed_docstring in (None, UNKNOWN): return ''
         linker = _HTMLDocstringLinker(self, where)
         return parsed_docstring.to_html(linker, indent=indent).strip()
     
+    def doc_kind(self, doc):
+        if isinstance(doc, ModuleDoc) and doc.is_package:
+            return 'Package'
+        elif isinstance(doc, ModuleDoc):
+            return 'Module'
+        elif isinstance(doc, ClassDoc):
+            return 'Class'
+        elif isinstance(doc, MethodDoc):
+            return 'Method'
+        elif isinstance(doc, FunctionDoc):
+            return 'Function'
+        else:
+            return 'Variable'
+        
 
 class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
-    def __init__(self, foo, where):
-        self.where = where
+    def __init__(self, htmlwriter, container):
+        self.htmlwriter = htmlwriter
+        self.docindex = htmlwriter.docindex
+        self.container = container
+        
     def translate_indexterm(self, indexterm):
-        return '???'
+        key = self.htmlwriter._term_index_to_anchor(indexterm)
+        return ('<a name="%s"></a><i class="indexterm">%s</i>' %
+                (key, indexterm.to_html(self)))
+    
     def translate_identifier_xref(self, identifier, label=None):
-        return '???'
+        if label is None: label = markup.plaintext_to_html(identifier)
+
+        doc = findit(DottedName(identifier), self.container, self.docindex)
+        if doc is None:
+            failed_xrefs = self.htmlwriter._failed_xrefs
+            if not failed_xrefs.has_key(identifier):
+                failed_xrefs[identifier] = {}
+            failed_xrefs[identifier][`self.container`] = 1
+            return '<span class="link">%s</span>' % label
+        else:
+            return self.htmlwriter.href(doc, label, 'link')
+
+# [xx] some values are not to be trusted! (eg None, UNKNOWN, '')
+def findit(name, container, docindex):
+    #print 'look for %r in %r' % (name, container.canonical_name)
+    container_name = container.canonical_name
+    if container_name in (None, UNKNOWN):
+        return docindex.get(name)
+    for i in range(len(container_name), -1, -1):
+        val_doc = docindex.get(DottedName(*(container_name[:i]+(name,))))
+        #print '  Check', DottedName(*(container_name[:i]+(name,))),
+        if val_doc is not None:
+            #print '=> yes'
+            return val_doc
+        #print '=> no'
+    return docindex.get(name)
+
