@@ -17,6 +17,7 @@ objects containing the API documentation for those objects.
 C{DocInspector} can be subclassed to extend the set of object types
 that it supports.
 """
+__docformat__ = 'epytext en'
 
 ######################################################################
 ## Imports
@@ -196,7 +197,7 @@ class DocInspector:
         if hasattr(module, '__doc__'):
             module_doc.docstring = self.get_docstring(module)
         if hasattr(module, '__docformat__'):
-            module_doc.docformat = str(module.__docformat__)
+            module_doc.docformat = unicode(module.__docformat__)
                                       
         # Record the module's __all__ attribute (public names).
         if hasattr(module, '__all__'):
@@ -208,14 +209,14 @@ class DocInspector:
 
         # Record the module's filename
         if hasattr(module, '__file__'):
-            try: module_doc.filename = str(module.__file__)
+            try: module_doc.filename = unicode(module.__file__)
             except: pass
 
         # If the module has a __path__, then it's (probably) a
         # package; so set is_package=True and record its __path__.
         if hasattr(module, '__path__'):
             module_doc.is_package = True
-            try: module_doc.path = str(module.__path__)
+            try: module_doc.path = [unicode(p) for p in module.__path__]
             except: pass
         else:
             module_doc.is_package = False
@@ -249,18 +250,21 @@ class DocInspector:
                 child_val_doc = self.inspect(child, module_doc)
                 child_var_doc = VariableDoc(name=child_name,
                                             value=child_val_doc,
-                                            is_imported=False)
+                                            is_imported=False,
+                                            container=module_doc)
             elif container is None or module_doc.canonical_name is UNKNOWN:
                 # Possibly imported variable.
                 child_val_doc = self.inspect(child, module_doc)
                 child_var_doc = VariableDoc(name=child_name,
-                                            value=child_val_doc)
+                                            value=child_val_doc,
+                                            container=module_doc)
             else:
                 # Imported variable.
                 child_val_doc = self.get_valuedoc(child)
                 child_var_doc = VariableDoc(name=child_name,
                                             value=child_val_doc,
-                                            is_imported=True)
+                                            is_imported=True,
+                                            container=module_doc)
 
             module_doc.variables[child_name] = child_var_doc
 
@@ -317,7 +321,8 @@ class DocInspector:
                 #try: child = getattr(cls, child_name)
                 #except: continue
                 val_doc = self.inspect(child, class_doc)
-                var_doc = VariableDoc(name=child_name, value=val_doc)
+                var_doc = VariableDoc(name=child_name, value=val_doc,
+                                      container=class_doc)
                 class_doc.local_variables[child_name] = var_doc
 
     #////////////////////////////////////////////////////////////
@@ -434,14 +439,20 @@ class DocInspector:
         """
         Return the docstring for the given value; or C{None} if it
         does not have a docstring.
-        @rtype: C{str}
+        @rtype: C{unicode}
         """
         docstring = getattr(value, '__doc__', None)
         if docstring is None:
             return None
+        elif isinstance(docstring, basestring):
+            try: return unicode(docstring)
+            except UnicodeDecodeError:
+                print ("Warning: %r's docstring is not a unicode string, "
+                       "but it contains non-ascii data") % value
+            return None
         else:
-            try: return str(docstring)
-            except: return None
+            print "Warning: docstring for %r is not a string" % value
+            return None
 
     def get_canonical_name(self, value):
         """
