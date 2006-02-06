@@ -18,6 +18,7 @@ in those modules.
 C{DocParser} can be subclassed to extend the set of source code
 constructions that it supports.
 """
+__docformat__ = 'epytext en'
 
 ######################################################################
 ## Imports
@@ -333,6 +334,8 @@ class DocParser:
     # Top level: Module parsing
     #////////////////////////////////////////////////////////////
 
+    DEFAULT_ENCODING = 'iso-8859-1' # aka 'latin-1'
+
     def parse(self, filename, package_doc=None):
         """
         Parse the given python module, and return a C{ModuleDoc}
@@ -381,6 +384,9 @@ class DocParser:
         # If there's an encoding-decl, then strip it.
         if ast[0] == symbol.encoding_decl:
             ast = ast[1]
+            encoding = ast[2] # reentrance!!
+        else:
+            encoding = self.DEFAULT_ENCODING
             
         # Find docstrings in the syntax tree.  Record the old value of
         # self.docstrings, in case we recursively call parse().
@@ -939,12 +945,12 @@ class DocParser:
             val_doc = self.rhs_to_valuedoc(rhs, varname)
 
         # Create the VariableDoc, and add it to its parent.
-        var_doc = VariableDoc(name=varname, value=val_doc,
-                              docstring=docstring_info[0],
-                              docstring_lineno=docstring_info[1],
-                              is_imported=False, is_alias=is_alias, 
-                              is_instvar=is_instvar)
         if isinstance(parentdoc, NamespaceDoc):
+            var_doc = VariableDoc(name=varname, value=val_doc,
+                                  docstring=docstring_info[0],
+                                  docstring_lineno=docstring_info[1],
+                                  is_imported=False, is_alias=is_alias, 
+                                  is_instvar=is_instvar)
             self._set_variable(parentdoc, var_doc)
 
     def _inside_init(self):
