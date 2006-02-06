@@ -108,7 +108,7 @@ import re, string, types, sys
 from xml.dom.minidom import Document, Text
 import xml.dom.minidom
 from epydoc.markup import *
-from epydoc.colorize import colorize_doctestblock
+from epydoc.docwriter.html_colorize import colorize_doctestblock
 
 ##################################################
 ## Constants
