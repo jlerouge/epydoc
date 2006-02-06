@@ -213,8 +213,8 @@ class APIDoc:
     do I{not} use other values that evaluate as true or false, such as
     C{2} or C{()}.  This restriction makes it easier to handle
     C{UNKNOWN} values.  For example, to test if a boolean attribute is
-    True or UNKNOWN, use C'{attrib in (True, UNKNOWN)}' or 'C{attrib
-    is not False}'.
+    C{True} or C{UNKNOWN}, use 'C{attrib in (True, UNKNOWN)}' or
+    'C{attrib is not False}'.
     
     @ivar docstring: The documented item's docstring.
     @type docstring: C{string} or C{None}
@@ -290,6 +290,9 @@ class APIDoc:
         if not issubclass(cls, self.__class__):
             raise ValueError, 'xxx'
         self.__class__ = cls
+        
+        # DO THIS [xx]?
+        self.__init__(**self.__dict__)
 
     def __hash__(self):
         return id(self.__dict__)
@@ -345,7 +348,7 @@ class VariableDoc(APIDoc):
     is_imported = UNKNOWN
     is_instvar = UNKNOWN
     is_alias = UNKNOWN
-    is_public = UNKNOWN #: DOES THIS GET SET???
+    is_public = UNKNOWN
     overrides = UNKNOWN #: rename -- don't use a verb.
     type_descr = UNKNOWN
     is_inherited = False
@@ -368,11 +371,13 @@ class VariableDoc(APIDoc):
 
     # hackish:
     def canonical_name(self):
+        if self.container is UNKNOWN:
+            raise ValueError, `self`
         if (self.container is UNKNOWN or
             self.container.canonical_name is UNKNOWN):
             return UNKNOWN
         else:
-            return '%s.%s' % (self.container.canonical_name, self.name)
+            return self.container.canonical_name + self.name
     canonical_name = property(canonical_name)
 
 ######################################################################
@@ -839,7 +844,7 @@ class RoutineDoc(ValueDoc):
     @ivar exception_descrs: A list of descriptions of exceptions
         that the routine might raise.  Each element of this list is a
         tuple C{(exc, descr)}, where C{exc} is a string contianing the
-        exception name; and C{descr} is a L{ParsedDcostring}
+        exception name; and C{descr} is a L{ParsedDocstring}
         describing the circumstances under which the exception
         specified by C{exc} is raised.
     @type exception_descrs: C{list}
