@@ -27,6 +27,67 @@ reachable C{ValueDoc}s.
 from epydoc.apidoc import *
 from sets import Set
 
+class DocIndex:
+    def __init__(self, value_index):
+        self.values = []
+        self.root = {}
+        
+        for (name, val_doc) in value_index:
+            if val_doc.canonical_name != name: continue
+            values.append(val_doc)
+            if len(name) == 1:
+                self.root.append(val_doc)
+
+    def __get(self, name):
+        # Make sure name is a DottedName.
+        name = DottedName(name)
+
+        # Get the root value specified by name[0]
+        val_doc = self.root.get(name[0])
+        var_doc = None
+
+        for identifier in name[1:]:
+            var_doc = val_doc[identifier]
+            val_doc = var_doc.value
+        return (var_doc, val_doc)
+    
+            
+#             if isinstance(val, ModuleDoc):
+#                 if identifier in val.variables:
+#                     var = val.variables[identifier]
+#                 elif identifier in val.subpackages:
+#                     var = val.subpackages[identifier] # [xx]
+#                 else:
+#                     return None
+#             elif isinstance(val, ClassDoc):
+#                 if identifier in val.local_variables:
+#                     var = val.local_variables[identifier]
+#                 elif val.variables is not UNKNOWN and identifier in val.variables:
+#                     var = val.variables[identifier]
+#                 else:
+#                     reutrn None
+#            val = var.value
+#        return (var, val)
+
+    def get_variable(self, name):
+        var, val = self.__get(name)
+        if var is None:
+            raise KeyError('Variable %s not found' % name)
+        else:
+            return var
+
+    def get_value(self, name):
+        var, val = self.__get(name)
+        if val is None:
+            raise KeyError('Value %s not found' % name)
+        else:
+            return val
+    __getitem__ = get_value
+
+    def __iter__(self):
+        return iter(self.values)
+
+
 ######################################################################
 ## Doc Indexer
 ######################################################################
