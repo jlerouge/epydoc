@@ -15,7 +15,7 @@ expressions and doctest blocks.
 """
 __docformat__ = 'epytext en'
 
-import sys, sre_parse, sre, re
+import sys, sre_parse, sre, re, codecs
 import sre_constants
 
 ######################################################################
@@ -393,7 +393,7 @@ Goals:
   - 
 """
 
-JAVASCRIPTS = '''
+PYSRC_JAVASCRIPTS = '''
 <script type="text/javascript">
 <!--
 
@@ -443,7 +443,28 @@ function expandto(href) {
 // -->
 </script>'''
 
-
+PYSRC_TEMPLATE = '''\
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
+          "DTD/xhtml1-frameset.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>color test</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+</head>'''+PYSRC_JAVASCRIPTS.replace('%','%%')+'''<body>
+<h2 class="py-src">%s</h1>
+<div class="py-src">
+<pre class="py-src">
+%s
+</pre>
+</div>
+<script type="text/javascript">
+<!--
+expandto(location.href);
+// -->
+</script>
+</body>
+</html>
+'''
 
 
 
@@ -540,7 +561,8 @@ class PythonSourceColorizer:
     START_DEF_BLOCK = ('<div id="%s-collapsed" style="display:none;">'
                        '<span class="lineno">   .</span> '
                        '%s'
-                       '<a href="#-" onclick="expand(\'%s\');">...</a>\n'
+                       '<a href="#" onclick="expand(\'%s\');return false;"'
+                       'title="Expand body.">...</a>\n'
                        '<span class="lineno">   .</span> \n'
                        '</div>'
                        '<div id="%s-expanded">')
@@ -675,8 +697,8 @@ class PythonSourceColorizer:
         unicode_html = unicode(html, coding)
         html = codecs.encode(unicode_html, 'ascii', 'xmlcharrefreplace')
 
-        # Wrap our html string in a <pre>...</pre> block and return it.
-        return '<pre class="py-src">\n%s\n</pre>' % html
+        # Add header/footer and return
+        return PYSRC_TEMPLATE % (self.module_name, html)
 
     def tokeneater(self, toktype, toktext, (srow,scol), (erow,ecol), line):
         """
@@ -910,39 +932,9 @@ class PythonSourceColorizer:
         else:
             return '%s-module.html#%s' % (self.module_name, func_name)
 
-
-
-
-
-HEADER = '''\
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
-          "DTD/xhtml1-frameset.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<title>color test</title>
-  <link rel="stylesheet" href="epydoc.css" type="text/css" />
-</head>'''+JAVASCRIPTS+'''<body>'''
-
-FOOTER = '''
-<script type="text/javascript">
-<!--
-expandto(location.href);
-// -->
-</script>
-</body>
-</html>
-'''
-
-import time
-t0 = time.time()
-for i in range(3):
+if __name__='__main__':
     s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
-    s = PythonSourceColorizer('/sw/lib/python2.3/pydoc.py', 'pydoc').colorize()
-print '%.4f' % (time.time()-t0)
-
-
-#s = PythonSourceColorizer('/tmp/foo.py', 'epydoc.apidoc').colorize()
-#import codecs
-#f = codecs.open('/tmp/color.html', 'w', 'ascii', 'xmlcharrefreplace')
-#f.write(HEADER+s+FOOTER)
-#f.close()
+    import codecs
+    f = codecs.open('/home/edloper/public_html/color.html', 'w', 'ascii', 'xmlcharrefreplace')
+    f.write(s)
+    f.close()
