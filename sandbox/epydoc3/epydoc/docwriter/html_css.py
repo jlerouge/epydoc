@@ -98,6 +98,16 @@ comes before them. */
 a.navbar:link      { text-decoration: none; }  
 a.navbar:visited   { text-decoration: none; }  
 
+/* Source Code Listings */
+h2.py-src          { margin-top: 0.2em; }
+div.py-src         { border: 2px solid; }
+div.highlight-hdr  { border-top: 2px solid; }
+div.highlight      { border-top: 1px solid;
+                     border-bottom: 2px solid; }
+.lineno            { border-right: 2px solid;
+                     padding-right: .2em;
+                     font-style: italic; }
+
 /* Lists */
 ul { margin-top: 0; }
 
@@ -144,13 +154,22 @@ h3.var-details     { background: transparent; color: #000000; }
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                    { background: transparent; color: #008060; }  
 
-/* Doctest blocks */
+/* Souce code listings & doctest blocks */
 .py-src            { background: transparent; color: #000000; }
 .py-prompt         { background: transparent; color: #005050; }
 .py-string         { background: transparent; color: #006030; }
 .py-comment        { background: transparent; color: #003060; }
 .py-keyword        { background: transparent; color: #600000; }
 .py-output         { background: transparent; color: #404040; }
+.py-name           { background: transparent; color: #000050; }
+.py-number         { background: transparent; color: #005000; }
+.py-def-name       { background: transparent; color: #000060;
+                     font-weight: bold; }
+.py-base-class     { background: transparent; color: #000060; }
+.py-param          { background: transparent; color: #000060; }
+.py-docstring      { background: transparent; color: #006030; }
+.py-decorator      { background: transparent; color: #804020; }
+
 pre.doctestblock   { background: #f4faff; color: #000000; 
                      border-color: #708890; }
 table pre.doctestblock
@@ -231,6 +250,15 @@ h3.var-details     { background: transparent; color: #000000; }
 .py-comment        { background: transparent; color: #003060; }
 .py-keyword        { background: transparent; color: #600000; }
 .py-output         { background: transparent; color: #404040; }
+.py-name           { background: transparent; color: #000050; }
+.py-number         { background: transparent; color: #005000; }
+.py-def-name       { background: transparent; color: #000060;
+                     font-weight: bold; }
+.py-base-class     { background: transparent; color: #000060; }
+.py-param          { background: transparent; color: #000060; }
+.py-docstring      { background: transparent; color: #006030; }
+.py-decorator      { background: transparent; color: #804020; }
+
 pre.doctestblock   { background: #90a8b0; color: #000000; }
                      border-color: #708890; }
 table pre.doctestblock
@@ -311,6 +339,15 @@ h3.var-details     { background: transparent; color: #000000; }
 .py-comment        { background: transparent; color: #004080; }
 .py-keyword        { background: transparent; color: #800000; }
 .py-output         { background: transparent; color: #484848; }
+.py-name           { background: transparent; color: #000050; }
+.py-number         { background: transparent; color: #005000; }
+.py-def-name       { background: transparent; color: #000060;
+                     font-weight: bold; }
+.py-base-class     { background: transparent; color: #000060; }
+.py-param          { background: transparent; color: #000060; }
+.py-docstring      { background: transparent; color: #006030; }
+.py-decorator      { background: transparent; color: #804020; }
+
 pre.doctestblock   { background: #c8e0e8; color: #000000; 
                      border-color: #708890; }
 table pre.doctestblock
