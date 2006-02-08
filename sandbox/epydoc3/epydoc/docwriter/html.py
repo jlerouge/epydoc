@@ -7,21 +7,10 @@
 #
 
 """
-Use css/javascript to hide/show private elements.
-
-
-Forms of output:
-
-  - summary table
-  - details list
-
-I could potentially add:
-  # pos = mark_pos(out)
-  # rollback(out, pos)
-
-But I doubt it's worth it.
-
+The HTML output generator for epydoc.  The main interface provided by
+this module is the L{HTMLWriter} class.
 """
+
 import re, os, sys, codecs
 from epydoc.apidoc import *
 from epydoc.docstringparser import DocstringParser
@@ -33,21 +22,9 @@ from epydoc.docwriter.html_help import HTML_HELP
 ######################################################################
 ## Template Compiler
 ######################################################################
+# The compile_tempalte() method defined in this section is used to
+# define several of HTMLWriter's methods.
 
-def strip_indent(s):
-    # Strip indentation from the template.
-    minindent = 10000
-    lines = s.split('\n')
-    for line in lines:
-        stripline = line.lstrip()
-        if stripline:
-            minindent = min(minindent, len(line)-len(stripline))
-    return '\n'.join([l[minindent:] for l in lines])
-
-# consider using psp-style tags instead?
-#   <%= foo %>
-#   <% foo %>
-# look up psp/php?
 def compile_template(docstring, template_string,
                      output_function='out', debug=False):
     """
@@ -95,13 +72,17 @@ def compile_template(docstring, template_string,
     # Extract signature from the docstring:
     signature = docstring.lstrip().split('\n',1)[0].strip()
     func_name = signature.split('(',1)[0].strip()
-    
+
+    # Regexp to search for inline substitutions:
     INLINE = re.compile(r'\$([^\$]+)\$')
+    # Regexp to search for python statements in the template:
     COMMAND = re.compile(r'(^#.*)\n?', re.MULTILINE)
 
     # Strip indentation from the template.
     template_string = strip_indent(template_string)
 
+    # If we're debugging, then we'll store the generated function,
+    # so we can print it along with any tracebacks that depend on it.
     if debug:
         signature = re.sub(r'\)\s*$', ', pysrc=pysrc)', signature)
 
@@ -159,6 +140,21 @@ def compile_template(docstring, template_string,
     template_func.__doc__ = docstring
     return template_func
     
+def strip_indent(s):
+    """
+    Given a multiline string C{s}, find the minimum indentation for
+    all non-blank lines, and return a new string formed by stripping
+    that amount of indentation from all lines in C{s}.
+    """
+    # Strip indentation from the template.
+    minindent = sys.maxint
+    lines = s.split('\n')
+    for line in lines:
+        stripline = line.lstrip()
+        if stripline:
+            minindent = min(minindent, len(line)-len(stripline))
+    return '\n'.join([l[minindent:] for l in lines])
+
 ######################################################################
 ## HTML Writer
 ######################################################################
@@ -167,20 +163,126 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     # Table of Contents
     #////////////////////////////////////////////////////////////
+    #
     # 1. Interface Methods
-    # 2. Page Generation -- write complete web pages
-    #   2.1. Module Page
-    #   2.2. Class Page
-    # 3. Page Element Generation -- write pieces of a web page
+    #
+    # 2. Page Generation -- write complete web page files
+    #   2.1. Module Pages
+    #   2.2. Class Pages
+    #   2.3. Trees Page
+    #   2.4. Indices Page
+    #   2.5. Help Page
+    #   2.6. Frames-based table of contents pages
+    #   2.7. Homepage (index.html)
+    #   2.8. CSS Stylesheet
+    #
+    # 3. Page Element Generation -- write pieces of a web page file
     #   3.1. Page Header
     #   3.2. Page Footer
     #   3.3. Navigation Bar
     #   3.4. Breadcrumbs
     #   3.5. Summary Tables
+    #
+    # 4. Helper functions
 
     def __init__(self, docindex, **kwargs):
+        """
+        Construct a new HTML writer, using the given documentation
+        index.
+        
+        @param docmap: The documentation index.
+        
+        @type prj_name: C{string}
+        @keyword prj_name: The name of the project.  Defaults to
+              none.
+        @type prj_url: C{string}
+        @keyword prj_url: The target for the project hopeage link on
+              the navigation bar.  If C{prj_url} is not specified,
+              then no hyperlink is created.
+        @type prj_link: C{string}
+        @keyword prj_link: The label for the project link on the
+              navigation bar.  This link can contain arbitrary HTML
+              code (e.g. images).  By default, a label is constructed
+              from C{prj_name}.
+        @type top: C{string}
+        @keyword top: The top page for the documentation.  This
+              is the default page shown main frame, when frames are
+              enabled.  C{top} can be a URL, the name of a
+              module, the name of a class, or one of the special
+              strings C{"trees.html"}, C{"indices.html"}, or
+              C{"help.html"}.  By default, the top-level package or
+              module is used, if there is one; otherwise, C{"trees"}
+              is used.
+        @type css: C{string}
+        @keyword css: The CSS stylesheet file.  If C{css} is a file
+              name, then the specified file's conents will be used.
+              Otherwise, if C{css} is the name of a CSS stylesheet in
+              L{epydoc.css}, then that stylesheet will be used.
+              Otherwise, an error is reported.  If no stylesheet is
+              specified, then the default stylesheet is used.
+        @type private_css: C{string}
+        @keyword private_css: The CSS stylesheet file for the private
+              API documentation.  If C{css} is a file name, then the
+              specified file's conents will be used.  Otherwise, if
+              C{css} is the name of a CSS stylesheet in L{epydoc.css},
+              then that stylesheet will be used.  Otherwise, an error
+              is reported.  If no stylesheet is specified, then the
+              private API documentation will use the same stylesheet
+              as the public API documentation.
+        @type help: C{string}
+        @keyword help: The name of the help file.  If no help file is
+              specified, then the default help file will be used.
+        @type private: C{boolean}
+        @keyword private: Whether to create documentation for private
+              objects.  By default, private objects are documented.
+        @type frames: C{boolean})
+        @keyword frames: Whether to create a frames-based table of
+              contents.  By default, it is produced.
+        @type show_imports: C{boolean}
+        @keyword show_imports: Whether or not to display lists of
+              imported functions and classes.  By default, they are
+              not shown.
+        @type index_parameters: C{boolean}
+        @keyword index_parameters: Whether or not to include function
+              parameters in the identifier index.  By default, they
+              are not included.
+        @type variable_maxlines: C{int}
+        @keyword variable_maxlines: The maximum number of lines that
+              should be displayed for the value of a variable in the
+              variable details section.  By default, 8 lines are
+              displayed.
+        @type variable_linelength: C{int}
+        @keyword variable_linelength: The maximum line length used for
+              displaying the values of variables in the variable
+              details sections.  If a line is longer than this length,
+              then it will be wrapped to the next line.  The default
+              line length is 70 characters.
+        @type variable_summary_linelength: C{int}
+        @keyword variable_summary_linelength: The maximum line length
+              used for displaying the values of variables in the summary
+              section.  If a line is longer than this length, then it
+              will be truncated.  The default is 40 characters.
+        @type variable_tooltip_linelength: C{int}
+        @keyword variable_tooltip_linelength: The maximum line length
+              used for tooltips for the values of variables.  If a
+              line is longer than this length, then it will be
+              truncated.  The default is 600 characters.
+        @type property_function_linelength: C{int}
+        @keyword property_function_linelength: The maximum line length
+              used to dispaly property functions (C{fget}, C{fset}, and
+              C{fdel}) that contain something other than a function
+              object.  The dfeault length is 40 characters.
+        @type inheritance: C{string}
+        @keyword inheritance: How inherited objects should be displayed.
+              If C{inheritance='grouped'}, then inherited objects are
+              gathered into groups; if C{inheritance='listed'}, then
+              inherited objects are listed in a short list at the
+              end of their group; if C{inheritance='included'}, then
+              inherited objects are mixed in with non-inherited
+              objects.  The default is 'grouped'.
+        """
         self.docindex = docindex
-        self.docset = Set(docindex.values())
+        self.docset = Set(docindex.contained_valdocs)
 
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
@@ -220,6 +322,7 @@ class HTMLWriter:
                               self._prj_url+'">'+self._prj_link+'</a>')
 
     def _find_top_page(self, pagename):
+        # [XXX]
         return 'trees.html'
     
     #////////////////////////////////////////////////////////////
@@ -240,7 +343,7 @@ class HTMLWriter:
             before each file is written, with the name of the created
             file.
         @rtype: C{None}
-        @raise OSError: If C{directory} cannot be created,
+        @raise OSError: If C{directory} cannot be created.
         @raise OSError: If any file cannot be created or written to.
         """        
         # Keep track of failed xrefs, and report them at the end.
@@ -264,6 +367,8 @@ class HTMLWriter:
             else:
                 self._write(self.write_class, directory, filename,
                             progress_callback, doc)
+
+        # [XX] Write source code files.
         
         # Write the term & identifier indices
         self._write(self.write_indices, directory,
@@ -334,7 +439,7 @@ class HTMLWriter:
             os.mkdir(directory)
         
     #////////////////////////////////////////////////////////////
-    # 2.1. Module Page
+    # 2.1. Module Pages
     #////////////////////////////////////////////////////////////
 
     def write_module(self, out, doc):
@@ -352,6 +457,8 @@ class HTMLWriter:
         self.write_header(out, str(longname))
         self.write_navbar(out, doc)
         self.write_breadcrumbs(out, doc)
+
+        # [XX] source code link
 
         # Write the name of the module we're describing.
         if doc.is_package is True: typ = 'Package'
@@ -381,7 +488,8 @@ class HTMLWriter:
         self.write_summary_table(out, "Variables", doc, "other")
 
         # Write a list of all imported objects.
-        # [xx] imports?
+        if self._show_imports:
+            self.write_imports(out, doc)
 
         # Write detailed descriptions of functions & variables defined
         # in this module.
@@ -393,7 +501,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.2. Class Page
+    # 2.2. Class Pages
     #////////////////////////////////////////////////////////////
 
     def write_class(self, out, doc):
@@ -412,7 +520,9 @@ class HTMLWriter:
         self.write_navbar(out, doc)
         self.write_breadcrumbs(out, doc)
 
-        # Write the name of the module we're describing.
+        # [XX] source code link
+
+        # Write the name of the class we're describing.
         if doc.is_type(): typ = 'Type'
         elif doc.is_exception(): typ = 'Exception'
         else: typ = 'Class'
@@ -447,9 +557,10 @@ class HTMLWriter:
         self.write_standard_fields(out, doc)
 
         # Write summary tables describing the variables that the
-        # module defines.
+        # class defines.
         self.write_summary_table(out, "Nested Classes", doc, "class")
-        self.write_summary_table(out, "Methods", doc, "instancemethod")
+        self.write_summary_table(out, "Instance Methods", doc,
+                                 "instancemethod")
         self.write_summary_table(out, "Class Methods", doc, "classmethod")
         self.write_summary_table(out, "Static Methods", doc, "staticmethod")
         self.write_summary_table(out, "Class Variables", doc,
@@ -459,7 +570,7 @@ class HTMLWriter:
         self.write_summary_table(out, "Properties", doc, "property")
 
         # Write detailed descriptions of functions & variables defined
-        # in this module.
+        # in this class.
         self.write_details_list(out, "Method Details", doc, "method")
         self.write_details_list(out, "Class Variable Details", doc,
                                 "classvariable")
@@ -472,141 +583,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.3. Stylesheet (epydoc.css)
-    #////////////////////////////////////////////////////////////
-
-    def write_css(self, directory, cssname):
-        """
-        Write the CSS stylesheet in the given directory.  If
-        C{cssname} contains a stylesheet file or name (from
-        L{epydoc.css}), then use that stylesheet; otherwise, if a
-        stylesheet file already exists, use that stylesheet.
-        Otherwise, use the default stylesheet.
-
-        @rtype: C{None}
-        """
-        filename = os.path.join(directory, 'epydoc.css')
-        
-        # Get the contents for the stylesheet file.  If none was
-        # specified, and a stylesheet is already present, then don't
-        # do anything.
-        if cssname is None:
-            if os.path.exists(filename):
-                return
-            else: css = STYLESHEETS['default'][0]
-        else:
-            if os.path.exists(cssname):
-                try: css = open(cssname).read()
-                except: raise IOError("Can't open CSS file: %r" % cssname)
-            elif STYLESHEETS.has_key(cssname):
-                css = STYLESHEETS[cssname][0]
-            else:
-                raise IOError("Can't find CSS file: %r" % cssname)
-
-        # Write the stylesheet.
-        cssfile = open(filename, 'w')
-        cssfile.write(css)
-        cssfile.close()
-
-    #////////////////////////////////////////////////////////////
-    # 2.4. Project homepage (index.html)
-    #////////////////////////////////////////////////////////////
-
-    def write_homepage(self, directory):
-        """
-        Write an C{index.html} file in the given directory.  The
-        contents of this file are copied or linked from an existing
-        page.  The page used is determined by L{_frames_index} and
-        L{_top_page}:
-            - If L{_frames_index} is true, then C{frames.html} is
-              copied.
-            - Otherwise, the page specified by L{_top_page} is
-              copied.
-        """
-        filename = os.path.join(directory, 'index.html')
-        if self._frames_index: top = 'frames.html'
-        else: top = self._top_page
-
-        # Copy the non-frames index file from top, if it's internal.
-        if top[:5] != 'http:' and '/' not in top:
-            try:
-                # Read top into `s`.
-                topfile = os.path.join(directory, top)
-                s = open(topfile, 'r').read()
-
-                # Write the output file.
-                open(filename, 'w').write(s)
-                return
-            except:
-                if sys.stderr.softspace: print >>sys.stderr
-                estr = 'Warning: error copying index; using a redirect page'
-                print >>sys.stderr, estr
-
-        # Use a redirect if top is external, or if we faild to copy.
-        
-        name = self._prj_name or 'this project'
-        f = open(filename, 'w')
-        self.write_redirect_index(f.write, top, name)
-        f.close()
-
-    write_redirect_index = compile_template(
-        """
-        write_redirect_index(self, out, top, name)
-        """,
-        '''
-        <?xml version="1.0" encoding="iso-8859-1"?>
-        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
-                  "DTD/xhtml1-strict.dtd">
-        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-        <head>
-          <title> Redirect </title>
-          <meta http-equiv="refresh" content="1;url=$top$" />
-          <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
-        </head>
-        <body>
-          <p>Redirecting to the API documentation for
-            <a href="$top$">$self._prj_name or "this project"$</a>...</p>
-        </body>
-        </html>
-        ''')
-
-    #////////////////////////////////////////////////////////////
-    # 2.5. Help Page
-    #////////////////////////////////////////////////////////////
-
-    def write_help(self, out):
-        """
-        Write an HTML help file to the given streams.  If
-        C{self._helpfile} contains a help file, then use it;
-        otherwise, use the default helpfile from L{epydoc.help}.
-        @param public: The output stream for the public version of the page.
-        @param private: The output stream for the private version of the page.
-        """
-        # todo: optionally parse .rst etc help files?
-        
-        # Get the contents of the help file.
-        if self._helpfile:
-            if os.path.exists(self._helpfile):
-                try: help = open(self._helpfile).read()
-                except: raise IOError("Can't open help file: %r" %
-                                      self._helpfile)
-            else:
-                raise IOError("Can't find help file: %r" % self._helpfile)
-        else:
-            if self._prj_name: thisprj = self._prj_name
-            else: thisprj = 'this project'
-            help = HTML_HELP % {'this_project':thisprj}
-
-        # Insert the help contents into a webpage.
-        self.write_header(out, 'Help')
-        self.write_navbar(out, 'help')
-        self.write_breadcrumbs(out, 'help')
-        out(help)
-        self.write_navbar(out, 'help')
-        self.write_footer(out, 'Help')
-
-    #////////////////////////////////////////////////////////////
-    # 2.6. Trees page.
+    # 2.3. Trees page
     #////////////////////////////////////////////////////////////
 
     def write_trees(self, out):
@@ -644,39 +621,7 @@ class HTMLWriter:
         self.write_footer(out, 'Trees')
 
     #////////////////////////////////////////////////////////////
-    # 2.n. Frames
-    #////////////////////////////////////////////////////////////
-    
-    write_frames_index = compile_template(
-        """
-        write_frames_index(self, out)
-
-        Write the frames index file for the frames-based table of
-        contents to the given streams.
-        """,
-        '''
-        <?xml version="1.0" encoding="iso-8859-1"?>
-        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
-                  "DTD/xhtml1-frameset.dtd">
-        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-        <head>
-          <title> $self._prj_name or "API Documentation"$ </title>
-        </head>
-        <frameset cols="20%,80%">
-          <frameset rows="30%,70%">
-            <frame src="toc.html" name="moduleListFrame"
-                   id="moduleListFrame" />
-            <frame src="toc-everything.html" name="moduleFrame"
-                   id="moduleFrame" />
-          </frameset>
-          <frame src="$self._top_page$" name="mainFrame" id="mainFrame" />
-        </frameset>
-        </html>
-        ''')
-        
-
-    #////////////////////////////////////////////////////////////
-    # 2.2. Indices
+    # 2.4. Indices page
     #////////////////////////////////////////////////////////////
 
     def write_indices(self, out):
@@ -755,9 +700,11 @@ class HTMLWriter:
               </td>
               <td>$self.doc_kind(doc)$
         #     container_name = name.container()
-        #     container = self.docindex.get(container_name)
-        #     if container is not None:
-                  in $self.doc_kind(container)$ $self.href(container)$
+        #     if container_name is not None:
+        #         container = self.docindex.get_valdoc(container_name)
+        #         if container is not None:
+                      in $self.doc_kind(container)$ $self.href(container)$
+        #         #endif
         #     #endif
               </td>
           </tr>
@@ -791,8 +738,70 @@ class HTMLWriter:
         ''')
 
     #////////////////////////////////////////////////////////////
-    # 2.2. Table of contents
+    # 2.5. Help Page
     #////////////////////////////////////////////////////////////
+
+    def write_help(self, out):
+        """
+        Write an HTML help file to the given stream.  If
+        C{self._helpfile} contains a help file, then use it;
+        otherwise, use the default helpfile from L{epydoc.help}.
+        @param public: The output stream for the public version of the page.
+        @param private: The output stream for the private version of the page.
+        """
+        # todo: optionally parse .rst etc help files?
+        
+        # Get the contents of the help file.
+        if self._helpfile:
+            if os.path.exists(self._helpfile):
+                try: help = open(self._helpfile).read()
+                except: raise IOError("Can't open help file: %r" %
+                                      self._helpfile)
+            else:
+                raise IOError("Can't find help file: %r" % self._helpfile)
+        else:
+            if self._prj_name: thisprj = self._prj_name
+            else: thisprj = 'this project'
+            help = HTML_HELP % {'this_project':thisprj}
+
+        # Insert the help contents into a webpage.
+        self.write_header(out, 'Help')
+        self.write_navbar(out, 'help')
+        self.write_breadcrumbs(out, 'help')
+        out(help)
+        self.write_navbar(out, 'help')
+        self.write_footer(out, 'Help')
+
+    #////////////////////////////////////////////////////////////
+    # 2.6. Frames-based Table of Contents
+    #////////////////////////////////////////////////////////////
+    
+    write_frames_index = compile_template(
+        """
+        write_frames_index(self, out)
+
+        Write the frames index file for the frames-based table of
+        contents to the given streams.
+        """,
+        '''
+        <?xml version="1.0" encoding="iso-8859-1"?>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
+                  "DTD/xhtml1-frameset.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head>
+          <title> $self._prj_name or "API Documentation"$ </title>
+        </head>
+        <frameset cols="20%,80%">
+          <frameset rows="30%,70%">
+            <frame src="toc.html" name="moduleListFrame"
+                   id="moduleListFrame" />
+            <frame src="toc-everything.html" name="moduleFrame"
+                   id="moduleFrame" />
+          </frameset>
+          <frame src="$self._top_page$" name="mainFrame" id="mainFrame" />
+        </frameset>
+        </html>
+        ''')
     
     write_toc = compile_template(
         """
@@ -931,6 +940,105 @@ class HTMLWriter:
         str = '\n</body>\n</html>\n'
         public.write(str); private.write(str)
     
+    #////////////////////////////////////////////////////////////
+    # 2.7. Project homepage (index.html)
+    #////////////////////////////////////////////////////////////
+
+    def write_homepage(self, directory):
+        """
+        Write an C{index.html} file in the given directory.  The
+        contents of this file are copied or linked from an existing
+        page, so this method must be called after all pages have been
+        written.  The page used is determined by L{_frames_index} and
+        L{_top_page}:
+            - If L{_frames_index} is true, then C{frames.html} is
+              copied.
+            - Otherwise, the page specified by L{_top_page} is
+              copied.
+        """
+        filename = os.path.join(directory, 'index.html')
+        if self._frames_index: top = 'frames.html'
+        else: top = self._top_page
+
+        # Copy the non-frames index file from top, if it's internal.
+        if top[:5] != 'http:' and '/' not in top:
+            try:
+                # Read top into `s`.
+                topfile = os.path.join(directory, top)
+                s = open(topfile, 'r').read()
+
+                # Write the output file.
+                open(filename, 'w').write(s)
+                return
+            except:
+                if sys.stderr.softspace: print >>sys.stderr
+                estr = 'Warning: error copying index; using a redirect page'
+                print >>sys.stderr, estr
+
+        # Use a redirect if top is external, or if we faild to copy.
+        name = self._prj_name or 'this project'
+        f = open(filename, 'w')
+        self.write_redirect_index(f.write, top, name)
+        f.close()
+
+    write_redirect_index = compile_template(
+        """
+        write_redirect_index(self, out, top, name)
+        """,
+        '''
+        <?xml version="1.0" encoding="iso-8859-1"?>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+                  "DTD/xhtml1-strict.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head>
+          <title> Redirect </title>
+          <meta http-equiv="refresh" content="1;url=$top$" />
+          <link rel="stylesheet" href="epydoc.css" type="text/css"></link>
+        </head>
+        <body>
+          <p>Redirecting to the API documentation for
+            <a href="$top$">$self._prj_name or "this project"$</a>...</p>
+        </body>
+        </html>
+        ''')
+
+    #////////////////////////////////////////////////////////////
+    # 2.8. Stylesheet (epydoc.css)
+    #////////////////////////////////////////////////////////////
+
+    def write_css(self, directory, cssname):
+        """
+        Write the CSS stylesheet in the given directory.  If
+        C{cssname} contains a stylesheet file or name (from
+        L{epydoc.css}), then use that stylesheet; otherwise, if a
+        stylesheet file already exists, use that stylesheet.
+        Otherwise, use the default stylesheet.
+
+        @rtype: C{None}
+        """
+        filename = os.path.join(directory, 'epydoc.css')
+        
+        # Get the contents for the stylesheet file.  If none was
+        # specified, and a stylesheet is already present, then don't
+        # do anything.
+        if cssname is None:
+            if os.path.exists(filename):
+                return
+            else: css = STYLESHEETS['default'][0]
+        else:
+            if os.path.exists(cssname):
+                try: css = open(cssname).read()
+                except: raise IOError("Can't open CSS file: %r" % cssname)
+            elif STYLESHEETS.has_key(cssname):
+                css = STYLESHEETS[cssname][0]
+            else:
+                raise IOError("Can't find CSS file: %r" % cssname)
+
+        # Write the stylesheet.
+        cssfile = open(filename, 'w')
+        cssfile.write(css)
+        cssfile.close()
+
     #////////////////////////////////////////////////////////////
     # 3.1. Page Header
     #////////////////////////////////////////////////////////////
@@ -1212,6 +1320,8 @@ class HTMLWriter:
         while True:
             if doc.canonical_container is None:
                 return crumbs
+            if doc.canonical_container is UNKNOWN:
+                return ['??']+crumbs
             doc = doc.canonical_container
             label = self._crumb(doc)
             name = doc.canonical_name
@@ -1828,7 +1938,12 @@ class HTMLWriter:
 
     
 
-    
+    #////////////////////////////////////////////////////////////
+    # Import Lists
+    #////////////////////////////////////////////////////////////
+        
+    def write_imports(self, out, doc):
+        return # [XXX]
 
     #////////////////////////////////////////////////////////////
     # Function Attributes
@@ -1838,6 +1953,20 @@ class HTMLWriter:
     # Module Trees
     #////////////////////////////////////////////////////////////
 
+    def write_module_tree(self, out):
+        # Get all modules.
+        modules = [doc for doc in self.docset
+                   if isinstance(doc, ModuleDoc)]
+        if not modules: return
+        # [XX] sort?
+
+        # Write entries for all top-level modules/packages.
+        out('<ul>\n')
+        for doc in modules:
+            if doc.package in (None, UNKNOWN):
+                self.write_module_tree_item(out, doc)
+        out('</ul>\n')
+    
     write_module_list = compile_template(
         '''
         write_module_list(self, out, doc)
@@ -1853,22 +1982,16 @@ class HTMLWriter:
         <br />
         ''')
 
-    def write_module_tree(self, out):
-        return # [xx]
-
-    def write_class_tree(self, out):
-        return # [xx]
-
     write_module_tree_item = compile_template(
         '''
         write_module_tree_item(self, out, doc)
         ''',
         '''
         # if doc.summary in (None, UNKNOWN):
-            <li> <strong class="udlink">$self.href(doc)$</strong>
+            <li> <strong class="uidlink">$self.href(doc)$</strong>
         # else:
-            <li> <strong class="udlink">$self.href(doc)$</strong>:
-                $self.description(doc.summary, doc, 8)$
+            <li> <strong class="uidlink">$self.href(doc)$</strong>:
+              <em class="summary">$self.description(doc.summary, doc, 8)$</em>
         # # endif
         # if doc.submodules:
             <ul>
@@ -1880,6 +2003,57 @@ class HTMLWriter:
             </li>
         ''')
 
+
+    #////////////////////////////////////////////////////////////
+    # Class trees
+    #////////////////////////////////////////////////////////////
+
+
+    def write_class_tree(self, out):
+        """
+        Write HTML code for a nested list showing the base/subclass
+        relationships between all documented classes.  Each element of
+        the top-level list is a class with no (documented) bases; and
+        under each class is listed all of its subclasses.  Note that
+        in the case of multiple inheritance, a class may appear
+        multiple times.  This is used by L{write_trees} to write
+        the class hierarchy.
+        
+        @todo: For multiple inheritance, don't repeat subclasses the
+            second time a class is mentioned; instead, link to the
+            first mention.
+        """
+        classes = [doc for doc in self.docset
+                   if isinstance(doc, ClassDoc)]
+        if not classes: return
+        # [XX] sort?
+
+        out('<ul>\n')
+        for doc in classes:
+            if not doc.bases:
+                self.write_class_tree_item(out, doc)
+        out('</ul>\n')
+
+    write_class_tree_item = compile_template(
+        '''
+        write_class_tree_item(self, out, doc)
+        ''',
+        '''
+        # if doc.summary in (None, UNKNOWN):
+            <li> <strong class="uidlink">$self.href(doc)$</strong>
+        # else:
+            <li> <strong class="uidlink">$self.href(doc)$</strong>:
+              <em class="summary">$self.description(doc.summary, doc, 8)$</em>
+        # # endif
+        # if doc.subclasses:
+            <ul>
+        #   for subclass in doc.subclasses:
+        #     self.write_class_tree_item(out, subclass)
+        #   #endfor
+            </ul>
+        # #endif
+            </li>
+        ''')
     
     #////////////////////////////////////////////////////////////
     # Standard Fields
@@ -2059,8 +2233,9 @@ class HTMLWriter:
                 return '%s#%s' % (self.url(obj.canonical_container),
                                   obj.canonical_name[-1])
         elif isinstance(obj, DottedName):
-            if obj in self.docindex:
-                return self.url(self.docindex[obj])
+            val_doc = self.docindex.get_valdoc(obj)
+            if val_doc is not None:
+                return self.url(val_doc)
             else:
                 return None # [xx] hmm...
         elif obj == 'indices':
@@ -2148,18 +2323,19 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         else:
             return self.htmlwriter.href(doc, label, 'link')
 
+# [xx] what is this doing exactly?
 # [xx] some values are not to be trusted! (eg None, UNKNOWN, '')
 def findit(name, container, docindex):
     #print 'look for %r in %r' % (name, container.canonical_name)
     container_name = container.canonical_name
     if container_name in (None, UNKNOWN):
-        return docindex.get(name)
+        return docindex.get_valdoc(name)
     for i in range(len(container_name), -1, -1):
-        val_doc = docindex.get(DottedName(*(container_name[:i]+(name,))))
+        val_doc = docindex.get_valdoc(DottedName(*(container_name[:i]+(name,))))
         #print '  Check', DottedName(*(container_name[:i]+(name,))),
         if val_doc is not None:
             #print '=> yes'
             return val_doc
         #print '=> no'
-    return docindex.get(name)
+    return docindex.get_valdoc(name)
 
