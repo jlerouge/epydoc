@@ -3,7 +3,7 @@ from epydoc.apidoc import *
 from epydoc.docinspector import DocInspector
 from epydoc.docparser import DocParser
 from epydoc.docmerger import DocMerger
-from epydoc.docindexer import DocIndexer
+from epydoc.docindexer import DocIndex
 from epydoc.docstringparser import DocstringParser
 from epydoc.docinheriter import DocInheriter
 from epydoc.docwriter.plaintext import PlaintextWriter
@@ -17,7 +17,6 @@ def build_docs(names, inspect=True, parse=True):
     inspector = DocInspector()
     parser = DocParser(inspector.inspect(__builtins__))
     merger = DocMerger()
-    indexer = DocIndexer()
     docstring_parser = DocstringParser()
     inheriter = DocInheriter()
 
@@ -59,12 +58,13 @@ def build_docs(names, inspect=True, parse=True):
         else:
             merged_docs.append(merger.merge(inspectdoc, parsedoc))
 
-    # Add canonical names
-    docindex = indexer.index(merged_docs)
+    # Construct a dictionary mapping name -> ValueDoc, and use that
+    # dictionary to create an index.
+    doc_dict = dict(zip(names, merged_docs))
+    docindex = DocIndex(doc_dict)
 
     # Parse all docstrings.
-    for name, val_doc in docindex.items():
-        if name != val_doc.canonical_name: continue
+    for val_doc in docindex.reachable_valdocs:
         docstring_parser.parse_docstring(val_doc)
         if isinstance(val_doc, ClassDoc):
             if val_doc.local_variables is not UNKNOWN:
@@ -78,16 +78,17 @@ def build_docs(names, inspect=True, parse=True):
     # Inheritance.
     inheriter.inherit(docindex)
 
-    # debug:
-    for n,v in docindex.items():
-        if n!=v.canonical_name: continue
-        if isinstance(v, NamespaceDoc):
-            for var in v.variables.values():
-                assert var.container == v
-            for var in v.sorted_variables:
-                assert var.container == v
+#     # debug:
+#     for n,v in docindex.items():
+#         if n!=v.canonical_name: continue
+#         if isinstance(v, NamespaceDoc):
+#             for var in v.variables.values():
+#                 assert var.container == v
+#             for var in v.sorted_variables:
+#                 assert var.container == v
+#     print docindex[DottedName('epydoc.apidoc.APIDoc')].\
+#            pp(exclude='canonical_container')
 
-    #print docindex[DottedName('epydoc.apidoc.APIDoc')].pp(exclude='canonical_container')
     return docindex
 
 def help(names):
@@ -101,12 +102,15 @@ def help(names):
     #parse = False
 
     docindex = build_docs(names, inspect=inspect, parse=parse)
-
-    print docindex[DottedName(names[0])]
+    
+    #print docindex.get_valdoc(DottedName(names[0]))
+    #print 'C', sorted([v.canonical_name for v in docindex.contained_valdocs])
+    #print 'R', sorted([v.canonical_name for v in docindex.reachable_valdocs])
+    
     writer = HTMLWriter(docindex)
     def progress(s):
         print 'Writing %s...' % s
-    writer.write('/tmp/epydoc', progress)
+    writer.write('/home/edloper/public_html/epydoc', progress)
     
 if __name__ == '__main__':
     if len(sys.argv) <= 1:

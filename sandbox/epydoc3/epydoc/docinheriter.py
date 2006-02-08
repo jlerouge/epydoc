@@ -17,9 +17,7 @@ from epydoc.apidoc import *
 class DocInheriter:
 
     def inherit(self, docindex):
-        for name, val_doc in docindex.items():
-            if name != val_doc.canonical_name: continue
-
+        for val_doc in docindex.reachable_valdocs:
             # Do inheritance
             if isinstance(val_doc, ClassDoc):
                 self._inherit(val_doc)
