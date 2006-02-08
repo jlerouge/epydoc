@@ -1405,9 +1405,12 @@ class DocParser:
         else:
             var_dict = namespace.variables
         # If we already have a variable with this name, then remove the
-        # old VariableDoc from the sort_spec list.
+        # old VariableDoc from the sort_spec list; and if we gave its
+        # value a canonical name, then delete it.
         if var_doc.name in var_dict:
             namespace.sort_spec.remove(var_doc.name)
+            if not var_doc.is_alias and var_doc.value is not UNKNOWN:
+                var_doc.value.canonical_name = UNKNOWN
         # Add the variable to the namespace.
         var_dict[var_doc.name] = var_doc
         namespace.sort_spec.append(var_doc.name)
@@ -1426,8 +1429,11 @@ class DocParser:
         name = DottedName(name)
         if name[0] in var_dict:
             if len(name) == 1:
+                var_doc = var_dict[name[0]]
                 namespace.sort_spec.remove(name[0])
                 del var_dict[name[0]]
+                if not var_doc.is_alias and var_doc.value is not UNKNOWN:
+                    var_doc.value.canonical_name = UNKNOWN
             else:
                 self._del_variable(var_dict[name[0]], name[1:])
                 
