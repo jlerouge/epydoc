@@ -69,7 +69,7 @@ class DottedName:
         for piece in pieces:
             if isinstance(piece, DottedName):
                 self._identifiers += piece._identifiers
-            elif isinstance(piece, types.StringType):
+            elif isinstance(piece, basestring):
                 if not _IDENTIFIER_RE.match(piece):
                     raise ValueError('Bad identifier %r' % (piece,))
                 self._identifiers += piece.split('.')
