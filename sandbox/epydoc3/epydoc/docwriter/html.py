@@ -175,6 +175,7 @@ class HTMLWriter:
     #   2.6. Frames-based table of contents pages
     #   2.7. Homepage (index.html)
     #   2.8. CSS Stylesheet
+    #   2.9. Javascript file
     #
     # 3. Page Element Generation -- write pieces of a web page file
     #   3.1. Page Header
@@ -282,7 +283,6 @@ class HTMLWriter:
               objects.  The default is 'grouped'.
         """
         self.docindex = docindex
-        self.docset = Set(docindex.contained_valdocs)
 
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
@@ -353,12 +353,16 @@ class HTMLWriter:
         if not directory: directory = os.curdir
         self._mkdir(directory)
 
-        # Write the CSS files.
+        # Write the CSS file.
         if progress_callback: progress_callback('epydoc.css')
         self.write_css(directory, self._css)
 
+        # Write the Javascript file.
+        if progress_callback: progress_callback('epydoc.js')
+        self.write_javascript(directory)
+
         # Write the object documentation.
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
             filename = self.url(doc)
             if isinstance(doc, ModuleDoc):
@@ -389,7 +393,7 @@ class HTMLWriter:
                      progress_callback)
         self._write(self.write_project_toc, directory,
                     'toc-everything.html', progress_callback)
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             if isinstance(doc, ModuleDoc):
                 filename = 'toc-%s' % self.url(doc)
                 self._write(self.write_module_toc, directory, filename,
@@ -606,7 +610,7 @@ class HTMLWriter:
 
         # Does the project define any classes?
         defines_classes = False
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             if isinstance(doc, ClassDoc): defines_classes = True; break
 
         # Write the class hierarchy
@@ -642,10 +646,10 @@ class HTMLWriter:
 
         terms = self._extract_term_index()
         if terms:
-            self.write_term_index(out)
+            self.write_term_index(out, terms)
 
         identifiers = []
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             name = doc.canonical_name
             if self.url(doc) is None: continue
             key = name[-1].lower()
@@ -814,43 +818,41 @@ class HTMLWriter:
         <p class="toc">
           <a target="moduleFrame" href="toc-everything.html">Everything</a>
         </p>
-        # packages = [d for d in self.docset if
-        #             isinstance(d, ModuleDoc) and d.is_package]
-        # self.write_toc_section(out, "Packages", packages)
-        # modules = [d for d in self.docset if
-        #            isinstance(d, ModuleDoc) and not d.is_package]
+        # modules = [d for d in self.docindex.contained_valdocs if
+        #            isinstance(d, ModuleDoc)]
         # self.write_toc_section(out, "Modules", modules)
         <hr />
         $self.PRIVATE_LINK$
         # self.write_footer(out, short=True)
         ''')
 
-    write_toc_section = compile_template(
-        """
-        write_toc_section(self, out, name, docs)
-        """,
-        '''
-        # if not docs: return
-          <h2 class="tocheading">$name$</h2>
-        # # sort by name:
-        # decorated = [(str(d.canonical_name),d) for d in docs]
-        # decorated.sort()
-        # for sortkey, doc in decorated:
-        #   doc_url = self.url(doc)
-        #   if not doc_url: continue #[xx] hmmm!
-        #   toc_url = "toc-"+doc_url
-        #   #if not doc.is_public: #[xx] vars are public not val!
-        #   #     <div class="private">
-        #   # endif
-            <p class="toc">
-              <a target="moduleFrame" href="$toc_url$"
-                 onclick="setFrame(\'$toc_url$\',\'$doc_url$\');"
-              >$doc.canonical_name$</a></p>
-        #   #if not doc.is_public: #[xx] vars are public not val!
-        #   #     </div>
-        #   # endif
-        # #endfor
-        ''')
+    def write_toc_section(self, out, name, docs, fullname=True):
+        if not docs: return
+
+        # Assign names to each item, and sort by name.
+        if fullname:
+            docs = [(str(d.canonical_name), d) for d in docs]
+        else:
+            docs = [(str(d.canonical_name[-1]), d) for d in docs]
+        docs.sort()
+
+        out('  <h2 class="tocheading">%s</h2>\n' % name)
+        for label, doc in docs:
+            doc_url = self.url(doc)
+            toc_url = 'toc-%s' % doc_url
+            if isinstance(doc, VariableDoc) and doc.is_public is False:
+                out('  <div class="private">\n')
+                
+            out('  <p class="toc">\n')
+            if isinstance(doc, ModuleDoc):
+                out('    <a target="moduleFrame" href="%s"\n'
+                    '     onclick="setFrame(\'%s\',\'%s\');"'
+                    '     >%s</a></p>' % (toc_url, toc_url, doc_url, label))
+            else:
+                out('    <a target="mainFrame" href="%s"\n'
+                    '     >%s</a></p>' % (doc_url, label))
+            if isinstance(doc, VariableDoc) and doc.is_public is False:
+                out('  </div>\n')
 
     def write_project_toc(self, out):
         self.write_header(out, "Everything")
@@ -858,16 +860,18 @@ class HTMLWriter:
         out('<hr />\n')
 
         # List the classes.
-        classes = [d for d in self.docset if isinstance(d, ClassDoc)]
+        classes = [d for d in self.docindex.contained_valdocs
+                   if isinstance(d, ClassDoc)]
         self.write_toc_section(out, "All Classes", classes)
 
         # List the functions.
-        funcs = [d for d in self.docset if isinstance(d, FunctionDoc)]
+        funcs = [d for d in self.docindex.contained_valdocs
+                 if isinstance(d, FunctionDoc)]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
         vars = []
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             if isinstance(doc, ModuleDoc):
                 vars += doc.select_variables(value_type='other',
                                              imported=False)
@@ -897,49 +901,24 @@ class HTMLWriter:
         out('<h1 class="tocheading">Module %s</h1>\n' % name)
         out('<hr />\n')
 
+
+        # List the classes.
+        classes = doc.select_variables(value_type='class', imported=False)
+        self.write_toc_section(out, "Classes", classes, fullname=False)
+
+        # List the functions.
+        funcs = doc.select_variables(value_type='function', imported=False)
+        self.write_toc_section(out, "Functions", funcs, fullname=False)
+
+        # List the variables.
+        variables = doc.select_variables(value_type='other', imported=False)
+        self.write_toc_section(out, "Variables", variables, fullname=False)
         
         # Footer material.
         out('<hr />\n')
         out(self.PRIVATE_LINK+'\n')
         self.write_footer(out, short=True)
 
-        return # [XX]
-
-
-
-    
-        # Split classes into classes & exceptions.
-        doc = self._docmap[uid]
-        (classes,excepts) = self._split_classes(doc.classes())
-
-        # Write the header.
-        str = self._header(uid.name())
-        str += (('<h1 class="tocheading"><a target="mainFrame" '+
-                'href="%s">%s</a></h1>\n<hr />\n')
-                % (self._dotted_name_to_uri(uid), uid[-1]))
-        public.write(str); private.write(str)
-        
-        # Write the lists of objects.
-        if uid.is_package():
-            self._write_toc_section(public, private, 'Modules', doc.modules())
-        self._write_toc_section(public, private, 'Classes', classes)
-        self._write_toc_section(public, private, 'Exceptions', excepts)
-        self._write_toc_section(public, private, 'Functions', doc.functions())
-        self._write_toc_section(public, private, 'Variables', doc.variables())
-                                 
-        # Write the private/public link.
-        if self._create_private_docs:
-            str = '\n<hr />\n'
-            public.write(str); private.write(str)
-            public.write(self._public_private_link(uid, toc=1,
-                                                   from_private=0))
-            private.write(self._public_private_link(uid, toc=1,
-                                                    from_private=1))
-
-        # Write the footer.
-        str = '\n</body>\n</html>\n'
-        public.write(str); private.write(str)
-    
     #////////////////////////////////////////////////////////////
     # 2.7. Project homepage (index.html)
     #////////////////////////////////////////////////////////////
@@ -1010,21 +989,16 @@ class HTMLWriter:
         """
         Write the CSS stylesheet in the given directory.  If
         C{cssname} contains a stylesheet file or name (from
-        L{epydoc.css}), then use that stylesheet; otherwise, if a
-        stylesheet file already exists, use that stylesheet.
-        Otherwise, use the default stylesheet.
+        L{epydoc.css}), then use that stylesheet; otherwise, use the
+        default stylesheet.
 
         @rtype: C{None}
         """
         filename = os.path.join(directory, 'epydoc.css')
         
-        # Get the contents for the stylesheet file.  If none was
-        # specified, and a stylesheet is already present, then don't
-        # do anything.
+        # Get the contents for the stylesheet file.
         if cssname is None:
-            if os.path.exists(filename):
-                return
-            else: css = STYLESHEETS['default'][0]
+            css = STYLESHEETS['default'][0]
         else:
             if os.path.exists(cssname):
                 try: css = open(cssname).read()
@@ -1040,41 +1014,16 @@ class HTMLWriter:
         cssfile.close()
 
     #////////////////////////////////////////////////////////////
-    # 3.1. Page Header
+    # 2.9. Javascript (epydoc.js)
     #////////////////////////////////////////////////////////////
 
-    write_header = compile_template(
-        """
-        write_header(self, out, title)
-
-        Generate HTML code for the standard page header, and write it
-        to C{out}.  C{title} is a string containing the page title.
-        It should be appropriately escaped/encoded.
-        """,
-        # /------------------------- Template -------------------------\
-        '''
-        <?xml version="1.0" encoding="ascii"?>
-        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-                  "DTD/xhtml1-transitional.dtd">
-        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-        <head>
-          <title>$title$</title>
-          <link rel="stylesheet" href="epydoc.css" type="text/css" />
-        <script type="text/javascript">
-          <!--
-              $self.TOGGLE_PRIVATE_JS$
-              $self.GET_COOKIE_JS$
-              $self.SET_FRAME_JS$
-          // -->
-        </script>
-        </head>
-        
-        <body bgcolor="white" text="black" link="blue" vlink="#204080"
-              alink="#204080">
-        ''')
-        # \------------------------------------------------------------/
-
-    # [xx] put the javascripts in a single file?
+    def write_javascript(self, directory):
+        jsfile = open(os.path.join(directory, 'epydoc.js'), 'w')
+        print >> jsfile, self.TOGGLE_PRIVATE_JS
+        print >> jsfile, self.GET_COOKIE_JS
+        print >> jsfile, self.SET_FRAME_JS
+        print >> jsfile, self.HIDE_PRIVATE_JS
+        jsfile.close()
 
     #: A javascript that is used to show or hide the API documentation
     #: for private objects.  In order for this to work correctly, all
@@ -1104,8 +1053,11 @@ class HTMLWriter:
         // Set a cookie to remember the current option.
         document.cookie = "EpydocPrivate="+cmd;
       }
-      '''
+      '''.strip()
 
+    #: A javascript that is used to read the value of a cookie.  This
+    #: is used to remember whether private variables should be shown or
+    #: hidden.
     GET_COOKIE_JS = '''
       function getCookie(name) {
         var dc = document.cookie;
@@ -1121,12 +1073,7 @@ class HTMLWriter:
         { end = dc.length; }
         return unescape(dc.substring(begin + prefix.length, end));
       }
-      '''
-
-    HIDE_PRIVATE_JS = '''
-    var cmd=getCookie("EpydocPrivate");
-    if (cmd!="show private") {toggle_private();}
-    '''
+      '''.strip()
 
     #: A javascript that is used to set the contents of two frames at
     #: once.  This is used by the project table-of-contents frame to
@@ -1139,6 +1086,42 @@ class HTMLWriter:
       }
     '''.strip()
     
+    HIDE_PRIVATE_JS = '''
+      function hidePrivate() {
+        var cmd=getCookie("EpydocPrivate");
+        if (cmd!="show private") {toggle_private();}
+      }
+    '''.strip()
+
+    #////////////////////////////////////////////////////////////
+    # 3.1. Page Header
+    #////////////////////////////////////////////////////////////
+
+    write_header = compile_template(
+        """
+        write_header(self, out, title)
+
+        Generate HTML code for the standard page header, and write it
+        to C{out}.  C{title} is a string containing the page title.
+        It should be appropriately escaped/encoded.
+        """,
+        # /------------------------- Template -------------------------\
+        '''
+        <?xml version="1.0" encoding="ascii"?>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                  "DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head>
+          <title>$title$</title>
+          <link rel="stylesheet" href="epydoc.css" type="text/css" />
+          <script type="text/javascript" src="epydoc.js"></script>
+        </head>
+        
+        <body bgcolor="white" text="black" link="blue" vlink="#204080"
+              alink="#204080">
+        ''')
+        # \------------------------------------------------------------/
+
     #////////////////////////////////////////////////////////////
     # 3.2. Page Footer
     #////////////////////////////////////////////////////////////
@@ -1169,7 +1152,7 @@ class HTMLWriter:
           // javascript is turned off then we want them to be
           // visible); but by default, we want to hide them.  So hide
           // them unless we have a cookie that says to show them.
-          $self.HIDE_PRIVATE_JS$
+          hidePrivate()
           // -->
         </script>
           
@@ -1289,7 +1272,7 @@ class HTMLWriter:
                 $crumb$ ::
         #   #endfor
                 $crumbs[-1]$
-              </span><br />
+              </span>
             </td>
         # else:
             <td width="100%">&nbsp;</td>
@@ -1297,15 +1280,11 @@ class HTMLWriter:
             <td>
               <table cellpadding="0" cellspacing="0">
                 <!-- hide/show private -->
-                <tr><td align="right">
-                  $self.PRIVATE_LINK$
-                </td></tr>
-                <tr><td align="right">
-                  <span class="options"
+                <tr><td align="right">$self.PRIVATE_LINK$</td></tr>
+                <tr><td align="right"><span class="options"
                     >[<a href="frames.html" target="_top">frames</a
                     >]&nbsp;|&nbsp;<a href="$self.url(context)$"
-                    target="_top">no&nbsp;frames</a>]</span>
-                </td></tr>
+                    target="_top">no&nbsp;frames</a>]</span></td></tr>
               </table>
             </td>
           </tr>
@@ -1866,8 +1845,8 @@ class HTMLWriter:
         else: s = ''
         for i in range(len(bases)-1, -1, -1):
             base = bases[i]
-            s = (' '*(width-4-len(str(base.canonical_name))) +
-                   self.href(base.canonical_name)
+            label = self.base_label(doc, base)
+            s = (' '*(width-4-len(label)) + self.href(base, label)
                    +' --+'+postfix+'\n' + 
                    ' '*(width-4) +
                    '   |'+postfix+'\n' +
@@ -1876,7 +1855,6 @@ class HTMLWriter:
                 s = (self.base_tree(base, width-4, '   |'+postfix)+s)
             else:
                 s = (self.base_tree(base, width-4, '    '+postfix)+s)
-        ss = re.sub('<[^<>]+>','',s) # [XX] ????
         return s
 
     def find_tree_width(self, doc):
@@ -1889,9 +1867,16 @@ class HTMLWriter:
         """
         width = 2
         for base in doc.bases:
-            width = max(width, len(str(base.canonical_name))+4,
+            width = max(width, len(self.base_label(doc, base))+4,
                         self.find_tree_width(base)+4)
         return width
+
+    def base_label(self, doc, base):
+        if (base.canonical_container not in (None, UNKNOWN) and
+            base.canonical_container == doc.canonical_container):
+            return base.canonical_name[-1]
+        else:
+            return str(base.canonical_name)
     
     #////////////////////////////////////////////////////////////
     # Function Signatures
@@ -1955,7 +1940,7 @@ class HTMLWriter:
 
     def write_module_tree(self, out):
         # Get all modules.
-        modules = [doc for doc in self.docset
+        modules = [doc for doc in self.docindex.contained_valdocs
                    if isinstance(doc, ModuleDoc)]
         if not modules: return
         # [XX] sort?
@@ -2023,7 +2008,7 @@ class HTMLWriter:
             second time a class is mentioned; instead, link to the
             first mention.
         """
-        classes = [doc for doc in self.docset
+        classes = [doc for doc in self.docindex.contained_valdocs
                    if isinstance(doc, ClassDoc)]
         if not classes: return
         # [XX] sort?
@@ -2144,7 +2129,7 @@ class HTMLWriter:
         """
         terms = {}
         links = {}
-        for doc in self.docset:
+        for doc in self.docindex.contained_valdocs:
             self._get_index_terms(doc.descr, doc, terms, links)
             if doc.metadata not in (None, UNKNOWN):
                 for descrlist in doc.metadata.values():
@@ -2215,8 +2200,10 @@ class HTMLWriter:
         C{VariableDoc}, a C{ValueDoc}, or a C{DottedName}.
         """
         if isinstance(obj, ModuleDoc):
+            if obj not in self.docindex.contained_valdocs: return None
             return '%s-module.html' % obj.canonical_name
         elif isinstance(obj, ClassDoc):
+            if obj not in self.docindex.contained_valdocs: return None
             return '%s-class.html' % obj.canonical_name
         elif isinstance(obj, VariableDoc):
             val_doc = obj.value
