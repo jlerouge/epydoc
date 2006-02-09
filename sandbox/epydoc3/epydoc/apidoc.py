@@ -152,6 +152,9 @@ class DottedName:
         else:
             return DottedName(*self._identifiers[:-1])
 
+    def dominates(self, name):
+        return self._identifiers == name._identifiers[:len(self)]
+
 #     # [XX] This might not be the right way to do this -- variables are
 #     # public/private, not dotted names???
 #     def is_public(self):
