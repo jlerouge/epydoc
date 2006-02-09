@@ -224,7 +224,7 @@ class DocInspector:
         # Record the module's parent package, if it has one.
         dotted_name = module_doc.canonical_name
         if dotted_name is not UNKNOWN and len(dotted_name) > 1:
-            package_name = str(dotted_name[:-1])
+            package_name = str(dotted_name.container())
             package = sys.modules.get(package_name)
             if package is not None:
                 module_doc.package = self.inspect(package)
