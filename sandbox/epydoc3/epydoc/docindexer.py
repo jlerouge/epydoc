@@ -8,16 +8,8 @@
 
 """
 Create an index containing the API documentation information contained
-in a set of C{ValueDoc}s, including any C{ValueDoc}s that are
-reachable from that set.  This index is encoded as a dictionary
-mapping from canonical names to C{ValueDoc} objects, and contains a
-single entry for each C{ValueDoc} that is reachable from the original
-set of C{ValueDoc}s.  Any C{ValueDoc} that did not already have a
-canonical name will be assigned a canonical name.  The
-C{canonical_container} properties will also be initialized for all
-reachable C{ValueDoc}s.
-
-
+in a root set of C{ValueDoc}s, including any C{APIDoc}s that are
+reachable from that set.
 """
 
 ######################################################################
@@ -30,29 +22,44 @@ from sets import Set
 
 class DocIndex:
     """
-    A collection of C{APIDoc} objects that can be reached from a root
-    set of C{APIDoc} objects.  These C{APIDoc}s are indexed in two
-    ways:
+    An index of all the C{APIDoc} objects that can be reached from a
+    root set of C{ValueDoc}s.  As a side effect of constructing this
+    index, the reachable C{APIDoc}s are modified in several ways:
     
-      - As mappings from fully qualified dotted names to the
-        C{APIDoc}s that are reachable via those names.  Separate
-        mappings are provided for C{ValueDoc}s and C{VariableDoc}s,
-        since C{ValueDoc}s and C{VariableDoc}s can share names.  If a
-        single name can be used to refer to both a package-local
-        variable and a subpackage, then the package-local variable
-        'shadows' the subpackage.
+      - Canonicalization:
+        - A cannonical name is assigned to any C{ValueDoc} that does
+          not already have one.
+        - The {canonical_container} attribute is initialized for all
+          C{ValueDoc} objects where a value can be found.
+          
+      - Linking:
+        - Any C{ValueDoc}s that define the C{imported_from} attribute
+          are replaced by the referenced C{ValueDoc}, if it is
+          reachable from the root set.
+    
+    The members of this index can be accessed by dotted name.  In
+    particular, C{DocIndex} defines two mappings, accessed via the
+    L{get_vardoc()} and L{get_valdoc()} methods, which can be used to
+    access C{VariableDoc}s or C{ValueDoc}s respectively by name.  (Two
+    separate mappings are necessary because a single name can be used
+    to refer to both a variable and to the value contained by that
+    variable.)
 
-      - As a list of all the C{ValueDoc}s that are 'contained'
-        (directly or indirectly) in the root set.  In particular, this
-        list contains the C{ValueDoc}s in the root set, plus any
-        C{ValueDoc}s that can be reached from that set via
-        non-imported variables of C{NamespaceDoc}s.  It does I{not}
-        include: (a) values that can only be reached from the root set
-        via import statments; and (b) values that can only be reached
-        from the root set via non-variable pointers (e.g., the base
-        class list of a C{ClassDoc}; the package pointer of a
-        C{ModuleDoc}; or the C{fget}/C{fset}/C{fdel} functions of a
-        property).
+    Additionally, the index defines two sets of C{ValueDoc}s:
+    \"reachable C{ValueDoc}s\" and \"contained C{ValueDoc}s\".  The
+    X{reachable C{ValueDoc}s} are defined as the set of all
+    C{ValueDoc}s that can be reached from the root set by following
+    I{any} sequence of pointers to C{ValueDoc}s or C{VariableDoc}s.
+    The X{contained C{ValueDoc}s} are defined as the set of all
+    C{ValueDoc}s that can be reached from the root set by following
+    only the C{ValueDoc} pointers defined by non-imported
+    C{VariableDoc}s.  For example, if the root set contains a module
+    C{m}, then the contained C{ValueDoc}s includes the C{ValueDoc}s
+    for any functions, variables, or classes defined in that module,
+    as well as methods and variables defined in classes defined in the
+    module.  The reachable C{ValueDoc}s includes all of those
+    C{ValueDoc}s, as well as C{ValueDoc}s for any values imported into
+    the module, and base classes for classes defined in the module.
     """
     def __init__(self, root):
         """
@@ -63,18 +70,24 @@ class DocIndex:
         
         @param root: A dictionary mapping from names to C{ValueDoc}s.
         """
-        #: A dictionary specifying the root set of C{ValueDocs}, along
-        #: with their names.
-        self._root = root
+        #: A list of (name, ValueDoc) pairs.
+        self._root_items = []
         
         #: The set of all C{ValueDoc}s that are directly or indirectly
-        #: contained in the root set.
-        self.contained_valdocs = Set()
-
-        #: The set of all C{ValueDoc}s that are directly or indirectly
-        #: reachable from the root set.
+        #: reachable from the root set.  In particular, this set contains
+        #: all C{ValueDoc}s that can be reached from the root set by
+        #: following I{any} sequence of pointers to C{ValueDoc}s or
+        #: C{VariableDoc}s.
         self.reachable_valdocs = Set()
         
+        #: The set of all C{ValueDoc}s that are directly or indirectly
+        #: contained in the root set.  In particular, this set contains
+        #: all C{ValueDoc}s that can be reached from the root set by
+        #: following only the C{ValueDoc} pointers defined by
+        #: non-imported C{VariableDoc}s.  This will always be a subset
+        #: of L{reachable_valdocs}.
+        self.contained_valdocs = Set()
+
         #: A dictionary mapping from each C{ValueDoc} to the score that
         #: has been assigned to its current cannonical name.  If
         #: L{_index()} finds a cannonical name with a better score,
@@ -86,13 +99,31 @@ class DocIndex:
         #: assigned.
         self._unreachable_names = Set()
 
-        # [xx] check that we don't have conflicts in the root set?
+        # Initialize the root items list.  We sort them by length in
+        # ascending order, so that module variables shadow submodules
+        # (rather than vice versa).
+        root_items = [(DottedName(n),v) for (n,v) in root.items()]
+        decorated = [(len(n), n, v) for (n,v) in root_items]
+        decorated.sort()
+        self._root_items = [(n,v) for (l,n,v) in decorated]
+        
+        # Check that we don't have any conflicts in the root set (and
+        # remove redundancies)
+        for i1, (name1, valdoc1) in enumerate(self._root_items):
+            for i2 in range(len(self._root_items)-1, i1, -1):
+                name2, valdoc2 = self._root_items[i2]
+                if name1.dominates(name2):
+                    del self._root_items[i2]
+                    if self.get_valdoc(name2) != valdoc2:
+                        raise ValueError, 'Inconsistant root set'
 
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
         for name, val_doc in root.items():
             self._find_contained_valdocs(val_doc)
+            # the following method does both canonical name assignment
+            # and initialization of _reachable_valdocs:
             self._assign_canonical_names(val_doc, name)
 
         for val_doc in self.reachable_valdocs:
@@ -144,8 +175,8 @@ class DocIndex:
 
         # Look for an element in the root set whose name is a prefix
         # of `name`.  If we can't find one, then return None.
-        for (root_name, root_valdoc) in self._root.items():
-            if name[:len(root_name)] == root_name[:]:
+        for (root_name, root_valdoc) in self._root_items:
+            if root_name.dominates(name):
                 val_doc = root_valdoc
                 var_doc = None
                 break
@@ -332,271 +363,3 @@ class DocIndex:
         return reachable
     
 
-
-
-
-
-
-
-
-    
-
-
-
-        
-
-        
-
-        
-    
-#     def __init__(self, value_index):
-#         self.values = []
-#         self.root = {}
-        
-#         for (name, val_doc) in value_index:
-#             if val_doc.canonical_name != name: continue
-#             values.append(val_doc)
-#             if len(name) == 1:
-#                 self.root.append(val_doc)
-
-#     def __get(self, name):
-#         # Make sure name is a DottedName.
-#         name = DottedName(name)
-
-#         # Get the root value specified by name[0]
-#         val_doc = self.root.get(name[0])
-#         var_doc = None
-
-#         for identifier in name[1:]:
-#             var_doc = val_doc[identifier]
-#             val_doc = var_doc.value
-#         return (var_doc, val_doc)
-    
-            
-#     def get_variable(self, name):
-#         var, val = self.__get(name)
-#         if var is None:
-#             raise KeyError('Variable %s not found' % name)
-#         else:
-#             return var
-
-#     def get_value(self, name):
-#         var, val = self.__get(name)
-#         if val is None:
-#             raise KeyError('Value %s not found' % name)
-#         else:
-#             return val
-#     __getitem__ = get_value
-
-#     def contents(self):
-#         return self.contents
-
-#     def __iter__(self):
-#         return iter(self.values)
-
-
-# #             if isinstance(val, ModuleDoc):
-# #                 if identifier in val.variables:
-# #                     var = val.variables[identifier]
-# #                 elif identifier in val.subpackages:
-# #                     var = val.subpackages[identifier] # [xx]
-# #                 else:
-# #                     return None
-# #             elif isinstance(val, ClassDoc):
-# #                 if identifier in val.local_variables:
-# #                     var = val.local_variables[identifier]
-# #                 elif val.variables is not UNKNOWN and identifier in val.variables:
-# #                     var = val.variables[identifier]
-# #                 else:
-# #                     reutrn None
-# #            val = var.value
-# #        return (var, val)
-
-
-
-# ######################################################################
-# ## Doc Indexer
-# ######################################################################
-
-# class DocIndexer:
-#     """
-#     A processing class that creates an index containing the API
-#     documentation information contained in a set of C{ValueDoc}s,
-#     including any C{ValueDoc}s that are reachable from that set.  This
-#     index is encoded as a dictionary mapping from canonical names to
-#     C{ValueDoc} objects, and contains a single entry for each
-#     C{ValueDoc} that is reachable from the original set of
-#     C{ValueDoc}s.
-
-#     Any C{ValueDoc} that did not already have a canonical name will be
-#     assigned a canonical name.  If the C{ValueDoc}'s value can be
-#     reached using a single sequence of identifiers (given the
-#     appropriate imports), then that sequence of identifiers will be
-#     used as its canonical name.  If the value can be reached by
-#     multiple sequences of identifiers (i.e., if it has multiple
-#     aliases), then one of those sequences of identifiers is used.  If
-#     the value cannot be reached by any sequence of identifiers (e.g.,
-#     if it was used as a base class but then its variable was deleted),
-#     then its canonical name will start with C{'??'}.  If necessary, a
-#     dash followed by a number will be appended to the end of a
-#     non-reachable identifier to make its canonical name unique.
-
-#     If C{DocIndexer} finds a C{ValueDoc} with an C{imported_from}
-#     value, then it will replace it with the C{ValueDoc} whose
-#     canonical name is C{imported_from}, if such a C{ValueDoc} is
-#     found.
-
-#     C{DocIndexer} also initializes the C{canonical_container}
-#     properties of all C{ValueDoc}s reachable from the given set.
-#     """
-#     def index(self, valuedocs):
-#         docindex = {} # maps dottedname -> val_doc
-#         score_dict = {}
-#         cyclecheck = Set()
-
-#         # Find canonical names for all variables & values, and add
-#         # them to the docindex.
-#         for val_doc in valuedocs:
-#             self._index(docindex, val_doc, val_doc.canonical_name,
-#                        0, score_dict, cyclecheck)
-
-#         # Assign canonical names to any variables that are unreachable
-#         # from the root.
-#         cyclecheck = Set()
-#         for val_doc in valuedocs:
-#             self._unreachables(docindex, val_doc, cyclecheck)
-
-#         # Resolve any imported_from links.
-#         for name, val_doc in docindex.items():
-#             # This ensures that we visit each val_doc only once:
-#             if val_doc.canonical_name != name: continue
-            
-#             # If there are any ValueDocs that are aliases for other
-#             # ValueDocs, then replace them with the source ValueDoc
-#             # (if we have found it). [XX] HM NOT QUITE RIGHT??
-#             if val_doc.imported_from is not UNKNOWN:
-#                 if val_doc.imported_from in docindex:
-#                     srcdoc = docindex[val_doc.imported_from]
-#                     if srcdoc is not val_doc:
-#                         val_doc.__class__ = srcdoc.__class__
-#                         val_doc.__dict__ = srcdoc.__dict__
-
-#             # Set the canonical_container attribute.
-#             container_name = val_doc.canonical_name.container()
-#             val_doc.canonical_container = docindex.get(container_name)
-
-#         return docindex
-
-#     def _index(self, docindex, val_doc, name, score, score_dict, cyclecheck):
-#         if val_doc in cyclecheck: return
-
-#         # Add this val_doc to the index.
-#         docindex[name] = val_doc
-
-#         # Use this name as the val_doc object's canonical name if
-#         # either:
-#         #  - The val_doc doesn't have a canonical name; or
-#         #  - The current canonical name was assigned by this method,
-#         #    but the new name has a better score.  (If val_doc already
-#         #    had a canonical name before this method was called, then
-#         #    it won't have a score in score_dict, so it won't be
-#         #    replaced.)
-#         # (Note: this will even assign names to values like integers
-#         # and None; but that should be harmless.)
-#         if ((val_doc.canonical_name is UNKNOWN or
-#              (val_doc in score_dict and score>score_dict[val_doc]))):
-#             score_dict[val_doc] = score
-#             val_doc.canonical_name = name
-
-#         # If this ValueDoc is a namespace, then recurse to its variables.
-#         cyclecheck.add(val_doc)
-
-#         for var_doc in self._vardocs_reachable_from(val_doc):
-#             varname = DottedName(name, var_doc.name)
-#             # Find the score for this name.  Give decreased score to
-#             # imported variables & known aliases.
-#             vardoc_score = score
-#             if var_doc.is_imported is UNKNOWN: vardoc_score -= 1
-#             elif var_doc.is_imported: vardoc_score -= 10
-#             if var_doc.is_alias is UNKNOWN: vardoc_score -= 1
-#             elif var_doc.is_alias: vardoc_score -= 100
-#             if var_doc.value is not UNKNOWN:
-#                 self._index(docindex, var_doc.value, varname,
-#                             vardoc_score, score_dict, cyclecheck)
-
-#         cyclecheck.remove(val_doc)
-
-#     # [XX] NEED TO ADD NUMBERS TO MAKE THESE UNIQUE?
-#     def _unreachables(self, docindex, val_doc, cyclecheck):
-#         if val_doc in cyclecheck: return
-#         cyclecheck.add(val_doc)
-
-#         if val_doc.canonical_name is UNKNOWN:
-#             # Pick a name for the value.
-#             if val_doc.imported_from not in (UNKNOWN, None):
-#                 if val_doc.imported_from not in docindex:
-#                     val_name = val_doc.imported_from
-#                 else:
-#                     val_name = DottedName('??', val_doc.imported_from)
-#             elif (val_doc.pyval is not UNKNOWN and
-#                 hasattr(val_doc.pyval, '__name__')):
-#                 val_name = DottedName('??', val_doc.pyval.__name__)
-#             else:
-#                 val_name = DottedName('??')
-
-#             # Make sure it's unique.
-#             if val_name in docindex:
-#                 n = 2
-#                 while DottedName('%s-%s' % (val_name,n)) in docindex:
-#                     n += 1
-#                 val_name = DottedName('%s-%s' % (val_name,n))
-                                    
-#             val_doc.canonical_name = val_name
-
-#         # Add the value to the index.
-#         docindex[val_doc.canonical_name] = val_doc
-
-#         for valuedoc2 in self._valdocs_reachable_from(val_doc):
-#             self._unreachables(docindex, valuedoc2, cyclecheck)
-#         for var_doc in self._vardocs_reachable_from(val_doc):
-#             if var_doc.value is not UNKNOWN:
-#                 self._unreachables(docindex, var_doc.value, cyclecheck)
-
-#     def _vardocs_reachable_from(self, val_doc):
-#         reachable = []
-#         if (isinstance(val_doc, ClassDoc)
-#             and val_doc.local_variables is not UNKNOWN):
-#             reachable += val_doc.local_variables.values()
-#         if (isinstance(val_doc, NamespaceDoc)
-#             and val_doc.variables is not UNKNOWN):
-#             reachable += val_doc.variables.values()
-#         return reachable
-
-#     def _valdocs_reachable_from(self, val_doc):
-#         """
-#         Return a list of all valuedocs that are directly reachable
-#         from the given val_doc.  (This does not include variables of a
-#         Namespace doc, since they're reachable indirectly via a
-#         VariableDoc.)
-#         """
-#         reachable = []
-#         # Recurse to any other valuedocs reachable from this val_doc.
-#         if isinstance(val_doc, ModuleDoc):
-#             if val_doc.package not in(UNKNOWN, None):
-#                 reachable.append(val_doc.package)
-#             if val_doc.submodules not in(UNKNOWN, None):
-#                 reachable += val_doc.submodules
-#         if isinstance(val_doc, ClassDoc):
-#             if val_doc.bases is not UNKNOWN:
-#                 reachable += val_doc.bases
-#             if val_doc.subclasses is not UNKNOWN:
-#                 reachable += val_doc.subclasses
-#         if isinstance(val_doc, PropertyDoc):
-#             if val_doc.fget not in (UNKNOWN, None):
-#                 reachable.append(val_doc.fget)
-#             if val_doc.fset not in (UNKNOWN, None):
-#                 reachable.append(val_doc.fset)
-#             if val_doc.fdel not in (UNKNOWN, None):
-#                 reachable.append(val_doc.fdel)
-#         return reachable
-    
