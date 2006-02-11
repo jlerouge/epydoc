@@ -55,7 +55,8 @@ class DocInheriter:
 
     def _inherit_var(self, dst_class, name, src_var):
         dst_var = VariableDoc(**src_var.__dict__)
-        dst_var.container = dst_class
+        # [xx] keep pointer to *original* container?
+        #dst_var.container = src_var.container
         dst_var.is_inherited = True
         dst_class.variables[name] = dst_var
 
