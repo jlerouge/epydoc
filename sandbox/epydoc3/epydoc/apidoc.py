@@ -189,7 +189,7 @@ default value for all instance variables."""
 # API Documentation Objects: Abstract Base Classes
 ######################################################################
 
-class APIDoc:
+class APIDoc(object):
     """
     API documentation information for a single element of a Python
     program.  C{APIDoc} itself is an abstract base class; subclasses
@@ -271,6 +271,9 @@ class APIDoc:
         @raise AttributeError: If C{attr} is not a valid attribute for
             this (sub)class of C{APIDoc}.
         """
+        # Don't intercept special assignments like __class__.
+        if attr.startswith('__') and attr.endswith('__'):
+            return object.__setattr__(self, attr, val)
         if not hasattr(self, attr):
             raise AttributeError('%s does not define attribute %r' %
                             (self.__class__.__name__, attr))
