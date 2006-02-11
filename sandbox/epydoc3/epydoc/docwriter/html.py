@@ -303,7 +303,7 @@ class HTMLWriter:
                          kwargs.get('variable_summary_linelength', 55)
         self._variable_tooltip_linelen = \
                          kwargs.get('variable_tooltip_linelength', 600)
-        self._inheritance = kwargs.get('inheritance', 'grouped')
+        self._inheritance = kwargs.get('inheritance', 'included')
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
@@ -572,6 +572,10 @@ class HTMLWriter:
         self.write_summary_table(out, "Instance Variables", doc,
                                  "instancevariable")
         self.write_summary_table(out, "Properties", doc, "property")
+
+        # Write a list of all imported objects.
+        if self._show_imports:
+            self.write_imports(out, doc)
 
         # Write detailed descriptions of functions & variables defined
         # in this class.
@@ -886,7 +890,7 @@ class HTMLWriter:
     <span class="options">[<a href="javascript: void(0);" class="privatelink"
     onclick="toggle_private();">hide private</a>]</span>
     '''.strip()
-        
+
     def write_module_toc(self, out, doc):
         """
         Write an HTML page containing the table of contents page for
@@ -1048,6 +1052,16 @@ class HTMLWriter:
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
             elts[i].style.display = ((cmd=="hide private")?"none":"block");
+          }
+        }
+        // Update all table rowss containing private objects.  Note, we
+        // use "" instead of "block" becaue IE & firefox disagree on what
+        // this should be (block vs table-row), and "" just gives the
+        // default for both browsers.
+        var elts = document.getElementsByTagName("tr");
+        for(var i=0; i<elts.length; i++) {
+          if (elts[i].className == "private") {
+            elts[i].style.display = ((cmd=="hide private")?"none":"");
           }
         }
         // Set a cookie to remember the current option.
@@ -1318,8 +1332,8 @@ class HTMLWriter:
         """
         Generate HTML code for a summary table, and write it to
         C{out}.  A summary table is a table that includes a one-row
-        description for each variable (of a given type) in a module or
-        class.
+        description for each variable (of a given type) in a module
+        or class.
 
         @param heading: The heading for the summary table; typically,
             this indicates what kind of value the table describes
@@ -1331,15 +1345,19 @@ class HTMLWriter:
             should be listed in this summary table.  This value
             is passed on to C{doc}'s C{select_variables()} method.
         """
-        # [xx] Deal with imports!
-        # [xx] Deal with inheritance!
+        # inh_var_groups is a dictionary used to hold "inheritance
+        # pseudo-groups", which are created when inheritance is
+        # 'grouped'.  It maps each base to a list of vars inherited
+        # from that base.
+        grouped_inh_vars = {}
 
         # Divide all public variables of the given type into groups.
-        groups = [(g,doc.select_variables(group=g, value_type=value_type,
-                                          public=True, imported=False))
+        groups = [(g.replace('&','&amp;').replace('<','&lt;'),
+                   doc.select_variables(group=g, value_type=value_type,
+                                        imported=False))
                   for g in doc.group_names]
-
-        # Discard any empty groups [xx] necessary?
+                
+        # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
         if not groups: return
 
@@ -1348,36 +1366,83 @@ class HTMLWriter:
 
         # Write a section for each group.
         for name, var_docs in groups:
-            if name != '':
-                name = name.replace('&','&amp;').replace('<','&lt;')
-                self.write_group_header(out, name)
-            for var_doc in var_docs:
-                if not var_doc.is_public: raise ValueError
-                self.write_summary_line(out, var_doc, doc)
+            self.write_summary_group(out, doc, name,
+                                     var_docs, grouped_inh_vars)
+
+        # Write a section for each inheritance pseudo-group (used if
+        # inheritance=='grouped')
+        if grouped_inh_vars:
+            for base in doc.mro():
+                if base in grouped_inh_vars:
+                    hdr = 'Inherited from %s' % self.href(base)
+                    self.write_group_header(out, hdr)
+                    for var_doc in grouped_inh_vars[base]:
+                        self.write_summary_line(out, var_doc, doc)
 
         # Write a footer for the table.
         out(self.TABLE_FOOTER)
+        out('\n<br />\n')
 
-        # If there are also private variables, then add on a table
-        # containing thier summary.  We need to put them in a separate
-        # table, in its own <div>, to make the show/hide private
-        # functionality work across different browsers.
-        private_var_docs = doc.select_variables(group=None, imported=False,
-                                                value_type=value_type,
-                                                public=False)
-        if private_var_docs:
-            out('<div class="private">\n')
-            self.write_table_header(out, "summary continue")
-            self.write_group_header(out, 'Private %s' % heading,
-                                    "group continue")
-            self.write_summary_line(out, private_var_docs[0], doc)
-            for var_doc in private_var_docs[1:]:
-                self.write_summary_line(out, var_doc, doc)
-            out(self.TABLE_FOOTER)
-            out('</div>\n')
-            out('%s<br />\n' % self.PRIVATE_LINK)
+    def write_summary_group(self, out, doc, name, var_docs, grouped_inh_vars):
+        # Split up the var_docs list, according to the way each var
+        # should be displayed:
+        #   - listed_inh_vars -- for listed inherited variables.
+        #   - grouped_inh_vars -- for grouped inherited variables.
+        #   - normal_vars -- for all other variables.
+        listed_inh_vars = {}
+        normal_vars = []
+        for i in range(len(var_docs)-1, -1, -1):
+            vardoc = var_docs[i]
+            if vardoc.is_inherited == True:
+                base = vardoc.container
+                if (base not in self.docindex.contained_valdocs
+                    or self._inheritance == 'listed'):
+                    listed_inh_vars.setdefault(base,[]).append(vardoc)
+                    continue
+                elif self._inheritance == 'grouped':
+                    grouped_inh_vars.setdefault(base,[]).append(vardoc)
+                    continue
+            normal_vars.append(vardoc)
+            
+        # Write a header for the group.
+        if name != '': self.write_group_header(out, name)
 
-        out('<br />\n')
+        # Write a line for each normal var:
+        for vardoc in normal_vars:
+            self.write_summary_line(out, vardoc, doc)
+        # Write a subsection for inherited vars:
+        if listed_inh_vars:
+            self.write_inheritance_list(out, doc, listed_inh_vars)
+
+    def write_inheritance_list(self, out, doc, listed_inh_vars):
+        out('  <tr>\n    <td colspan="2">\n')
+        for base in doc.mro():
+            if base not in listed_inh_vars: continue
+            public_vars = [v for v in listed_inh_vars[base]
+                           if v.is_public]
+            private_vars = [v for v in listed_inh_vars[base]
+                            if not v.is_public]
+            if public_vars:
+                out('    <p class="varlist">'
+                    '<span class="varlist-header">Inherited '
+                    'from <code>%s</code></span>:\n' %
+                    self.href(base, self.base_label(doc, base)))
+                self.write_var_list(out, public_vars)
+                out('      </p>\n')
+            if private_vars:
+                out('    <div class="private">')
+                out('    <p class="varlist">'
+                    '<span class="varlist-header">Inherited '
+                    'from <code>%s</code></span> (private):\n' %
+                    self.href(base, self.base_label(doc, base)))
+                self.write_var_list(out, private_vars)
+                out('      </p></div>\n')
+        out('    </td>\n  </tr>\n')
+    
+    def write_var_list(self, out, vardocs):
+        out('      ')
+        out(',\n      '.join(['<code>%s</code>' % self.href(v,v.name)
+                              for v in vardocs])+'\n')
 
     def write_summary_line(self, out, var_doc, container):
         """
@@ -1390,16 +1455,21 @@ class HTMLWriter:
         @param container: The API documentation for the class or
             module whose summary table we're writing.
         """
+        if var_doc.is_public: tr_class = ''
+        else: tr_class = ' class="private"'
+        
         if isinstance(var_doc.value, ClassDoc):
-            self.write_class_summary_line(out, var_doc)
+            self.write_class_summary_line(out, var_doc, tr_class)
         elif isinstance(var_doc.value, RoutineDoc):
-            self.write_function_summary_line(out, var_doc, container)
+            self.write_function_summary_line(out, var_doc, container,
+                                             tr_class)
         else:
-            self.write_variable_summary_line(out, var_doc)
+            self.write_variable_summary_line(out, var_doc, tr_class)
+        # [XXX] properties!
 
     write_function_summary_line = compile_template(
         """
-        write_variable_summary_line(self, out, var_doc, container)
+        write_variable_summary_line(self, out, var_doc, container, tr_class)
 
         Generate HTML code for a single line of a summary table,
         describing a variable whose value is a function, and write
@@ -1413,7 +1483,7 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
         # func_doc = var_doc.value
-          <tr>
+          <tr$tr_class$>
             <td width="15%" align="right" valign="top" class="rtype">
         # if func_doc.return_type not in (None, UNKNOWN):
               $self.description(func_doc.return_type, func_doc, 6)$
@@ -1423,12 +1493,13 @@ class HTMLWriter:
             </td>
             <td>
               $self.function_signature(var_doc, link_name=True)$
-        #     if var_doc.is_inherited or func_doc.summary != None:
+        #     if ((var_doc.is_inherited and self._inheritance=="included") or
+        #         (func_doc.summary != None)):
                 <br />
         #       if func_doc.summary != None:
                   $self.description(func_doc.summary, func_doc, 6)$
         #       #endif
-        #       if var_doc.is_inherited:
+        #       if var_doc.is_inherited and self._inheritance=="included":
                   <em>(Inherited from
                     $var_doc.value.canonical_name.container()$)</em>
         #       #endif
@@ -1440,40 +1511,29 @@ class HTMLWriter:
 
     write_variable_summary_line = compile_template(
         '''
-        write_variable_summary_line(self, out, var_doc)
+        write_variable_summary_line(self, out, var_doc, tr_class)
         ''',
         # /------------------------- Template -------------------------\
         '''
-          <tr>
+          <tr$tr_class$>
             <td width="15%">
               <strong>$self.href(var_doc)$</strong></td>
-        #     if var_doc.summary not in (None, UNKNOWN):
             <td>$self.description(var_doc.summary, var_doc, 6)$</td>
-        #     elif var_doc.descr not in (None, UNKNOWN):
-            <td>$self.description(var_doc.descr.summary(), var_doc, 6)$</td>
-        #     else:
-            <td>&nbsp;</td>
-        #     #endif
           </tr>
         ''')
         # \------------------------------------------------------------/
 
     write_class_summary_line = compile_template(
         '''
-        write_class_summary_line(self, out, var_doc)
+        write_class_summary_line(self, out, var_doc, tr_class)
         ''',
         # /------------------------- Template -------------------------\
         '''
-          <tr>
+        # class_doc = var_doc.value
+          <tr$tr_class$>
             <td width="15%">
               <strong>$self.href(var_doc)$</strong></td>
-        #     if var_doc.value.summary not in (None, UNKNOWN):
-            <td>
-              $self.description(var_doc.value.summary, var_doc.value, 6)$
-            </td>
-        #     else:
-            <td>&nbsp;</td>
-        #     #endif
+            <td>$self.description(class_doc.summary, class_doc, 6)$</td>
           </tr>
         ''')
         # \------------------------------------------------------------/
@@ -1493,17 +1553,19 @@ class HTMLWriter:
         # Write a header
         self.write_table_header(out, "details", heading)
         out(self.TABLE_FOOTER)
-        out('<br />\n')
 
         for var_doc in var_docs:
             self.write_details_entry(out, var_doc)
+
+        out('<br />\n')
 
     def write_details_entry(self, out, var_doc):
         if isinstance(var_doc.value, RoutineDoc):
             self.write_function_details_entry(out, var_doc)
         else:
             self.write_variable_details_entry(out, var_doc)
-
+        # [XXX] properties!
+        
     write_function_details_entry = compile_template(
         '''
         write_function_details_entry(self, out, var_doc)
@@ -1577,7 +1639,7 @@ class HTMLWriter:
 
         # self.write_standard_fields(out, func_doc)
           </dd></dl>
-        </td></tr></table><br /></div>
+        </td></tr></table></div>
         ''')
         # \------------------------------------------------------------/
 
@@ -1648,7 +1710,7 @@ class HTMLWriter:
             </dl>
         # #endif
           </dd></dl>
-        </td></tr></table><br /></div>
+        </td></tr></table></div>
         ''')
         # \------------------------------------------------------------/
 
@@ -2008,20 +2070,27 @@ class HTMLWriter:
             second time a class is mentioned; instead, link to the
             first mention.
         """
-        classes = [doc for doc in self.docindex.contained_valdocs
-                   if isinstance(doc, ClassDoc)]
+        # [XX] sort? and backref for multiple inheritance?
+        classes = Set([doc for doc in self.docindex.contained_valdocs
+                       if isinstance(doc, ClassDoc)])
         if not classes: return
-        # [XX] sort?
 
+        # Add external classes.
+        for doc in self.docindex.contained_valdocs:
+            if isinstance(doc, ClassDoc):
+                for base in doc.bases:
+                    if base not in self.docindex.contained_valdocs:
+                        classes.union_update(base.mro())
+ 
         out('<ul>\n')
         for doc in classes:
-            if not doc.bases:
-                self.write_class_tree_item(out, doc)
+            if len(doc.bases)==0:
+                self.write_class_tree_item(out, doc, classes)
         out('</ul>\n')
 
     write_class_tree_item = compile_template(
         '''
-        write_class_tree_item(self, out, doc)
+        write_class_tree_item(self, out, doc, classes)
         ''',
         '''
         # if doc.summary in (None, UNKNOWN):
@@ -2032,8 +2101,10 @@ class HTMLWriter:
         # # endif
         # if doc.subclasses:
             <ul>
-        #   for subclass in doc.subclasses:
-        #     self.write_class_tree_item(out, subclass)
+        #   for subclass in Set(doc.subclasses):
+        #     if subclass in classes:
+        #       self.write_class_tree_item(out, subclass, classes)
+        #     #endif
         #   #endfor
             </ul>
         # #endif
@@ -2166,19 +2237,40 @@ class HTMLWriter:
     # Helper functions
     #////////////////////////////////////////////////////////////
 
+    # [XX] Is it worth-while to pull the anchor tricks that I do here?
+    # Or should I just live with the fact that show/hide private moves
+    # stuff around?
     write_table_header = compile_template(
         '''
-        write_table_header(self, out, css_class, heading=None)
+        write_table_header(self, out, css_class, heading=None, \
+                           private_link=True)
         ''',
         '''
         # if heading is not None:
+        #     anchor = "section-%s" % re.sub("\W", "", heading)
         <!-- ==================== $heading.upper()$ ==================== -->
+        <a name="$anchor$"></a>
         # #endif
         <table class="$css_class$" border="1" cellpadding="3"
                cellspacing="0" width="100%" bgcolor="white">
         # if heading is not None:
         <tr bgcolor="#70b0f0" class="$css_class$">
-          <th colspan="2">$heading$</th></tr>
+        #     if private_link:
+          <td colspan="2">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr valign="top">
+                <th align="left" class="$css_class$">$heading$</th>
+                <td align="right" valign="top"
+                 ><span class="options">[<a href="#$anchor$"
+                 class="privatelink" onclick="toggle_private();"
+                 >hide private</a>]</span></td>
+              </tr>
+            </table>
+          </td>
+        #     else:
+          <th align="left" colspan="2" class="$css_class$">$heading$</th>
+        #     #endif
+        </tr>
         # #endif
         ''')
 
@@ -2212,12 +2304,16 @@ class HTMLWriter:
             elif obj.container in (None, UNKNOWN):
                 return self.url(val_doc)
             else:
-                return '%s#%s' % (self.url(obj.container), obj.name)
+                container_url = self.url(obj.container)
+                if container_url is None: return None
+                return '%s#%s' % (container_url, obj.name)
         elif isinstance(obj, ValueDoc):
             if obj.canonical_container in (None, UNKNOWN):
                 return None # [xx] hmm...
             else:
-                return '%s#%s' % (self.url(obj.canonical_container),
+                container_url = self.url(obj.canonical_container)
+                if container_url is None: return None
+                return '%s#%s' % (container_url,
                                   obj.canonical_name[-1])
         elif isinstance(obj, DottedName):
             val_doc = self.docindex.get_valdoc(obj)
@@ -2267,9 +2363,11 @@ class HTMLWriter:
 
     def description(self, parsed_docstring, where=None, indent=0):
         assert isinstance(where, (APIDoc, type(None)))
-        if parsed_docstring in (None, UNKNOWN): return ''
+        if parsed_docstring in (None, UNKNOWN): return '&nbsp;'
         linker = _HTMLDocstringLinker(self, where)
-        return parsed_docstring.to_html(linker, indent=indent).strip()
+        descr = parsed_docstring.to_html(linker, indent=indent).strip()
+        if descr == '': return '&nbsp;'
+        return descr
     
     def doc_kind(self, doc):
         if isinstance(doc, ModuleDoc) and doc.is_package:
