@@ -36,9 +36,9 @@ _LAYOUT = """
 
 /* Tables */ 
 table.help         { margin-left: auto; margin-right: auto; }
-tr.summary, tr.details, tr.index
+th.summary, th.details, th.index
                    { text-align: left; font-size: 120%; } 
-tr.group           { text-align: left; font-size: 120%;
+th.group           { text-align: left; font-size: 120%;
                      font-style: italic; } 
 
 /* Documentation page titles */
@@ -63,6 +63,11 @@ p.toc              { margin: 0; padding: 0; }
 
 /* Base tree */
 pre.base-tree      { font-size: 80%; margin: 0; }
+
+/* Summary Sections */
+p.varlist          { margin: 0; padding: 0 0 0 7em;
+                     text-indent: -7em; }
+.varlist-header    { font-weight: bold; }
 
 /* Details Sections */
 table.func-details { border-width: 2px; border-style: groove;
