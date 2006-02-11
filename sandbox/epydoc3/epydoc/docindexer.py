@@ -29,7 +29,7 @@ class DocIndex:
       - Canonicalization:
         - A cannonical name is assigned to any C{ValueDoc} that does
           not already have one.
-        - The {canonical_container} attribute is initialized for all
+        - The C{canonical_container} attribute is initialized for all
           C{ValueDoc} objects where a value can be found.
           
       - Linking:
