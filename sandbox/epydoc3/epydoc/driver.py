@@ -20,60 +20,67 @@ def build_docs(names, inspect=True, parse=True):
     docstring_parser = DocstringParser()
     inheriter = DocInheriter()
 
-    parsedocs = []
-    inspectdocs = []
+    doc_dict = {}
     for name in names:
+        # Parsing
         if parse:
-            parsedocs.append(parser.find(name))
+            try:
+                parsedoc = parser.find(name)
+            except ValueError:
+                # hmm -- ValueError might be too general!
+                print "  Failed to parse (couldn't find %s)." % name
+                parsedoc = None
         else:
-            parsedocs.append(None)
+            parsedoc = None
     
         # Inspecting
         if inspect:
+            print 'inspect %s...' % name
             for i in range(len(name)):
+                n = '.'.join(name[:len(name)-i])
                 try:
-                    n = '.'.join(name[:len(name)-i])
                     val = __import__(n)
                     for identifier in name[1:]:
                         val = getattr(val, identifier)
-                    inspectdocs.append(inspector.inspect(val))
+                    inspectdoc = inspector.inspect(val)
                     break
-                except ImportError:
-                    pass
+                except ImportError, err:
+                    if str(err).endswith(' '+n): pass # continue loop
+                    else: raise
             else:
                 print 'Could not import %s' % name
-                inspectdocs.append(None)
+                inspectdoc = None
         else:
-            inspectdocs.append(None)
-
-    # Merge all docs.
-    merged_docs = []
-    for name, parsedoc, inspectdoc in zip(names, parsedocs, inspectdocs):
+            inspectdoc = None
+            
+        # Merge them.
         if inspectdoc is None and parsedoc is None:
             print 'Warning: No docs for %s' % name
         elif inspectdoc is None:
-            merged_docs.append(parsedoc)
+            doc_dict[name] = parsedoc
         elif parsedoc is None:
-            merged_docs.append(inspectdoc)
+            doc_dict[name] = inspectdoc
         else:
-            merged_docs.append(merger.merge(inspectdoc, parsedoc))
+            doc_dict[name] = merger.merge(inspectdoc, parsedoc)
+
+        if name in doc_dict:
+            print `doc_dict[name]`, name
 
     # Construct a dictionary mapping name -> ValueDoc, and use that
     # dictionary to create an index.
-    doc_dict = dict(zip(names, merged_docs))
     docindex = DocIndex(doc_dict)
 
     # Parse all docstrings.
     for val_doc in docindex.reachable_valdocs:
         docstring_parser.parse_docstring(val_doc)
-        if isinstance(val_doc, ClassDoc):
-            if val_doc.local_variables is not UNKNOWN:
-                for var_doc in val_doc.local_variables.values():
-                    docstring_parser.parse_docstring(var_doc)
-        if isinstance(val_doc, NamespaceDoc):
-            if val_doc.variables is not UNKNOWN:
-                for var_doc in val_doc.variables.values():
-                    docstring_parser.parse_docstring(var_doc)
+#         if isinstance(val_doc, ClassDoc):
+#             if val_doc.local_variables is not UNKNOWN:
+#                 for var_doc in val_doc.local_variables.values():
+#                     docstring_parser.parse_docstring(var_doc)
+#         if isinstance(val_doc, NamespaceDoc):
+#             if val_doc.variables is not UNKNOWN:
+#                 for var_doc in val_doc.variables.values():
+#                     docstring_parser.parse_docstring(var_doc)
 
     # Inheritance.
     inheriter.inherit(docindex)
