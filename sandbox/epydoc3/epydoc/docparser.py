@@ -1522,7 +1522,7 @@ class DocParser:
         return docstrings
             
     def _find_docstrings_helper(self, ast, filename, tokeniter,
-                                docstrings, stmts):
+                                docstrings, stmts, suite=None):
         if ast == '': return
     
         # If `ast` is a leaf in the syntax tree, then iterate through the
@@ -1538,6 +1538,16 @@ class DocParser:
                     s = compiler.parse(tok).getChildren()[0]
                     docstrings.setdefault(id(stmts[-2]), ([],start[0]))
                     docstrings[id(stmts[-2])][0].append(s)
+                    
+                # Is it a docstring for a single-line def?
+                # (e.g., "class A(B): 'docstring.'")
+                if (typ == token.STRING and stmts[-1] is not None and
+                    stmts[-1][1][0] == symbol.compound_stmt and
+                    stmts[-1][1][1][-1] is suite):
+                    # This is safer than eval():
+                    s = compiler.parse(tok).getChildren()[0]
+                    docstrings.setdefault(id(stmts[-1]), ([],start[0]))
+                    docstrings[id(stmts[-1])][0].append(s)
     
                 # Is this token a comment docstring?
                 if (typ == tokenize.COMMENT and stmts[-1] is not None and
@@ -1551,9 +1561,10 @@ class DocParser:
         # If `ast` is a non-leaf node, then explore its contents.
         else:
             if ast[0] == symbol.stmt: stmts.append(ast)
+            if ast[0] == symbol.suite: suite = ast
             for child in ast[1:]:
                 self._find_docstrings_helper(child, filename, tokeniter, 
-                                             docstrings, stmts)
+                                             docstrings, stmts, suite)
 
     #////////////////////////////////////////////////////////////
     # Name Lookup
