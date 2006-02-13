@@ -594,7 +594,7 @@ class ModuleDoc(NamespaceDoc):
             var_list = [v for v in var_list if v.is_imported is True]
         elif imported is False:
             var_list = [v for v in var_list if v.is_imported is not True]
-        
+
         if value_type is None:
             return var_list
         elif value_type == 'class':
@@ -762,9 +762,9 @@ class ClassDoc(NamespaceDoc):
         # Inherited filter (Count UNKNOWN as non-inherited)
         if inherited is None: pass
         elif inherited:
-            var_list = [v for v in var_list if v.is_imported is True]
+            var_list = [v for v in var_list if v.is_inherited is True]
         else:
-            var_list = [v for v in var_list if v.container is not True]
+            var_list = [v for v in var_list if v.is_inherited is not True]
 
         # Imported filter (Count UNKNOWN as non-imported)
         if imported is True:
