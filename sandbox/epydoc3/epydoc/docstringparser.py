@@ -310,7 +310,7 @@ class DocstringParser:
     EXPECTED_ARG = '%r expected an argument'
     EXPECTED_SINGLE_ARG = '%r expected a single argument'
     BAD_CONTEXT = 'Invalid context for %r'
-    REDEFINED = 'Redefinition of %r'
+    REDEFINED = 'Redefinition of %s'
     UNKNOWN = '%r for unknown %s %r'
     UNKNOWN_TAG = 'Unknown field tag %r'
 
