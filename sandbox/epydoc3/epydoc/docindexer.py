@@ -72,6 +72,7 @@ class DocIndex:
         """
         #: A list of (name, ValueDoc) pairs.
         self._root_items = []
+        self._root_dict = dict(root)
         
         #: The set of all C{ValueDoc}s that are directly or indirectly
         #: reachable from the root set.  In particular, this set contains
@@ -79,6 +80,13 @@ class DocIndex:
         #: following I{any} sequence of pointers to C{ValueDoc}s or
         #: C{VariableDoc}s.
         self.reachable_valdocs = Set()
+
+        #: The set of all C{VariableDoc}s that are directly or indirectly
+        #: reachable from the root set.  In particular, this set
+        #: contains all C{VariableDoc}s that can be reached from the
+        #: root set by following I{any} sequence of pointers to
+        #: C{ValueDoc}s or C{VariableDoc}s.
+        self.reachable_vardocs = Set()
         
         #: The set of all C{ValueDoc}s that are directly or indirectly
         #: contained in the root set.  In particular, this set contains
@@ -100,40 +108,32 @@ class DocIndex:
         self._unreachable_names = Set()
 
         # Initialize the root items list.  We sort them by length in
-        # ascending order, so that module variables shadow submodules
-        # (rather than vice versa).
+        # descending order. [XX] is this the right thing to do, in
+        # particular in cases where module variables shadow submodules??
         root_items = [(DottedName(n),v) for (n,v) in root.items()]
-        decorated = [(len(n), n, v) for (n,v) in root_items]
+        decorated = [(-len(n), n, v) for (n,v) in root_items]
         decorated.sort()
         self._root_items = [(n,v) for (l,n,v) in decorated]
         
-        # Check that we don't have any conflicts in the root set (and
-        # remove redundancies)
-        for i1, (name1, valdoc1) in enumerate(self._root_items):
-            for i2 in range(len(self._root_items)-1, i1, -1):
-                name2, valdoc2 = self._root_items[i2]
-                if name1.dominates(name2):
-                    del self._root_items[i2]
-                    if self.get_valdoc(name2) != valdoc2:
-                        raise ValueError, 'Inconsistant root set'
-
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
         for name, val_doc in root.items():
             self._find_contained_valdocs(val_doc)
             # the following method does both canonical name assignment
-            # and initialization of _reachable_valdocs:
+            # and initialization of reachable_valdocs:
             self._assign_canonical_names(val_doc, name)
 
         for val_doc in self.reachable_valdocs:
             # Resolve any imported_from links, if the target of the
             # link is contained in the index.
-            if val_doc.imported_from not in (UNKNOWN, None):
+            while val_doc.imported_from not in (UNKNOWN, None):
                 srcdoc = self.get_valdoc(val_doc.imported_from)
-                if srcdoc is not val_doc and srcdoc is not None:
+                if srcdoc != val_doc and srcdoc is not None:
                     val_doc.__class__ = srcdoc.__class__
                     val_doc.__dict__ = srcdoc.__dict__
+                else:
+                    break
 
             # Set the canonical_container attribute on all reachable
             # valuedocs (where possible).
@@ -144,6 +144,25 @@ class DocIndex:
                 container_doc = self.get_valdoc(container_name)
                 if container_doc is not None:
                     val_doc.canonical_container = container_doc
+                    
+        # Check that we don't have any conflicts in the root set (and
+        # remove redundancies).  This is intentionally done *after*
+        # we resolve imported_from links.
+        # [xx] I can probably get rid of this check eventually.
+        for i1, (name1, valdoc1) in enumerate(self._root_items):
+            for i2 in range(len(self._root_items)-1, i1, -1):
+                name2, valdoc2 = self._root_items[i2]
+                if name1.dominates(name2):
+                    del self._root_items[i2]
+                    if self.get_valdoc(name2) != valdoc2:
+                        print '[XX] ROOT SET CONFLICT'
+                        print `valdoc1`, name1
+                        print `valdoc2`, name2, `self.get_valdoc(name2)`
+                        print name1.dominates(name2)
+                        print valdoc1.filename
+                        print valdoc2.filename
+                        raise ValueError, 'Inconsistant root set'
+
 
     #////////////////////////////////////////////////////////////
     # Lookup methods
@@ -186,7 +205,7 @@ class DocIndex:
         # Starting at the selected root valdoc, walk down the variable
         # chain until we find the requested value/variable.
         for identifier in name[len(root_name):]:
-            if val_doc is UNKNOWN:
+            if val_doc == None:
                 return None, None
             
             # First, check for variables in namespaces.
@@ -195,6 +214,7 @@ class DocIndex:
                 if child.name == identifier:
                     var_doc = child
                     val_doc = var_doc.value
+                    if val_doc is UNKNOWN: val_doc = None
                     break
 
             # If that fails, then see if it's a submodule.
@@ -206,6 +226,7 @@ class DocIndex:
                             DottedName(val_doc.canonical_name, identifier)):
                             var_doc = None
                             val_doc = submodule
+                            if val_doc is UNKNOWN: val_doc = None
                             break
                     else:
                         return None, None
@@ -230,8 +251,9 @@ class DocIndex:
         self.contained_valdocs.add(val_doc)
         # Recurse:
         for var_doc in self._vardocs_reachable_from(val_doc):
+            self.reachable_vardocs.add(var_doc)
             if var_doc.value is UNKNOWN: continue
-            # [xx] what should we do with UNKNOWN here?
+            # [xx] what should we do with UNKNOWN for imported?
             if var_doc.is_imported is not True:#not in (True, UNKNOWN):
                 self._find_contained_valdocs(var_doc.value)
 
