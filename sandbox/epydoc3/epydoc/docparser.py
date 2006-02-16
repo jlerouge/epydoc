@@ -1219,7 +1219,7 @@ class DocParser:
             an empty argument list, then C{decorator_args} is C{()}.
         """
         if decorator_name == DottedName('staticmethod'):
-            return  StaticMethodDoc(**func_doc.__dict__)
+            return StaticMethodDoc(**func_doc.__dict__)
         elif decorator_name == DottedName('classmethod'):
             return ClassMethodDoc(**func_doc.__dict__)
         elif self.DEFAULT_DECORATOR_BEHAVIOR == 'passthrough':
@@ -1321,7 +1321,7 @@ class DocParser:
                     classdoc.bases.append(base_doc)
                 else:
                     # [XX] This is a potentially significant problem?
-                    base_doc = ClassDoc(variables={}, sort_spec=[],
+                    base_doc = ClassDoc(local_variables={}, sort_spec=[],
                                         bases=[], subclasses=[],
                                         imported_from = base)
                     classdoc.bases.append(base_doc)
