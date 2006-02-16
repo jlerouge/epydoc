@@ -71,8 +71,8 @@ def build_docs(names, inspect=True, parse=True):
     # Parse all docstrings.
     for val_doc in docindex.reachable_valdocs:
         docstring_parser.parse_docstring(val_doc)
-    for val_doc in docindex.reachable_vardocs:
-        docstring_parser.parse_docstring(val_doc)
+    for var_doc in docindex.reachable_vardocs:
+        docstring_parser.parse_docstring(var_doc)
 
     # Inheritance.
     inheriter.inherit(docindex)
