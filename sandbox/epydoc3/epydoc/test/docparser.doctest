@@ -1,6 +1,27 @@
 Tests: epydoc.docparser
 ~~~~~~~~~~~~~~~~~~~~~~~
 
+Base lists:
+   class A: pass                   # no bases
+   class B(A): pass                # single base
+   class C(A,B): pass              # multiple bases
+   class D( ((A)) ): pass          # extra parens around base
+   class E(Dotted.Name): pass      # dotted name
+   class F(B.__bases__[0]): pass   # calculated base
+
+Delete:
+   del x
+   del x,y
+   del (x,y)
+   del [x,y]
+   del ((((x))))
+   del [[[[x]]]]
+   del ((a, ((b, c)), d), [e])
+   del ((a, ((b.c.d, c)), d.q), [e.f])
+   del x[3]                             # not parsed
+
+
+
 DocParser is a processing class that extracts API documentation by
 parsing the source code of Python files.  Its primary interface is
 C{parse()}, which takes a module's filename, and returns a ModuleDoc
