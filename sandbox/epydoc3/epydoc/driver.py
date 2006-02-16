@@ -1,7 +1,7 @@
 # Import inspector/parser
 from epydoc.apidoc import *
 from epydoc.docinspector import DocInspector
-from epydoc.docparser import DocParser
+from epydoc.docparser_quick import DocParser
 from epydoc.docmerger import DocMerger
 from epydoc.docindexer import DocIndex
 from epydoc.docstringparser import DocstringParser
@@ -29,6 +29,7 @@ def build_docs(names, inspect=True, parse=True):
             except ValueError:
                 # hmm -- ValueError might be too general!
                 print "  Failed to parse (couldn't find %s)." % name
+                raise
                 parsedoc = None
         else:
             parsedoc = None
@@ -63,9 +64,6 @@ def build_docs(names, inspect=True, parse=True):
         else:
             doc_dict[name] = merger.merge(inspectdoc, parsedoc)
 
-        if name in doc_dict:
-            print `doc_dict[name]`, name
-
     # Construct a dictionary mapping name -> ValueDoc, and use that
     # dictionary to create an index.
     docindex = DocIndex(doc_dict)
@@ -73,14 +71,8 @@ def build_docs(names, inspect=True, parse=True):
     # Parse all docstrings.
     for val_doc in docindex.reachable_valdocs:
         docstring_parser.parse_docstring(val_doc)
-#         if isinstance(val_doc, ClassDoc):
-#             if val_doc.local_variables is not UNKNOWN:
-#                 for var_doc in val_doc.local_variables.values():
-#                     docstring_parser.parse_docstring(var_doc)
-#         if isinstance(val_doc, NamespaceDoc):
-#             if val_doc.variables is not UNKNOWN:
-#                 for var_doc in val_doc.variables.values():
-#                     docstring_parser.parse_docstring(var_doc)
+    for val_doc in docindex.reachable_vardocs:
+        docstring_parser.parse_docstring(val_doc)
 
     # Inheritance.
     inheriter.inherit(docindex)
@@ -105,7 +97,7 @@ def help(names):
     inspect = True
     parse = True
     
-    #inspect = False
+    inspect = False
     #parse = False
 
     docindex = build_docs(names, inspect=inspect, parse=parse)
