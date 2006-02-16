@@ -1311,7 +1311,14 @@ class HTMLWriter:
             if doc.canonical_container is None:
                 return crumbs
             if doc.canonical_container is UNKNOWN:
-                return ['??']+crumbs
+                # Use canonical_name, if we can.
+                if doc.canonical_name is UNKNOWN:
+                    return ['??']+crumbs
+                elif isinstance(doc, ModuleDoc):
+                    return ['Package&nbsp;%s' % ident
+                            for ident in doc.canonical_name]+crumbs
+                else:
+                    return list(doc.canonical_name)+crumbs
             doc = doc.canonical_container
             label = self._crumb(doc)
             name = doc.canonical_name
@@ -1402,7 +1409,8 @@ class HTMLWriter:
             normal_vars.append(vardoc)
             
         # Write a header for the group.
-        if name != '': self.write_group_header(out, name)
+        if name != '':
+            self.write_group_header(out, name)
 
         # Write a line for each normal var:
         for vardoc in normal_vars:
@@ -2068,6 +2076,7 @@ class HTMLWriter:
           <tr><td><ul>
         #   self.write_module_tree_item(out, submodule)
           </ul></td></tr>
+        # #endif
         $self.TABLE_FOOTER$
         <br />
         ''')
