@@ -124,19 +124,29 @@ class DocIndex:
             # and initialization of reachable_valdocs:
             self._assign_canonical_names(val_doc, name)
 
-        for val_doc in self.reachable_valdocs:
-            # Resolve any imported_from links, if the target of the
-            # link is contained in the index.
+        # Resolve any imported_from links, if the target of the link
+        # is contained in the index.  We have to be a bit careful
+        # here, because when we merge srcdoc & val_doc, we might
+        # unintentionally create a duplicate entry in
+        # reachable/contained valdocs.
+        for val_doc in list(self.reachable_valdocs):
             while val_doc.imported_from not in (UNKNOWN, None):
                 srcdoc = self.get_valdoc(val_doc.imported_from)
+                # avoid duplicates in sets:
+                if val_doc in self.contained_valdocs:
+                    self.reachable_valdocs.discard(val_doc)
+                if srcdoc in self.contained_valdocs:
+                    self.contained_valdocs.discard(val_doc)
+                # merge them:
                 if srcdoc != val_doc and srcdoc is not None:
                     val_doc.__class__ = srcdoc.__class__
                     val_doc.__dict__ = srcdoc.__dict__
                 else:
                     break
 
-            # Set the canonical_container attribute on all reachable
-            # valuedocs (where possible).
+        # Set the canonical_container attribute on all reachable
+        # valuedocs (where possible).
+        for val_doc in self.reachable_valdocs:
             container_name = val_doc.canonical_name.container()
             if container_name is None:
                 val_doc.canonical_container = None
@@ -144,7 +154,7 @@ class DocIndex:
                 container_doc = self.get_valdoc(container_name)
                 if container_doc is not None:
                     val_doc.canonical_container = container_doc
-                    
+
         # Check that we don't have any conflicts in the root set (and
         # remove redundancies).  This is intentionally done *after*
         # we resolve imported_from links.
