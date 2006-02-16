@@ -223,17 +223,18 @@ class APIDoc(object):
     @type docstring: C{string} or C{None}
     @ivar descr: A description of the documented item, extracted from
         its docstring.
-    @type descr: L{ParsedDocstring}
+    @type descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
     @ivar summary: A summary description of the documented item,
         extracted from its docstring.
-    @type summary: L{ParsedDocstring}
+    @type summary: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
     @ivar metadata: Metadata about the documented item, extracted from
         fields in its docstring.  This metadata is encoded as a
         dictionary whose keys are cannonical field tag names (such as
         C{'author'} or tuples of field tag name and argument value
         (such as C{('todo', '1.2')}.  The metadata dictionary's values
-        are lists of L{ParsedDocstring} segments, each corresponding
-        to the body of a single docstring field.
+        are lists of L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
+        segments, each corresponding to the body of a single docstring
+        field.
     @type metadata: C{dict}
     
     @ivar extra_docstring_fields: A list of new docstring fields
@@ -346,7 +347,7 @@ class VariableDoc(APIDoc):
     
     @ivar type_descr: A description of the variable's expected type,
         extracted from its docstring.
-    @type type_descr: L{ParsedDocstring}
+    @type type_descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
     """
     container = UNKNOWN
     name = UNKNOWN
@@ -678,6 +679,7 @@ class ClassDoc(NamespaceDoc):
                 if isinstance(base, ClassDoc):
                     base._dfs_bases(mro, seen)
                 else:
+                    # [XX]
                     print 'hmm base?', `base`
         return mro
 
@@ -831,28 +833,31 @@ class RoutineDoc(ValueDoc):
     @ivar arg_descrs: A list of descriptions of the routine's
         arguments.  Each element of this list is a tuple C{(arg,
         descr)}, where C{arg} is an argument name (or a tuple of 
-        of argument names); and C{descr} is a L{ParsedDocstring}
-        describing the argument(s) specified by C{arg}.
+        of argument names); and C{descr} is a L{ParsedDocstring
+        <epydoc.markup.ParsedDocstring>} describing the argument(s)
+        specified by C{arg}.
     @type arg_descrs: C{list}
     
     @ivar arg_types: Descriptions of the expected types for the
         routine's arguments, encoded as a dictionary mapping from
         argument names to type descriptions.
-    @type arg_types: C{dict} from C{string} to L{ParsedDocstring}
+    @type arg_types: C{dict} from C{string} to L{ParsedDocstring
+        <epydoc.markup.ParsedDocstring>}
 
     @ivar return_descr: A description of the value returned by this
         routine.
-    @type return_descr: L{ParsedDocstring}
+    @type return_descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
     @ivar return_type: A description of expected type for the value
         returned by this routine.
-    @type return_type: L{ParsedDocstring}
+    @type return_type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
 
     @ivar exception_descrs: A list of descriptions of exceptions
         that the routine might raise.  Each element of this list is a
         tuple C{(exc, descr)}, where C{exc} is a string contianing the
-        exception name; and C{descr} is a L{ParsedDocstring}
-        describing the circumstances under which the exception
-        specified by C{exc} is raised.
+        exception name; and C{descr} is a L{ParsedDocstring
+        <epydoc.markup.ParsedDocstring>} describing the circumstances
+        under which the exception specified by C{exc} is raised.
+        
     @type exception_descrs: C{list}
     """
     posargs = UNKNOWN
