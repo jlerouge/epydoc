@@ -1,9 +1,33 @@
+# epydoc -- Source code parsing
+#
+# Copyright (C) 2005 Edward Loper
+# Author: Edward Loper <edloper@loper.org>
+# URL: <http://epydoc.sf.net>
+#
+# $Id$
+
 """
-Playing with trying to make docparser faster.  process line-by-line.
+Extract API documentation about python objects by parsing their source
+code.
+
+L{DocParser} is a processing class that reads the Python source code
+for one or more modules, and uses it to create L{APIDoc} objects
+containing the API documentation for the variables and values defined
+in those modules.
+
+C{DocParser} can be subclassed to extend the set of source code
+constructions that it supports.
+
+@bug: Instance vars are not created if they just have a docstring..
 """
+__docformat__ = 'epytext en'
+
+######################################################################
+## Imports
+######################################################################
 
 # Python source code parsing:
-import symbol, token, tokenize
+import token, tokenize
 # Finding modules:
 import imp
 # File services:
@@ -13,7 +37,89 @@ from epydoc.apidoc import *
 
 class ParseError(Exception): pass
 
+######################################################################
+## Doc Parser
+######################################################################
+
 class DocParser:
+    """    
+    An API documentation extractor based on source code parsing.
+    C{DocParser} reads and parses the Python source code for one or
+    more modules, and uses it to create L{APIDoc} objects containing
+    the API documentation for the variables and values defined in
+    those modules.
+
+    C{DocParser} defines two methods that return L{APIDoc} objects for
+    a specified object:
+    
+      - L{find} - get the documentation for an object with a given
+        dotted name.
+      - L{parse} - get the documentation for a module with a given
+        filename.
+
+    Currently, C{DocParser} extracts documentation from the following
+    source code constructions:
+
+      - module docstring
+      - import statements
+      - class definition blocks
+      - function definition blocks
+      - assignment statements
+        - simple assignment statements
+        - assignment statements with multiple C{'='}s
+        - assignment statements with unpacked left-hand sides
+        - assignment statements that wrap a function in classmethod
+          or staticmethod.
+        - assignment to special variables __path__, __all__, and
+          __docformat__.
+      - delete statements
+
+    C{DocParser} does not yet support the following source code
+    constructions:
+    
+      - assignment statements that create properties
+
+    By default, C{DocParser} will expore the contents of top-level
+    C{try} and C{if} blocks.  If desired, C{DocParser} can also
+    be told to explore the contents of C{while} and C{for} blocks.
+
+    Subclassing
+    ===========
+    C{DocParser} can be subclassed, to extend the set of source code
+    constructions that it supports.  C{DocParser} can be extended in
+    several different ways:
+
+      - [XX] fill this in!
+
+    @group Entry Points: find, parse
+
+    @group Line Processors: process_*
+    @group Variable Manipulation: set_variable, del_variable
+    @group Name Lookup: lookup_*
+    
+    """
+
+    def __init__(self, builtins_moduledoc):
+        """
+        Construct a new C{DocParser}.
+
+        @param builtins_moduledoc: A C{ModuleDoc} for C{__builtins__},
+        which is used when builtin objects are referenced by a
+        module's code (e.g., if C{object} is used as a base class).
+        @type builtins_moduledoc: L{ModuleDoc}
+        """
+        
+        self.builtins_moduledoc = builtins_moduledoc
+        """A C{ModuleDoc} for C{__builtins__}, which is used whenever
+        builtin objects are referenced by a module's code (e.g., if
+        C{object} is used as a base class).
+        @type: L{ModuleDoc}"""
+
+        self.moduledoc_cache = {}
+        """A cache of C{ModuleDoc}s that we've already created.
+        C{moduledoc_cache} is a dictionary mapping from 
+        @type: C{dict}"""
+
     #////////////////////////////////////////////////////////////
     # Configuration Constants
     #////////////////////////////////////////////////////////////
@@ -74,18 +180,6 @@ class DocParser:
     docstrings for variables."""
 
     DEFAULT_ENCODING = 'iso-8859-1' # aka 'latin-1'
-
-    #/////////////////////////////////////////////////////////////////
-    # Constructor
-    #/////////////////////////////////////////////////////////////////
-
-    def __init__(self, builtins_moduledoc):
-        self.builtins_moduledoc = builtins_moduledoc
-
-        self.moduledoc_cache = {}
-        """A cache of C{ModuleDoc}s that we've already created.  Dict
-        from filename to ModuleDoc."""
-
 
     #////////////////////////////////////////////////////////////
     # Entry point
@@ -343,6 +437,9 @@ class DocParser:
         # element is a tuple (comment_text, comment_lineno).
         comments = []
 
+        # A list of decorator lines that occur before the current
+        # logical line.  This is used so we can process a function
+        # declaration line and its decorators all at once.
         decorators = []
 
         # The token-eating loop:
@@ -350,9 +447,9 @@ class DocParser:
         tok_iter = tokenize.generate_tokens(module_file.readline)
         for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
             # Update lineno when we reach a new logical line.
-            if lineno is None:
-                lineno = srow
-
+            # [xx] but don't count comments for this?
+            if lineno is None: lineno = srow
+                
             # Error token: abort
             if toktype == token.ERRORTOKEN:
                 raise ParseError()
@@ -378,29 +475,17 @@ class DocParser:
             elif line_toks and line_toks[0] == (token.OP, '@'):
                 decorators.append(self.shallow_parse(line_toks))
                 line_toks = []
-
-            # For efficiency, ignore contents of funcs (except __init__)
-            # [xx] is this a premature optimization?
-            elif (isinstance(parent_docs[-1], RoutineDoc) and
-                  prev_line_doc is None and
-                  (parent_docs[-1].canonical_name == UNKNOWN or
-                   parent_docs[-1].canonical_name[-1] != '__init__')):
-                line_toks = []
-                lineno = None
-                comments = []
-
             # End of line token: parse the logical line & process it.
             else:
-                if line_toks:
+                if parent_docs[-1] != 'skip_block':
                     try:
-                        doc = self.process_line(
+                        prev_line_doc = self.process_line(
                             self.shallow_parse(line_toks), parent_docs,
                             prev_line_doc, lineno, comments, decorators)
                     except ParseError:
-                        # [XX] catch ParseError here?
-                        print 'Parse error on line %s' % lineno
-                        raise
-                    prev_line_doc = doc
+                        raise ParseError('line %d: Parse error' % lineno)
+                else:
+                    prev_line_doc = None
 
                 # Reset line contents.
                 line_toks = []
@@ -444,7 +529,6 @@ class DocParser:
             raise ParseError('Unbalanced parens')
         return stack[0]
 
-
     #/////////////////////////////////////////////////////////////////
     # Line processing Methods
     #/////////////////////////////////////////////////////////////////
@@ -479,9 +563,63 @@ class DocParser:
             return self.process_docstring(*args)
         elif (token.OP, '=') in line:
             return self.process_assignment(*args)
+        elif (line[0][0] == token.NAME and
+              line[0][1] in self.CONTROL_FLOW_KEYWORDS):
+            return self.process_control_flow_line(*args)
         else:
             return None
             # [xx] do something with control structures like for/if?
+
+    #/////////////////////////////////////////////////////////////////
+    # Line handler: control flow
+    #/////////////////////////////////////////////////////////////////
+
+    CONTROL_FLOW_KEYWORDS = ['if', 'elif', 'else', 'while',
+                             'for', 'try', 'except', 'finally']
+
+    def process_control_flow_line(self, line, parent_docs, prev_line_doc,
+                                  lineno, comments, decorators):
+        keyword = line[0][1]
+        if ((keyword == 'if' and self.PARSE_IF_BLOCKS) or
+            (keyword == 'elif' and self.PARSE_ELSE_BLOCKS) or
+            (keyword == 'else' and self.PARSE_ELSE_BLOCKS) or
+            (keyword == 'while' and self.PARSE_WHILE_BLOCKS) or
+            (keyword == 'for' and self.PARSE_FOR_BLOCKS) or
+            (keyword == 'try' and self.PARSE_TRY_BLOCKS) or
+            (keyword == 'except' and self.PARSE_EXCEPT_BLOCKS) or
+            (keyword == 'finally' and self.PARSE_FINALLY_BLOCKS)):
+            # Return "None" to indicate that we should process the
+            # block using the same context that we were already in.
+            return None
+        else:
+            # Return 'skip_block' to indicate that we should ignore
+            # the contents of this block.
+            return 'skip_block'
+
+    def process_else_line(self, line, parent_docs, *args):
+        if not self.PARSE_ELSE_BLOCKS: return 'skip_block'
+        return None
+
+    def process_while_line(self, line, parent_docs, *args):
+        if not self.PARSE_WHILE_BLOCKS: return 'skip_block'
+        return None
+
+    def process_try_line(self, line, parent_docs, *args):
+        if not self.PARSE_TRY_BLOCKS: return 'skip_block'
+        return None
+
+    def process_except_line(self, line, parent_docs, *args):
+        if not self.PARSE_EXCEPT__BLOCKS: return 'skip_block'
+        return None
+
+    def process_finally_line(self, line, parent_docs, *args):
+        if not self.PARSE_FINALLY_BLOCKS: return 'skip_block'
+        return None
+
+    def process_for_line(self, line, parent_docs, prev_line_doc, lineno,
+                         comments, decorators):
+        if not self.PARSE_FOR_BLOCKS: return 'skip_block'
+        return None
 
     #/////////////////////////////////////////////////////////////////
     # Line handler: imports
@@ -549,9 +687,11 @@ class DocParser:
         # If src is package-local, then convert it to a global name.
         src = self._global_name(src, parent_docs)
 
+        # [xx] add check for if we already have the source docs in our
+        # cache??
+
         if (self.IMPORT_HANDLING == 'parse' or
-            self.IMPORT_STAR_HANDLING == 'parse' or
-            src in self.moduledoc_cache): # [xx] is this ok?
+            self.IMPORT_STAR_HANDLING == 'parse'): # [xx] is this ok?
             try: module_doc = self._find(src)
             except ValueError: module_doc = None
             if isinstance(module_doc, ModuleDoc):
@@ -601,8 +741,10 @@ class DocParser:
         # If name is package-local, then convert it to a global name.
         name = self._global_name(name, parent_docs)
         
-        if (self.IMPORT_HANDLING == 'parse' or
-            name in self.moduledoc_cache): # [xx] is this ok?
+        # [xx] add check for if we already have the source docs in our
+        # cache??
+
+        if self.IMPORT_HANDLING == 'parse':
             # Check to make sure that we can actually find the value.
             try: val_doc = self._find(name)
             except ValueError: val_doc = None
@@ -723,8 +865,7 @@ class DocParser:
         elif (len(lhs_pieces)==1 and len(lhs_pieces[0]) == 3 and
               lhs_pieces[0][0] == (token.NAME, parent_docs[-1].posargs[0]) and
               lhs_pieces[0][1] == (token.OP, '.') and
-              lhs_pieces[0][2][0] == token.NAME and 
-              self.comments_include_docstring(comments)):
+              lhs_pieces[0][2][0] == token.NAME):
             is_instvar = True
             rhs_val = UNKNOWN # should this be ValueDoc()? [XX]
         else:
@@ -739,15 +880,33 @@ class DocParser:
                 lhs_name = self.parse_dotted_name(lhs)
                 lhs_parent = self.lhs_parent(lhs_name, parent_docs)
                 if lhs_parent is None: continue
-                # Create the VariableDoc, and assign it to its parent.
+                # Create the VariableDoc.
                 var_doc = VariableDoc(name=lhs_name[-1], value=rhs_val,
                                       is_imported=False, is_alias=is_alias,
                                       is_instvar=is_instvar)
-                self.set_variable(lhs_parent, var_doc)
                 # Extract a docstring from the comments, when present,
-                # but only if there's only one LHS.
+                # but only if there's a single LHS.
                 if len(lhs_pieces) == 1:
                     self.add_docstring_from_comments(var_doc, comments)
+
+                # Assign the variable to the containing namespace,
+                # *unless* the variable is an instance variable
+                # without a comment docstring.  In that case, we'll
+                # only want to add it if we later discover that it's
+                # followed by a variable docstring.  If it is, then
+                # process_docstring will take care of adding it to the
+                # containing clas.  (This is a little hackish, but
+                # unfortunately is necessary because we won't know if
+                # this assignment line is followed by a docstring
+                # until later.)
+                if is_instvar:
+                    if self.comments_include_docstring(comments):
+                        self.set_variable(lhs_parent, var_doc)
+                else:
+                    self.set_variable(lhs_parent, var_doc)
+
+                if len(lhs_pieces) == 1:
+                    return var_doc
 
             # Otherwise, the LHS must be a complex expression; use
             # dotted_names_in() to decide what variables it contains,
@@ -891,11 +1050,23 @@ class DocParser:
         """
         if prev_line_doc is None: return
 
-        # [XX] This doesn't do the right thing for instance var
-        # comments! Ouchies..  Or for any var comments, actually.
-        
         # [XX] something friendlier than eval here??
         docstring = eval(line[0][1])
+
+        # If the modified APIDoc is an instance variable, and it has
+        # not yet been added to its class's C{local_variables} list,
+        # then add it now.  This is done here, rather than in the
+        # process_assignment() call that created the variable, because
+        # we only want to add instance variables if they have an
+        # associated docstring.  (For more info, see the comment above
+        # the set_variable() call in process_assignment().)
+        if (isinstance(prev_line_doc, VariableDoc) and
+            prev_line_doc.is_instvar and
+            prev_line_doc.docstring in (None, UNKNOWN)):
+            for i in range(len(parent_docs)-1, -1, -1):
+                if isinstance(parent_docs[i], ClassDoc):
+                    self.set_variable(parent_docs[i], prev_line_doc)
+                    break
 
         if prev_line_doc.docstring in (None, UNKNOWN):
             prev_line_doc.docstring = docstring
@@ -1330,6 +1501,9 @@ class DocParser:
         if var_doc is None: return None
         return var_doc.value
 
+    #/////////////////////////////////////////////////////////////////
+    # Docstring Comments
+    #/////////////////////////////////////////////////////////////////
 
     def comments_include_docstring(self, comments):
         return (len(comments) > 0 and
@@ -1360,6 +1534,9 @@ class DocParser:
             apidoc.docstring = docstring
             apidoc.docstring_lineno = docstring_lineno
 
+    #/////////////////////////////////////////////////////////////////
+    # Tree tokens
+    #/////////////////////////////////////////////////////////////////
 
     def pp_toktree(self, elts, spacing='normal', indent=0):
         s = ''
