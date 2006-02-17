@@ -454,6 +454,8 @@ class ValueDoc(APIDoc):
     repr = UNKNOWN
     type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
     imported_from = None
+
+    toktree = UNKNOWN # from the tokenizing docparser.
     
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
