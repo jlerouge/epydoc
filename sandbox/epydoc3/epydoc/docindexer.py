@@ -118,7 +118,7 @@ class DocIndex:
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
-        for name, val_doc in root.items():
+        for name, val_doc in self._root_items:
             self._find_contained_valdocs(val_doc)
             # the following method does both canonical name assignment
             # and initialization of reachable_valdocs:
@@ -128,12 +128,12 @@ class DocIndex:
         # is contained in the index.  We have to be a bit careful
         # here, because when we merge srcdoc & val_doc, we might
         # unintentionally create a duplicate entry in
-        # reachable/contained valdocs.
+        # reachable/contained valdocs sets.
         for val_doc in list(self.reachable_valdocs):
             while val_doc.imported_from not in (UNKNOWN, None):
                 srcdoc = self.get_valdoc(val_doc.imported_from)
                 # avoid duplicates in sets:
-                if val_doc in self.contained_valdocs:
+                if srcdoc in self.reachable_valdocs:
                     self.reachable_valdocs.discard(val_doc)
                 if srcdoc in self.contained_valdocs:
                     self.contained_valdocs.discard(val_doc)
@@ -266,7 +266,7 @@ class DocIndex:
             # [xx] what should we do with UNKNOWN for imported?
             if var_doc.is_imported is not True:#not in (True, UNKNOWN):
                 self._find_contained_valdocs(var_doc.value)
-
+        
     def _assign_canonical_names(self, val_doc, name, score=0):
         """
         Assign a canonical name to C{val_doc} (if it doesn't have one
