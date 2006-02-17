@@ -213,6 +213,7 @@ class DocParser:
             path = None
         else:
             try:
+                # [XXX]
                 path_ast = module_doc.variables['__path__'].value.ast
                 path = self.extract_string_list(path_ast)
             except:
@@ -230,21 +231,21 @@ class DocParser:
         if len(name) == 1: return module_doc
 
         # Otherwise, we're looking for something inside the module.
-        # First, check to see if it's in a variable.
+        # First, check to see if it's in a variable (but ignore
+        # variables that just contain imported submodules).
         var_doc = module_doc.variables.get(name[1])
         if (var_doc is not None and
             (var_doc.value.imported_from !=
-             DottedName(package_doc.canonical_name, name))):
+             DottedName(module_doc.canonical_name, *name[1:]))):
             return self._find_in_namespace(DottedName(*name[1:]), module_doc)
 
         # If not, then check to see if it's in a subpackage.
-        elif re.match(r'__init__.py\w?', os.path.split(filename)[1]):
+        if module_doc.is_package:
             return self._find(DottedName(*name[1:]), module_doc)
 
         # If it's not in a variable or a subpackage, then we can't
         # find it.
-        else:
-            raise ValueError('Could not find value')
+        raise ValueError('Could not find value')
         
     def _find_in_namespace(self, name, namespace_doc):
         # Look up the variable in the namespace.
@@ -331,11 +332,10 @@ class DocParser:
                                is_package=is_pkg, submodules=[])
         self.moduledoc_cache[filename] = module_doc
 
-        # Default __path__ value, used for local imports..
+        # Set the module's __path__ to its default value.
         if is_pkg:
             module_doc.path = [os.path.split(module_doc.filename)[0]]
         
-
         # Add this module to the parent package's list of submodules.
         if package_doc is not None:
             package_doc.submodules.append(module_doc)
@@ -344,63 +344,46 @@ class DocParser:
         self.process_file(module_doc)
 
         # Handle any special variables (__path__, __docformat__, etc.)
-        self.handle_special_module_vars(module_doc, None)
+        self.handle_special_module_vars(module_doc)
 
         # Return the completed ModuleDoc
         return module_doc
 
-    def handle_special_module_vars(self, module_doc, ast):
-        """
-        Extract values from any special variables that are defined by
-        the module.  Currently, this looks for values for
-        C{__docformat__}, C{__all__}, and C{__path__}.
-        """
-        if module_doc.is_package:
-            module_doc.path = [os.path.split(module_doc.filename)[0]]
-        # [XX] This needs to be updated to work with toks instead of ast.
-        return
-        
-        # If __docformat__ is defined, then extract its value.
-        ast = self._module_var_ast(module_doc, '__docformat__')
-        if ast is not None:
-            try: module_doc.docformat = self.extract_string(ast)
-            except ValueError: module_doc.docformat = None
-        if '__docformat__' in module_doc.variables:
-            self._del_variable(module_doc, '__docformat__')
-
-        # If __all__ is defined, then extract its value.
-        ast = self._module_var_ast(module_doc, '__all__')
-        if ast is not None:
+    # Special vars:
+    # C{__docformat__}, C{__all__}, and C{__path__}.
+    def handle_special_module_vars(self, module_doc):
+        # If __docformat__ is defined, parse its value.
+        toktree = self._module_var_toktree(module_doc, '__docformat__')
+        if toktree is not None:
+            try: module_doc.docformat = self.parse_string(toktree)
+            except: pass
+                
+        # If __all__ is defined, parse its value.
+        toktree = self._module_var_toktree(module_doc, '__all__')
+        if toktree is not None:
             try:
-                public_names = Set(self.extract_string_list(ast))
+                public_names = Set(self.parse_string_list(toktree))
                 for name, var_doc in module_doc.variables.items():
                     var_doc.is_public = (name in public_names)
-            except ValueError: pass
-        if '__all__' in module_doc.variables:
-            self._del_variable(module_doc, '__all__')
+            except ParseError:
+                pass # [xx]
 
-        # If __path__ is defined, then extract its value.  Otherwise,
-        # use the default value.
+        # If __path__ is defined, then extract its value (pkgs only)
         if module_doc.is_package:
-            module_doc.path = [os.path.split(module_doc.filename)[0]]
-            ast = self._module_var_ast(module_doc, '__path__')
-            if ast is not None:
-                try: module_doc.path = self.extract_string_list(ast)
-                except ValueError: raise #pass
-            if '__path__' in module_doc.variables:
-                self._del_variable(module_doc, '__path__')
-                
-    def _module_var_ast(self, module_doc, name):
-        """
-        If a variable named C{name} exists in C{module_doc}, and its
-        value has an ast, then return its ast.
-        """
+            toktree = self._module_var_toktree(module_doc, '__path__')
+            if toktree is not None:
+                try:
+                    module_doc.path = self.parse_string_list(toktree)
+                except ParseError:
+                    pass # [xx]
+
+    def _module_var_toktree(self, module_doc, name):
         var_doc = module_doc.variables.get(name)
         if (var_doc is None or var_doc.value in (None, UNKNOWN) or
-            var_doc.value.ast is UNKNOWN):
+            var_doc.value.toktree is UNKNOWN):
             return None
         else:
-            return var_doc.value.ast
+            return var_doc.value.toktree
 
     #/////////////////////////////////////////////////////////////////
     # File tokenization loop
@@ -483,6 +466,7 @@ class DocParser:
                             self.shallow_parse(line_toks), parent_docs,
                             prev_line_doc, lineno, comments, decorators)
                     except ParseError:
+                        raise
                         raise ParseError('line %d: Parse error' % lineno)
                 else:
                     prev_line_doc = None
@@ -837,47 +821,35 @@ class DocParser:
     #/////////////////////////////////////////////////////////////////
     # Line handler: assignment
     #/////////////////////////////////////////////////////////////////
-    
+
     def process_assignment(self, line, parent_docs, prev_line_doc, lineno,
                            comments, decorators):
-        # If we're not in a namespace, then ignore it.
-        if not (isinstance(parent_docs[-1], NamespaceDoc) or
-                (isinstance(parent_docs[-1], InstanceMethodDoc) and
-                 parent_docs[-1].canonical_name != UNKNOWN and
-                 parent_docs[-1].canonical_name[-1] == '__init__')):
-            return None
-
         # Divide the assignment statement into its pieces.
         pieces = self.split_on(line, (token.OP, '='))
 
         lhs_pieces = pieces[:-1]
         rhs = pieces[-1]
 
+        # Decide whether the variable is an instance variable or not.
+        # If it's an instance var, then discard the value.
+        is_instvar = self.lhs_is_instvar(lhs_pieces, parent_docs[-1])
+        
+        if is_instvar: rhs_val = UNKNOWN
+
+        # if it's not an instance var, and we're not in a namespace,
+        # then it's just a local var -- so ignore it.
+        if not (is_instvar or isinstance(parent_docs[-1], NamespaceDoc)):
+            return None
+        
         # Evaluate the right hand side.
         rhs_val, is_alias = self.rhs_to_valuedoc(rhs, parent_docs)
 
-        # Decide whether the variable is an instance variable or not.
-        # A variable is considered an instance variable if it's
-        # defined in an __init__ method, and has a comment docstring.
-        # [XX] what about non-comment docstrings????
-        if isinstance(parent_docs[-1], NamespaceDoc):
-            is_instvar = False
-        elif (len(lhs_pieces)==1 and len(lhs_pieces[0]) == 3 and
-              lhs_pieces[0][0] == (token.NAME, parent_docs[-1].posargs[0]) and
-              lhs_pieces[0][1] == (token.OP, '.') and
-              lhs_pieces[0][2][0] == token.NAME):
-            is_instvar = True
-            rhs_val = UNKNOWN # should this be ValueDoc()? [XX]
-        else:
-            # If we're not in a namespace and it's not an instance
-            # variable, then there's nothing more to do.
-            return
-        
         # Assign the right hand side value to each left hand side.
         for lhs in lhs_pieces:
             # Try treating the LHS as a simple dotted name.
-            try:
-                lhs_name = self.parse_dotted_name(lhs)
+            try: lhs_name = self.parse_dotted_name(lhs)
+            except: lhs_name = None
+            if lhs_name is not None:
                 lhs_parent = self.lhs_parent(lhs_name, parent_docs)
                 if lhs_parent is None: continue
                 # Create the VariableDoc.
@@ -899,12 +871,11 @@ class DocParser:
                 # unfortunately is necessary because we won't know if
                 # this assignment line is followed by a docstring
                 # until later.)
-                if is_instvar:
-                    if self.comments_include_docstring(comments):
-                        self.set_variable(lhs_parent, var_doc)
-                else:
+                if not is_instvar or self.comments_include_docstring(comments):
                     self.set_variable(lhs_parent, var_doc)
 
+                # If it's the only var, then return the VarDoc for use
+                # as the new `prev_line_doc`.
                 if len(lhs_pieces) == 1:
                     return var_doc
 
@@ -912,7 +883,7 @@ class DocParser:
             # dotted_names_in() to decide what variables it contains,
             # and create VariableDoc's for all of them (with UNKNOWN
             # value).
-            except ParseError:
+            else:
                 for lhs_name in self.dotted_names_in(lhs_pieces):
                     lhs_parent = self.lhs_parent(lhs_name, parent_docs)
                     if lhs_parent is None: continue
@@ -922,6 +893,13 @@ class DocParser:
                                           is_instvar=is_instvar)
                     self.set_variable(lhs_parent, var_doc)
 
+    def lhs_is_instvar(self, lhs_pieces, parent_doc):
+        return (isinstance(parent_doc, InstanceMethodDoc) and
+                len(lhs_pieces)==1 and len(lhs_pieces[0]) == 3 and
+                lhs_pieces[0][0] == (token.NAME, parent_doc.posargs[0]) and
+                lhs_pieces[0][1] == (token.OP, '.') and
+                lhs_pieces[0][2][0] == token.NAME)
+            
     def rhs_to_valuedoc(self, rhs, parent_docs):
         # Dotted variable:
         try:
@@ -943,7 +921,8 @@ class DocParser:
                 return doc, False
 
         # Nothing else to do: make a val with the source as its repr.
-        return ValueDoc(repr=self.pp_toktree(rhs)), False
+        valdoc_repr = self.pp_toktree(rhs)
+        return ValueDoc(repr=valdoc_repr, toktree=rhs), False
         
 
     def lhs_parent(self, lhs_name, parent_docs):
@@ -1226,7 +1205,7 @@ class DocParser:
         var_doc = VariableDoc(name=class_name, value=class_doc,
                               is_imported=False, is_alias=False)
 
-        # Add the bases (if specified)
+        # Add the bases.
         if len(line) == 4:
             if (not isinstance(line[2], list) or
                 line[2][0] != (token.OP, '(')):
@@ -1241,7 +1220,14 @@ class DocParser:
                     class_doc.bases.append(base_doc)
             except ParseError:
                 class_doc.bases = UNKNOWN
+        else:
+            class_doc.bases = []
 
+        # Register ourselves as a subclass to our bases.
+        for basedoc in class_doc.bases:
+            if isinstance(basedoc, ClassDoc):
+                basedoc.subclasses.append(class_doc)
+        
         # If the preceeding comment includes a docstring, then add it.
         self.add_docstring_from_comments(class_doc, comments)
         
@@ -1383,6 +1369,24 @@ class DocParser:
             raise ParseError()
         return names
 
+    def parse_string(self, elt_list):
+        if len(elt_list) == 1 and elt_list[0][0] == token.STRING:
+            return eval(elt_list[0][1]) # [xx] use something safer??
+        else:
+            raise ParseError()
+
+    # ['1', 'b', 'c']
+    def parse_string_list(self, elt_list):
+        if (len(elt_list) == 1 and isinstance(elt_list, list) and
+            elt_list[0][0][1] in ('(', '[')):
+            elt_list = elt_list[0][1:-1]
+
+        string_list = []
+        for string_elt in self.split_on(elt_list, (token.OP, ',')):
+            string_list.append(self.parse_string(string_elt))
+
+        return string_list
+    
     #/////////////////////////////////////////////////////////////////
     # Variable Manipulation
     #/////////////////////////////////////////////////////////////////
@@ -1409,7 +1413,7 @@ class DocParser:
         namespace.sort_spec.append(var_doc.name)
         assert var_doc.container is UNKNOWN
         var_doc.container = namespace
-
+    
     # need to handle things like 'del A.B.c'
     def del_variable(self, namespace, name):
         if not isinstance(namespace, NamespaceDoc):
