@@ -233,11 +233,10 @@ class DocParser:
         # Otherwise, we're looking for something inside the module.
         # First, check to see if it's in a variable (but ignore
         # variables that just contain imported submodules).
-        var_doc = module_doc.variables.get(name[1])
-        if (var_doc is not None and
-            (var_doc.value.imported_from !=
-             DottedName(module_doc.canonical_name, *name[1:]))):
-            return self._find_in_namespace(DottedName(*name[1:]), module_doc)
+        if not self._is_submodule_import_var(module_doc, name[1]):
+            try: return self._find_in_namespace(DottedName(*name[1:]),
+                                                module_doc)
+            except ValueError: pass
 
         # If not, then check to see if it's in a subpackage.
         if module_doc.is_package:
@@ -246,8 +245,24 @@ class DocParser:
         # If it's not in a variable or a subpackage, then we can't
         # find it.
         raise ValueError('Could not find value')
+
+    def _is_submodule_import_var(self, module_doc, var_name):
+        """
+        Return true if C{var_name} is the name of a variable in
+        C{module_doc} that just contains an C{imported_from} link to a
+        submodule of the same name.  (I.e., is a variable created when
+        a package imports one of its own submodules.)
+        """
+        var_doc = module_doc.variables.get(var_name)
+        full_var_name = DottedName(module_doc.canonical_name, var_name)
+        return (var_doc is not None and
+                var_doc.value is not None and
+                var_doc.value.imported_from == full_var_name)
         
     def _find_in_namespace(self, name, namespace_doc):
+        if name[0] not in namespace_doc.variables:
+            raise ValueError('Could not find value')
+        
         # Look up the variable in the namespace.
         var_doc = namespace_doc.variables[name[0]]
         if var_doc.value is UNKNOWN:
