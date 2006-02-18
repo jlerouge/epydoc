@@ -331,6 +331,8 @@ class VariableDoc(APIDoc):
     @type value: L{ValueDoc}
     
     @ivar is_imported: Is this variable's value defined in another module?
+        (Exception: variables that are explicitly included in __all__
+        are considered non-imported, even if they are in fact imported.)
     @type is_imported: C{bool}
     @ivar is_instvar: Is this an instance variable?
     @type is_instvar: C{bool}

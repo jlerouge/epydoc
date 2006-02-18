@@ -364,7 +364,11 @@ class DocParser:
             try:
                 public_names = Set(self.parse_string_list(toktree))
                 for name, var_doc in module_doc.variables.items():
-                    var_doc.is_public = (name in public_names)
+                    if name in public_names:
+                        var_doc.is_public = True
+                        var_doc.is_imported = False
+                    else:
+                        var_doc.is_public = False
             except ParseError:
                 pass # [xx]
 

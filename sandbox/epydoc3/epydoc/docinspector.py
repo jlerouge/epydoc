@@ -204,7 +204,11 @@ class DocInspector:
             try:
                 public_names = Set([str(name) for name in module.__all__])
                 for name, var_doc in module_doc.variables.items():
-                    var_doc.is_public = (name in public_names)
+                    if name in public_names:
+                        var_doc.is_public = True
+                        var_doc.is_imported = False
+                    else:
+                        var_doc.is_public = False
             except: pass
 
         # Record the module's filename

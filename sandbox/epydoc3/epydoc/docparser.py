@@ -437,7 +437,11 @@ class DocParser:
             try:
                 public_names = Set(self.extract_string_list(ast))
                 for name, var_doc in module_doc.variables.items():
-                    var_doc.is_public = (name in public_names)
+                    if name in public_names:
+                        var_doc.is_public = True
+                        var_doc.is_imported = False
+                    else:
+                        var_doc.is_public = False
             except ValueError: pass
         if '__all__' in module_doc.variables:
             self._del_variable(module_doc, '__all__')
