@@ -314,15 +314,21 @@ class DocIndex:
         # Recurse to any contained values.
         for var_doc in self._vardocs_reachable_from(val_doc):
             if var_doc.value is UNKNOWN: continue
-            
+
+            # Get the name.  (If it's an imported variable, then use
+            # the imported name instead.)
             varname = DottedName(name, var_doc.name)
+            if (var_doc.value not in (None, UNKNOWN) and
+                var_doc.value.imported_from not in (None, UNKNOWN)):
+                varname = var_doc.value.imported_from
+            
             # Find the score for this new name.            
             vardoc_score = score-1
             if var_doc.is_imported is UNKNOWN: vardoc_score -= 10
             elif var_doc.is_imported: vardoc_score -= 100
             if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
             elif var_doc.is_alias: vardoc_score -= 1000
-            # Imported vars don't count as "contained".
+            
             self._assign_canonical_names(var_doc.value, varname, vardoc_score)
 
         # Recurse to any directly reachable values.
