@@ -1,7 +1,7 @@
 # Import inspector/parser
 from epydoc.apidoc import *
 from epydoc.docinspector import DocInspector
-from epydoc.docparser_quick import DocParser
+from epydoc.docparser import DocParser
 from epydoc.docmerger import DocMerger
 from epydoc.docindexer import DocIndex
 from epydoc.docstringparser import DocstringParser
@@ -97,7 +97,7 @@ def help(names):
     inspect = True
     parse = True
     
-    inspect = False
+    #inspect = False
     #parse = False
 
     docindex = build_docs(names, inspect=inspect, parse=parse)
