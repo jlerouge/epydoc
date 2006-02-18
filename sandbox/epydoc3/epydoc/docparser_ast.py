@@ -34,8 +34,6 @@ import imp
 import os, os.path
 # API documentation encoding:
 from epydoc.apidoc import *
-# Syntax tree matching:
-from epydoc.astmatcher import compile_ast_matcher
 # Type comparisons:
 from types import StringType, ListType, TupleType, IntType
 
