@@ -933,7 +933,7 @@ class PythonSourceColorizer:
             return '%s-module.html#%s' % (self.module_name, func_name)
 
 if __name__=='__main__':
-    s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
+    s = PythonSourceColorizer('../api_doc.py', 'epydoc.apidoc').colorize()
     import codecs
     f = codecs.open('/home/edloper/public_html/color.html', 'w', 'ascii', 'xmlcharrefreplace')
     f.write(s)

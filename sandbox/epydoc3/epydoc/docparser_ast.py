@@ -1543,9 +1543,9 @@ class DocParser:
         if not isinstance(parentdoc, NamespaceDoc): return
         
         # Create the class's ClassDoc & VariableDoc.
-        classdoc = ClassDoc(local_variables={}, sort_spec=[],
+        class_doc = ClassDoc(local_variables={}, sort_spec=[],
                             bases=[], subclasses=[])
-        var_doc = VariableDoc(name=classname, value=classdoc,
+        var_doc = VariableDoc(name=classname, value=class_doc,
                               is_imported=False, is_alias=False)
 
         # Add the VariableDoc to our container.
@@ -1557,28 +1557,28 @@ class DocParser:
             for base in base_dotted_names:
                 base_doc = self.lookup_value(base)
                 if base_doc is not None:
-                    classdoc.bases.append(base_doc)
+                    class_doc.bases.append(base_doc)
                 else:
                     # [XX] This is a potentially significant problem?
                     base_doc = ClassDoc(local_variables={}, sort_spec=[],
                                         bases=[], subclasses=[],
                                         imported_from = base)
-                    classdoc.bases.append(base_doc)
+                    class_doc.bases.append(base_doc)
 
         # Register ourselves as a subclass to our bases.
-        for basedoc in classdoc.bases:
+        for basedoc in class_doc.bases:
             if isinstance(basedoc, ClassDoc):
-                basedoc.subclasses.append(classdoc)
+                basedoc.subclasses.append(class_doc)
         
         # Add the class's docstring.
-        classdoc.docstring, classdoc.docstring_lineno = docstring_info
+        class_doc.docstring, class_doc.docstring_lineno = docstring_info
         
         # Add the class's canonical name
-        classdoc.canonical_name = DottedName(self.context, classname)
+        class_doc.canonical_name = DottedName(self.context, classname)
         
         # Parse the suite.
         self.context = DottedName(self.context, classname)
-        self.parentdocs.append(classdoc)
+        self.parentdocs.append(class_doc)
         self.process_suite(body)
         self.context = DottedName(*self.context[:-1])
         self.parentdocs.pop()

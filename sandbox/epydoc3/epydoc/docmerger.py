@@ -94,7 +94,7 @@ class DocMerger:
         if inspect_doc.__dict__ is parse_doc.__dict__:
             return inspect_doc
 
-        # Merge the two apidoc's attributes.
+        # Merge the two api_doc's attributes.
         for attrib in Set(inspect_doc.__dict__.keys() +
                           parse_doc.__dict__.keys()):
             self.merge_attribute(attrib, inspect_doc, parse_doc, cyclecheck)

@@ -46,11 +46,11 @@ class DottedName:
     Python variable, value, or argument.  The identifiers that make up
     a dotted name can be accessed using the indexing operator:
 
-        >>> name = DottedName('epydoc', 'apidoc', 'DottedName')
+        >>> name = DottedName('epydoc', 'api_doc', 'DottedName')
         >>> print name
         epydoc.apidoc.DottedName
         >>> name[1]
-        'apidoc'
+        'api_doc'
     """
     def __init__(self, *pieces):
         """
@@ -86,7 +86,7 @@ class DottedName:
         Return the dotted name as a string formed by joining its
         identifiers with periods:
 
-            >>> print DottedName('epydoc', 'apidoc', DottedName')
+            >>> print DottedName('epydoc', 'api_doc', DottedName')
             epydoc.apidoc.DottedName
         """
         return '.'.join(self._identifiers)
@@ -132,8 +132,8 @@ class DottedName:
 #         Return true if C{other}'s sequence of identifiers forms a
 #         prefix for C{self}'s sequence of identifiers:
 #        
-#             >>> name1 = DottedName('epydoc', 'apidoc', 'DottedName')
-#             >>> name2 = DottedName('epydoc', 'apidoc')
+#             >>> name1 = DottedName('epydoc', 'api_doc', 'DottedName')
+#             >>> name2 = DottedName('epydoc', 'api_doc')
 #             >>> name1 in name2
 #             True
 #         """
@@ -926,7 +926,7 @@ class PropertyDoc(ValueDoc):
 ## Pretty Printing
 ######################################################################
 
-def pp_apidoc(apidoc, doublespace=0, depth=-1, exclude=(),
+def pp_apidoc(api_doc, doublespace=0, depth=-1, exclude=(),
               backpointers=None):
     """
     @return: A multiline pretty-printed string representation for the
@@ -940,23 +940,23 @@ def pp_apidoc(apidoc, doublespace=0, depth=-1, exclude=(),
         not be shown.
     @param backpointers: For internal use.
     """
-    pyid = id(apidoc.__dict__)
+    pyid = id(api_doc.__dict__)
     if backpointers is None: backpointers = {}
-    if (hasattr(apidoc, 'canonical_name') and
-        apidoc.canonical_name is not UNKNOWN):
-        name = '%s for %s' % (apidoc.__class__.__name__,
-                              apidoc.canonical_name)
-    elif hasattr(apidoc, 'name') and apidoc.name is not UNKNOWN:
-        name = '%s for %s' % (apidoc.__class__.__name__, apidoc.name)
+    if (hasattr(api_doc, 'canonical_name') and
+        api_doc.canonical_name is not UNKNOWN):
+        name = '%s for %s' % (api_doc.__class__.__name__,
+                              api_doc.canonical_name)
+    elif hasattr(api_doc, 'name') and api_doc.name is not UNKNOWN:
+        name = '%s for %s' % (api_doc.__class__.__name__, api_doc.name)
     else:
-        name = apidoc.__class__.__name__
+        name = api_doc.__class__.__name__
         
     if pyid in backpointers:
         return '%s [%s] (defined above)' % (name, backpointers[pyid])
     
     if depth == 0:
-        if hasattr(apidoc, 'name') and apidoc.name is not None:
-            return '%s...' % apidoc.name
+        if hasattr(api_doc, 'name') and api_doc.name is not None:
+            return '%s...' % api_doc.name
         else:
             return '...'
 
@@ -964,39 +964,39 @@ def pp_apidoc(apidoc, doublespace=0, depth=-1, exclude=(),
     s = '%s [%s]' % (name, backpointers[pyid])
 
     # Only print non-empty fields:
-    fields = [field for field in apidoc.__dict__.keys()
-              if getattr(apidoc, field) is not UNKNOWN
+    fields = [field for field in api_doc.__dict__.keys()
+              if getattr(api_doc, field) is not UNKNOWN
               and field not in exclude]
     fields.sort()
     
     for field in fields:
-        fieldval = getattr(apidoc, field)
+        fieldval = getattr(api_doc, field)
         if doublespace: s += '\n |'
         s += '\n +- %s' % field
 
         if (isinstance(fieldval, types.ListType) and
             len(fieldval)>0 and
             isinstance(fieldval[0], APIDoc)):
-            s += _pp_list(apidoc, fieldval, doublespace, depth,
+            s += _pp_list(api_doc, fieldval, doublespace, depth,
                           exclude, backpointers,
                           (field is fields[-1]))
         elif (isinstance(fieldval, types.DictType) and
               len(fieldval)>0 and 
               isinstance(fieldval.values()[0], APIDoc)):
-            s += _pp_dict(apidoc, fieldval, doublespace, 
+            s += _pp_dict(api_doc, fieldval, doublespace, 
                           depth, exclude, backpointers,
                           (field is fields[-1]))
         elif isinstance(fieldval, APIDoc):
-            s += _pp_apidoc(apidoc, fieldval, doublespace, depth,
+            s += _pp_apidoc(api_doc, fieldval, doublespace, depth,
                             exclude, backpointers,
                             (field is fields[-1]))
         else:
-            s += ' = ' + _pp_val(apidoc, fieldval, doublespace,
+            s += ' = ' + _pp_val(api_doc, fieldval, doublespace,
                                  depth, exclude, backpointers)
                 
     return s
 
-def _pp_list(apidoc, items, doublespace, depth, exclude,
+def _pp_list(api_doc, items, doublespace, depth, exclude,
               backpointers, is_last):
     line1 = (is_last and ' ') or '|'
     s = ''
@@ -1005,12 +1005,12 @@ def _pp_list(apidoc, items, doublespace, depth, exclude,
         joiner = '\n %s  %s ' % (line1, line2)
         if doublespace: s += '\n %s  |' % line1
         s += '\n %s  +- ' % line1
-        valstr = _pp_val(apidoc, item, doublespace, depth, exclude,
+        valstr = _pp_val(api_doc, item, doublespace, depth, exclude,
                          backpointers)
         s += joiner.join(valstr.split('\n'))
     return s
 
-def _pp_dict(apidoc, dict, doublespace, depth, exclude,
+def _pp_dict(api_doc, dict, doublespace, depth, exclude,
               backpointers, is_last):
     items = dict.items()
     items.sort()
@@ -1021,12 +1021,12 @@ def _pp_dict(apidoc, dict, doublespace, depth, exclude,
         joiner = '\n %s  %s ' % (line1, line2)
         if doublespace: s += '\n %s  |' % line1
         s += '\n %s  +- ' % line1
-        valstr = _pp_val(apidoc, item[1], doublespace, depth, exclude,
+        valstr = _pp_val(api_doc, item[1], doublespace, depth, exclude,
                          backpointers)
         s += joiner.join(('%s => %s' % (item[0], valstr)).split('\n'))
     return s
 
-def _pp_apidoc(apidoc, val, doublespace, depth, exclude,
+def _pp_apidoc(api_doc, val, doublespace, depth, exclude,
                 backpointers, is_last):
     line1 = (is_last and ' ') or '|'
     s = ''
@@ -1036,7 +1036,7 @@ def _pp_apidoc(apidoc, val, doublespace, depth, exclude,
     childstr = pp_apidoc(val, doublespace, depth-1, exclude, backpointers)
     return s + joiner.join(childstr.split('\n'))
     
-def _pp_val(apidoc, val, doublespace, depth, exclude, backpointers):
+def _pp_val(api_doc, val, doublespace, depth, exclude, backpointers):
     from epydoc import markup
     if isinstance(val, APIDoc):
         return pp_apidoc(val, doublespace, depth-1, exclude, backpointers)

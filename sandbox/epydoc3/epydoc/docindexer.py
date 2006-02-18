@@ -212,7 +212,7 @@ class DocIndex:
         else:
             return None, None
                 
-        # Starting at the selected root valdoc, walk down the variable
+        # Starting at the selected root val_doc, walk down the variable
         # chain until we find the requested value/variable.
         for identifier in name[len(root_name):]:
             if val_doc == None:

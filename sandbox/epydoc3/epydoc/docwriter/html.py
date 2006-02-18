@@ -1396,25 +1396,25 @@ class HTMLWriter:
         listed_inh_vars = {}
         normal_vars = []
         for i in range(len(var_docs)-1, -1, -1):
-            vardoc = var_docs[i]
-            if vardoc.is_inherited == True:
-                base = vardoc.container
+            var_doc = var_docs[i]
+            if var_doc.is_inherited == True:
+                base = var_doc.container
                 if (base not in self.docindex.contained_valdocs
                     or self._inheritance == 'listed'):
-                    listed_inh_vars.setdefault(base,[]).append(vardoc)
+                    listed_inh_vars.setdefault(base,[]).append(var_doc)
                     continue
                 elif self._inheritance == 'grouped':
-                    grouped_inh_vars.setdefault(base,[]).append(vardoc)
+                    grouped_inh_vars.setdefault(base,[]).append(var_doc)
                     continue
-            normal_vars.append(vardoc)
+            normal_vars.append(var_doc)
             
         # Write a header for the group.
         if name != '':
             self.write_group_header(out, name)
 
         # Write a line for each normal var:
-        for vardoc in normal_vars:
-            self.write_summary_line(out, vardoc, doc)
+        for var_doc in normal_vars:
+            self.write_summary_line(out, var_doc, doc)
         # Write a subsection for inherited vars:
         if listed_inh_vars:
             self.write_inheritance_list(out, doc, listed_inh_vars)
@@ -1563,11 +1563,11 @@ class HTMLWriter:
 
         # Properties
         elif isinstance(var_doc.value, PropertyDoc):
-            propdoc = var_doc.value
-            accessors = [(name, self.property_accessor_to_html(valdoc),
-                          self.summary(valdoc)) for (name, valdoc) in
-                         [('Get', propdoc.fget), ('Set', propdoc.fset),
-                          ('Delete', propdoc.fdel)]]
+            prop_doc = var_doc.value
+            accessors = [(name, self.property_accessor_to_html(val_doc),
+                          self.summary(val_doc)) for (name, val_doc) in
+                         [('Get', prop_doc.fget), ('Set', prop_doc.fset),
+                          ('Delete', prop_doc.fdel)]]
             self.write_property_details_entry(out, var_doc, descr,
                                               accessors, div_class)
         
@@ -1575,16 +1575,16 @@ class HTMLWriter:
         else:
             self.write_variable_details_entry(out, var_doc, descr, div_class)
 
-    def property_accessor_to_html(self, valdoc):
-        if valdoc not in (None, UNKNOWN):
-            if isinstance(valdoc, RoutineDoc):
-                return self.function_signature(valdoc, css_class=
+    def property_accessor_to_html(self, val_doc):
+        if val_doc not in (None, UNKNOWN):
+            if isinstance(val_doc, RoutineDoc):
+                return self.function_signature(val_doc, css_class=
                                                 "summary-sig")
-            elif (type(valdoc) == ValueDoc and
-                  valdoc.repr not in (None, UNKNOWN)):
-                return quote_html(valdoc.repr)
+            elif (type(val_doc) == ValueDoc and
+                  val_doc.repr not in (None, UNKNOWN)):
+                return quote_html(val_doc.repr)
             else:
-                return self.href(valdoc)
+                return self.href(val_doc)
         
 
     def arg_name_to_html(self, func_doc, arg_name):
@@ -2429,48 +2429,48 @@ class HTMLWriter:
         return '<a href="%s"%s>%s</a>' % (url, css, label)
 
 
-    def summary(self, apidoc, indent=0):
-        assert isinstance(apidoc, APIDoc)
-        if (isinstance(apidoc, VariableDoc) and
-            apidoc.summary in (None, UNKNOWN)):
-            if apidoc.value in (None, UNKNOWN): return ''
-            apidoc = apidoc.value
-        if apidoc.summary in (None, UNKNOWN): return ''
-        return self.docstring_to_html(apidoc.summary, apidoc, indent)
+    def summary(self, api_doc, indent=0):
+        assert isinstance(api_doc, APIDoc)
+        if (isinstance(api_doc, VariableDoc) and
+            api_doc.summary in (None, UNKNOWN)):
+            if api_doc.value in (None, UNKNOWN): return ''
+            api_doc = api_doc.value
+        if api_doc.summary in (None, UNKNOWN): return ''
+        return self.docstring_to_html(api_doc.summary, api_doc, indent)
         
-    def descr(self, apidoc, indent=0):
-        assert isinstance(apidoc, APIDoc)
-        if (isinstance(apidoc, VariableDoc) and
-            apidoc.descr in (None, UNKNOWN)):
-            if apidoc.value in (None, UNKNOWN): return ''
-            apidoc = apidoc.value
-        if apidoc.descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(apidoc.descr, apidoc, indent)
+    def descr(self, api_doc, indent=0):
+        assert isinstance(api_doc, APIDoc)
+        if (isinstance(api_doc, VariableDoc) and
+            api_doc.descr in (None, UNKNOWN)):
+            if api_doc.value in (None, UNKNOWN): return ''
+            api_doc = api_doc.value
+        if api_doc.descr in (None, UNKNOWN): return ''
+        return self.docstring_to_html(api_doc.descr, api_doc, indent)
 
-    def type_descr(self, apidoc, indent=0):
-        assert isinstance(apidoc, APIDoc)
-        if (isinstance(apidoc, VariableDoc) and
-            apidoc.type_descr in (None, UNKNOWN)):
-            if apidoc.value in (None, UNKNOWN): return ''
-            apidoc = apidoc.value
-        if apidoc.type_descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(apidoc.type_descr, apidoc, indent)
+    def type_descr(self, api_doc, indent=0):
+        assert isinstance(api_doc, APIDoc)
+        if (isinstance(api_doc, VariableDoc) and
+            api_doc.type_descr in (None, UNKNOWN)):
+            if api_doc.value in (None, UNKNOWN): return ''
+            api_doc = api_doc.value
+        if api_doc.type_descr in (None, UNKNOWN): return ''
+        return self.docstring_to_html(api_doc.type_descr, api_doc, indent)
 
-    def rtype(self, apidoc, indent=0):
-        if isinstance(apidoc, VariableDoc):
-            if apidoc.value in (None, UNKNOWN): return ''
-            apidoc = apidoc.value
-        assert isinstance(apidoc, RoutineDoc)
-        if apidoc.return_type in (None, UNKNOWN): return ''
-        return self.docstring_to_html(apidoc.return_type, apidoc, indent)
+    def rtype(self, api_doc, indent=0):
+        if isinstance(api_doc, VariableDoc):
+            if api_doc.value in (None, UNKNOWN): return ''
+            api_doc = api_doc.value
+        assert isinstance(api_doc, RoutineDoc)
+        if api_doc.return_type in (None, UNKNOWN): return ''
+        return self.docstring_to_html(api_doc.return_type, api_doc, indent)
 
-    def return_descr(self, apidoc, indent=0):
-        if isinstance(apidoc, VariableDoc):
-            if apidoc.value in (None, UNKNOWN): return ''
-            apidoc = apidoc.value
-        assert isinstance(apidoc, RoutineDoc)
-        if apidoc.return_descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(apidoc.return_descr, apidoc, indent)
+    def return_descr(self, api_doc, indent=0):
+        if isinstance(api_doc, VariableDoc):
+            if api_doc.value in (None, UNKNOWN): return ''
+            api_doc = api_doc.value
+        assert isinstance(api_doc, RoutineDoc)
+        if api_doc.return_descr in (None, UNKNOWN): return ''
+        return self.docstring_to_html(api_doc.return_descr, api_doc, indent)
 
     def docstring_to_html(self, parsed_docstring, where=None, indent=0):
         if parsed_docstring in (None, UNKNOWN): return ''

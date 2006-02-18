@@ -12,7 +12,7 @@ from epydoc.apidoc import *
 # then this wouldn't just be direct children, could potentailly be
 # lots and lots of stuff..
 
-# [xx] should inheriting make new variables, or copy the vardoc
+# [xx] should inheriting make new variables, or copy the var_doc
 # objects??  probably make new ones?
 class DocInheriter:
 

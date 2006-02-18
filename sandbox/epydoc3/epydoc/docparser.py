@@ -1532,8 +1532,8 @@ class DocParser:
         return (len(comments) > 0 and
                 comments[-1][0].startswith(self.COMMENT_DOCSTRING_MARKER))
     
-    def add_docstring_from_comments(self, apidoc, comments):
-        if apidoc is None or not comments: return        
+    def add_docstring_from_comments(self, api_doc, comments):
+        if api_doc is None or not comments: return        
 
         # The length of the marker (to strip it off each line)
         marker_len = len(self.COMMENT_DOCSTRING_MARKER)
@@ -1554,8 +1554,8 @@ class DocParser:
                 docstring_lineno = None
 
         if docstring:
-            apidoc.docstring = docstring
-            apidoc.docstring_lineno = docstring_lineno
+            api_doc.docstring = docstring
+            api_doc.docstring_lineno = docstring_lineno
 
     #/////////////////////////////////////////////////////////////////
     # Tree tokens
