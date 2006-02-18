@@ -65,9 +65,11 @@ p.toc              { margin: 0; padding: 0; }
 pre.base-tree      { font-size: 80%; margin: 0; }
 
 /* Summary Sections */
-p.varlist          { margin: 0; padding: 0 0 0 7em;
-                     text-indent: -7em; }
+p.varlist          { padding: 0 0 0 7em; text-indent: -7em;
+                     margin: 0; }
 .varlist-header    { font-weight: bold; }
+p.imports          { padding: 0 0 0 7em; text-indent: -7em; }
+.imports-header    { font-weight: bold; }
 
 /* Details Sections */
 table.func-details { border-width: 2px; border-style: groove;

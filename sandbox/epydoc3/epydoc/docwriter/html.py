@@ -295,7 +295,7 @@ class HTMLWriter:
         self._private_css = kwargs.get('private_css') or self._css
         self._helpfile = kwargs.get('help', None)
         self._frames_index = kwargs.get('frames', 1)
-        self._show_imports = kwargs.get('show_imports', 0)
+        self._show_imports = kwargs.get('show_imports', False)
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._propfunc_linelen = kwargs.get('property_function_linelength', 40)
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
@@ -2041,7 +2041,17 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
         
     def write_imports(self, out, doc):
-        return # [XXX]
+        assert  isinstance(doc, NamespaceDoc)
+
+        imports = doc.select_variables(imported=True)
+        if not imports: return
+
+        import_htmls = ['  <dd>%s</dd>' % self.href(v) for v in imports]
+
+        out('<p class="imports">')
+        out('<span class="varlist-header">Imports:</span>\n  ')
+        out(',\n  '.join([self.href(v.value) for v in imports]))
+        out('\n</p>\n')
 
     #////////////////////////////////////////////////////////////
     # Function Attributes
