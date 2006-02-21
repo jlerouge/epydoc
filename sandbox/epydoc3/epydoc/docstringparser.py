@@ -523,6 +523,16 @@ class DocstringParser:
         Return the name of the markup language that should be used to
         parse the API documentation for the given object.
         """
+        # HACK!!
+        import __builtin__
+        if (isinstance(api_doc, ValueDoc) and
+            api_doc.pyval in __builtin__.__dict__.values() or
+            ((api_doc.canonical_container not in (None, UNKNOWN) and
+              api_doc.canonical_container.pyval in
+              __builtin__.__dict__.values()))):
+            return 'plaintext'
+
+        
         if isinstance(api_doc, ModuleDoc):
             containing_module = api_doc
         elif isinstance(api_doc, VariableDoc):
