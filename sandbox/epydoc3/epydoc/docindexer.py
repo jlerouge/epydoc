@@ -61,6 +61,7 @@ class DocIndex:
     C{ValueDoc}s, as well as C{ValueDoc}s for any values imported into
     the module, and base classes for classes defined in the module.
     """
+
     def __init__(self, root):
         """
         Create a new documentation index, based on the given root set
@@ -68,11 +69,11 @@ class DocIndex:
         set does not have a canonical name, then it will be assigned
         one.  etc.
         
-        @param root: A dictionary mapping from names to C{ValueDoc}s.
+        @param root: A list of C{ValueDoc}s.
         """
         #: A list of (name, ValueDoc) pairs.
-        self._root_items = []
-        self._root_dict = dict(root)
+        self._root_list = list(root)
+        self._root_dict = dict([(d.canonical_name, d) for d in root])
         
         #: The set of all C{ValueDoc}s that are directly or indirectly
         #: reachable from the root set.  In particular, this set contains
@@ -110,19 +111,17 @@ class DocIndex:
         # Initialize the root items list.  We sort them by length in
         # descending order. [XX] is this the right thing to do, in
         # particular in cases where module variables shadow submodules??
-        root_items = [(DottedName(n),v) for (n,v) in root.items()]
-        decorated = [(-len(n), n, v) for (n,v) in root_items]
-        decorated.sort()
-        self._root_items = [(n,v) for (l,n,v) in decorated]
+        # Shouldn't they be sorted in ascending length???
+        self._root_list = sorted(root, key=lambda d:len(d.canonical_name))
         
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
-        for name, val_doc in self._root_items:
+        for val_doc in self._root_list:
             self._find_contained_valdocs(val_doc)
             # the following method does both canonical name assignment
             # and initialization of reachable_valdocs:
-            self._assign_canonical_names(val_doc, name)
+            self._assign_canonical_names(val_doc, val_doc.canonical_name)
 
         # Resolve any imported_from links, if the target of the link
         # is contained in the index.  We have to be a bit careful
@@ -131,46 +130,48 @@ class DocIndex:
         # reachable/contained valdocs sets.
         for val_doc in list(self.reachable_valdocs):
             while val_doc.imported_from not in (UNKNOWN, None):
-                srcdoc = self.get_valdoc(val_doc.imported_from)
-                # avoid duplicates in sets:
-                if srcdoc in self.reachable_valdocs:
-                    self.reachable_valdocs.discard(val_doc)
-                if srcdoc in self.contained_valdocs:
-                    self.contained_valdocs.discard(val_doc)
-                # merge them:
-                if srcdoc != val_doc and srcdoc is not None:
-                    val_doc.__class__ = srcdoc.__class__
-                    val_doc.__dict__ = srcdoc.__dict__
+                src_doc = self.get_valdoc(val_doc.imported_from)
+                # Should we merge them?
+                if src_doc != val_doc and src_doc is not None:
+                    # avoid duplicates in sets: [xx hmm but dups elsewhere??]
+                    if src_doc in self.reachable_valdocs:
+                        self.reachable_valdocs.discard(val_doc)
+                    if src_doc in self.contained_valdocs:
+                        self.contained_valdocs.discard(val_doc)
+                    # Merge them.
+                    val_doc.__class__ = src_doc.__class__
+                    val_doc.__dict__ = src_doc.__dict__
                 else:
                     break
 
         # Set the canonical_container attribute on all reachable
         # valuedocs (where possible).
         for val_doc in self.reachable_valdocs:
-            container_name = val_doc.canonical_name.container()
-            if container_name is None:
-                val_doc.canonical_container = None
+            if isinstance(val_doc, ModuleDoc):
+               val_doc.canonical_container = val_doc.package
             else:
-                container_doc = self.get_valdoc(container_name)
-                if container_doc is not None:
-                    val_doc.canonical_container = container_doc
-
+                container_name = val_doc.canonical_name.container()
+                if container_name is None:
+                    val_doc.canonical_container = None
+                else:
+                    container_doc = self.get_valdoc(container_name)
+                    if container_doc is not None:
+                        val_doc.canonical_container = container_doc
+    
         # Check that we don't have any conflicts in the root set (and
         # remove redundancies).  This is intentionally done *after*
         # we resolve imported_from links.
         # [xx] I can probably get rid of this check eventually.
-        for i1, (name1, valdoc1) in enumerate(self._root_items):
-            for i2 in range(len(self._root_items)-1, i1, -1):
-                name2, valdoc2 = self._root_items[i2]
-                if name1.dominates(name2):
-                    del self._root_items[i2]
-                    if self.get_valdoc(name2) != valdoc2:
-                        print '[XX] ROOT SET CONFLICT'
-                        print `valdoc1`, name1
-                        print `valdoc2`, name2, `self.get_valdoc(name2)`
-                        print name1.dominates(name2)
-                        print valdoc1.filename
-                        print valdoc2.filename
+        for i1, valdoc1 in enumerate(self._root_list):
+            for i2 in range(len(self._root_list)-1, i1, -1):
+                valdoc2 = self._root_list[i2]
+                if valdoc1.canonical_name.dominates(valdoc2.canonical_name):
+                    del self._root_list[i2]
+                    if self.get_valdoc(valdoc2.canonical_name) != valdoc2:
+                        print (('bad root set: %r dominates %r '
+                                'but lookup direct inside %r gives %r') %
+                               (valdoc1, valdoc2, valdoc1, 
+                                self.get_valdoc(valdoc2.canonical_name)))
                         raise ValueError, 'Inconsistant root set'
 
 
@@ -204,17 +205,23 @@ class DocIndex:
 
         # Look for an element in the root set whose name is a prefix
         # of `name`.  If we can't find one, then return None.
-        for (root_name, root_valdoc) in self._root_items:
-            if root_name.dominates(name):
-                val_doc = root_valdoc
-                var_doc = None
-                break
-        else:
-            return None, None
-                
+        for root_valdoc in self._root_list:
+            if root_valdoc.canonical_name.dominates(name):
+                var_doc, val_doc = self._get_from(
+                    root_valdoc, name[len(root_valdoc.canonical_name):])
+                if var_doc is not None or val_doc is not None:
+                    return var_doc, val_doc
+
+        # We didn't find it.
+        return None, None
+        
+    def _get_from(self, root_valdoc, name):
         # Starting at the selected root val_doc, walk down the variable
         # chain until we find the requested value/variable.
-        for identifier in name[len(root_name):]:
+        var_doc = None
+        val_doc = root_valdoc
+    
+        for identifier in name:
             if val_doc == None:
                 return None, None
             
