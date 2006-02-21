@@ -206,8 +206,8 @@ class HTMLWriter:
               navigation bar.  This link can contain arbitrary HTML
               code (e.g. images).  By default, a label is constructed
               from C{prj_name}.
-        @type top: C{string}
-        @keyword top: The top page for the documentation.  This
+        @type top_page: C{string}
+        @keyword top_page: The top page for the documentation.  This
               is the default page shown main frame, when frames are
               enabled.  C{top} can be a URL, the name of a
               module, the name of a class, or one of the special
@@ -222,23 +222,14 @@ class HTMLWriter:
               L{epydoc.css}, then that stylesheet will be used.
               Otherwise, an error is reported.  If no stylesheet is
               specified, then the default stylesheet is used.
-        @type private_css: C{string}
-        @keyword private_css: The CSS stylesheet file for the private
-              API documentation.  If C{css} is a file name, then the
-              specified file's conents will be used.  Otherwise, if
-              C{css} is the name of a CSS stylesheet in L{epydoc.css},
-              then that stylesheet will be used.  Otherwise, an error
-              is reported.  If no stylesheet is specified, then the
-              private API documentation will use the same stylesheet
-              as the public API documentation.
-        @type help: C{string}
-        @keyword help: The name of the help file.  If no help file is
+        @type help_file: C{string}
+        @keyword help_file: The name of the help file.  If no help file is
               specified, then the default help file will be used.
-        @type private: C{boolean}
-        @keyword private: Whether to create documentation for private
-              objects.  By default, private objects are documented.
-        @type frames: C{boolean})
-        @keyword frames: Whether to create a frames-based table of
+        @type show_private: C{boolean}
+        @keyword show_private: Whether to create documentation for
+            private objects.  By default, private objects are documented.
+        @type show_frames: C{boolean})
+        @keyword show_frames: Whether to create a frames-based table of
               contents.  By default, it is produced.
         @type show_imports: C{boolean}
         @keyword show_imports: Whether or not to display lists of
@@ -289,12 +280,11 @@ class HTMLWriter:
         self._prj_name = kwargs.get('prj_name', None)
         self._prj_url = kwargs.get('prj_url', None)
         self._prj_link = kwargs.get('prj_link', None)
-        self._create_private_docs = kwargs.get('private', 1)
-        self._top_page = self._find_top_page(kwargs.get('top', None))
+        self._create_private_docs = kwargs.get('show_private', 1)
+        self._top_page = self._find_top_page(kwargs.get('top_page', None))
         self._css = kwargs.get('css')
-        self._private_css = kwargs.get('private_css') or self._css
-        self._helpfile = kwargs.get('help', None)
-        self._frames_index = kwargs.get('frames', 1)
+        self._helpfile = kwargs.get('help_file', None)
+        self._frames_index = kwargs.get('show_frames', 1)
         self._show_imports = kwargs.get('show_imports', False)
         self._index_parameters = kwargs.get('index_parameters', 0)
         self._propfunc_linelen = kwargs.get('property_function_linelength', 40)
@@ -1316,7 +1306,7 @@ class HTMLWriter:
                     return ['??']+crumbs
                 elif isinstance(doc, ModuleDoc):
                     return ['Package&nbsp;%s' % ident
-                            for ident in doc.canonical_name]+crumbs
+                            for ident in doc.canonical_name[:-1]]+crumbs
                 else:
                     return list(doc.canonical_name)+crumbs
             doc = doc.canonical_container
