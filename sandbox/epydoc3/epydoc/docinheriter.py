@@ -69,11 +69,11 @@ class DocInheriter:
           - param descrs & types?
           
         """
-        #print 'INHERIT', `var_doc`, '<=', `var_doc.overrides`
+        # [XX] flesh this out!
         if var_doc.descr in (None, UNKNOWN):
             var_doc.descr = var_doc.overrides.descr
-        if var_doc.value.descr in (None, UNKNOWN):
-            #print 'HERE', var_doc.overrides.value.descr
+        if (var_doc.value not in (None, UNKNOWN) and
+            var_doc.value.descr in (None, UNKNOWN)):
             var_doc.value.descr = var_doc.overrides.value.descr
 
 
