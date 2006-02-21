@@ -35,6 +35,8 @@ import os, os.path
 # API documentation encoding:
 from epydoc.apidoc import *
 
+from epydoc.util import * # [xx] hmm
+
 class ParseError(Exception): pass
 
 ######################################################################
@@ -181,26 +183,169 @@ class DocParser:
 
     DEFAULT_ENCODING = 'iso-8859-1' # aka 'latin-1'
 
-    #////////////////////////////////////////////////////////////
-    # Entry point
-    #////////////////////////////////////////////////////////////
+    #/////////////////////////////////////////////////////////////////
+    # Top level: Module parsing
+    #/////////////////////////////////////////////////////////////////
 
-    def find(self, name):
+    def parse(self, filename=None, name=None, context=None):
         """
-        Return a L{ValueDoc} object containing the API documentation
-        for the object with the given name.
-        """
-        name = DottedName(name)
-        
-        # Check if it's a builtin.
-        if (len(name) == 1 and
-            name[0] in self.builtins_moduledoc.variables):
-            var_doc = self.builtins_moduledoc.variables[name[0]]
-            return var_doc.value
+        Generate the API documentation for a specified object by
+        parsing Python source files, and return it as a L{ValueDoc}.
+        The object to generate documentation for may be specified
+        using the C{filename} parameter I{or} the C{name} parameter.
+        (It is an error to specify both a filename and a name; or to
+        specify neither a filename nor a name).
 
-        # Otherwise, try importing it.
+        @param filename: The name of the file that contains the python
+            source code for a package, module, or script.  If
+            C{filename} is specified, then C{parse} will return a
+            C{ModuleDoc} describing its contents.
+        @param name: The fully-qualified python dotted name of any
+            value (including packages, modules, classes, and
+            functions).  C{DocParser} will automatically figure out
+            which module(s) it needs to parse in order to find the
+            documentation for the specified object.
+        @param context: The API documentation for the package that
+            contains C{filename}.  If no context is given, then
+            C{filename} is assumed to contain a top-level module or
+            package.  It is an error to specify a C{context} if the
+            C{name} argument is used.
+        @rtype: L{ValueDoc}
+        """
+        # If our input is a python object name, then delegate to
+        # _find() (unless it's a builtin, in which case, just return
+        # the precomputed doc for it.)
+        if filename is None and name is not None:
+            if context:
+                raise ValueError("context should only be specified together "
+                                 "with filename, not with name.")
+            name = DottedName(name)
+            # Check if it's a builtin.
+            if (len(name) == 1 and
+                name[0] in self.builtins_moduledoc.variables):
+                var_doc = self.builtins_moduledoc.variables[name[0]]
+                val = var_doc.value
+            # Otherwise, try importing it.
+            else:
+                val = self._find(name)
+            if val.canonical_name == UNKNOWN:
+                val.canonical_name = name
+            return val
+
+        # If our input is a filename, then create a ModuleDoc for it,
+        # and use process_file() to populate its attributes.
+        elif filename is not None and name is None:
+            # Use a python source version, if possible.
+            filename = py_src_filename(filename)
+                
+            # Check the cache, first.
+            if self.moduledoc_cache.has_key(filename):
+                return self.moduledoc_cache[filename]
+            
+            # debug:
+            print 'parsing %r...' % filename
+    
+            # If the context wasn't provided, then check if the file is in
+            # a package directory.  If so, then update basedir & name to
+            # contain the topmost package's directory and the fully
+            # qualified name for this file.  (This update assume the
+            # default value of __path__ for the parent packages; if the
+            # parent packages override their __path__s, then this can
+            # cause us not to find the value.)
+            if context is None:
+                basedir = os.path.split(filename)[0]
+                name = os.path.splitext(os.path.split(filename)[1])[0]
+                if name == '__init__':
+                    basedir, name = os.path.split(basedir)
+                context = self._parse_package(basedir)
+    
+            # Figure out the canonical name of the module we're parsing.
+            module_name, is_pkg = _get_module_name(filename, context)
+    
+            # Create a new ModuleDoc for the module, & add it to the cache.
+            module_doc = ModuleDoc(canonical_name=module_name, variables={},
+                                   sort_spec=[],
+                                   filename=filename, package=context,
+                                   is_package=is_pkg, submodules=[])
+            self.moduledoc_cache[filename] = module_doc
+    
+            # Set the module's __path__ to its default value.
+            if is_pkg:
+                module_doc.path = [os.path.split(module_doc.filename)[0]]
+            
+            # Add this module to the parent package's list of submodules.
+            if context is not None:
+                context.submodules.append(module_doc)
+    
+            # Tokenize & process the contents of the module's source file.
+            self.process_file(module_doc)
+    
+            # Handle any special variables (__path__, __docformat__, etc.)
+            self.handle_special_module_vars(module_doc)
+    
+            # Return the completed ModuleDoc
+            return module_doc
         else:
-            return self._find(name)
+            raise ValueError("Expected exactly one of the following "
+                             "arguments: name, filename")
+
+    def _parse_package(self, package_dir):
+        """
+        If the given directory is a package directory, then parse its
+        __init__.py file (and the __init__.py files of all ancestor
+        packages); and return its C{ModuleDoc}.
+        """
+        if not is_package_dir(package_dir):
+            return None
+        parent_dir = os.path.split(package_dir)[0]
+        parent_doc = self._parse_package(parent_dir)
+        package_file = os.path.join(package_dir, '__init__')
+        return self.parse(filename=package_file, context=parent_doc)
+
+    # Special vars:
+    # C{__docformat__}, C{__all__}, and C{__path__}.
+    def handle_special_module_vars(self, module_doc):
+        # If __docformat__ is defined, parse its value.
+        toktree = self._module_var_toktree(module_doc, '__docformat__')
+        if toktree is not None:
+            try: module_doc.docformat = self.parse_string(toktree)
+            except: pass
+                
+        # If __all__ is defined, parse its value.
+        toktree = self._module_var_toktree(module_doc, '__all__')
+        if toktree is not None:
+            try:
+                public_names = Set(self.parse_string_list(toktree))
+                for name, var_doc in module_doc.variables.items():
+                    if name in public_names:
+                        var_doc.is_public = True
+                        if not isinstance(var_doc, ModuleDoc):
+                            var_doc.is_imported = False
+                    else:
+                        var_doc.is_public = False
+            except ParseError:
+                pass # [xx]
+
+        # If __path__ is defined, then extract its value (pkgs only)
+        if module_doc.is_package:
+            toktree = self._module_var_toktree(module_doc, '__path__')
+            if toktree is not None:
+                try:
+                    module_doc.path = self.parse_string_list(toktree)
+                except ParseError:
+                    pass # [xx]
+
+    def _module_var_toktree(self, module_doc, name):
+        var_doc = module_doc.variables.get(name)
+        if (var_doc is None or var_doc.value in (None, UNKNOWN) or
+            var_doc.value.toktree is UNKNOWN):
+            return None
+        else:
+            return var_doc.value.toktree
+
+    #////////////////////////////////////////////////////////////
+    # Module Lookup
+    #////////////////////////////////////////////////////////////
 
     def _find(self, name, package_doc=None):
         """
@@ -224,7 +369,7 @@ class DocParser:
         try: filename = self._get_filename(name[0], path)
         except ImportError:
             raise ValueError('Could not find value')
-        module_doc = self.parse(filename, package_doc)
+        module_doc = self.parse(filename, context=package_doc)
 
         # If the name just has one identifier, then the module we just
         # parsed is the object we're looking for; return it.
@@ -314,95 +459,6 @@ class DocParser:
             raise ImportError, 'No Python source file for c extensions.'
         else:
             raise ImportError, 'No Python source file found.'
-
-    #/////////////////////////////////////////////////////////////////
-    # Top level: Module parsing
-    #/////////////////////////////////////////////////////////////////
-
-    def parse(self, filename, package_doc=None):
-        """
-        Parse the given python module, and return a C{ModuleDoc}
-        containing its API documentation.  If you want the module to
-        be treated as a member of a package, then you must specify
-        C{package_doc}.
-        
-        @param filename: The filename of the module to parse.
-        @type filename: C{string}
-        @rtype: L{ModuleDoc}
-        """
-        # Check the cache, first.
-        if self.moduledoc_cache.has_key(filename):
-            return self.moduledoc_cache[filename]
-        
-        # debug:
-        print 'parsing %r...' % filename
-
-        # Figure out the canonical name of the module we're parsing.
-        module_name, is_pkg = _get_module_name(filename, package_doc)
-
-        # Create a new ModuleDoc for the module, & add it to the cache.
-        module_doc = ModuleDoc(canonical_name=module_name, variables={},
-                               sort_spec=[],
-                               filename=filename, package=package_doc,
-                               is_package=is_pkg, submodules=[])
-        self.moduledoc_cache[filename] = module_doc
-
-        # Set the module's __path__ to its default value.
-        if is_pkg:
-            module_doc.path = [os.path.split(module_doc.filename)[0]]
-        
-        # Add this module to the parent package's list of submodules.
-        if package_doc is not None:
-            package_doc.submodules.append(module_doc)
-
-        # Tokenize & process the contents of the module's source file.
-        self.process_file(module_doc)
-
-        # Handle any special variables (__path__, __docformat__, etc.)
-        self.handle_special_module_vars(module_doc)
-
-        # Return the completed ModuleDoc
-        return module_doc
-
-    # Special vars:
-    # C{__docformat__}, C{__all__}, and C{__path__}.
-    def handle_special_module_vars(self, module_doc):
-        # If __docformat__ is defined, parse its value.
-        toktree = self._module_var_toktree(module_doc, '__docformat__')
-        if toktree is not None:
-            try: module_doc.docformat = self.parse_string(toktree)
-            except: pass
-                
-        # If __all__ is defined, parse its value.
-        toktree = self._module_var_toktree(module_doc, '__all__')
-        if toktree is not None:
-            try:
-                public_names = Set(self.parse_string_list(toktree))
-                for name, var_doc in module_doc.variables.items():
-                    if name in public_names:
-                        var_doc.is_public = True
-                        var_doc.is_imported = False
-                    else:
-                        var_doc.is_public = False
-            except ParseError:
-                pass # [xx]
-
-        # If __path__ is defined, then extract its value (pkgs only)
-        if module_doc.is_package:
-            toktree = self._module_var_toktree(module_doc, '__path__')
-            if toktree is not None:
-                try:
-                    module_doc.path = self.parse_string_list(toktree)
-                except ParseError:
-                    pass # [xx]
-
-    def _module_var_toktree(self, module_doc, name):
-        var_doc = module_doc.variables.get(name)
-        if (var_doc is None or var_doc.value in (None, UNKNOWN) or
-            var_doc.value.toktree is UNKNOWN):
-            return None
-        else:
-            return var_doc.value.toktree
 
     #/////////////////////////////////////////////////////////////////
     # File tokenization loop
