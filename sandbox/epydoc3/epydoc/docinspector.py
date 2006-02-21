@@ -23,13 +23,15 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import inspect, re, sys
+import inspect, re, sys, os.path
 # API documentation encoding:
 from epydoc.apidoc import *
 # Type comparisons:
 from types import *
 # Set datatype:
 from sets import Set
+
+from epydoc.util import * # [xx] hmm
 
 class DocInspector:
     """
@@ -87,16 +89,39 @@ class DocInspector:
     # Inspection Entry Points
     #////////////////////////////////////////////////////////////
 
-    def inspect(self, value, context=None):
+    def inspect(self, value=None, name=None, filename=None, context=None):
         """
-        Return a L{ValueDoc} object containing the API documentation
-        for the Python object C{value}.
+        Generate the API documentation for a specified object by
+        inspecting Python values, and return it as a L{ValueDoc}.  The
+        object to generate documentation for may be specified using
+        the C{value} parameter, the C{filename} parameter, I{or} the
+        C{name} parameter.  (It is an error to specify more than one
+        of these three parameters, or to not specify any of them.)
 
+        @param value: The python object that should be documented.
+        @param filename: The name of the file that contains the python
+            source code for a package, module, or script.  If
+            C{filename} is specified, then C{inspect} will return a
+            C{ModuleDoc} describing its contents.
+        @param name: The fully-qualified python dotted name of any
+            value (including packages, modules, classes, and
+            functions).  C{DocParser} will automatically figure out
+            which module(s) it needs to import in order to find the
+            documentation for the specified object.
         @ivar context: The API documentation for the class of module
-            that contains C{value} (if available).  Currently, this is
-            just used to decide whether a function object should be
-            treated as an instance method or not.
+            that contains C{value} (if available).
         """
+        if value is None and name is not None and filename is None:
+            value = get_value_from_name(DottedName(name))
+        elif value is None and name is None and filename is not None:
+            value = get_value_from_filename(filename, context)
+        elif name is None and filename is None:
+            # it's ok if value is None -- that's a value, after all.
+            pass 
+        else:
+            raise ValueError("Expected exactly one of the following "
+                             "arguments: value, name, filename")
+        
         pyid = id(value)
 
         # If we've already inspected this value, then simply return
@@ -106,16 +131,20 @@ class DocInspector:
 
         # Get the ValueDoc for this value.  (Creating a new one if
         # necessary.)
-        val_doc = self.get_valuedoc(value)
+        val_doc = self._get_valuedoc(value)
 
         # Inspect the value, and return the completed ValueDoc.
         self._inspected_values[pyid] = True
         inspector_method = self.inspector_method(value, context)
         inspector_method(value, val_doc)
 
+        # Set canonical name, if it was given
+        if name is not None and val_doc.canonical_name == UNKNOWN:
+            val_doc.canonical_name = name
+
         return val_doc
 
-    def get_valuedoc(self, value):
+    def _get_valuedoc(self, value):
         """
         If a C{ValueDoc} for the given value exists in the valuedoc
         cache, then return it; otherwise, create a new C{ValueDoc},
@@ -132,6 +161,10 @@ class DocInspector:
             try: val_doc.repr = `value`
             except: pass
         return val_doc
+
+    #////////////////////////////////////////////////////////////
+    # Inspection Dispatch Table
+    #////////////////////////////////////////////////////////////
 
     # This can be overriden by subclasses.
     def inspector_method(self, value, context):
@@ -206,7 +239,8 @@ class DocInspector:
                 for name, var_doc in module_doc.variables.items():
                     if name in public_names:
                         var_doc.is_public = True
-                        var_doc.is_imported = False
+                        if not isinstance(var_doc, ModuleDoc):
+                            var_doc.is_imported = False
                     else:
                         var_doc.is_public = False
             except: pass
@@ -227,17 +261,20 @@ class DocInspector:
 
         # Record the module's parent package, if it has one.
         dotted_name = module_doc.canonical_name
-        if dotted_name is not UNKNOWN and len(dotted_name) > 1:
-            package_name = str(dotted_name.container())
-            package = sys.modules.get(package_name)
-            if package is not None:
-                module_doc.package = self.inspect(package)
+        if dotted_name is not UNKNOWN:
+            if len(dotted_name) > 1:
+                package_name = str(dotted_name.container())
+                package = sys.modules.get(package_name)
+                if package is not None:
+                    module_doc.package = self.inspect(package)
+            else:
+                module_doc.package = None
 
         # Initialize the submodules property
         module_doc.submodules = []
 
         # Add the module to its parent package's submodules list.
-        if module_doc.package is not UNKNOWN:
+        if module_doc.package not in (None, UNKNOWN):
             module_doc.package.submodules.append(module_doc)
 
         # Record the module's variables.
@@ -251,20 +288,20 @@ class DocInspector:
             container = self.get_containing_module(child)
             if container != None and container == module_doc.canonical_name:
                 # Local variable.
-                child_val_doc = self.inspect(child, module_doc)
+                child_val_doc = self.inspect(child, context=module_doc)
                 child_var_doc = VariableDoc(name=child_name,
                                             value=child_val_doc,
                                             is_imported=False,
                                             container=module_doc)
             elif container is None or module_doc.canonical_name is UNKNOWN:
                 # Possibly imported variable.
-                child_val_doc = self.inspect(child, module_doc)
+                child_val_doc = self.inspect(child, context=module_doc)
                 child_var_doc = VariableDoc(name=child_name,
                                             value=child_val_doc,
                                             container=module_doc)
             else:
                 # Imported variable.
-                child_val_doc = self.get_valuedoc(child)
+                child_val_doc = self._get_valuedoc(child)
                 child_var_doc = VariableDoc(name=child_name,
                                             value=child_val_doc,
                                             is_imported=True,
@@ -324,7 +361,7 @@ class DocInspector:
                 if child_name in self.UNDOCUMENTED_CLASS_VARS: continue
                 #try: child = getattr(cls, child_name)
                 #except: continue
-                val_doc = self.inspect(child, class_doc)
+                val_doc = self.inspect(child, context=class_doc)
                 var_doc = VariableDoc(name=child_name, value=val_doc,
                                       container=class_doc)
                 class_doc.local_variables[child_name] = var_doc
@@ -555,6 +592,142 @@ class DocInspector:
                 return module.__name__
         return None
 
+
+
+
+
+#////////////////////////////////////////////////////////////
+# Import support
+#////////////////////////////////////////////////////////////
+
+def get_value_from_filename(filename, context=None):
+    # Normalize the filename.
+    filename = os.path.normpath(os.path.abspath(filename))
+
+    # Divide the filename into a base directory and a name.  (For
+    # packages, use the package's parent directory as the base, and
+    # the directory name as its name).
+    basedir = os.path.split(filename)[0]
+    name = os.path.splitext(os.path.split(filename)[1])[0]
+    if name == '__init__':
+        basedir, name = os.path.split(basedir)
+    name = DottedName(name)
+
+    # If the context wasn't provided, then check if the file is in a
+    # package directory.  If so, then update basedir & name to contain
+    # the topmost package's directory and the fully qualified name for
+    # this file.  (This update assume the default value of __path__
+    # for the parent packages; if the parent packages override their
+    # __path__s, then this can cause us not to find the value.)
+    if context is None:
+        while is_package_dir(basedir): # [XX] NOT DEFINED HERE
+            basedir, pkg_name = os.path.split(basedir)
+            name = DottedName(pkg_name, name)
+            
+    # If a parent package was specified, then find the directory of
+    # the topmost package, and the fully qualified name for this file.
+    if context is not None:
+        # Combine the name.
+        name = DottedName(context.canonical_name, name)
+        # Find the directory of the base package.
+        while context not in (None, UNKNOWN):
+            pkg_dir = os.path.split(context.filename)[0]
+            basedir = os.path.split(pkg_dir)[0]
+            context = context.package
+
+    # Import the module.  (basedir is the directory of the module's
+    # topmost package, or its own directory if it's not in a package;
+    # and name is the fully qualified dotted name for the module.)
+    old_sys_path = sys.path[:]
+    try:
+        sys.path.insert(0, basedir)
+        return get_value_from_name(name)
+    finally:
+        sys.path = old_sys_path
+
+def get_value_from_name(name):
+    """
+    Given a name, return the corresponding value.
+    """
+    name = DottedName(name)
+    # Break name up into two pieces name1,name2 such that we can do:
+    # >>> import name1 as module
+    # >>> self.inspect(module.name2)
+    for i in range(len(name)):
+        # Import name1 as module
+        n = '.'.join(name[:len(name)-i])
+        try: module = _sandbox(__import__, n)
+        except ImportError, err: continue
+        # inspect(self.inspect(module.name2)
+        val = module
+        for identifier in name[1:]:
+            val = getattr(val, identifier)
+        return val
+    else:
+        raise ValueError, "didn't find %s" % name
+
+def _import(name):
+    # If we've already imported it, then just return it.
+    if sys.modules.has_key(name): return sys.modules[name]
+
+    # Import the module.  Note that if "name" has a package component,
+    # then this just gives us the top-level object, so we have to
+    # manually go down the package tree.
+    try:
+        m = __import__(name)
+    except KeyboardInterrupt:
+        raise # don't capture keyboard interrupts!
+    except Exception, e:
+        raise ImportError('Error importing %r: %s' % (name, e))
+    except SystemExit, e:
+        raise ImportError('Error importing %r: %s' % (name, e))
+    except:
+        raise ImportError('Error importing %r' % name)
+    for p in name.split(".")[1:]:
+        try: m = getattr(m, p)
+        except AttributeError:
+            estr = 'Error importing %r: getattr failed' % name
+            raise ImportError(estr)
+    return m
+
+def _sandbox(callback, *args, **kwargs):
+    """
+    Run the given callable in a 'sandboxed' environment.
+    Currently, this includes saving and restoring the contents of
+    sys and __builtins__; and supressing stdin, stdout, and stderr.
+    """
+    # Note that we just do a shallow copy of sys.  In particular,
+    # any changes made to sys.modules will be kept.  But we do
+    # explicitly store sys.path.
+    old_sys = sys.__dict__.copy()
+    old_sys_path = sys.path[:]
+    if type(__builtins__) == types.DictionaryType:
+        old_builtins = __builtins__.copy()
+    else:
+        old_builtins = __builtins__.__dict__.copy()
+
+    # Supress input and output.  (These get restored when we restore
+    # sys to old_sys).  
+    sys.stdin = sys.stdout = sys.stderr = _dev_null
+    sys.__stdin__ = sys.__stdout__ = sys.__stderr__ = _dev_null
+
+    # Remove any command-line arguments
+    sys.argv = ['(imported)']
+
+    try:
+        return callback(*args, **kwargs)
+    finally:
+        # Restore the important values that we saved.
+        if type(__builtins__) == types.DictionaryType:
+            __builtins__.clear()
+            __builtins__.update(old_builtins)
+        else:
+            __builtins__.__dict__.clear()
+            __builtins__.__dict__.update(old_builtins)
+        sys.__dict__.clear()
+        sys.__dict__.update(old_sys)
+        sys.path = old_sys_path
+        
 def inspect_docstring_lineno(api_doc):
     """
     Try to determine the line number on which the given item's
@@ -576,7 +749,37 @@ def inspect_docstring_lineno(api_doc):
         except TypeError: pass
     return None
 
+class _DevNull:
+    """
+    A "file-like" object that discards anything that is written and
+    always reports end-of-file when read.  C{_DevNull} is used by
+    L{import_module} to discard output when importing modules; and to
+    ensure that stdin appears closed.
+    """
+    def __init__(self):
+        self.closed = 1
+        self.mode = 'r+'
+        self.softspace = 0
+        self.name='</dev/null>'
+    def close(self): pass
+    def flush(self): pass
+    def read(self, size=0): return ''
+    def readline(self, size=0): return ''
+    def readlines(self, sizehint=0): return []
+    def seek(self, offset, whence=0): pass
+    def tell(self): return 0L
+    def truncate(self, size=0): pass
+    def write(self, str): pass
+    def writelines(self, sequence): pass
+    xreadlines = readlines
+_dev_null = _DevNull()
     
+
+
+
+
+    
+
 
 """
 ######################################################################
