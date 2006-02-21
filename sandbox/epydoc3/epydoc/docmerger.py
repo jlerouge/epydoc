@@ -55,12 +55,13 @@ class DocMerger:
     """
     PRECEDENCE = {
         'repr': 'parse',
-        'canonical_name': 'inspect',
+        'canonical_name': 'inspect', # hmm.. change this? [xx]
         'is_imported': 'parse',
         'is_alias': 'parse',
         'docformat': 'parse',
         'is_package': 'parse',
         'sorted_variables': 'parse',
+        'subpackages': 'inspect',
         }
     DEFAULT_PRECEDENCE = 'inspect'
 
