@@ -242,9 +242,6 @@ class DocParser:
             if self.moduledoc_cache.has_key(filename):
                 return self.moduledoc_cache[filename]
             
-            # debug:
-            print 'parsing %r...' % filename
-    
             # If the context wasn't provided, then check if the file is in
             # a package directory.  If so, then update basedir & name to
             # contain the topmost package's directory and the fully
@@ -686,6 +683,8 @@ class DocParser:
     
     def process_import(self, line, parent_docs, prev_line_doc, lineno,
                        comments, decorators):
+        if not isinstance(parent_docs[-1], NamespaceDoc): return
+        
         names = self.split_on(line[1:], (token.OP, ','))
         
         for name in names:
@@ -702,6 +701,8 @@ class DocParser:
 
     def process_from_import(self, line, parent_docs, prev_line_doc, lineno,
                             comments, decorators):
+        if not isinstance(parent_docs[-1], NamespaceDoc): return
+        
         pieces = self.split_on(line[1:], (token.NAME, 'import'))
         if len(pieces) != 2 or not pieces[0] or not pieces[1]:
             raise ParseError()
@@ -743,6 +744,8 @@ class DocParser:
         C{'inspect'}, then the list of exports is found by importing
         and inspecting C{M{<src>}}.
         """
+        if not isinstance(parent_docs[-1], NamespaceDoc): return
+        
         # If src is package-local, then convert it to a global name.
         src = self._global_name(src, parent_docs)
 
@@ -797,6 +800,8 @@ class DocParser:
         C{'a'} in parentdoc containing a proxy module; and a variable
         C{'b'} in the proxy module containing a proxy value.
         """
+        if not isinstance(parent_docs[-1], NamespaceDoc): return
+        
         # If name is package-local, then convert it to a global name.
         name = self._global_name(name, parent_docs)
         
@@ -849,6 +854,8 @@ class DocParser:
         value with C{imported_from} attributes pointing to the
         imported object).
         """
+        if not isinstance(parent_docs[-1], NamespaceDoc): return
+        
         # If src is package-local, then convert it to a global name.
         src = self._global_name(src, parent_docs)
         
