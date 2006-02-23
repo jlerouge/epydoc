@@ -13,6 +13,7 @@ import logging, re, sys, string
 from epydoc import markup
 from epydoc.apidoc import *
 from epydoc.docinspector import inspect_docstring_lineno
+from epydoc import log
 
 #////////////////////////////////////////////////////////
 #// Generalized Fields
@@ -224,29 +225,27 @@ class DocstringParser:
 
         # Get the start line of the docstring containing the error.
         startline = api_doc.docstring_lineno
-        if startline is UNKNOWN:
+        if startline in (None, UNKNOWN):
             startline = inspect_docstring_lineno(api_doc)
-        
-        s = '='*75 + '\n'
-        if startline is None:
-            startline = 0
-            s += 'In %s (line ??)\n' % (name,)
-        else:
-            s += 'In %s (line %s)\n' % (name, startline)
-        s += '-' * 75 + '\n'
+            if startline in (None, UNKNOWN):
+                startline = '??'
+
+        log.start_block('In %s (line %s)' % (name, startline))
         for error in parse_errors:
             error.set_linenum_offset(startline+1)
-            s += '%s\n' % error
+            log.warn(error)
 
         for warning in field_warnings:
-            if startline is None:
-                s += '       %s\n' % warning
+            if startline == '??':
+                log.warn('       %s' % warning)
             else:
                 estr = ' Warning: %s' % warning
-                estr = markup.wordwrap(estr, 7, startindex=7).strip()
-                s += '     - %s\n' % estr
+                log.warn('     - %s' %
+                         markup.wordwrap(estr, 7, startindex=7).strip())
 
-        print >>sys.stderr, s # use logger??
+        log.end_block()
+
+        #print >>sys.stderr, s # use logger??
 
     #////////////////////////////////////////////////////////////
     # Field Processing
@@ -526,10 +525,10 @@ class DocstringParser:
         # HACK!!
         import __builtin__
         if (isinstance(api_doc, ValueDoc) and
-            api_doc.pyval in __builtin__.__dict__.values() or
-            ((api_doc.canonical_container not in (None, UNKNOWN) and
-              api_doc.canonical_container.pyval in
-              __builtin__.__dict__.values()))):
+            (api_doc.pyval in __builtin__.__dict__.values() or
+             ((api_doc.canonical_container not in (None, UNKNOWN) and
+               api_doc.canonical_container.pyval in
+               __builtin__.__dict__.values())))):
             return 'plaintext'
 
         
