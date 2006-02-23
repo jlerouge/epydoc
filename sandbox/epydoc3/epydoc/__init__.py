@@ -51,7 +51,7 @@ Architecture graph::
                +------------+
 
 
-[XX] Out of date:
+[XX] Out of date::
 
   1. Import the requested modules, using L{epydoc.imports}.
   2. Construct documentation for each object, using L{epydoc.objdoc}.

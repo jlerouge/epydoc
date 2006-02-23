@@ -587,9 +587,9 @@ class PythonSourceColorizer:
         """
         Create a new HTML colorizer for the specified module.
 
-        @ivar module_filename: The name of the file containing the
+        @param module_filename: The name of the file containing the
             module; its text will be loaded from this file.
-        @ivar module_name: The dotted name of the module; this will
+        @param module_name: The dotted name of the module; this will
             be used to create links back into the API source
             documentation.
         """
