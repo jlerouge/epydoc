@@ -18,6 +18,7 @@ reachable from that set.
 
 import sys # for maxint
 from epydoc.apidoc import *
+from epydoc import log
 from sets import Set
 
 class DocIndex:
@@ -109,19 +110,22 @@ class DocIndex:
         self._unreachable_names = Set()
 
         # Initialize the root items list.  We sort them by length in
-        # descending order. [XX] is this the right thing to do, in
-        # particular in cases where module variables shadow submodules??
-        # Shouldn't they be sorted in ascending length???
+        # ascending order.  (This ensures that variables will shadow
+        # submodules when appropriate.)
         self._root_list = sorted(root, key=lambda d:len(d.canonical_name))
         
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
-        for val_doc in self._root_list:
+        log.start_progress('Indexing documentation')
+        for i, val_doc in enumerate(self._root_list):
+            log.progress(float(i)/len(self._root_list),
+                         val_doc.canonical_name)
             self._find_contained_valdocs(val_doc)
             # the following method does both canonical name assignment
             # and initialization of reachable_valdocs:
             self._assign_canonical_names(val_doc, val_doc.canonical_name)
+        log.end_progress()
 
         # Resolve any imported_from links, if the target of the link
         # is contained in the index.  We have to be a bit careful
