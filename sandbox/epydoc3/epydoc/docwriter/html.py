@@ -18,6 +18,7 @@ import time, epydoc, epydoc.markup
 from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
+from epydoc import log
 
 ######################################################################
 ## Template Compiler
@@ -66,6 +67,7 @@ def compile_template(docstring, template_string,
         ... </book>
         >>> write_book = compile_template('write_book(out, book)', TEMPLATE)
 
+    @newfield acknowledgements: Acknowledgements
     @acknowledgements: The syntax used by C{compile_template} is
     loosely based on Cheetah.
     """
@@ -235,10 +237,6 @@ class HTMLWriter:
         @keyword show_imports: Whether or not to display lists of
               imported functions and classes.  By default, they are
               not shown.
-        @type index_parameters: C{boolean}
-        @keyword index_parameters: Whether or not to include function
-              parameters in the identifier index.  By default, they
-              are not included.
         @type variable_maxlines: C{int}
         @keyword variable_maxlines: The maximum number of lines that
               should be displayed for the value of a variable in the
@@ -264,7 +262,7 @@ class HTMLWriter:
         @keyword property_function_linelength: The maximum line length
               used to dispaly property functions (C{fget}, C{fset}, and
               C{fdel}) that contain something other than a function
-              object.  The dfeault length is 40 characters.
+              object.  The default length is 40 characters.
         @type inheritance: C{string}
         @keyword inheritance: How inherited objects should be displayed.
               If C{inheritance='grouped'}, then inherited objects are
@@ -278,23 +276,56 @@ class HTMLWriter:
 
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
+        """The project's name (for the project link in the navbar)"""
+        
         self._prj_url = kwargs.get('prj_url', None)
+        """URL for the project link in the navbar"""
+        
         self._prj_link = kwargs.get('prj_link', None)
+        """HTML code for the project link in the navbar"""
+        
         self._create_private_docs = kwargs.get('show_private', 1)
+        """Should private docs be included?"""
+        
         self._top_page = self._find_top_page(kwargs.get('top_page', None))
+        """The 'main' page"""
+        
         self._css = kwargs.get('css')
+        """CSS stylesheet to use"""
+        
         self._helpfile = kwargs.get('help_file', None)
+        """Filename of file to extract help contents from"""
+        
         self._frames_index = kwargs.get('show_frames', 1)
+        """Should a frames index be created?"""
+        
         self._show_imports = kwargs.get('show_imports', False)
-        self._index_parameters = kwargs.get('index_parameters', 0)
+        """Should imports be listed?"""
+        
         self._propfunc_linelen = kwargs.get('property_function_linelength', 40)
+        """[XXX] Not used!"""
+        
         self._variable_maxlines = kwargs.get('variable_maxlines', 8)
+        """Max lines for variable values"""
+        
         self._variable_linelen = kwargs.get('variable_linelength', 70)
+        """Max line length for variable values"""
+        
         self._variable_summary_linelen = \
                          kwargs.get('variable_summary_linelength', 55)
+        """Max length for variable value summaries"""
+        
         self._variable_tooltip_linelen = \
                          kwargs.get('variable_tooltip_linelength', 600)
+        """Max length for variable tooltips"""
+        
         self._inheritance = kwargs.get('inheritance', 'listed')
+        """How should inheritance be displayed?  'listed', 'included',
+        or 'grouped'"""
+
+        # Make sure inheritance has a sane value.
+        if self._inheritance not in ('listed', 'included', 'grouped'):
+            raise ValueError, 'Bad value for inheritance'
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
@@ -315,7 +346,7 @@ class HTMLWriter:
     # 1. Interface Methods
     #////////////////////////////////////////////////////////////
 
-    def write(self, directory=None, progress_callback=None):
+    def write(self, directory=None):
         """
         Write the documentation to the given directory.
 
@@ -324,14 +355,19 @@ class HTMLWriter:
             written.  If no directory is specified, output will be
             written to the current directory.  If the directory does
             not exist, it will be created.
-        @type progress_callback: C{function}
-        @param progress_callback: A callback function that is called
-            before each file is written, with the name of the created
-            file.
         @rtype: C{None}
         @raise OSError: If C{directory} cannot be created.
         @raise OSError: If any file cannot be created or written to.
-        """        
+        """
+        # Keep track of total number of files..
+        contained_valdocs = self.docindex.contained_valdocs
+        self._num_files = (len([d for d in contained_valdocs
+                                if isinstance(d, ClassDoc)]) +
+                           2*len([d for d in contained_valdocs
+                                if isinstance(d, ModuleDoc)]) +
+                           9)
+        self._files_written = 0.
+        
         # Keep track of failed xrefs, and report them at the end.
         self._failed_xrefs = {}
 
@@ -340,53 +376,47 @@ class HTMLWriter:
         self._mkdir(directory)
 
         # Write the CSS file.
-        if progress_callback: progress_callback('epydoc.css')
+        self._files_written += 1
+        log.progress(self._files_written/self._num_files, 'epydoc.css')
         self.write_css(directory, self._css)
 
         # Write the Javascript file.
-        if progress_callback: progress_callback('epydoc.js')
+        self._files_written += 1
+        log.progress(self._files_written/self._num_files, 'epydoc.js')
         self.write_javascript(directory)
 
         # Write the object documentation.
-        for doc in self.docindex.contained_valdocs:
+        for doc in contained_valdocs:
             if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
             filename = self.url(doc)
             if isinstance(doc, ModuleDoc):
-                self._write(self.write_module, directory, filename,
-                            progress_callback, doc)
+                self._write(self.write_module, directory, filename, doc)
             else:
-                self._write(self.write_class, directory, filename,
-                            progress_callback, doc)
+                self._write(self.write_class, directory, filename, doc)
 
         # [XX] Write source code files.
         
         # Write the term & identifier indices
-        self._write(self.write_indices, directory,
-                    'indices.html', progress_callback)
+        self._write(self.write_indices, directory, 'indices.html')
         
         # Write the trees file (package & class hierarchies)
-        self._write(self.write_trees, directory,
-                    'trees.html', progress_callback)
+        self._write(self.write_trees, directory, 'trees.html')
         
         # Write the help file.
-        self._write(self.write_help, directory,
-                    'help.html', progress_callback)
+        self._write(self.write_help, directory,'help.html')
         
         # Write the frames-based table of contents.
-        self._write(self.write_frames_index, directory, 'frames.html',
-                     progress_callback)
-        self._write(self.write_toc, directory, 'toc.html',
-                     progress_callback)
-        self._write(self.write_project_toc, directory,
-                    'toc-everything.html', progress_callback)
-        for doc in self.docindex.contained_valdocs:
+        self._write(self.write_frames_index, directory, 'frames.html')
+        self._write(self.write_toc, directory, 'toc.html')
+        self._write(self.write_project_toc, directory, 'toc-everything.html')
+        for doc in contained_valdocs:
             if isinstance(doc, ModuleDoc):
                 filename = 'toc-%s' % self.url(doc)
-                self._write(self.write_module_toc, directory, filename,
-                             progress_callback, doc)
-        
+                self._write(self.write_module_toc, directory, filename, doc)
+
         # Write the index.html files.
-        if progress_callback: progress_callback('index.html')
+        self._files_written += 1
+        log.progress(self._files_written/self._num_files, 'index.html')
         self.write_homepage(directory)
 
         # Report any failed crossreferences
@@ -405,13 +435,12 @@ class HTMLWriter:
                     estr += '\n'
                     for name in names:
                         estr += '      (from %s)\n' % name
-            if sys.stderr.softspace: print >>sys.stderr
-            print >>sys.stderr, estr
+            log.warn(estr)
 
-    def _write(self, write_func, directory, filename,
-               progress_callback, *args):
+    def _write(self, write_func, directory, filename, *args):
         # Display our progress.
-        if progress_callback: progress_callback(filename)
+        self._files_written += 1
+        log.progress(self._files_written/self._num_files, filename)
         
         path = os.path.join(directory, filename)
         f = codecs.open(path, 'w', 'ascii', errors='xmlcharrefreplace')
@@ -1957,9 +1986,9 @@ class HTMLWriter:
 
     def find_tree_width(self, doc):
         """
-        Helper function for L{_base_tree}.
+        Helper function for L{base_tree}.
         @return: The width of a base tree, when drawn
-            right-justified.  This is used by L{_base_tree} to
+            right-justified.  This is used by L{base_tree} to
             determine how far to indent lines of the base tree.
         @rtype: C{int}
         """
