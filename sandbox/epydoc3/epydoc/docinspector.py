@@ -108,7 +108,7 @@ class DocInspector:
             functions).  C{DocParser} will automatically figure out
             which module(s) it needs to import in order to find the
             documentation for the specified object.
-        @ivar context: The API documentation for the class of module
+        @param context: The API documentation for the class of module
             that contains C{value} (if available).
         """
         if value is None and name is not None and filename is None:
@@ -176,7 +176,7 @@ class DocInspector:
         routine will modify the C{ValueDoc}'s class using the
         L{specialize_to()<APIDoc.specialize_to>} method.
         
-        @ivar context: The API documentation for the class of module
+        @param context: The API documentation for the class of module
             that contains C{value} (if available).  Currently, this is
             just used to decide whether a function object should be
             treated as an instance method or not.
@@ -779,8 +779,8 @@ _dev_null = _DevNull()
 
 
     
-
-
+# [xx]
+0 # hm..  otherwise the following gets treated as a docstring!  ouch!
 """
 ######################################################################
 ## Zope Extension...
