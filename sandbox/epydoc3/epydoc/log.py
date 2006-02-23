@@ -130,7 +130,7 @@ def register_logger(logger):
     defined by this module will be delegated to each registered
     logger.
     """
-    _loggers.append(logger)
+    _loggers.add(logger)
 
 def remove_logger(logger):
     _loggers.remove(logger)
