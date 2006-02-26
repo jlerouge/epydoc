@@ -87,7 +87,7 @@ class Logger:
         """
         raise NotImplementedError()
 
-    def start_progress(self, header):
+    def start_progress(self, header=None):
         """
         Begin displaying progress for a new task.  C{header} is a
         description of the task for which progress is being reported.
@@ -161,7 +161,7 @@ def end_block():
     for logger in _loggers: logger.end_block()
 end_block.__doc__ = Logger.end_block.__doc__
     
-def start_progress(header):
+def start_progress(header=None):
     for logger in _loggers: logger.start_progress(header)
 start_progress.__doc__ = Logger.start_progress.__doc__
     
