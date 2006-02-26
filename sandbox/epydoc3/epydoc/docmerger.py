@@ -24,6 +24,7 @@ documentation information.
 
 # API documentation encoding:
 from epydoc.apidoc import *
+from epydoc import log
 from sets import Set
 
 ######################################################################
@@ -66,15 +67,32 @@ class DocMerger:
     DEFAULT_PRECEDENCE = 'inspect'
 
     def merge(self, inspect_doc, parse_doc):
-        return self._merge(inspect_doc, parse_doc, Set())
+        if inspect_doc.canonical_name not in (None, UNKNOWN):
+            path = '%s' % inspect_doc.canonical_name
+        elif parse_doc.canonical_name not in (None, UNKNOWN):
+            path = '%s' % parse_doc.canonical_name
+        else:
+            path = '??'
+        return self._merge(inspect_doc, parse_doc, Set(), path)
 
-    def _merge(self, inspect_doc, parse_doc, cyclecheck):
+    def _merge(self, inspect_doc, parse_doc, cyclecheck, path):
         assert isinstance(inspect_doc, APIDoc)
         assert isinstance(parse_doc, APIDoc)
 
         if (inspect_doc, parse_doc) in cyclecheck:
             return inspect_doc
         cyclecheck.add( (inspect_doc, parse_doc) )
+
+        # Sanity check:
+        if (isinstance(inspect_doc, ValueDoc) and
+            isinstance(parse_doc, ValueDoc) and
+            inspect_doc.canonical_name not in (None, UNKNOWN) and
+            parse_doc.canonical_name not in (None, UNKNOWN) and
+            inspect_doc.canonical_name != parse_doc.canonical_name):
+            log.info("Warning: Not merging the parsed & inspected values "
+                     "of\n         %s, since their canonical names don't "
+                     "match." % (path,))
+            return inspect_doc
 
         # If the types don't match, then discard whichever APIDoc is
         # disfavored by DEFAULT_PRECEDENCE.
@@ -95,16 +113,25 @@ class DocMerger:
         if inspect_doc.__dict__ is parse_doc.__dict__:
             return inspect_doc
 
+        # The posargs and defaults are tied together -- if we merge
+        # the posargs one way, then we need to merge the defaults the
+        # same way.  So check them first.  (This is a minor hack)
+        if (isinstance(inspect_doc, RoutineDoc) and
+            isinstance(parse_doc, RoutineDoc)):
+            self._merge_posargs_and_defaults(inspect_doc, parse_doc, path)
+        
         # Merge the two api_doc's attributes.
         for attrib in Set(inspect_doc.__dict__.keys() +
                           parse_doc.__dict__.keys()):
-            self.merge_attribute(attrib, inspect_doc, parse_doc, cyclecheck)
-            
+            self.merge_attribute(attrib, inspect_doc, parse_doc,
+                                 cyclecheck, path)
+
         # Set the dictionaries to be shared
         parse_doc.__dict__ = inspect_doc.__dict__
         return inspect_doc
 
-    def merge_attribute(self, attrib, inspect_doc, parse_doc, cyclecheck):
+    def merge_attribute(self, attrib, inspect_doc, parse_doc,
+                        cyclecheck, path):
         precedence = self.PRECEDENCE.get(attrib, self.DEFAULT_PRECEDENCE)
         if precedence not in ('parse', 'inspect'):
             raise ValueError('Bad precedence value %r' % precedence)
@@ -122,7 +149,7 @@ class DocMerger:
             if hasattr(self, 'merge_%s' % attrib):
                 handler = getattr(self, 'merge_%s' % attrib)
                 merged_val = handler(inspect_val, parse_val, precedence,
-                                     cyclecheck)
+                                     cyclecheck, path)
             elif precedence == 'inspect':
                 merged_val = inspect_val
             elif precedence == 'parse':
@@ -131,12 +158,13 @@ class DocMerger:
             setattr(inspect_doc, attrib, merged_val)
             setattr(parse_doc, attrib, merged_val)
 
-    def merge_variables(self, varlist1, varlist2, precedence, cyclecheck):
+    def merge_variables(self, varlist1, varlist2, precedence,
+                        cyclecheck, path):
         # Merge all variables that are in both sets.
         for varname, var1 in varlist1.items():
             if varname in varlist2:
                 var2 = varlist2[varname]
-                self._merge(var1, var2, cyclecheck)
+                self._merge(var1, var2, cyclecheck, path+'.'+varname)
 
         # Copy any variables that are not in varlist1 over.
         for varname, var in varlist2.items():
@@ -145,7 +173,7 @@ class DocMerger:
         return varlist1
     merge_local_variables = merge_variables
 
-    def merge_value(self, value1, value2, precedence, cyclecheck):
+    def merge_value(self, value1, value2, precedence, cyclecheck, path):
         if value1 is None and value2 is None:
             return None
         elif value1 is None or value2 is None:
@@ -157,7 +185,7 @@ class DocMerger:
             if precedence == 'inspect': return value1
             else: return value2
         else:
-            self._merge(value1, value2, cyclecheck)
+            self._merge(value1, value2, cyclecheck, path)
             return value1
     merge_package = merge_value
     merge_container = merge_value
@@ -166,31 +194,70 @@ class DocMerger:
     merge_fset = merge_value
     merge_fdel = merge_value
 
-    def merge_bases(self, baselist1, baselist2, precedence, cyclecheck):
+    def _merge_posargs_and_defaults(self, inspect_doc, parse_doc, path):
+        # If the inspected doc just has '...', then trust the parsed doc.
+        if inspect_doc.posargs == ['...'] and parse_doc.posargs != ['...']:
+            inspect_doc.posargs = parse_doc.posargs
+            inspect_doc.posarg_defaults = parse_doc.posarg_defaults
+
+        # If they are incompatible, then check the precedence.
+        elif inspect_doc.posargs != parse_doc.posargs:
+            log.info("Warning: Not merging the parsed & inspected arg "
+                     "lists for\n         %s, since they don't "
+                     "match (%s vs %s)" % (path, inspect_doc.posargs,
+                                           parse_doc.posargs))
+            if (self.PRECEDENCE.get('posargs', self.DEFAULT_PRECEDENCE) ==
+                'inspect'):
+                parse_doc.posargs = inspect_doc.posargs
+                parse_doc.posarg_defaults = inspect_doc.posarg_defaults
+            else:
+                inspect_doc.posargs = parse_doc.posargs
+                inspect_doc.posarg_defaults = parse_doc.posarg_defaults
+
+    def merge_bases(self, baselist1, baselist2, precedence, cyclecheck, path):
+        # Be careful here -- if we get it wrong, then we could end up
+        # merging two unrelated classes, which could lead to bad
+        # things (e.g., a class that's its own subclass).  So only
+        # merge two bases if we're quite sure they're the same class.
+        # (In particular, if they have the same canonical name.)
+
+        # If the lengths don't match up, then give up.  This is most
+        # often caused by __metaclass__.
         if len(baselist1) != len(baselist2):
-            print 'Warning: base list length mismatch'
+            log.info("Warning: Not merging the parsed & inspected base lists "
+                     "for\n         %s, since their lengths don't match "
+                     "(%s vs %s)" % (path, len(baselist1), len(baselist2)))
             if precedence == 'inspect': return baselist1
             else: return baselist2
+
+        # If any names disagree, then give up.
         for base1, base2 in zip(baselist1, baselist2):
-            self._merge(base1, base2, cyclecheck)
+            if ((base1.canonical_name not in (None, UNKNOWN) and
+                 base2.canonical_name not in (None, UNKNOWN)) and
+                base1.canonical_name != base2.canonical_name):
+                log.info("Warning: Not merging the parsed & inspected base "
+                         "lists for\n         %s, since the bases' names "
+                         "don't match (%s vs %s)"
+                         % (path, base1.canonical_name, base2.canonical_name))
+                if precedence == 'inspect': return baselist1
+                else: return baselist2
+
+        for i, (base1, base2) in enumerate(zip(baselist1, baselist2)):
+            self._merge(base1, base2, cyclecheck,
+                            '%s.__bases__[%d]' % (path, i))
+                
         return baselist1
 
-    def merge_posargs(self, args1, args2, precedence, cyclecheck):
-        if len(args1) != len(args2):
-            print 'Warning: arg list mismatch'
-        if precedence == 'inspect': return args1
-        else: return args2
-
     def merge_posarg_defaults(self, defaults1, defaults2, precedence,
-                              cyclecheck):
+                              cyclecheck, path):
         if len(defaults1) != len(defaults2):
-            print 'Warning: arg list mismatch'
             if precedence == 'inspect': return defaults1
             else: return defaults2
         defaults = []
-        for d1, d2 in zip(defaults1, defaults2):
+        for i, (d1, d2) in enumerate(zip(defaults1, defaults2)):
             if d1 is not None and d2 is not None:
-                defaults.append(self._merge(d1, d2, cyclecheck))
+                d_path = '%s.<default-arg-val>[%d]' % (path, i)
+                defaults.append(self._merge(d1, d2, cyclecheck, d_path))
             elif precedence == 'inspect':
                 defaults.append(d1)
             else:
