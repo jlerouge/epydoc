@@ -32,6 +32,8 @@ import token, tokenize
 import imp
 # File services:
 import os, os.path
+# Unicode:
+import codecs
 # API documentation encoding:
 from epydoc.apidoc import *
 
@@ -49,15 +51,9 @@ class DocParser:
     C{DocParser} reads and parses the Python source code for one or
     more modules, and uses it to create L{APIDoc} objects containing
     the API documentation for the variables and values defined in
-    those modules.
-
-    C{DocParser} defines two methods that return L{APIDoc} objects for
-    a specified object:
-    
-      - L{find} - get the documentation for an object with a given
-        dotted name.
-      - L{parse} - get the documentation for a module with a given
-        filename.
+    those modules.  The main interface method is L{parse()}, which
+    returns the documentation for an object with a given dotted name,
+    or a module with a given filename.
 
     Currently, C{DocParser} extracts documentation from the following
     source code constructions:
@@ -181,8 +177,6 @@ class DocParser:
     """The prefix used to mark comments that contain attribute
     docstrings for variables."""
 
-    DEFAULT_ENCODING = 'iso-8859-1' # aka 'latin-1'
-
     #/////////////////////////////////////////////////////////////////
     # Top level: Module parsing
     #/////////////////////////////////////////////////////////////////
@@ -236,7 +230,8 @@ class DocParser:
         # and use process_file() to populate its attributes.
         elif filename is not None and name is None:
             # Use a python source version, if possible.
-            filename = py_src_filename(filename)
+            try: filename = py_src_filename(filename)
+            except ValueError, e: raise ImportError('%s' % e)
                 
             # Check the cache, first.
             if self.moduledoc_cache.has_key(filename):
@@ -298,6 +293,7 @@ class DocParser:
         parent_doc = self._parse_package(parent_dir)
         package_file = os.path.join(package_dir, '__init__')
         return self.parse(filename=package_file, context=parent_doc)
+            
 
     # Special vars:
     # C{__docformat__}, C{__all__}, and C{__path__}.
@@ -363,9 +359,7 @@ class DocParser:
 
         # The leftmost identifier in `name` should be a module or
         # package on the given path; find it and parse it.
-        try: filename = self._get_filename(name[0], path)
-        except ImportError:
-            raise ValueError('Could not find value')
+        filename = self._get_filename(name[0], path)
         module_doc = self.parse(filename, context=package_doc)
 
         # If the name just has one identifier, then the module we just
@@ -378,7 +372,7 @@ class DocParser:
         if not self._is_submodule_import_var(module_doc, name[1]):
             try: return self._find_in_namespace(DottedName(*name[1:]),
                                                 module_doc)
-            except ValueError: pass
+            except ImportError: pass
 
         # If not, then check to see if it's in a subpackage.
         if module_doc.is_package:
@@ -386,7 +380,7 @@ class DocParser:
 
         # If it's not in a variable or a subpackage, then we can't
         # find it.
-        raise ValueError('Could not find value')
+        raise ImportError('Could not find value')
 
     def _is_submodule_import_var(self, module_doc, var_name):
         """
@@ -403,12 +397,12 @@ class DocParser:
         
     def _find_in_namespace(self, name, namespace_doc):
         if name[0] not in namespace_doc.variables:
-            raise ValueError('Could not find value')
+            raise ImportError('Could not find value')
         
         # Look up the variable in the namespace.
         var_doc = namespace_doc.variables[name[0]]
         if var_doc.value is UNKNOWN:
-            raise ValueError('Could not find value')
+            raise ImportError('Could not find value')
         val_doc = var_doc.value
 
         # If the variable's value was imported, then follow its
@@ -427,7 +421,7 @@ class DocParser:
 
         # Otherwise, we ran into a dead end.
         else:
-            raise ValueError('Could not find value')
+            raise ImportError('Could not find value')
         
     def _get_filename(self, identifier, path=None):
         if path == UNKNOWN: path = None
@@ -451,7 +445,7 @@ class DocParser:
                     raise ImportError, 'No package file found.'
             return filename
         elif typ == imp.C_BUILTIN:
-            raise ImportError, 'No Python source file for builtins.'
+            raise ImportError, 'No Python source file for builtin modules.'
         elif typ == imp.C_EXTENSION:
             raise ImportError, 'No Python source file for c extensions.'
         else:
@@ -497,17 +491,36 @@ class DocParser:
         # declaration line and its decorators all at once.
         decorators = []
 
+        # Check if the source file declares an encoding.
+        encoding = _get_encoding(module_doc.filename)
+
         # The token-eating loop:
-        module_file = open(module_doc.filename)
+        module_file = codecs.open(module_doc.filename, 'r', encoding)
         tok_iter = tokenize.generate_tokens(module_file.readline)
         for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
             # Update lineno when we reach a new logical line.
             # [xx] but don't count comments for this?
             if lineno is None: lineno = srow
+
+            # If it's a non-unicode string literal, then we need to
+            # re-encode using the file's encoding (to get back to the
+            # original 8-bit data); and then convert that string with
+            # 8-bit data to a 7-bit ascii representation.
+            if toktype == token.STRING:
+                str_prefixes = re.match('[^\'"]*', toktext).group()
+                if 'u' not in str_prefixes:
+                    s = toktext.encode(encoding)
+                    toktext = decode_with_backslashreplace(s)
+
+            # Non-unicode string tokens need to be reencoded into
+            # 8-bit string data.  But, in order to make sure we can
+            # display it properly, we will convert any 
                 
             # Error token: abort
             if toktype == token.ERRORTOKEN:
-                raise ParseError()
+                raise ParseError('Error during parsing: invalid '
+                                 'syntax (%s, line %d)' %
+                                 (module_doc.filename, lineno))
             # Indent token: update the parent_doc stack.
             elif toktype == token.INDENT:
                 if prev_line_doc is None:
@@ -538,8 +551,9 @@ class DocParser:
                             self.shallow_parse(line_toks), parent_docs,
                             prev_line_doc, lineno, comments, decorators)
                     except ParseError:
-                        raise
-                        raise ParseError('line %d: Parse error' % lineno)
+                        raise ParseError('Error during parsing: invalid '
+                                         'syntax (%s, line %d)' %
+                                         (module_doc.filename, lineno))
                 else:
                     prev_line_doc = None
 
@@ -652,31 +666,6 @@ class DocParser:
             # the contents of this block.
             return 'skip_block'
 
-    def process_else_line(self, line, parent_docs, *args):
-        if not self.PARSE_ELSE_BLOCKS: return 'skip_block'
-        return None
-
-    def process_while_line(self, line, parent_docs, *args):
-        if not self.PARSE_WHILE_BLOCKS: return 'skip_block'
-        return None
-
-    def process_try_line(self, line, parent_docs, *args):
-        if not self.PARSE_TRY_BLOCKS: return 'skip_block'
-        return None
-
-    def process_except_line(self, line, parent_docs, *args):
-        if not self.PARSE_EXCEPT__BLOCKS: return 'skip_block'
-        return None
-
-    def process_finally_line(self, line, parent_docs, *args):
-        if not self.PARSE_FINALLY_BLOCKS: return 'skip_block'
-        return None
-
-    def process_for_line(self, line, parent_docs, prev_line_doc, lineno,
-                         comments, decorators):
-        if not self.PARSE_FOR_BLOCKS: return 'skip_block'
-        return None
-
     #/////////////////////////////////////////////////////////////////
     # Line handler: imports
     #/////////////////////////////////////////////////////////////////
@@ -693,8 +682,9 @@ class DocParser:
                 src_name = self.parse_dotted_name(name_pieces[0])
                 self._import_var(src_name, parent_docs)
             elif len(name_pieces) == 2:
+                if len(name_pieces[1]) != 1: raise ParseError()
                 src_name = self.parse_dotted_name(name_pieces[0])
-                var_name = self.parse_name(name_pieces[1])
+                var_name = self.parse_name(name_pieces[1][0])
                 self._import_var_as(src_name, var_name, parent_docs)
             else:
                 raise ParseError()
@@ -707,6 +697,12 @@ class DocParser:
         if len(pieces) != 2 or not pieces[0] or not pieces[1]:
             raise ParseError()
         lhs, rhs = pieces
+
+        # The RHS might be parenthasized, as specified by PEP 328:
+        # http://www.python.org/peps/pep-0328.html
+        if (len(rhs) == 1 and isinstance(rhs[0], list) and
+            rhs[0][0] == (token.OP, '(') and rhs[0][-1] == (token.OP, ')')):
+            rhs = rhs[0][1:-1]
 
         # >>> from __future__ import nested_scopes
         if lhs == [(token.NAME, '__future__')]:
@@ -755,7 +751,7 @@ class DocParser:
         if (self.IMPORT_HANDLING == 'parse' or
             self.IMPORT_STAR_HANDLING == 'parse'): # [xx] is this ok?
             try: module_doc = self._find(src)
-            except ValueError: module_doc = None
+            except ImportError: module_doc = None
             if isinstance(module_doc, ModuleDoc):
                 for name, imp_var in module_doc.variables.items():
                     if imp_var.is_public:
@@ -811,7 +807,7 @@ class DocParser:
         if self.IMPORT_HANDLING == 'parse':
             # Check to make sure that we can actually find the value.
             try: val_doc = self._find(name)
-            except ValueError: val_doc = None
+            except ImportError: val_doc = None
             if val_doc is not None:
                 # We found it; but it's not the value itself we want to
                 # import, but the module containing it; so import that
@@ -862,7 +858,7 @@ class DocParser:
         if self.IMPORT_HANDLING == 'parse':
             # Parse the value and create a variable for it.
             try: val_doc = self._find(src)
-            except ValueError: val_doc = None
+            except ImportError: val_doc = None
             if val_doc is not None:
                 var_doc = VariableDoc(name=name, value=val_doc,
                                       is_imported=True, is_alias=False)
@@ -887,7 +883,7 @@ class DocParser:
     def _global_name(self, name, parent_docs):
         """
         If the given name is package-local (relative to the current
-        context, as determined by L{self.parent_docs}), then convert it
+        context, as determined by C{parent_docs}), then convert it
         to a global name.
         """
         module_doc = parent_docs[0]
@@ -1008,6 +1004,8 @@ class DocParser:
         
 
     def lhs_parent(self, lhs_name, parent_docs):
+        assert isinstance(lhs_name, DottedName)
+        
         if isinstance(parent_docs[-1], InstanceMethodDoc):
             for i in range(len(parent_docs)-1, -1, -1):
                 if isinstance(parent_docs[i], ClassDoc):
@@ -1017,7 +1015,7 @@ class DocParser:
             return parent_docs[-1]
         
         else:
-            return self.lookup_value(lhs_name[:-1], parent_docs)
+            return self.lookup_value(lhs_name.container(), parent_docs)
 
     #/////////////////////////////////////////////////////////////////
     # Line handler: single-line blocks
@@ -1110,9 +1108,7 @@ class DocParser:
         will be appended to the old one.
         """
         if prev_line_doc is None: return
-
-        # [XX] something friendlier than eval here??
-        docstring = eval(line[0][1])
+        docstring = self.parse_string(line)
 
         # If the modified APIDoc is an instance variable, and it has
         # not yet been added to its class's C{local_variables} list,
@@ -1453,7 +1449,9 @@ class DocParser:
 
     def parse_string(self, elt_list):
         if len(elt_list) == 1 and elt_list[0][0] == token.STRING:
-            return eval(elt_list[0][1]) # [xx] use something safer??
+            # [xx] use something safer here?  But it needs to deal with
+            # any string type (eg r"foo\bar" etc).
+            return eval(elt_list[0][1])
         else:
             raise ParseError()
 
@@ -1514,9 +1512,8 @@ class DocParser:
                 if not var_doc.is_alias and var_doc.value is not UNKNOWN:
                     var_doc.value.canonical_name = UNKNOWN
             else:
-                self._del_variable(var_dict[name[0]], name[1:])
+                self.del_variable(var_dict[name[0]], name[1:])
                 
-            
     #/////////////////////////////////////////////////////////////////
     # Name Lookup
     #/////////////////////////////////////////////////////////////////
@@ -1625,7 +1622,7 @@ class DocParser:
     #/////////////////////////////////////////////////////////////////
 
     def pp_toktree(self, elts, spacing='normal', indent=0):
-        s = ''
+        s = u''
         for elt in elts:
             # Put a blank line before class & def statements.
             if elt == (token.NAME, 'class') or elt == (token.NAME, 'def'):
@@ -1684,6 +1681,25 @@ for <name> in <iterable>: <rest...>?
 ## Helper Functions
 ######################################################################
 
+def _get_encoding(filename):
+    """
+    @see: U{PEP 263<http://www.python.org/peps/pep-0263.html>}
+    """
+    module_file = open(filename)
+    try:
+        lines = [module_file.readline() for i in range(2)]
+        if lines[0].startswith('\xef\xbb\xbf'):
+            return 'utf-8'
+        else:
+            for line in lines:
+                m = re.search("coding[:=]\s*([-\w.]+)", line)
+                if m: return m.group(1)
+                
+        # Fall back on Python's default encoding.
+        return 'iso-8859-1' # aka 'latin-1'
+    finally:
+        module_file.close()
+        
 def _get_module_name(filename, package_doc):
     """
     Return (dotted_name, is_package)
@@ -1717,7 +1733,3 @@ def flatten(lst, out=None):
             out.append(elt)
     return out
 
-
-#DocParser(None).parse('epydoc/docparser_quick.py')
-if __name__=='__main__':
-    print DocParser(None).parse('bar.py')
