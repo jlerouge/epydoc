@@ -435,8 +435,8 @@ class ValueDoc(APIDoc):
     @ivar ast: The syntax tree of the Python source code that was used
         to create this value.
     @type ast: C{list}
-    @ivar repr: A string representation of this value.
-    @type repr: C{str}
+    @ivar repr: A text representation of this value.
+    @type repr: C{unicode}
     @ivar type: API documentation for the value's type
     @type type: L{ValueDoc}
     @ivar imported_from: If C{imported_from} is not None, then this
