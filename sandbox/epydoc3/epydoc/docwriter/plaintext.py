@@ -100,8 +100,8 @@ class PlaintextWriter:
         s += self.write_classlist(classes, 'Nested Classes', indent)
 
         # List of instance methods in this class.
-        print class_doc.sort_spec
-        print class_doc.sorted_variables
+        #print class_doc.sort_spec
+        #print class_doc.sorted_variables
         funcs = [v for v in class_doc.sorted_variables
                  if isinstance(v.value, InstanceMethodDoc) and
                  v.is_imported in (False, UNKNOWN)]
