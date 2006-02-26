@@ -13,7 +13,9 @@ import logging, re, sys, string
 from epydoc import markup
 from epydoc.apidoc import *
 from epydoc.docinspector import inspect_docstring_lineno
+from epydoc.util import py_src_filename
 from epydoc import log
+import __builtin__, exceptions
 
 #////////////////////////////////////////////////////////
 #// Generalized Fields
@@ -145,7 +147,7 @@ class DocstringParser:
             return
 
         # Remove leading indentation from the docstring.
-        docstring = self.unindent_docstring(api_doc.docstring)
+        api_doc.docstring = self.unindent_docstring(api_doc.docstring)
 
         # Extract a signature from the docstring, if it has one.  This
         # overrides any signature we got via inspection/parsing.
@@ -156,7 +158,8 @@ class DocstringParser:
         # `ParseError` objects in the errors list.
         docformat = self.docformat(api_doc)
         parse_errors = []
-        parsed_docstring = markup.parse(docstring, docformat, parse_errors)
+        parsed_docstring = markup.parse(api_doc.docstring, docformat,
+                                        parse_errors)
             
         # Divide the docstring into a description and a list of
         # fields.
@@ -217,32 +220,78 @@ class DocstringParser:
     def report_errors(self, api_doc, parse_errors, field_warnings):
         if not parse_errors and not field_warnings: return
 
-        # Get the name of the item containing the error.
-        if isinstance(api_doc, ValueDoc):
+        # Get the name of the item containing the error, and of its
+        # containing module.
+        if isinstance(api_doc, ModuleDoc):
+            module = api_doc
+            name = api_doc.canonical_name
+        elif isinstance(api_doc, ValueDoc):
+            module = api_doc.containing_module()
             name = api_doc.canonical_name
         else:
+            module = api_doc.container.containing_module()
             name = '%s.%s' % (api_doc.container.canonical_name, api_doc.name)
+        if (module not in (None, UNKNOWN) and
+            module.filename not in (None, UNKNOWN)):
+            try: filename = py_src_filename(module.filename)
+            except: filename = module.filename
+        else:
+            filename = '??'
+
+        # [xx] Don't report markup errors for standard builtins.
+        if (isinstance(api_doc, ValueDoc) and api_doc != module and
+            (api_doc.pyval in __builtin__.__dict__.values() or
+             (module is not None and 
+              module.pyval in (__builtin__, exceptions)))):
+            return
 
         # Get the start line of the docstring containing the error.
         startline = api_doc.docstring_lineno
         if startline in (None, UNKNOWN):
             startline = inspect_docstring_lineno(api_doc)
             if startline in (None, UNKNOWN):
-                startline = '??'
+                startline = None
 
-        log.start_block('In %s (line %s)' % (name, startline))
-        for error in parse_errors:
-            if startline != '??':
+        # Display a block header.
+        header = 'File %s, ' % filename
+        if startline is not None:
+            header += 'line %d, ' % startline
+        header += 'in %s' % name
+        log.start_block(header)
+        
+
+        # Display all parse errors.  But first, combine any errors
+        # with duplicate description messages.
+        if startline is None:
+            # remove dups, but keep original order:
+            dups = {}
+            for error in parse_errors:
+                message = error.descr()
+                if message not in dups:
+                    log.warn(message)
+                    dups[message] = 1
+        else:
+            # Combine line number fields for dup messages:
+            messages = {} # maps message -> list of linenum
+            for error in parse_errors:
                 error.set_linenum_offset(startline+1)
-            # [XX] Hm.. what level should this be??
-            log.warn(error)
+                message = error.descr()
+                messages.setdefault(message, []).append(error.linenum())
+            message_items = messages.items()
+            message_items.sort(lambda a,b:cmp(min(a[1]), min(b[1])))
+            for message, linenums in message_items:
+                if len(linenums) == 1:
+                    log.warn("Line %s: %s" % (linenums[0], message))
+                else:
+                    linenums = ', '.join(['%s' % l for l in linenums])
+                    log.warn("Lines %s: %s" % (linenums, message))
 
+        # Display all field warnings.
         for warning in field_warnings:
             log.warn(warning)
 
+        # End the message block.
         log.end_block()
-
-        #print >>sys.stderr, s # use logger??
 
     #////////////////////////////////////////////////////////////
     # Field Processing
@@ -519,16 +568,6 @@ class DocstringParser:
         Return the name of the markup language that should be used to
         parse the API documentation for the given object.
         """
-        # HACK!!
-        import __builtin__
-        if (isinstance(api_doc, ValueDoc) and
-            (api_doc.pyval in __builtin__.__dict__.values() or
-             ((api_doc.canonical_container not in (None, UNKNOWN) and
-               api_doc.canonical_container.pyval in
-               __builtin__.__dict__.values())))):
-            return 'plaintext'
-
-        
         if isinstance(api_doc, ModuleDoc):
             containing_module = api_doc
         elif isinstance(api_doc, VariableDoc):
@@ -587,7 +626,7 @@ class DocstringParser:
         # The return value (optional)
         r'(\s*(->)\s*(?P<return>\S.*?))?'+
         # The end marker
-        r'\s*(\n|\s+(--|<=+>)\s+|$|\.\s|\.\n)')
+        r'\s*(\n|\s+(--|<=+>)\s+|$|\.\s+|\.\n)')
     """A regular expression that is used to extract signatures from
     docstrings."""
         
