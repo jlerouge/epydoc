@@ -34,6 +34,7 @@ __docformat__ = 'epytext en'
 
 import types, re
 from sets import Set
+from epydoc import log
 
 ######################################################################
 # Dotted Names
@@ -683,8 +684,7 @@ class ClassDoc(NamespaceDoc):
                 if isinstance(base, ClassDoc):
                     base._dfs_bases(mro, seen)
                 else:
-                    # [XX]
-                    print 'hmm base?', `base`
+                   log.warn("Non-class base?: %s" % base)
         return mro
 
     def _c3_mro(self):
