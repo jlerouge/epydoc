@@ -129,9 +129,9 @@ class DocBuilder:
     
         # Parse all docstrings.  (Sort them first, so that warnings
         # from the same module get listed consecutively.)
+        log.start_progress('Parsing docstrings')
         val_docs = sorted(docindex.reachable_valdocs,
                           key=lambda doc: doc.canonical_name)
-        log.start_progress('Parsing docstrings')
         for i, val_doc in enumerate(val_docs):
             if (isinstance(val_doc, (ModuleDoc, ClassDoc)) and
                 val_doc.canonical_name[0] != '??'):
