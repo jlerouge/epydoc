@@ -19,7 +19,7 @@ from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc import log
-from epydoc.util import quote_html
+from epydoc.util import plaintext_to_html
 import __builtin__
 
 ######################################################################
@@ -45,11 +45,11 @@ def compile_template(docstring, template_string,
         M{x} spaces, then the first M{x} spaces are stripped from each
         line.
 
-      - Any line that begins with '#' (with no indentation)
+      - Any line that begins with '>>>' (with no indentation)
         should contain python code, and will be inserted as-is into
         the template-filling function.  If the line begins a control
         block (such as 'if' or 'for'), then the control block will
-        be closed by the first '#'-marked line whose indentation is
+        be closed by the first '>>>'-marked line whose indentation is
         less than or equal to the line's own indentation (including
         lines that only contain comments.)
 
@@ -63,9 +63,9 @@ def compile_template(docstring, template_string,
         ... <book>
         ...   <title>$book.title$</title>
         ...   <pages>$book.count_pages()$</pages>
-        ... # for chapter in book.chapters:
+        ... >>> for chapter in book.chapters:
         ...     <chaptername>$chapter.name$</chaptername>
-        ... # #endfor
+        ... >>> #endfor
         ... </book>
         >>> write_book = compile_template('write_book(out, book)', TEMPLATE)
 
@@ -80,7 +80,7 @@ def compile_template(docstring, template_string,
     # Regexp to search for inline substitutions:
     INLINE = re.compile(r'\$([^\$]+)\$')
     # Regexp to search for python statements in the template:
-    COMMAND = re.compile(r'(^#.*)\n?', re.MULTILINE)
+    COMMAND = re.compile(r'(^>>>.*)\n?', re.MULTILINE)
 
     # Strip indentation from the template.
     template_string = strip_indent(template_string)
@@ -117,7 +117,7 @@ def compile_template(docstring, template_string,
 
         # Python command:
         else:
-            srcline = command[1:].lstrip()
+            srcline = command[3:].lstrip()
             # Update indentation
             indent = len(command)-len(srcline)
             while indent <= indents[-1]: indents.pop()
@@ -332,7 +332,8 @@ class HTMLWriter:
 
         # Create the project homepage link, if it was not specified.
         if (self._prj_name or self._prj_url) and not self._prj_link:
-            self._prj_link = quote_html(self._prj_name or 'Project Homepage')
+            self._prj_link = plaintext_to_html(self._prj_name or
+                                               'Project Homepage')
 
         # Add a hyperlink to _prj_url, if _prj_link doesn't already
         # contain any hyperlinks.
@@ -699,9 +700,9 @@ class HTMLWriter:
             <tr><td>Identifier&nbsp;Index</td>
               <td width="100%" align="right"> [
                 <a href="#_">_</a>
-        # for c in "abcdefghijklmnopqrstuvwxyz":
+        >>> for c in "abcdefghijklmnopqrstuvwxyz":
                 <a href="#$c$">$c$</a>
-        # #endfor
+        >>> #endfor
               ] </td>
             </tr></table>
         </th></tr>
@@ -712,33 +713,33 @@ class HTMLWriter:
         write_identifier_index(self, out, index)
         """,
         '''
-        # #self.write_table_header(out, "index", "Identifier Index")
-        # self.write_identifier_index_header(out)
-        # letters = "_abcdefghijklmnopqrstuvwxyz"
-        # for sortkey, name, doc in index:
+        >>> #self.write_table_header(out, "index", "Identifier Index")
+        >>> self.write_identifier_index_header(out)
+        >>> letters = "_abcdefghijklmnopqrstuvwxyz"
+        >>> for sortkey, name, doc in index:
           <tr><td width="15%">
-        #     if letters and (letters[0] == "_" or
-        #                     letters[0] <= name[-1][:1].lower()):
+        >>>     if letters and (letters[0] == "_" or
+        >>>                     letters[0] <= name[-1][:1].lower()):
                   <a name="$letters[0]$"></a>
-        #             letters = letters[1:]
-        #     #endif
+        >>>             letters = letters[1:]
+        >>>     #endif
                 $self.href(doc, name[-1])$
               </td>
               <td>$self.doc_kind(doc)$
-        #     container_name = name.container()
-        #     if container_name is not None:
-        #         container = self.docindex.get_valdoc(container_name)
-        #         if container is not None:
+        >>>     container_name = name.container()
+        >>>     if container_name is not None:
+        >>>         container = self.docindex.get_valdoc(container_name)
+        >>>         if container is not None:
                       in $self.doc_kind(container)$ $self.href(container)$
-        #         #endif
-        #     #endif
+        >>>         #endif
+        >>>     #endif
               </td>
           </tr>
-        # #endfor
+        >>> #endfor
         </table>
-        # for letter in letters:
+        >>> for letter in letters:
         <a name="$letter$"></a>
-        # #endfor
+        >>> #endfor
         <br />
         ''')
 
@@ -747,18 +748,18 @@ class HTMLWriter:
         write_term_index(self, out, index)
         """,
         '''
-        # if not index: return
-        # self.write_table_header(out, "index", "Term Index")
-        # for (key, term, links) in index:
+        >>> if not index: return
+        >>> self.write_table_header(out, "index", "Term Index")
+        >>> for (key, term, links) in index:
           <tr><td width="15%">$term.to_plaintext(None)$</td>
               <td>
-        #     for link in links[:-1]:
+        >>>     for link in links[:-1]:
                 <em>$self.href(link)$</em>,
-        #     #endfor
+        >>>     #endfor
                 <em>$self.href(links[-1])$</em>
               </td>
           </tr>
-        # #endfor
+        >>> #endfor
         </table>
         <br />
         ''')
@@ -836,18 +837,18 @@ class HTMLWriter:
         write_toc(self, out)
         """,
         '''
-        # self.write_header(out, "Table of Contents")
+        >>> self.write_header(out, "Table of Contents")
         <h1 class="tocheading">Table&nbsp;of&nbsp;Contents</h1>
         <hr />
         <p class="toc">
           <a target="moduleFrame" href="toc-everything.html">Everything</a>
         </p>
-        # modules = [d for d in self.docindex.contained_valdocs if
-        #            isinstance(d, ModuleDoc)]
-        # self.write_toc_section(out, "Modules", modules)
+        >>> modules = [d for d in self.docindex.contained_valdocs if
+        >>>            isinstance(d, ModuleDoc)]
+        >>> self.write_toc_section(out, "Modules", modules)
         <hr />
         $self.PRIVATE_LINK$
-        # self.write_footer(out, short=True)
+        >>> self.write_footer(out, short=True)
         ''')
 
     def write_toc_section(self, out, name, docs, fullname=True):
@@ -1168,7 +1169,7 @@ class HTMLWriter:
         """,
         # /------------------------- Template -------------------------\
         '''
-        # if not short:
+        >>> if not short:
         <table border="0" cellpadding="0" cellspacing="0" width="100%%">
           <tr>
             <td align="left" class="footer">Generated by Epydoc
@@ -1178,7 +1179,7 @@ class HTMLWriter:
             </td>
           </tr>
         </table>
-        # #endif
+        >>> #endif
 
         <script type="text/javascript">
           <!--
@@ -1222,45 +1223,45 @@ class HTMLWriter:
         <table class="navbar" border="0" width="100%" cellpadding="0"
                bgcolor="#a0c0ff" cellspacing="0">
           <tr valign="middle">
-        # if self._top_page not in ("trees.html", "indices.html", "help.html"):
+        >>> if self._top_page not in ("trees.html", "indices.html", "help.html"):
           <!-- Home link -->
-        #   if (isinstance(context, ValueDoc) and
-        #       self._top_page == self.url(context.dotted_name)):
+        >>>   if (isinstance(context, ValueDoc) and
+        >>>       self._top_page == self.url(context.dotted_name)):
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Home&nbsp;&nbsp;&nbsp;</th>
-        #   else:
+        >>>   else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
                 href="$self._top_page$">Home</a>&nbsp;&nbsp;&nbsp;</th>
-        # #endif
+        >>> #endif
         
           <!-- Tree link -->
-        # if context == "trees":
+        >>> if context == "trees":
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Trees&nbsp;&nbsp;&nbsp;</th>
-        # else:
+        >>> else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
                 href="trees.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
-        # #endif
+        >>> #endif
         
           <!-- Index link -->
-        # if context == "indices":
+        >>> if context == "indices":
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Index&nbsp;&nbsp;&nbsp;</th>
-        # else:
+        >>> else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
                 href="indices.html">Index</a>&nbsp;&nbsp;&nbsp;</th>
-        # #endif
+        >>> #endif
         
           <!-- Help link -->
-        # if context == "help":
+        >>> if context == "help":
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Help&nbsp;&nbsp;&nbsp;</th>
-        # else:
+        >>> else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
                 href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
-        # #endif
+        >>> #endif
         
-        # if self._prj_link:
+        >>> if self._prj_link:
           <!-- Project homepage -->
               <th class="navbar" align="right" width="100%">
                 <table border="0" cellpadding="0" cellspacing="0">
@@ -1268,9 +1269,9 @@ class HTMLWriter:
                     <p class="nomargin">
                       $self._prj_link$
               </p></th></tr></table></th>
-        # else:
+        >>> else:
               <th class="navbar" width="100%"></th>
-        # #endif
+        >>> #endif
           </tr>
         </table>
         ''')
@@ -1298,19 +1299,19 @@ class HTMLWriter:
         '''
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr valign="top">
-        # if isinstance(context, APIDoc):
+        >>> if isinstance(context, APIDoc):
             <td width="100%">
               <span class="breadcrumbs">
-        #   crumbs = self.breadcrumbs(context)
-        #   for crumb in crumbs[:-1]:
+        >>>   crumbs = self.breadcrumbs(context)
+        >>>   for crumb in crumbs[:-1]:
                 $crumb$ ::
-        #   #endfor
+        >>>   #endfor
                 $crumbs[-1]$
               </span>
             </td>
-        # else:
+        >>> else:
             <td width="100%">&nbsp;</td>
-        # #endif
+        >>> #endif
             <td>
               <table cellpadding="0" cellspacing="0">
                 <!-- hide/show private -->
@@ -1379,7 +1380,7 @@ class HTMLWriter:
         grouped_inh_vars = {}
 
         # Divide all public variables of the given type into groups.
-        groups = [(quote_html(g),
+        groups = [(plaintext_to_html(g),
                    doc.select_variables(group=g, value_type=value_type,
                                         imported=False))
                   for g in doc.group_names]
@@ -1605,7 +1606,7 @@ class HTMLWriter:
                                                 "summary-sig")
             elif (type(val_doc) == ValueDoc and
                   val_doc.repr not in (None, UNKNOWN)):
-                return quote_html(val_doc.repr)
+                return plaintext_to_html(val_doc.repr)
             else:
                 return self.href(val_doc)
         
@@ -1632,57 +1633,57 @@ class HTMLWriter:
         ''',
         # /------------------------- Template -------------------------\
         '''
-        # func_doc = var_doc.value
+        >>> func_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
         <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
           <h3>$self.function_signature(var_doc)$
-        # if var_doc.name in self.SPECIAL_METHODS:
+        >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
-        # #endif
+        >>> #endif
           </h3>
           $descr$
           <dl><dt></dt><dd>
-        # # === parameters ===
-        # if func_doc.arg_descrs not in (None, UNKNOWN, [], ()):
+        >>> # === parameters ===
+        >>> if func_doc.arg_descrs not in (None, UNKNOWN, [], ()):
             <dl><dt>Parameters:</dt></dl>
             <ul>
-        #   for (lhs, rhs) in arg_descrs:
+        >>>   for (lhs, rhs) in arg_descrs:
                 <li>$lhs$ - $rhs$</li>
-        #   #endfor
+        >>>   #endfor
             </ul>
-        # #endif
-        # # === return type ===
-        # if rdescr and rtype:
+        >>> #endif
+        >>> # === return type ===
+        >>> if rdescr and rtype:
             <dl><dt>Returns: <code>$rtype$</code></dt>
                 <dd>$rdescr$</dd></dl>
-        # elif rdescr:
+        >>> elif rdescr:
             <dl><dt>Returns:</dt>
                 <dd>$rdescr$</dd></dl>
-        # elif rtype:
+        >>> elif rtype:
             <dl><dt>Returns: <code>$rtype$</code></dt></dl>
-        # #endif
-        # # === exceptions ===
-        # if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
+        >>> #endif
+        >>> # === exceptions ===
+        >>> if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
             <dl><dt>Raises:</dt>
-        #   for name, descr in func_doc.exception_descrs:
+        >>>   for name, descr in func_doc.exception_descrs:
               <dd>
                 <code><strong class="fraise">$self.href(name)$</strong></code>
               </dd> - $self.docstring_to_html(descr, func_doc, 8)$
-        #   #endfor
+        >>>   #endfor
             </dl>
-        # #endif
-        # # === overrides ===
-        # if var_doc.overrides not in (None, UNKNOWN):
+        >>> #endif
+        >>> # === overrides ===
+        >>> if var_doc.overrides not in (None, UNKNOWN):
             <dl><dt>Overrides:
               $self.href(var_doc.overrides.value)$
-        #   if var_doc.overrides.value.descr == var_doc.value.descr:
+        >>>   if var_doc.overrides.value.descr == var_doc.value.descr:
                 <dd><em class="note">(inherited documentation)</em></dd>
-        #   #endif
+        >>>   #endif
             </dt></dl>
-        # #endif
-        # # === metadata ===
-        # self.write_standard_fields(out, func_doc)
+        >>> #endif
+        >>> # === metadata ===
+        >>> self.write_standard_fields(out, func_doc)
           </dd></dl>
         </td></tr></table>
         </div>
@@ -1727,25 +1728,25 @@ class HTMLWriter:
                                      accessors, div_class)
         ''',
         '''
-        # prop_doc = var_doc.value
+        >>> prop_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
         <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
           <h3>$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
-        # if prop_doc.type_descr not in (None, UNKNOWN):
+        >>> if prop_doc.type_descr not in (None, UNKNOWN):
             <dl><dt>Type:</dt>
               <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
-        # #endif
-        # for (name, val, summary) in accessors:
+        >>> #endif
+        >>> for (name, val, summary) in accessors:
             <dt>$name$ Method:</dt>
             <dd>$val$
-        #     if summary:
+        >>>     if summary:
                 - $summary$
-        #     #endif
+        >>>     #endif
             </dd>
-        # #endfor
+        >>> #endfor
           </dd></dl>
         </td></tr></table>
         </div>
@@ -1763,19 +1764,19 @@ class HTMLWriter:
           <h3>$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
-        # if var_doc.type_descr not in (None, UNKNOWN):
+        >>> if var_doc.type_descr not in (None, UNKNOWN):
             <dl><dt>Type:</dt>
               <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
-        # #endif
-        # if (var_doc.value not in (None, UNKNOWN) and
-        #     var_doc.value.repr not in (None, UNKNOWN)):
-        #        tooltip = self.variable_tooltip(var_doc.value.repr)
+        >>> #endif
+        >>> if (var_doc.value not in (None, UNKNOWN) and
+        >>>     var_doc.value.repr not in (None, UNKNOWN)):
+        >>>        tooltip = self.variable_tooltip(var_doc.value.repr)
             <dl title="$tooltip$"><dt>Value:</dt>
               <dd><table><tr><td><pre class="variable">
         $self.pprint_value(var_doc.value)$
               </pre></td></tr></table></dd>
             </dl>
-        # #endif
+        >>> #endif
           </dd></dl>
         </td></tr></table>
         </div>
@@ -1788,7 +1789,7 @@ class HTMLWriter:
     def variable_tooltip(self, s):
         if len(s) > self._variable_tooltip_linelen:
             s = s[:self._variable_tooltip_linelen-3]+'...'
-        return quote_html(s)
+        return plaintext_to_html(s)
 
     def pprint_value(self, val_doc, multiline=True, summary_linelen=0):
         # word-wrap, quote, etc?
@@ -1797,9 +1798,9 @@ class HTMLWriter:
             try:
                 s = colorize_re(val_doc.pyval)
             except TypeError, sre_constants.error:
-                s = quote_html(val_doc.repr)
+                s = plaintext_to_html(val_doc.repr)
         else:
-            s = quote_html(val_doc.repr)
+            s = plaintext_to_html(val_doc.repr)
         return self._linewrap_html(s, self._variable_linelen,
                                    self._variable_maxlines)
 
@@ -1822,12 +1823,12 @@ class HTMLWriter:
             if vstr.find(r'\n') >= 0 and multiline:
                 body = vstr[1:-1].replace(r'\n', '\n')
                 vstr = ('<span class="variable-quote">'+vstr[0]*3+'</span>'+
-                        quote_html(body) +
+                        plaintext_to_html(body) +
                        '<span class="variable-quote">'+vstr[0]*3+'</span>')
                      
             else:
                 vstr = ('<span class="variable-quote">'+vstr[0]+'</span>'+
-                        quote_html(vstr[1:-1])+
+                        plaintext_to_html(vstr[1:-1])+
                        '<span class="variable-quote">'+vstr[0]+'</span>')
 
         # For lists, tuples, and dicts, use pprint.  When possible,
@@ -1838,7 +1839,7 @@ class HTMLWriter:
             except: vstr = '...'
             if multiline and len(vstr) > self._variable_linelen:
                 vstr = pprint.pformat(pyval[:self._variable_maxlines+1])
-            vstr = quote_html(vstr)
+            vstr = plaintext_to_html(vstr)
         elif type(pyval) is type({}):
             try: vstr = repr(pyval)
             except: vstr = '...'
@@ -1850,18 +1851,18 @@ class HTMLWriter:
                     for (k,v) in pyval.items()[:self._variable_maxlines+1]:
                         shortval[k]=v
                     vstr = pprint.pformat(shortval)
-            vstr = quote_html(vstr)
+            vstr = plaintext_to_html(vstr)
 
         # For regexps, use colorize_re.
         elif type(pyval).__name__ == 'SRE_Pattern':
             try: vstr = colorize_re(pyval)
             except TypeError, sre_constants.error:
-                try: vstr = quote_html(repr(pyval))
+                try: vstr = plaintext_to_html(repr(pyval))
                 except: vstr = '...'
            
         # For other objects, use repr to generate a representation.
         else:
-            try: vstr = quote_html(repr(pyval))
+            try: vstr = plaintext_to_html(repr(pyval))
             except: vstr = '...'
 
         # For the summary table, just return the value; don't
@@ -2107,13 +2108,13 @@ class HTMLWriter:
         write_module_list(self, out, doc)
         ''',
         '''
-        # if len(doc.submodules) == 0: return
-        # self.write_table_header(out, "details", "Submodules")
-        # for submodule in doc.submodules:
+        >>> if len(doc.submodules) == 0: return
+        >>> self.write_table_header(out, "details", "Submodules")
+        >>> for submodule in doc.submodules:
           <tr><td><ul>
-        #   self.write_module_tree_item(out, submodule)
+        >>>   self.write_module_tree_item(out, submodule)
           </ul></td></tr>
-        # #endif
+        >>> #endif
         $self.TABLE_FOOTER$
         <br />
         ''')
@@ -2123,19 +2124,19 @@ class HTMLWriter:
         write_module_tree_item(self, out, doc)
         ''',
         '''
-        # if doc.summary in (None, UNKNOWN):
+        >>> if doc.summary in (None, UNKNOWN):
             <li> <strong class="uidlink">$self.href(doc)$</strong>
-        # else:
+        >>> else:
             <li> <strong class="uidlink">$self.href(doc)$</strong>:
               <em class="summary">$self.description(doc.summary, doc, 8)$</em>
-        # # endif
-        # if doc.submodules:
+        >>> # endif
+        >>> if doc.submodules:
             <ul>
-        #   for submodule in doc.submodules:
-        #     self.write_module_tree_item(out, submodule)
-        #   #endfor
+        >>>   for submodule in doc.submodules:
+        >>>     self.write_module_tree_item(out, submodule)
+        >>>   #endfor
             </ul>
-        # #endif
+        >>> #endif
             </li>
         ''')
 
@@ -2179,11 +2180,7 @@ class HTMLWriter:
         out('<ul>\n')
         for doc in classes:
             if len(doc.bases)==0:
-                try:
-                    self.write_class_tree_item(out, doc, classes)
-                except RuntimeError, e:
-                    print "OUCH.. ", e # [XX] debugging..
-                    raise ValueError()
+                self.write_class_tree_item(out, doc, classes)
         out('</ul>\n')
 
     write_class_tree_item = compile_template(
@@ -2191,21 +2188,21 @@ class HTMLWriter:
         write_class_tree_item(self, out, doc, classes)
         ''',
         '''
-        # if doc.summary in (None, UNKNOWN):
+        >>> if doc.summary in (None, UNKNOWN):
             <li> <strong class="uidlink">$self.href(doc)$</strong>
-        # else:
+        >>> else:
             <li> <strong class="uidlink">$self.href(doc)$</strong>:
               <em class="summary">$self.description(doc.summary, doc, 8)$</em>
-        # # endif
-        # if doc.subclasses:
+        >>> # endif
+        >>> if doc.subclasses:
             <ul>
-        #   for subclass in Set(doc.subclasses):
-        #     if subclass in classes:
-        #       self.write_class_tree_item(out, subclass, classes)
-        #     #endif
-        #   #endfor
+        >>>   for subclass in Set(doc.subclasses):
+        >>>     if subclass in classes:
+        >>>       self.write_class_tree_item(out, subclass, classes)
+        >>>     #endif
+        >>>   #endfor
             </ul>
-        # #endif
+        >>> #endif
             </li>
         ''')
     
@@ -2226,33 +2223,33 @@ class HTMLWriter:
             described.
         """,
         """
-        # for field in DocstringParser.STANDARD_FIELDS:
-        #   vals = doc.metadata.get(field.tags[0])
-        #   if vals is None: continue
-        #   if len(vals) == 1:
+        >>> for field in DocstringParser.STANDARD_FIELDS:
+        >>>   vals = doc.metadata.get(field.tags[0])
+        >>>   if vals is None: continue
+        >>>   if len(vals) == 1:
               <p><strong>$field.singular$:</strong>
                 $self.description(vals[0], doc, 8)$
               </p>
-        #   elif field.short:
+        >>>   elif field.short:
               <dl><dt>$field.plural$:</dt>
                 <dd>
-        #     for val in vals[:-1]:
+        >>>     for val in vals[:-1]:
                   $self.description(val, doc, 10)$,
-        #     # end for
+        >>>     # end for
                   $self.description(vals[-1], doc, 10)$
                 </dd>
               </dl>
-        #   else:
+        >>>   else:
               <p><strong>$field.plural$:</strong>
               <ul>
-        #     for val in vals:
+        >>>     for val in vals:
                 <li>
                 $self.description(val, doc, 8)$
                 </li>
               # end for
               </ul>
-        #   # end else
-        # # end for
+        >>>   # end else
+        >>> # end for
         """)
 
     #////////////////////////////////////////////////////////////
@@ -2344,16 +2341,16 @@ class HTMLWriter:
                            private_link=True)
         ''',
         '''
-        # if heading is not None:
-        #     anchor = "section-%s" % re.sub("\W", "", heading)
+        >>> if heading is not None:
+        >>>     anchor = "section-%s" % re.sub("\W", "", heading)
         <!-- ==================== $heading.upper()$ ==================== -->
         <a name="$anchor$"></a>
-        # #endif
+        >>> #endif
         <table class="$css_class$" border="1" cellpadding="3"
                cellspacing="0" width="100%" bgcolor="white">
-        # if heading is not None:
+        >>> if heading is not None:
         <tr bgcolor="#70b0f0" class="$css_class$">
-        #     if private_link:
+        >>>     if private_link:
           <td colspan="2">
             <table border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr valign="top">
@@ -2365,11 +2362,11 @@ class HTMLWriter:
               </tr>
             </table>
           </td>
-        #     else:
+        >>>     else:
           <th align="left" colspan="2" class="$css_class$">$heading$</th>
-        #     #endif
+        >>>     #endif
         </tr>
-        # #endif
+        >>> #endif
         ''')
 
     TABLE_FOOTER = '</table>\n'
@@ -2548,7 +2545,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     
     def translate_identifier_xref(self, identifier, label=None):
         # Pick a label for this xref.
-        if label is None: label = quote_html(identifier)
+        if label is None: label = plaintext_to_html(identifier)
 
         # Find the APIDoc for it (if it's available).
         try:
