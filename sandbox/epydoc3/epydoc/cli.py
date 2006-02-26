@@ -58,7 +58,7 @@ import epydoc
 from epydoc.driver import DocBuilder
 from epydoc.docwriter.html import HTMLWriter
 from epydoc import log
-from epydoc.markup import wordwrap
+from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
 
 ######################################################################
@@ -336,19 +336,25 @@ class ConsoleLogger(log.Logger):
     def end_block(self):
         header, messages = self._message_blocks.pop()
         if messages:
-            width = self.TERM_WIDTH - 5 -2*len(self._message_blocks)
+            width = self.TERM_WIDTH - 5 - 2*len(self._message_blocks)
             prefix = self._TERM_CYAN+self._TERM_BOLD+"| "+self._TERM_NORM
+            divider = self._TERM_CYAN + self._TERM_BOLD + '+' + '-'*(width-1)
+            # Mark up the header:
+            header = wordwrap(header, right=width-2).rstrip()
+            header = '\n'.join([prefix+self._TERM_CYAN+l+self._TERM_NORM
+                                for l in header.split('\n')])
             # Indent the body:
             body = '\n'.join(messages)
             body = '\n'.join([prefix+'  '+l for l in body.split('\n')])
-            # Format the block:
-            message = (self._TERM_CYAN + self._TERM_BOLD + '+' +
-                       '-'*(width-1) + '\n' + prefix + self._TERM_CYAN +
-                       header + self._TERM_NORM + '\n' + body + '\n')
-            # Display the block.
+            # Put it all together:
+            message = divider + '\n' + header + '\n' + body + '\n'
             self._report(message, rstrip=False)
-
+            
     def _format(self, prefix, message, color):
+        """
+        Rewrap the message; but preserve newlines, and don't touch any
+        lines that begin with spaces.
+        """
         message = '%s' % message
         lines = message.split('\n')
         startindex = indent = len(prefix)
@@ -356,8 +362,8 @@ class ConsoleLogger(log.Logger):
             if lines[i].startswith(' '):
                 lines[i] = ' '*(indent-startindex) + lines[i] + '\n'
             else:
-                lines[i] = wordwrap(lines[i], indent, self.TERM_WIDTH, 
-                                    startindex)
+                width = self.TERM_WIDTH - 5 - 4*len(self._message_blocks)
+                lines[i] = wordwrap(lines[i], indent, width, startindex)
             startindex = 0
         return color+prefix+self._TERM_NORM+''.join(lines)
 
@@ -401,13 +407,12 @@ class ConsoleLogger(log.Logger):
             # Display the message message.
             print message
                 
-    def progress(self, percent, message=None):
+    def progress(self, percent, message=''):
         percent = min(1.0, percent)
-        if message is None: message = ''
-        else: message = '%s' % message
+        message = '%s' % message
         
         if self._progress_mode == 'list':
-            if message is not None:
+            if message:
                 print '[%3d%%] %s' % (100*percent, message)
                 
         elif self._progress_mode == 'bar':
