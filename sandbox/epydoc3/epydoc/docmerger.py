@@ -63,6 +63,7 @@ class DocMerger:
         'is_package': 'parse',
         'sorted_variables': 'parse',
         'subpackages': 'inspect',
+        'filename': 'parse',
         }
     DEFAULT_PRECEDENCE = 'inspect'
 
