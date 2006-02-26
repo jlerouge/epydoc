@@ -108,9 +108,13 @@ __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 __license__ = 'IBM Open Source License'
 
+# Is debugging turned on by default?
+DEBUG = True
+
 # Issues
 #   - curses.wrapper names both a function and a module; how to
-#     distinguish them?  Of course, we can't even *access* the module,
+#     distinguish them?  Of course, we can't even *access* the module
+#     (without going through sys.modules['curses.wrapper']),
 #     since "import curses.wrapper" gives us a function. :-/
 
 # Changes needed for docs:
