@@ -108,6 +108,7 @@ import re, string, types, sys
 from xml.dom.minidom import Document, Text
 import xml.dom.minidom
 from epydoc.markup import *
+from epydoc.util import wordwrap, plaintext_to_html, plaintext_to_latex
 from epydoc.docwriter.html_colorize import colorize_doctestblock
 
 ##################################################
@@ -1473,7 +1474,7 @@ class ColorizingError(ParseError):
         self.charnum = charnum
 
     CONTEXT_RANGE = 20
-    def __str__(self):
+    def descr(self):
         RANGE = self.CONTEXT_RANGE
         if self.charnum <= RANGE:
             left = self.token.contents[0:self.charnum]
@@ -1484,12 +1485,7 @@ class ColorizingError(ParseError):
         else:
             right = (self.token.contents[self.charnum:self.charnum+RANGE]
                      + '...')
-
-        str = 'Line %s: %s\n' % (self._linenum+self._offset, self._descr)
-        #str = '%5s: %s: ' % ('L'+`self._linenum+self._offset`, typ)
-        #str += wordwrap(self._descr, 7, startindex=len(str))
-        return (str + '\n%s%s\n%s^' %
-                (left, right, ' '*len(left)))
+        return ('%s\n\n%s%s\n%s^' % (self._descr, left, right, ' '*len(left)))
                 
 ##################################################
 ## Convenience parsers
