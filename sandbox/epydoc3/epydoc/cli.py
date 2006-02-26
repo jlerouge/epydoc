@@ -35,6 +35,21 @@ Usage::
 
  Run \"epydoc --help\" for a complete option list.
  See the epydoc(1) man page for more information.
+
+@todo: By default, don't list markup warnings as you find them; just
+keep track of whether any occur, and if so, then tell the user that
+they occured and that they can use some switch to view them.  Perhaps
+just increase the verbosity level?  I.e., the default verbosity level
+would hide them.  So verbosity levels would be...
+               Progress    Markup warnings   Errors/other warnings
+-2               none            no                 no
+-1               none            no                 yes
+ 0 (default)     bar             no                 yes
+ 1               bar             yes                yes
+ 2               bars            yes                yes
+ 3               list            yes                yes
+
+
 """
 
 import sys, os
@@ -43,6 +58,8 @@ import epydoc
 from epydoc.driver import DocBuilder
 from epydoc.docwriter.html import HTMLWriter
 from epydoc import log
+from epydoc.markup import wordwrap
+from epydoc.apidoc import UNKNOWN
 
 ######################################################################
 ## Argument Parsing
@@ -82,6 +99,9 @@ def parse_arguments(args):
     # ignore-param-mismatch -- not implemented yet, but will be related
     #                          to DocInheriter
     # tests=...
+    # --no-markup-warnings ?
+    # --no-source, --incl-source?
+    
 
     # Add options -- Options
     options_group.add_option(                                # --output
@@ -97,7 +117,7 @@ def parse_arguments(args):
         help="The default markup language for docstrings.  Defaults "
         "to \"%default\".")
     options_group.add_option(                                # --css
-        "--css", "-c", dest="css", metavar="STYLESHEET",
+        "--css", dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
     options_group.add_option(                                # --name
@@ -116,10 +136,10 @@ def parse_arguments(args):
         "be a URL, the name of a module or class, or one of the "
         "special names \"trees.html\", \"indices.html\", or \"help.html\"")
     # [XX] output encoding isnt' implemented yet!!
-    options_group.add_option(                                # --top
+    options_group.add_option(                                # --encoding
         "--encoding", dest="encoding", metavar="NAME",
         help="The output encoding for generated HTML files.")
-    options_group.add_option(
+    options_group.add_option(                                # --help-file
         "--help-file", dest="help_file", metavar="FILE",
         help="An alternate help file.  FILE should contain the body "
         "of an HTML file -- navigation bars will be added to it.")
@@ -141,15 +161,21 @@ def parse_arguments(args):
     options_group.add_option(                                # --show-imports
         "--no-imports", action="store_false", dest="show_imports",
         help="Do not list each module's imports.")
-    options_group.add_option(                             # --quiet
+    options_group.add_option(                                # --quiet
         "--quiet", "-q", action="count", dest="quiet",
         help="Decrease the verbosity.")
-    options_group.add_option(                             # --verbose
+    options_group.add_option(                                # --verbose
         "--verbose", "-v", action="count", dest="verbose",
         help="Increase the verbosity.")
-    options_group.add_option(                             # --denug
+    options_group.add_option(                                # --debug
         "--debug", action="store_true", dest="debug",
         help="Show full tracebacks for internal errors.")
+    options_group.add_option(                                # --parse-only
+        "--parse-only", action="store_false", dest="inspect",
+        help="Get all information from parsing (don't inspect)")
+    options_group.add_option(                                # --inspect-only
+        "--inspect-only", action="store_false", dest="parse",
+        help="Get all information from inspecting (don't parse)")
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -159,8 +185,10 @@ def parse_arguments(args):
     optparser.set_defaults(action="html", show_frames=True,
                            docformat='epytext', 
                            show_private=True, show_imports=False,
-                           debug=False, inheritance="grouped",
-                           verbose=0, quiet=0)
+                           inheritance="grouped",
+                           verbose=0, quiet=0,
+                           parse=True, inspect=True,
+                           debug=epydoc.DEBUG)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -171,6 +199,9 @@ def parse_arguments(args):
     if options.inheritance not in ('grouped', 'listed', 'included'):
         optparser.error("Bad inheritance style.  Valid options are "
                         "grouped, listed, and included.")
+    if not options.parse and not options.inspect:
+        optparser.error("Invalid option combination: --parse-only "
+                        "and --inspect-only.")
 
     # Calculate verbosity.
     options.verbosity = options.verbose - options.quiet
@@ -189,22 +220,29 @@ def parse_arguments(args):
 def cli(args):
     options, names = parse_arguments(args)
 
-    # figure these out from options..  add options.
-    parse = True
-    inspect = True
-
     # Set up the logger
     if options.verbosity > 0:
         logger = ConsoleLogger(options.verbosity)
     else:
-        if parse and inspect:
+        if options.parse and options.inspect:
             logger = UnifiedProgressConsoleLogger(options.verbosity+1, 5)
         else:
             logger = UnifiedProgressConsoleLogger(options.verbosity+1, 4)
     log.register_logger(logger)
+    print
+
+    # create the output directory.
+    if os.path.exists(options.target):
+        if not os.path.isdir(options.target):
+            return log.error("%s is not a directory" % options.target)
+    else:
+        try:
+            os.mkdir(options.target)
+        except Exception, e:
+            return log.error(e)
 
     # Build docs for the named values.
-    docbuilder = DocBuilder()
+    docbuilder = DocBuilder(inspect=options.inspect, parse=options.parse)
     docindex = docbuilder.build_doc_index(*names)
 
     # Perform the specified action.
@@ -234,8 +272,6 @@ def _sandbox(func, docindex, options):
 
 def _html(docindex, options):
     html_writer = HTMLWriter(docindex, **options.__dict__)
-    num_files = 20 # HMM!
-
     log.start_progress('Writing HTML docs to %r.' % options.target)
     html_writer.write(options.target)
     log.end_progress()
@@ -244,28 +280,55 @@ def _html(docindex, options):
 ## Logging
 ######################################################################
 
+import curses
+
 class ConsoleLogger(log.Logger):
-    WIDTH = 75
-    VT100_INV = '\033[1m'#'\033[7m'
-    VT100_BLK = ''#'\033[8m'
-    VT100_CLR = '\033[0m'
-    VT100_CLEAR_TO_EOL = '\033[0K'
+    TERM_WIDTH = 75
+    """The width of the console terminal."""
+    # Terminal control strings:
+    _TERM_CR = _TERM_CLR_EOL = _TERM_UP = ''
+    _TERM_HIDE_CURSOR = _TERM_HIDE_CURSOR = ''
+    _TERM_NORM = _TERM_BOLD = ''
+    _TERM_RED = _TERM_YELLOW = _TERM_GREEN = _TERM_CYAN = _TERM_BLUE = ''
+    _DISABLE_COLOR = False
     
     def __init__(self, verbosity):
         self._verbosity = verbosity
         self._progress = None
         self._message_blocks = []
         
+        # Examine the capabilities of our terminal.
+        try:
+            curses.setupterm()
+            self._TERM_CR = curses.tigetstr('cr') or ''
+            self.TERM_WIDTH = curses.tigetnum('cols')-1
+            self._TERM_CLR_EOL = curses.tigetstr('el') or ''
+            self._TERM_NORM =  curses.tigetstr('sgr0') or ''
+            self._TERM_HIDE_CURSOR = curses.tigetstr('civis') or ''
+            self._TERM_SHOW_CURSOR = curses.tigetstr('cnorm') or ''
+            self._TERM_UP = curses.tigetstr('cuu1') or ''
+            if self._TERM_NORM:
+                self._TERM_BOLD = curses.tigetstr('bold') or ''
+                term_setf = curses.tigetstr('setf')
+                if term_setf or self._DISABLE_COLOR:
+                    self._TERM_RED = curses.tparm(term_setf, 4) or ''
+                    self._TERM_YELLOW = curses.tparm(term_setf, 6) or ''
+                    self._TERM_GREEN = curses.tparm(term_setf, 2) or ''
+                    self._TERM_CYAN = curses.tparm(term_setf, 3) or ''
+                    self._TERM_BLUE = curses.tparm(term_setf, 1) or ''
+        except:
+            pass
+
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
-        elif verbosity >= 1: self._progress_mode = 'bar'
+        elif verbosity >= 1:
+            if self._TERM_CR and self._TERM_CLR_EOL and self._TERM_UP:
+                self._progress_mode = 'multiline-bar'
+            elif self._TERM_CR and self._TERM_CLR_EOL:
+                self._progress_mode = 'bar'
+            else:
+                self._progress_mode = 'simple-bar'
         else: self._progress_mode = 'hide'
-        
-        # Can we use '\r' to return to the beginning of the line?
-        if os.environ.get('TERM') in ['vt100', 'xterm']:
-            self._advanced_term = True
-        else:
-            self._advanced_term = False
 
     def start_block(self, header):
         self._message_blocks.append( (header, []) )
@@ -273,101 +336,146 @@ class ConsoleLogger(log.Logger):
     def end_block(self):
         header, messages = self._message_blocks.pop()
         if messages:
-            width = self.WIDTH - 5*len(self._message_blocks)
-            if self._advanced_term and False: # [xx] hmm
-                inv = self.VT100_INV
-                norm = self.VT100_CLR
-                submessage = '\n'.join(['%s %s %s' % (inv, norm, l) for l in 
-                                        '\n'.join(messages).split('\n')])
-                message = (inv + header + ' '*(self.WIDTH-len(header)) + 
-                           norm + '\n' + submessage + '\n')
-            else:
-                message = ('='*width + '\n' + header + '\n' +
-                           '-'*width + '\n' + '\n'.join(messages))
-            self._report(message+'\n', rstrip=False)
+            width = self.TERM_WIDTH - 5 -2*len(self._message_blocks)
+            prefix = self._TERM_CYAN+self._TERM_BOLD+"| "+self._TERM_NORM
+            # Indent the body:
+            body = '\n'.join(messages)
+            body = '\n'.join([prefix+'  '+l for l in body.split('\n')])
+            # Format the block:
+            message = (self._TERM_CYAN + self._TERM_BOLD + '+' +
+                       '-'*(width-1) + '\n' + prefix + self._TERM_CYAN +
+                       header + self._TERM_NORM + '\n' + body + '\n')
+            # Display the block.
+            self._report(message, rstrip=False)
 
-    def error(self, meessage):
+    def _format(self, prefix, message, color):
+        message = '%s' % message
+        lines = message.split('\n')
+        startindex = indent = len(prefix)
+        for i in range(len(lines)):
+            if lines[i].startswith(' '):
+                lines[i] = ' '*(indent-startindex) + lines[i] + '\n'
+            else:
+                lines[i] = wordwrap(lines[i], indent, self.TERM_WIDTH, 
+                                    startindex)
+            startindex = 0
+        return color+prefix+self._TERM_NORM+''.join(lines)
+
+    def error(self, message):
+        message = '%s' % message
         if self._verbosity >= -1:
+            message = self._format('  Error: ', message, self._TERM_RED)
             self._report(message)
         
     def warn(self, message):
+        message = '%s' % message
         if self._verbosity >= 0:
+            message = self._format('Warning: ', message, self._TERM_YELLOW)
             self._report(message)
         
     def info(self, message):
+        message = '%s' % message
         if self._verbosity >= 3:
+            message = self._format('   Info: ', message, self._TERM_NORM)
             self._report(message)
 
     def _report(self, message, rstrip=True):
-        message = str(message)
+        message = '%s' % message
         if rstrip: message = message.rstrip()
         
         if self._message_blocks:
             self._message_blocks[-1][-1].append(message)
         else:
             # If we're in the middle of displaying a progress bar,
-            # then print a newline, and reset self._progress to None,
-            # so we'll know to restart the progress bar on the next
-            # call to progress().
-            if self._progress is not None and self._progress_mode == 'bar':
-                if self._advanced_term:
-                    sys.stdout.write('\r'+self.VT100_CLEAR_TO_EOL)
-                else:
+            # then make room for the message.
+            if self._progress_mode == 'simple-bar':
+                if self._progress is not None:
                     print
-                self._progress = None
-
-            # shift message right? [xxx]
-            message = '\n'.join(['  '+l for l in message.split('\n')])
+                    self._progress = None
+            if self._progress_mode == 'bar':
+                sys.stdout.write(self._TERM_CR+self._TERM_CLR_EOL)
+            if self._progress_mode == 'multiline-bar':
+                sys.stdout.write((self._TERM_CLR_EOL + '\n')*2 +
+                                 self._TERM_CLR_EOL + self._TERM_UP*2)
 
             # Display the message message.
             print message
-
+                
     def progress(self, percent, message=None):
+        percent = min(1.0, percent)
+        if message is None: message = ''
+        else: message = '%s' % message
+        
         if self._progress_mode == 'list':
             if message is not None:
                 print '[%3d%%] %s' % (100*percent, message)
                 
         elif self._progress_mode == 'bar':
-            if self._advanced_term:
-                dots = int((self.WIDTH/2-5)*percent)
-                
-                if message is None: message = ''
-                else: message = str(message)
-                if len(message) > self.WIDTH/2:
-                    message = message[:self.WIDTH/2-3]+'...'
-                
-                sys.stdout.write('\r  [' + self.VT100_INV + self.VT100_BLK +
-                                 '='*dots + self.VT100_CLR +
-                                 ' '*(self.WIDTH/2-5-dots) + '] ' + 
-                                 message + self.VT100_CLEAR_TO_EOL)
-                sys.stdout.flush()
-                self._progress = percent
-            else:
-                dots = int((self.WIDTH-2)*percent)
-                progress_dots = int((self.WIDTH-2)*self._progress)
-                if dots > progress_dots:
-                    sys.stdout.write('.'*(dots-progress_dots))
-                    sys.stdout.flush()
-                    self._progress = progress
+            dots = int((self.TERM_WIDTH/2-5)*percent)
+            background = '-'*(self.TERM_WIDTH/2-5)
+            
+            if len(message) > self.TERM_WIDTH/2:
+                message = message[:self.TERM_WIDTH/2-3]+'...'
 
-    def start_progress(self, header):
+            sys.stdout.write(self._TERM_CR + '  ' + self._TERM_GREEN + '[' +
+                             self._TERM_BOLD + '='*dots + background[dots:] +
+                             self._TERM_NORM + self._TERM_GREEN + '] ' +
+                             self._TERM_NORM + message + self._TERM_CLR_EOL)
+            sys.stdout.flush()
+            self._progress = percent
+        elif self._progress_mode == 'multiline-bar':
+            dots = int((self.TERM_WIDTH-10)*percent)
+            background = '-'*(self.TERM_WIDTH-10)
+            
+            if len(message) > self.TERM_WIDTH-10:
+                message = message[:self.TERM_WIDTH-10-3]+'...'
+            else:
+                message = message.center(self.TERM_WIDTH-10)
+
+            sys.stdout.write(
+                # Line 1:
+                self._TERM_CLR_EOL + '      ' + self._TERM_BOLD + 
+                'Progress:'.center(self.TERM_WIDTH-10) + '\n' +
+                self._TERM_NORM +
+                # Line 2:
+                self._TERM_CLR_EOL + ('%3d%% ' % (100*percent)) +
+                self._TERM_GREEN + '[' +  self._TERM_BOLD + '='*dots +
+                background[dots:] + self._TERM_NORM + self._TERM_GREEN +
+                ']' + self._TERM_NORM + '\n' +
+                # Line 3:
+                self._TERM_CLR_EOL + '      ' + message + self._TERM_CR +
+                self._TERM_UP + self._TERM_UP)
+            
+            sys.stdout.flush()
+            self._progress = percent
+        elif self._progress_mode == 'simple-bar':
+            dots = int((self.TERM_WIDTH-2)*percent)
+            progress_dots = int((self.TERM_WIDTH-2)*self._progress)
+            if dots > progress_dots:
+                sys.stdout.write('.'*(dots-progress_dots))
+                sys.stdout.flush()
+                self._progress = progress
+
+    def start_progress(self, header=None):
         if self._progress is not None:
             raise ValueError
-        if self._progress_mode == 'hide': return
-        
-        print header
-        if self._progress_mode == 'bar':
-            if not self._advanced_term:
-                sys.stdout.write('  [')
+        if self._progress_mode == 'hide':
+            return
+        if header:
+            print self._TERM_BOLD + header + self._TERM_NORM
+        if self._progress_mode == 'simple-bar':
+            sys.stdout.write('  [')
         self._progress = 0.0
 
     def end_progress(self):
         self.progress(1.)
         if self._progress_mode == 'bar':
-            if self._advanced_term:
-                sys.stdout.write('\r'+self.VT100_CLEAR_TO_EOL)
-            else:
-                print ']'
+            sys.stdout.write(self._TERM_CR+self._TERM_CLR_EOL)
+        if self._progress_mode == 'multiline-bar':
+                sys.stdout.write((self._TERM_CLR_EOL + '\n')*2 +
+                                 self._TERM_CLR_EOL + self._TERM_UP*2)
+        if self._progress_mode == 'simple-bar':
+            print ']'
         self._progress = None
 
 class UnifiedProgressConsoleLogger(ConsoleLogger):
@@ -379,12 +487,14 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         
     def progress(self, percent, message=None):
         p = float(self.stage-1+percent)/self.stages
-        ConsoleLogger.progress(self, p, self.task)
+        if message == UNKNOWN: message = None
+        if message: message = '%s: %s' % (self.task, message)
+        ConsoleLogger.progress(self, p, message)
 
-    def start_progress(self, message):
+    def start_progress(self, message=None):
         self.task = message
         if self.stage == 0:
-            ConsoleLogger.start_progress(self, 'Progress:')
+            ConsoleLogger.start_progress(self)
         self.stage += 1
 
     def end_progress(self):
@@ -396,4 +506,8 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
 ######################################################################
 
 if __name__ == '__main__':
-    cli(sys.argv[1:])
+    try:
+        cli(sys.argv[1:])
+    except:
+        print
+        raise
