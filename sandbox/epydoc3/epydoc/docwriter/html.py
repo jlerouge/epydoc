@@ -11,7 +11,7 @@ The HTML output generator for epydoc.  The main interface provided by
 this module is the L{HTMLWriter} class.
 """
 
-import re, os, sys, codecs
+import re, os, sys, codecs, sre_constants
 from epydoc.apidoc import *
 from epydoc.docstringparser import DocstringParser
 import time, epydoc, epydoc.markup
@@ -19,6 +19,8 @@ from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc import log
+from epydoc.util import quote_html
+import __builtin__
 
 ######################################################################
 ## Template Compiler
@@ -27,7 +29,7 @@ from epydoc import log
 # define several of HTMLWriter's methods.
 
 def compile_template(docstring, template_string,
-                     output_function='out', debug=False):
+                     output_function='out', debug=epydoc.DEBUG):
     """
     Given a template string containing inline python source code,
     return a python function that will fill in the template, and
@@ -89,11 +91,11 @@ def compile_template(docstring, template_string,
         signature = re.sub(r'\)\s*$', ', pysrc=pysrc)', signature)
 
     # Funciton declaration line
-    pysrc = ['def %s:' % signature]
+    pysrc_lines = ['def %s:' % signature]
     indents = [-1]
 
     if debug:
-        pysrc.append('    try:')
+        pysrc_lines.append('    try:')
         indents.append(-1)
 
     commands = COMMAND.split(template_string.strip()+'\n')
@@ -105,11 +107,13 @@ def compile_template(docstring, template_string,
             pieces = INLINE.split(command)
             for j, piece in enumerate(pieces):
                 if j%2 == 0:
-                    pysrc.append('    '*len(indents)+
+                    # String piece
+                    pysrc_lines.append('    '*len(indents)+
                                  '%s(%r)' % (output_function, piece))
                 else:
-                    pysrc.append('    '*len(indents)+
-                                 '%s(str(%s))' % (output_function, piece))
+                    # Variable piece
+                    pysrc_lines.append('    '*len(indents)+
+                                 '%s(unicode(%s))' % (output_function, piece))
 
         # Python command:
         else:
@@ -119,25 +123,24 @@ def compile_template(docstring, template_string,
             while indent <= indents[-1]: indents.pop()
             # Add on the line.
             srcline = srcline.rstrip()
-            pysrc.append('    '*len(indents)+srcline)
+            pysrc_lines.append('    '*len(indents)+srcline)
             if srcline.endswith(':'):
                 indents.append(indent)
         
     if debug:
-        pysrc.append('    except Exception,e:')
-        pysrc.append('        print "Exception in template code:"')
-        pysrc.append('        print "="*70')
-        pysrc.append('        print pysrc')
-        pysrc.append('        print "="*70')
-        pysrc.append('        raise')
+        pysrc_lines.append('    except Exception,e:')
+        pysrc_lines.append('        if pysrc:') # only print it once.
+        pysrc_lines.append('            print "Exception in template code:"')
+        pysrc_lines.append('            print "="*70+"\\n"+pysrc[0]+"="*70')
+        pysrc_lines.append('            del pysrc[:]')
+        pysrc_lines.append('        raise')
         
-    pysrc = '\n'.join(pysrc)+'\n'
-    if debug: localdict = {'pysrc': pysrc}
+    pysrc = '\n'.join(pysrc_lines)+'\n'
+    if debug: localdict = {'pysrc': pysrc_lines}
     else: localdict = {}
     try: exec pysrc in globals(), localdict
     except SyntaxError:
-        print 'Error in script:'
-        print pysrc
+        log.error('Error in script:\n' + pysrc + '\n')
         raise
     template_func = localdict[func_name]
     template_func.__doc__ = docstring
@@ -221,9 +224,9 @@ class HTMLWriter:
         @keyword css: The CSS stylesheet file.  If C{css} is a file
               name, then the specified file's conents will be used.
               Otherwise, if C{css} is the name of a CSS stylesheet in
-              L{epydoc.css}, then that stylesheet will be used.
-              Otherwise, an error is reported.  If no stylesheet is
-              specified, then the default stylesheet is used.
+              L{epydoc.docwriter.html_css}, then that stylesheet will
+              be used.  Otherwise, an error is reported.  If no stylesheet 
+              is specified, then the default stylesheet is used.
         @type help_file: C{string}
         @keyword help_file: The name of the help file.  If no help file is
               specified, then the default help file will be used.
@@ -421,13 +424,13 @@ class HTMLWriter:
 
         # Report any failed crossreferences
         if self._failed_xrefs:
-            estr = 'Warning: Failed identifier crossreference targets:\n'
+            estr = 'Failed identifier crossreference targets:\n'
             failed_identifiers = self._failed_xrefs.keys()
             failed_identifiers.sort()
             for identifier in failed_identifiers:
                 names = self._failed_xrefs[identifier].keys()
                 names.sort()
-                estr += '    - %s' % identifier
+                estr += '- %s' % identifier
                 if (len(names)==1 and len(identifier)+
                     len(str(names[0]))+14 < 70):
                     estr += ' (from %s)\n' % names[0]
@@ -714,8 +717,8 @@ class HTMLWriter:
         # letters = "_abcdefghijklmnopqrstuvwxyz"
         # for sortkey, name, doc in index:
           <tr><td width="15%">
-        #     if (letters and letters[0] == "_" or
-        #         letters[0] <= name[-1][:1].lower()):
+        #     if letters and (letters[0] == "_" or
+        #                     letters[0] <= name[-1][:1].lower()):
                   <a name="$letters[0]$"></a>
         #             letters = letters[1:]
         #     #endif
@@ -768,7 +771,9 @@ class HTMLWriter:
         """
         Write an HTML help file to the given stream.  If
         C{self._helpfile} contains a help file, then use it;
-        otherwise, use the default helpfile from L{epydoc.help}.
+        otherwise, use the default helpfile from
+        L{epydoc.docwriter.html_help}.
+        
         @param public: The output stream for the public version of the page.
         @param private: The output stream for the private version of the page.
         """
@@ -969,9 +974,8 @@ class HTMLWriter:
                 open(filename, 'w').write(s)
                 return
             except:
-                if sys.stderr.softspace: print >>sys.stderr
-                estr = 'Warning: error copying index; using a redirect page'
-                print >>sys.stderr, estr
+                log.error('Warning: error copying index; '
+                          'using a redirect page')
 
         # Use a redirect if top is external, or if we faild to copy.
         name = self._prj_name or 'this project'
@@ -1008,8 +1012,8 @@ class HTMLWriter:
         """
         Write the CSS stylesheet in the given directory.  If
         C{cssname} contains a stylesheet file or name (from
-        L{epydoc.css}), then use that stylesheet; otherwise, use the
-        default stylesheet.
+        L{epydoc.docwriter.html_css}), then use that stylesheet;
+        otherwise, use the default stylesheet.
 
         @rtype: C{None}
         """
@@ -1790,7 +1794,10 @@ class HTMLWriter:
         # word-wrap, quote, etc?
         if (val_doc.pyval is not UNKNOWN and
             type(val_doc.pyval).__name__ == 'SRE_Pattern'):
-            s = colorize_re(val_doc.pyval)
+            try:
+                s = colorize_re(val_doc.pyval)
+            except TypeError, sre_constants.error:
+                s = quote_html(val_doc.repr)
         else:
             s = quote_html(val_doc.repr)
         return self._linewrap_html(s, self._variable_linelen,
@@ -1815,12 +1822,12 @@ class HTMLWriter:
             if vstr.find(r'\n') >= 0 and multiline:
                 body = vstr[1:-1].replace(r'\n', '\n')
                 vstr = ('<span class="variable-quote">'+vstr[0]*3+'</span>'+
-                        markup.plaintext_to_html(body) +
+                        quote_html(body) +
                        '<span class="variable-quote">'+vstr[0]*3+'</span>')
                      
             else:
                 vstr = ('<span class="variable-quote">'+vstr[0]+'</span>'+
-                        markup.plaintext_to_html(vstr[1:-1])+
+                        quote_html(vstr[1:-1])+
                        '<span class="variable-quote">'+vstr[0]+'</span>')
 
         # For lists, tuples, and dicts, use pprint.  When possible,
@@ -1831,7 +1838,7 @@ class HTMLWriter:
             except: vstr = '...'
             if multiline and len(vstr) > self._variable_linelen:
                 vstr = pprint.pformat(pyval[:self._variable_maxlines+1])
-            vstr = markup.plaintext_to_html(vstr)
+            vstr = quote_html(vstr)
         elif type(pyval) is type({}):
             try: vstr = repr(pyval)
             except: vstr = '...'
@@ -1843,15 +1850,18 @@ class HTMLWriter:
                     for (k,v) in pyval.items()[:self._variable_maxlines+1]:
                         shortval[k]=v
                     vstr = pprint.pformat(shortval)
-            vstr = markup.plaintext_to_html(vstr)
+            vstr = quote_html(vstr)
 
         # For regexps, use colorize_re.
         elif type(pyval).__name__ == 'SRE_Pattern':
-            vstr = colorize_re(pyval)
+            try: vstr = colorize_re(pyval)
+            except TypeError, sre_constants.error:
+                try: vstr = quote_html(repr(pyval))
+                except: vstr = '...'
            
         # For other objects, use repr to generate a representation.
         else:
-            try: vstr = markup.plaintext_to_html(repr(pyval))
+            try: vstr = quote_html(repr(pyval))
             except: vstr = '...'
 
         # For the summary table, just return the value; don't
@@ -2065,8 +2075,6 @@ class HTMLWriter:
         imports = doc.select_variables(imported=True)
         if not imports: return
 
-        import_htmls = ['  <dd>%s</dd>' % self.href(v) for v in imports]
-
         out('<p class="imports">')
         out('<span class="varlist-header">Imports:</span>\n  ')
         out(',\n  '.join([self.href(v.value) for v in imports]))
@@ -2171,7 +2179,11 @@ class HTMLWriter:
         out('<ul>\n')
         for doc in classes:
             if len(doc.bases)==0:
-                self.write_class_tree_item(out, doc, classes)
+                try:
+                    self.write_class_tree_item(out, doc, classes)
+                except RuntimeError, e:
+                    print "OUCH.. ", e # [XX] debugging..
+                    raise ValueError()
         out('</ul>\n')
 
     write_class_tree_item = compile_template(
@@ -2280,7 +2292,7 @@ class HTMLWriter:
         Extract the set of terms that should be indexed from all
         documented docstrings.  Return the extracted set as a
         list of tuples of the form C{(key, term, [links])}.
-        This list is used by L{_write_indices} to construct the
+        This list is used by L{write_indices()} to construct the
         term index.
         @rtype: C{list} of C{(string, ParsedDocstring, list of ValueDoc)}
         """
@@ -2416,6 +2428,7 @@ class HTMLWriter:
         else:
             raise ValueError, "Don't know what to do with %r" % obj
 
+    # [xx] add code to automatically do <code> wrapping or the like?
     def href(self, target, label=None, css_class=None):
         """
         Return the HTML code for an HREF link to the given target
@@ -2446,7 +2459,6 @@ class HTMLWriter:
             css = ' class="%s"' % css_class
 
         return '<a href="%s"%s>%s</a>' % (url, css, label)
-
 
     def summary(self, api_doc, indent=0):
         assert isinstance(api_doc, APIDoc)
@@ -2522,11 +2534,6 @@ class HTMLWriter:
         else:
             return 'Variable'
         
-def quote_html(s):
-    s = s.replace('&', '&amp;').replace('"', '&quot;')
-    s = s.replace('<', '&lt;').replace('>', '&gt;')
-    return s
-        
 
 class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     def __init__(self, htmlwriter, container):
@@ -2540,31 +2547,88 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
                 (key, indexterm.to_html(self)))
     
     def translate_identifier_xref(self, identifier, label=None):
-        if label is None: label = markup.plaintext_to_html(identifier)
+        # Pick a label for this xref.
+        if label is None: label = quote_html(identifier)
 
-        doc = findit(DottedName(identifier), self.container, self.docindex)
+        # Find the APIDoc for it (if it's available).
+        try:
+            doc = self._find(identifier)
+        except ValueError:
+            doc = None # e.g., if identifier == '[1,2]'
+
+        # Translate it into HTML.
         if doc is None:
-            failed_xrefs = self.htmlwriter._failed_xrefs
-            if not failed_xrefs.has_key(identifier):
-                failed_xrefs[identifier] = {}
-            failed_xrefs[identifier][`self.container`] = 1
-            return '<span class="link">%s</span>' % label
+            return '<code class="link">%s</code>' % label
         else:
             return self.htmlwriter.href(doc, label, 'link')
 
-# [xx] what is this doing exactly?
-# [xx] some values are not to be trusted! (eg None, UNKNOWN, '')
-def findit(name, container, docindex):
-    #print 'look for %r in %r' % (name, container.canonical_name)
-    container_name = container.canonical_name
-    if container_name in (None, UNKNOWN):
-        return docindex.get_valdoc(name)
-    for i in range(len(container_name), -1, -1):
-        val_doc = docindex.get_valdoc(DottedName(*(container_name[:i]+(name,))))
-        #print '  Check', DottedName(*(container_name[:i]+(name,))),
-        if val_doc is not None:
-            #print '=> yes'
-            return val_doc
-        #print '=> no'
-    return docindex.get_valdoc(name)
+    def _find(self, name):
+        """
+        @type name: C{str}
+        @return: An C{APIDoc}, or the string C{'imported'}, or
+        C{None}
+        """
+        assert isinstance(name, basestring)
+        # Convert `name` to a dotted name.  If it's not a valid python
+        # dotted name, then give up.
+        if re.match('\w+(\.\w+)*', name):
+            name = DottedName(name)
+        else:
+            return None
+        
+        if self.container is None or self.container.canonical_name is None:
+            container_name = []
+        else:
+            container_name = self.container.canonical_name
+
+        # Is it a parameter's name?
+        if (isinstance(self.container, RoutineDoc) and
+            len(name) == 1 and name[0] in self.container.all_args()):
+            return None
+
+        # Check for the name in all containing namespaces, starting
+        # with the closest one.
+        for i in range(len(container_name), -1, -1):
+            relative_name = DottedName(*(container_name[:i]+(name,)))
+            # Is `name` the absolute name of a documented value?
+            val_doc = self.docindex.get_valdoc(relative_name)
+            if val_doc is not None: return val_doc
+            # Is `name` the absolute name of a documented variable?
+            var_doc = self.docindex.get_vardoc(relative_name)
+            if var_doc is not None: return var_doc
+
+        # If the name begins with 'self', then try stripping that off
+        # and see if we can find the variable.
+        if name[0] == 'self':
+            doc = self._find('.'.join(name[1:]))
+            if doc is not None: return doc
+
+        # Is it the name of a builtin?
+        if len(name)==1 and hasattr(__builtin__, name[0]):
+            return None
+        
+        # Is it an attribute of a parameter?
+        if (isinstance(self.container, RoutineDoc) and
+            len(name) > 1 and name[0] in self.container.all_args()):
+            return None
+
+        # Check if `name` is contained inside of an imported variable
+        # whose value is not known.  (We check this case to avoid
+        # reporting xref failures when the cause is simply that the
+        # docs for the target's containing module were not processed.)
+        else:
+            for i in range(len(container_name), -1, -1):
+                for j in range(len(name), 0, -1):
+                    var_name = DottedName(*(container_name[:i]+name[:j]))
+                    var_doc = self.docindex.get_vardoc(var_name)
+                    if (var_doc is not None and var_doc.is_imported==True and
+                        var_doc.value not in self.docindex.contained_valdocs):
+                        return None
+
+        # We couldn't find it.  Add it to the list of failed xrefs.
+        failed_xrefs = self.htmlwriter._failed_xrefs
+        if not failed_xrefs.has_key(name):
+            failed_xrefs[name] = {}
+        failed_xrefs[name][self.container.canonical_name] = 1
+        return None
 
