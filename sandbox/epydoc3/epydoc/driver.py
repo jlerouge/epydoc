@@ -17,7 +17,7 @@ The top-level programmatic interface to epydoc.
 import sys, os, os.path, __builtin__
 from epydoc.apidoc import *
 from epydoc.docinspector import DocInspector
-from epydoc.docparser import DocParser
+from epydoc.docparser import DocParser, ParseError
 from epydoc.docmerger import DocMerger
 from epydoc.docindexer import DocIndex
 from epydoc.docstringparser import DocstringParser
@@ -108,8 +108,11 @@ class DocBuilder:
             docs = []
             for i, (inspect_doc, parse_doc) in enumerate(doc_pairs):
                 if inspect_doc is not None and parse_doc is not None:
-                    log.progress(float(i)/len(doc_pairs),
-                                 inspect_doc.canonical_name)
+                    if inspect_doc.canonical_name not in (None, UNKNOWN):
+                        name = inspect_doc.canonical_name
+                    else:
+                        name = parse_doc.canonical_name
+                    log.progress(float(i)/len(doc_pairs), name)
                     docs.append(self.merger.merge(inspect_doc, parse_doc))
                 elif inspect_doc is not None:
                     docs.append(inspect_doc)
@@ -176,8 +179,13 @@ class DocBuilder:
                 elif is_pyname(item):
                     # what about builtins here..?
                     doc_pairs.append(self._get_docs_from_pyname(item))
+                elif os.path.isdir(item):
+                    log.error("Directory %r is not a package" % item)
+                elif os.path.isfile(item):
+                    log.error("File %s is not a Python module" % item)
                 else:
-                    raise ValueError("Don't know what to do with %s" % item)
+                    log.error("Could not find a file or object named %s" %
+                              item)
             else:
                 doc_pairs.append(self._get_docs_from_pyobject(item))
                 
@@ -190,7 +198,10 @@ class DocBuilder:
         
         inspect_doc = parse_doc = None
         if self.inspect:
-            inspect_doc = self.inspector.inspect(value=obj)
+            try:
+                inspect_doc = self.inspector.inspect(value=obj)
+            except ImportError, e:
+                log.error(e)
         if self.parse:
             pass # [xx] do something for parse??
         return (inspect_doc, parse_doc)
@@ -203,11 +214,15 @@ class DocBuilder:
         if self.parse:
             try:
                 parse_doc = self.parser.parse(name=name)
-            except ValueError, e:
-                # [xx] overly-broad except!
-                log.warn('Error during parsing: %s' % e)
+            except ParseError, e:
+                log.error(e)
+            except ImportError, e:
+                log.error('While parsing %s: %s' % (name, e))
         if self.inspect:
-            inspect_doc = self.inspector.inspect(name=name)
+            try:
+                inspect_doc = self.inspector.inspect(name=name)
+            except ImportError, e:
+                log.error(e)
         return (inspect_doc, parse_doc)
 
     def _get_docs_from_module_file(self, filename, parent_docs=(None,None)):
@@ -221,18 +236,17 @@ class DocBuilder:
             if so, it will construct a stub C{ModuleDoc} for the
             containing package(s).
         """
+        # Record our progress.
+        modulename = os.path.splitext(os.path.split(filename)[1])[0]
+        if modulename == '__init__':
+            modulename = os.path.split(os.path.split(filename)[0])[1]
+        if parent_docs[0]:
+            modulename = DottedName(parent_docs[0].canonical_name, modulename)
+        elif parent_docs[1]:
+            modulename = DottedName(parent_docs[1].canonical_name, modulename)
+        log.progress(self._progress_estimator.progress(),
+                     '%s (%s)' % (modulename, filename))
         self._progress_estimator.complete += 1
-        if parent_docs[0] is not None:
-            log.progress(self._progress_estimator.progress(),
-                         DottedName(parent_docs[0].canonical_name,
-                                    os.path.split(filename)[1]))
-        elif parent_docs[1] is not None:
-            log.progress(self._progress_estimator.progress(),
-                         DottedName(parent_docs[1].canonical_name,
-                                    os.path.split(filename)[1]))
-        else:
-            log.progress(self._progress_estimator.progress(),
-                         os.path.split(filename)[1])
         
         # Normalize the filename.
         filename = os.path.normpath(os.path.abspath(filename))
@@ -244,15 +258,19 @@ class DocBuilder:
         # Get the inspected & parsed docs (as appropriate)
         inspect_doc = parse_doc = None
         if self.inspect:
-            inspect_doc = self.inspector.inspect(
-                filename=filename, context=parent_docs[0])
+            try:
+                inspect_doc = self.inspector.inspect(
+                    filename=filename, context=parent_docs[0])
+            except ImportError, e:
+                log.error(e)
         if self.parse:
             try:
                 parse_doc = self.parser.parse(
                     filename=filename, context=parent_docs[1])
-            except ValueError, e:
-                # [xx] overly-broad except!
-                log.warn('Error during parsing: %s' % e)
+            except ParseError, e:
+                log.error(e)
+            except ImportError, e:
+                log.error('While parsing %s: %s' % (filename, e))
         return (inspect_doc, parse_doc)
 
     def _get_docs_from_package_dir(self, package_dir, parent_docs=(None,None)):
@@ -268,7 +286,7 @@ class DocBuilder:
         else:
             pkg_path = pkg_docs[1].path
   
-        module_filenames = Set()
+        module_filenames = {}
         subpackage_dirs = Set()
         for subdir in pkg_path:
             if os.path.isdir(subdir):
@@ -276,20 +294,22 @@ class DocBuilder:
                     filename = os.path.join(subdir, name)
                     # Is it a valid module filename?
                     if is_module_file(filename):
-                        module_filenames.add(os.path.splitext(filename)[0])
+                        basename = os.path.splitext(filename)[0]
+                        if os.path.split(basename)[1] != '__init__':
+                            module_filenames[basename] = filename
                     # Is it a valid package filename?
                     if is_package_dir(filename):
                         subpackage_dirs.add(filename)
 
         # Update our estimate of the number of modules in this package.
-        self._progress_estimator.revise_estimate(package_dir, module_filenames,
+        self._progress_estimator.revise_estimate(package_dir,
+                                                 module_filenames.items(),
                                                  subpackage_dirs)
 
         docs = [pkg_docs]
-        for module_filename in module_filenames:
-            if os.path.split(module_filename)[1] != '__init__':
-                d = self._get_docs_from_module_file(module_filename, pkg_docs)
-                docs.append(d)
+        for module_filename in module_filenames.values():
+            d = self._get_docs_from_module_file(module_filename, pkg_docs)
+            docs.append(d)
         for subpackage_dir in subpackage_dirs:
             docs += self._get_docs_from_package_dir(subpackage_dir, pkg_docs)
         return docs
