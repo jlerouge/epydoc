@@ -45,14 +45,9 @@ Markup errors are represented using L{ParseError}s.  These exception
 classes record information about the cause, location, and severity of
 each error.
 
-The C{epydoc.markup} module also defines several utility functions,
-such as L{wordwrap}, L{plaintext_to_latex}, and L{plaintext_to_html},
-which are used by several different markup language parsers.
-
 @sort: parse, ParsedDocstring, Field, DocstringLinker
 @group Errors and Warnings: ParseError
-@group Utility Functions: wordwrap, plaintet_to_html, plaintext_to_latex,
-    parse_type_of
+@group Utility Functions: parse_type_of
 @var SCRWIDTH: The default width with which text will be wrapped
       when formatting the output of the parser.
 @type SCRWIDTH: C{int}
@@ -61,7 +56,8 @@ which are used by several different markup language parsers.
 __docformat__ = 'epytext en'
 
 import re, types, sys
-#from epydoc.imports import import_module
+from epydoc import log
+from epydoc.util import plaintext_to_html, plaintext_to_latex
 
 ##################################################
 ## Contents
@@ -113,13 +109,15 @@ def parse(docstring, markup='plaintext', errors=None, **options):
 
     # Is the markup language valid?
     if not re.match(r'\w+', markup):
-        _parse_warn('Warning: Bad markup language name: %s' % markup)
+        _parse_warn('Bad markup language name %r.  Treating '
+                    'docstrings as plaintext.' % markup)
         return plaintext.parse_docstring(docstring, errors, **options)
 
     # Is the markup language supported?
     try: exec('from epydoc.markup.%s import parse_docstring' % markup)
     except:
-        _parse_warn('Warning: Unsupported markup language: %s' % markup)
+        _parse_warn('Unsupported markup language %r.  Treating '
+                    'docstrings as plaintext.' % markup)
         return plaintext.parse_docstring(docstring, errors, **options)
 
     # Parse the docstring.
@@ -147,8 +145,7 @@ def _parse_warn(estr):
     global _parse_warnings
     if _parse_warnings.has_key(estr): return
     _parse_warnings[estr] = 1
-    if sys.stderr.softspace: print >>sys.stderr
-    print >>sys.stderr, estr
+    log.warn(estr)
 
 ##################################################
 ## ParsedDocstring
@@ -477,6 +474,9 @@ class ParseError(Exception):
         @rtype: C{None}
         """
         self._offset = offset
+
+    def descr(self):
+        return self._descr
     
     def __str__(self):
         """
@@ -488,19 +488,9 @@ class ParseError(Exception):
         @rtype: C{string}
         """
         if self._linenum is not None:
-            return 'Line %s: %s' % (self._linenum+self._offset, self._descr)
+            return 'Line %s: %s' % (self._linenum+self._offset, self.descr())
         else:
-            return self._descr
-            
-#         if self._linenum is not None:
-#             str = '%5s: ' % ('L'+`self._linenum+self._offset`)
-#         else:
-#             str = '     - '
-#         if self._fatal:
-#             str += 'Error: '
-#         else:
-#             str += 'Warning: '
-#         return str + wordwrap(self._descr, 7, startindex=len(str))[:-1]
+            return self.descr()
     
     def __repr__(self):
         """
@@ -535,95 +525,6 @@ class ParseError(Exception):
 ## Misc helpers
 ##################################################
 # These are used by multiple markup parsers
-
-# Default screen width, for word-wrapping
-SCRWIDTH = 73
-
-# [xx] move this to util?
-def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
-    """
-    Word-wrap the given string.  All sequences of whitespace are
-    converted into spaces, and the string is broken up into lines,
-    where each line begins with C{indent} spaces, followed by one or
-    more (space-deliniated) words whose length is less than
-    C{right-indent}.  If a word is longer than C{right-indent}
-    characters, then it is put on its own line.
-
-    @param str: The string that should be word-wrapped.
-    @type str: C{int}
-    @param indent: The left margin of the string.  C{indent} spaces
-        will be inserted at the beginning of every line.
-    @type indent: C{int}
-    @param right: The right margin of the string.
-    @type right: C{int}
-    @type startindex: C{int}
-    @param startindex: The index at which the first line starts.  This
-        is useful if you want to include other contents on the first
-        line. 
-    @return: A word-wrapped version of C{str}.
-    @rtype: C{string}
-    """
-    words = str.split()
-    out_str = ' '*(indent-startindex)
-    charindex = max(indent, startindex)
-    for word in words:
-        if charindex+len(word) > right and charindex > 0:
-            out_str += '\n' + ' '*indent
-            charindex = indent
-        out_str += word+' '
-        charindex += len(word)+1
-    return out_str.rstrip()+'\n'
-
-def plaintext_to_html(str):
-    """
-    @return: An HTML string that encodes the given plaintext string.
-    In particular, special characters (such as C{'<'} and C{'&'})
-    are escaped.
-    @rtype: C{string}
-    """
-    str = str.replace('&', '&amp;').replace('"', '&quot;')
-    str = str.replace('<', '&lt;').replace('>', '&gt;')
-    return str.replace('@', '&#64;')
-
-def plaintext_to_latex(str, nbsp=0, breakany=0):
-    """
-    @return: A LaTeX string that encodes the given plaintext string.
-    In particular, special characters (such as C{'$'} and C{'_'})
-    are escaped, and tabs are expanded.
-    @rtype: C{string}
-    @param breakany: Insert hyphenation marks, so that LaTeX can
-    break the resulting string at any point.  This is useful for
-    small boxes (e.g., the type box in the variable list table).
-    @param nbsp: Replace every space with a non-breaking space
-    (C{'~'}).
-    """
-    # These get converted to hyphenation points later
-    if breakany: str = re.sub('(.)', '\\1\1', str)
-
-    # These get converted to \textbackslash later.
-    str = str.replace('\\', '\0')
-
-    # Expand tabs
-    str = str.expandtabs()
-
-    # These elements need to be backslashed.
-    str = re.sub(r'([#$&%_\${}])', r'\\\1', str)
-
-    # These elements have special names.
-    str = str.replace('|', '{\\textbar}')
-    str = str.replace('<', '{\\textless}')
-    str = str.replace('>', '{\\textgreater}')
-    str = str.replace('^', '{\\textasciicircum}')
-    str = str.replace('~', '{\\textasciitilde}')
-    str = str.replace('\0', r'{\textbackslash}')
-
-    # replace spaces with non-breaking spaces
-    if nbsp: str = str.replace(' ', '~')
-
-    # Convert \1's to hyphenation points.
-    if breakany: str = str.replace('\1', r'\-')
-    
-    return str
 
 def parse_type_of(obj):
     """
