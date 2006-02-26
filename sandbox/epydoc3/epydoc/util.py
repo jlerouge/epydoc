@@ -1,4 +1,7 @@
-# TEMPY
+"""
+Other stuff that could go here..?
+  - quote_html?
+"""
 
 import os, os.path, re
 
@@ -47,6 +50,28 @@ def py_src_filename(filename):
             if os.path.isfile('%s%s' % (basefile, ext)):
                 return '%s%s' % (basefile, ext)
         else:
-            raise ValueError('Could not find a Python source file '
-                             'for %s.' % filename)
-            
+            raise ValueError('Could not find a corresponding '
+                             'Python source file.')
+
+def quote_html(s):
+    s = s.replace('&', '&amp;').replace('"', '&quot;')
+    s = s.replace('<', '&lt;').replace('>', '&gt;')
+    return s
+        
+def decode_with_backslashreplace(s):
+    r"""
+    Convert the given 8-bit string into unicode, treating any
+    character c such that ord(c)<128 as an ascii character, and
+    converting any c such that ord(c)>128 into a backslashed escape
+    sequence.
+
+        >>> decode_with_backslashreplace('abc\xff\xe8')
+        u'abc\\xff\\xe8'
+    """
+    # s.encode('string-escape') is not appropriate here, since it
+    # also adds backslashes to some ascii chars (eg \ and ').
+    assert isinstance(s, str)
+    return (s
+            .decode('latin1')
+            .encode('ascii', 'backslashreplace')
+            .decode('ascii'))
