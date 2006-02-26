@@ -488,14 +488,19 @@ class ParseError(Exception):
         @rtype: C{string}
         """
         if self._linenum is not None:
-            str = '%5s: ' % ('L'+`self._linenum+self._offset`)
+            return 'Line %s: %s' % (self._linenum+self._offset, self._descr)
         else:
-            str = '     - '
-        if self._fatal:
-            str += 'Error: '
-        else:
-            str += 'Warning: '
-        return str + wordwrap(self._descr, 7, startindex=len(str))[:-1]
+            return self._descr
+            
+#         if self._linenum is not None:
+#             str = '%5s: ' % ('L'+`self._linenum+self._offset`)
+#         else:
+#             str = '     - '
+#         if self._fatal:
+#             str += 'Error: '
+#         else:
+#             str += 'Warning: '
+#         return str + wordwrap(self._descr, 7, startindex=len(str))[:-1]
     
     def __repr__(self):
         """
@@ -534,6 +539,7 @@ class ParseError(Exception):
 # Default screen width, for word-wrapping
 SCRWIDTH = 73
 
+# [xx] move this to util?
 def wordwrap(str, indent=0, right=SCRWIDTH, startindex=0):
     """
     Word-wrap the given string.  All sequences of whitespace are

@@ -1475,8 +1475,6 @@ class ColorizingError(ParseError):
     CONTEXT_RANGE = 20
     def __str__(self):
         RANGE = self.CONTEXT_RANGE
-        if self._fatal: typ = 'Error'
-        else: typ = 'Warning'
         if self.charnum <= RANGE:
             left = self.token.contents[0:self.charnum]
         else:
@@ -1486,10 +1484,11 @@ class ColorizingError(ParseError):
         else:
             right = (self.token.contents[self.charnum:self.charnum+RANGE]
                      + '...')
-        
-        str = '%5s: %s: ' % ('L'+`self._linenum+self._offset`, typ)
-        str += wordwrap(self._descr, 7, startindex=len(str))
-        return (str + '\n       %s%s\n       %s^' %
+
+        str = 'Line %s: %s\n' % (self._linenum+self._offset, self._descr)
+        #str = '%5s: %s: ' % ('L'+`self._linenum+self._offset`, typ)
+        #str += wordwrap(self._descr, 7, startindex=len(str))
+        return (str + '\n%s%s\n%s^' %
                 (left, right, ' '*len(left)))
                 
 ##################################################
