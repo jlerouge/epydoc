@@ -18,7 +18,7 @@ __docformat__ = 'epytext en'
 import sys, sre_parse, sre, re, codecs
 import sre_constants
 from epydoc import log
-from epydoc.util import decode_with_backslashreplace, quote_html
+from epydoc.util import decode_with_backslashreplace, plaintext_to_html
 
 ######################################################################
 ## Regular expression colorizer
@@ -144,19 +144,18 @@ def _colorize_re(tree, noparen=0):
 
         if op == sre_constants.LITERAL:
             c = unichr(args)
-            if c == '&': out('&amp;')
-            elif c == '<': out('&lt;')
-            elif c == '>': out('&gt;')
-            elif c == '\t': out(r'<span class="%s">\t</span>' % ESCAPE_TAG)
+            if c == '\t': out(r'<span class="%s">\t</span>' % ESCAPE_TAG)
             elif c == '\n': out(r'<span class="%s">\n</span>' % ESCAPE_TAG)
             elif c == '\r': out(r'<span class="%s">\r</span>' % ESCAPE_TAG)
             elif c == '\f': out(r'<span class="%s">\f</span>' % ESCAPE_TAG)
             elif c == '\v': out(r'<span class="%s">\v</span>' % ESCAPE_TAG)
-            elif ord(c)<32 or ord(c)>=127: 
-                out(r'<span class="%s">\\x%02x</span>' % (ESCAPE_TAG,ord(c)))
+            elif ord(c)<32 or ord(c)>=127:
+                if c < 256: template = r'<span class="%s">\x%02x</span>'
+                else: template = r'<span class="%s">\u%04x</span>'
+                out(template % (ESCAPE_TAG,ord(c)))
             elif c in '.^$\\*+?{}[]|()':
-                out('<span class="%s">\\%c</span>' % (ESCAPE_TAG, c))
-            else: out(unichr(args))
+                out(r'<span class="%s">\%c</span>' % (ESCAPE_TAG, c))
+            else: out(plaintext_to_html(unichr(args)))
             continue
         
         elif op == sre_constants.ANY:
@@ -256,12 +255,13 @@ def _colorize_re(tree, noparen=0):
         elif op == sre_constants.SUBPATTERN:
             if args[0] is None:
                 out('<span class="%s">(?:</span>' % PAREN_TAG)
-            elif type(args[0]) == type(0):
+            elif isinstance(args[0], (int, long)):
                 # This is cheating:
                 out('<span class="%s">(</span>' % PAREN_TAG)
             else:
                 out('<span class="%s">(?P&lt;</span>' % PAREN_TAG)
-                out('<span class="%s">%s</span>' % (REF_TAG, args[0]))
+                out('<span class="%s">%s</span>' %
+                    (REF_TAG, plaintext_to_html(args[0])))
                 out('<span class="%s">&gt;</span>' % PAREN_TAG)
             out(_colorize_re(args[1], 1))
             out('<span class="%s">)</span>' % PAREN_TAG)
@@ -270,15 +270,9 @@ def _colorize_re(tree, noparen=0):
             out('<span class="%s">\\%d</span>' % (REF_TAG, args))
 
         elif op == sre_constants.RANGE:
-            c1, c2 = args[0:2]
-            if not isinstance(c1, int):
-                c1, c2 = ord(c1), ord(c2)
-            if c1>=32 and c1<127 and c2>=32 and c2<127:
-                out('%c<span class="%s">-</span>%c' %
-                    (c1, CHOICE_TAG, c2))
-            else:
-                out('\\x%02x<span class="%s">-</span>\\x%02x' %
-                    (c1, CHOICE_TAG, c2))
+            start = _colorize_re( ((sre_constants.LITERAL, args[0]),) )
+            end = _colorize_re( ((sre_constants.LITERAL, args[1]),) )
+            out('%s<span class="%s">-</span>%s' % (start, CHOICE_TAG, end))
             
         elif op == sre_constants.NEGATE:
             out('<span class="%s">^</span>' % CHOICE_TAG)
