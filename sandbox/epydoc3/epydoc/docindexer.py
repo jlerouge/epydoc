@@ -77,7 +77,6 @@ class DocIndex:
 
         for apidoc in root:
             if apidoc.canonical_name in (None, UNKNOWN):
-                print 'ouch', `apidoc`, `apidoc.pyval`
                 raise ValueError("All APIdocs passed to DocIndexer "
                                  "must already have canonical names.")
         

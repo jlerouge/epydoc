@@ -34,7 +34,6 @@ class DocInheriter:
         
                 
     def _inherit(self, class_doc):
-        #print 'inheritance for %r' % class_doc
         class_doc.variables = class_doc.local_variables.copy()
         
         mro = list(class_doc.mro())
