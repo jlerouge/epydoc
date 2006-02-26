@@ -142,7 +142,8 @@ class ParsedRstDocstring(ParsedDocstring):
 
 #     def concatenate(self, other):
 #         result = self._document.copy()
-#         for child in self._document.variables + other._document.variables:
+#         for child in (self._document.get_children() +
+#                       other._document.get_children()):
 #             visitor = TreeCopyVisitor(self._document)
 #             child.walkabout(visitor)
 #             result.append(visitor.get_tree_copy())
@@ -190,7 +191,7 @@ class _EpydocReader(StandaloneReader):
         except: linenum = None
 
         msg = ''.join([c.astext().encode(self._encoding, self._error_handler)
-                       for c in error.variables])
+                       for c in error])
 
         self._errors.append(ParseError(msg, linenum, is_fatal))
         
@@ -228,8 +229,9 @@ class _SummaryExtractor(NodeVisitor):
         if self.summary is not None: return
 
         summary_pieces = []
+
         # Extract the first sentence.
-        for child in node.variables:
+        for child in node:
             if isinstance(child, docutils.nodes.Text):
                 m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', child.data)
                 if m:
@@ -238,7 +240,7 @@ class _SummaryExtractor(NodeVisitor):
             summary_pieces.append(child)
             
         summary_doc = self.document.copy()
-        summary_doc.variables = summary_pieces
+        summary_doc[:] = summary_pieces
         self.summary = ParsedRstDocstring(summary_doc)
 
     def unknown_visit(self, node):
@@ -266,13 +268,13 @@ class _SplitFieldsTranslator(NodeVisitor):
         node.parent.remove(node)
 
         # Extract the field name & optional argument
-        tag = node.variables[0].astext().split(None, 1)
+        tag = node[0].astext().split(None, 1)
         tagname = tag[0]
         if len(tag)>1: arg = tag[1]
         else: arg = None
 
         # Handle special fields:
-        fbody = node.variables[1].variables
+        fbody = node[1].get_children()
         if arg is None:
             for (list_tag, entry_tag) in CONSOLIDATED_FIELDS.items():
                 if tagname.lower() == list_tag:
@@ -314,41 +316,41 @@ class _SplitFieldsTranslator(NodeVisitor):
 
         # Check that each list item begins with interpreted text
         n = 0
-        for item in body[0].variables:
+        for item in body[0]:
             n += 1
             if item.tagname != 'list_item':
                 raise ValueError('bad bulleted list (bad child).')
-            if len(item.variables) == 0: 
+            if len(item) == 0: 
                 raise ValueError('bad bulleted list (empty).')
-            if item.variables[0].tagname != 'paragraph':
-                if item.variables[0].tagname == 'definition_list':
+            if item[0].tagname != 'paragraph':
+                if item[0].tagname == 'definition_list':
                     raise ValueError(('list item %d contains a definition '+
                                       'list (it\'s probably indented '+
                                       'wrong).') % n)
                 else:
                     raise ValueError(('list item %d does not begin with '+
                                       'an identifier.') % n)
-            if len(item.variables[0].variables) == 0: 
+            if len(item[0]) == 0: 
                 raise ValueError(('list item %d does not begin with '+
                                   'an identifier.') % n)
-            if item.variables[0].variables[0].tagname != 'title_reference':
+            if item[0][0].tagname != 'title_reference':
                 raise ValueError(('list item %d does not begin with '+
                                   'an identifier.') % n)
 
         # Everything looks good; convert to multiple fields.
-        for item in body[0].variables:
+        for item in body[0]:
             # Extract the arg
-            arg = item.variables[0].variables[0].astext()
+            arg = item[0][0].astext()
 
             # Extract the field body, and remove the arg
-            fbody = item.variables[:]
+            fbody = item[:]
             fbody[0] = fbody[0].copy()
-            fbody[0].variables = item.variables[0].variables[1:]
+            fbody[0][:] = item[0][1:]
 
             # Remove the separating ":", if present
-            if (len(fbody[0].variables) > 0 and
-                isinstance(fbody[0].variables[0], docutils.nodes.Text)):
-                child = fbody[0].variables[0]
+            if (len(fbody[0]) > 0 and
+                isinstance(fbody[0][0], docutils.nodes.Text)):
+                child = fbody[0][0]
                 if child.data[:1] in ':-':
                     child.data = child.data[1:].lstrip()
                 elif child.data[:2] == ' -':
