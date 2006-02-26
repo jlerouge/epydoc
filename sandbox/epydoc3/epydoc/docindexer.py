@@ -74,7 +74,12 @@ class DocIndex:
         """
         #: A list of (name, ValueDoc) pairs.
         self._root_list = list(root)
-        self._root_dict = dict([(d.canonical_name, d) for d in root])
+
+        for apidoc in root:
+            if apidoc.canonical_name in (None, UNKNOWN):
+                print 'ouch', `apidoc`, `apidoc.pyval`
+                raise ValueError("All APIdocs passed to DocIndexer "
+                                 "must already have canonical names.")
         
         #: The set of all C{ValueDoc}s that are directly or indirectly
         #: reachable from the root set.  In particular, this set contains
@@ -100,8 +105,8 @@ class DocIndex:
 
         #: A dictionary mapping from each C{ValueDoc} to the score that
         #: has been assigned to its current cannonical name.  If
-        #: L{_index()} finds a cannonical name with a better score,
-        #: then it will replace the old name.
+        #: L{_assign_canonical_names()} finds a cannonical name with a
+        #: better score, then it will replace the old name.
         self._score_dict = {}
 
         #: The set of names that have been used for unreachable objects.
@@ -119,19 +124,19 @@ class DocIndex:
         # have them.
         log.start_progress('Indexing documentation')
         for i, val_doc in enumerate(self._root_list):
-            log.progress(float(i)/len(self._root_list),
+            log.progress(i*.7/len(self._root_list),
                          val_doc.canonical_name)
             self._find_contained_valdocs(val_doc)
             # the following method does both canonical name assignment
             # and initialization of reachable_valdocs:
             self._assign_canonical_names(val_doc, val_doc.canonical_name)
-        log.end_progress()
 
         # Resolve any imported_from links, if the target of the link
         # is contained in the index.  We have to be a bit careful
         # here, because when we merge srcdoc & val_doc, we might
         # unintentionally create a duplicate entry in
         # reachable/contained valdocs sets.
+        log.progress(.8, 'Resolving imports')
         for val_doc in list(self.reachable_valdocs):
             while val_doc.imported_from not in (UNKNOWN, None):
                 src_doc = self.get_valdoc(val_doc.imported_from)
@@ -150,7 +155,9 @@ class DocIndex:
 
         # Set the canonical_container attribute on all reachable
         # valuedocs (where possible).
+        log.progress(.9, 'Finding canonical containers')
         for val_doc in self.reachable_valdocs:
+            if val_doc.canonical_container is not UNKNOWN: continue
             if isinstance(val_doc, ModuleDoc):
                val_doc.canonical_container = val_doc.package
             else:
@@ -159,9 +166,19 @@ class DocIndex:
                     val_doc.canonical_container = None
                 else:
                     container_doc = self.get_valdoc(container_name)
-                    if container_doc is not None:
-                        val_doc.canonical_container = container_doc
-    
+                    if isinstance(container_doc, NamespaceDoc):
+                        if container_doc.variables != UNKNOWN:
+                            for var in container_doc.variables.values():
+                                if var.value == val_doc:
+                                    val_doc.canonical_container = container_doc
+                    if isinstance(container_doc, ClassDoc):
+                        for var in container_doc.local_variables.values():
+                            if var.value == val_doc:
+                                val_doc.canonical_container = container_doc
+        log.end_progress()
+
+        # [XX] conflict check turned off!
+        return
         # Check that we don't have any conflicts in the root set (and
         # remove redundancies).  This is intentionally done *after*
         # we resolve imported_from links.
@@ -172,8 +189,8 @@ class DocIndex:
                 if valdoc1.canonical_name.dominates(valdoc2.canonical_name):
                     del self._root_list[i2]
                     if self.get_valdoc(valdoc2.canonical_name) != valdoc2:
-                        print (('bad root set: %r dominates %r '
-                                'but lookup direct inside %r gives %r') %
+                        log.error(('bad root set: %r dominates %r '
+                                   'but lookup direct inside %r gives %r') %
                                (valdoc1, valdoc2, valdoc1, 
                                 self.get_valdoc(valdoc2.canonical_name)))
                         raise ValueError, 'Inconsistant root set'
@@ -278,7 +295,7 @@ class DocIndex:
             if var_doc.is_imported is not True:#not in (True, UNKNOWN):
                 self._find_contained_valdocs(var_doc.value)
         
-    def _assign_canonical_names(self, val_doc, name, score=0):
+    def _assign_canonical_names(self, val_doc, name, score=0, parent=None):
         """
         Assign a canonical name to C{val_doc} (if it doesn't have one
         already), and (recursively) to each variable in C{val_doc}.
@@ -320,6 +337,7 @@ class DocIndex:
             if (val_doc not in self._score_dict or
                 score > self._score_dict[val_doc]):
                 val_doc.canonical_name = name
+                val_doc.canonical_container = parent
                 self._score_dict[val_doc] = score
 
         # Recurse to any contained values.
@@ -340,12 +358,13 @@ class DocIndex:
             if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
             elif var_doc.is_alias: vardoc_score -= 1000
             
-            self._assign_canonical_names(var_doc.value, varname, vardoc_score)
+            self._assign_canonical_names(var_doc.value, varname,
+                                         vardoc_score, val_doc)
 
         # Recurse to any directly reachable values.
         for val_doc_2 in self._valdocs_reachable_from(val_doc):
             name = self._unreachable_name(val_doc_2)
-            self._assign_canonical_names(val_doc_2, name, -10000)
+            self._assign_canonical_names(val_doc_2, name, -10000, val_doc)
 
     def _unreachable_name(self, val_doc):
         if val_doc.imported_from not in (UNKNOWN, None):
