@@ -11,6 +11,7 @@ Parser for plaintext docstrings.  Plaintext docstrings are rendered as
 verbatim output, preserving all whitespace.
 """
 from epydoc.markup import *
+from epydoc.util import plaintext_to_html, plaintext_to_latex
 
 def parse_docstring(docstring, errors, **options):
     """
