@@ -232,16 +232,13 @@ class DocstringParser:
 
         log.start_block('In %s (line %s)' % (name, startline))
         for error in parse_errors:
-            error.set_linenum_offset(startline+1)
+            if startline != '??':
+                error.set_linenum_offset(startline+1)
+            # [XX] Hm.. what level should this be??
             log.warn(error)
 
         for warning in field_warnings:
-            if startline == '??':
-                log.warn('       %s' % warning)
-            else:
-                estr = ' Warning: %s' % warning
-                log.warn('     - %s' %
-                         markup.wordwrap(estr, 7, startindex=7).strip())
+            log.warn(warning)
 
         log.end_block()
 
