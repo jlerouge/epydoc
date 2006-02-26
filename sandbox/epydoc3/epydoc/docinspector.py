@@ -30,6 +30,8 @@ from epydoc.apidoc import *
 from types import *
 # Set datatype:
 from sets import Set
+# Error reporting:
+from epydoc import log
 
 from epydoc.util import * # [xx] hmm
 
@@ -158,7 +160,10 @@ class DocInspector:
             val_doc = self._valuedoc_cache[pyid] = ValueDoc()
             val_doc.pyval = value
             val_doc.canonical_name = self.get_canonical_name(value)
-            try: val_doc.repr = `value`
+            try:
+                # iso-8859-1 is Python's default encoding.. is
+                # that ok to use here?
+                val_doc.repr = unicode('%r' % value, 'iso-8859-1')
             except: pass
         return val_doc
 
@@ -259,16 +264,19 @@ class DocInspector:
         else:
             module_doc.is_package = False
 
-        # Record the module's parent package, if it has one.
+        # Make sure we have a name for the package.
         dotted_name = module_doc.canonical_name
-        if dotted_name is not UNKNOWN:
-            if len(dotted_name) > 1:
-                package_name = str(dotted_name.container())
-                package = sys.modules.get(package_name)
-                if package is not None:
-                    module_doc.package = self.inspect(package)
-            else:
-                module_doc.package = None
+        if dotted_name is UNKNOWN:
+            dotted_name = DottedName(module.__name__)
+            
+        # Record the module's parent package, if it has one.
+        if len(dotted_name) > 1:
+            package_name = str(dotted_name.container())
+            package = sys.modules.get(package_name)
+            if package is not None:
+                module_doc.package = self.inspect(package)
+        else:
+            module_doc.package = None
 
         # Initialize the submodules property
         module_doc.submodules = []
@@ -486,13 +494,20 @@ class DocInspector:
         if docstring is None:
             return None
         elif isinstance(docstring, basestring):
-            try: return unicode(docstring)
+            try: return unicode(docstring, 'ascii')
             except UnicodeDecodeError:
-                print ("Warning: %r's docstring is not a unicode string, "
-                       "but it contains non-ascii data") % value
+                if hasattr(value, '__name__'): name = value.__name__
+                else: name = `value`
+                log.warn("%s's docstring is not a unicode string, but it "
+                         "contains non-ascii data -- treating it as "
+                         "latin-1." % name)
+                # Assume it's latin-1.
+                return unicode(docstring, 'latin-1')
             return None
         else:
-            print "Warning: docstring for %r is not a string" % value
+            if hasattr(value, '__name__'): name = value.__name__
+            else: name = `value`
+            log.warn("%s's docstring is not a string -- ignoring it." % name)
             return None
 
     def get_canonical_name(self, value):
@@ -641,7 +656,14 @@ def get_value_from_filename(filename, context=None):
     old_sys_path = sys.path[:]
     try:
         sys.path.insert(0, basedir)
-        return get_value_from_name(name)
+        # This will make sure that we get the module itself, even
+        # if it is shadowed by a variable.  (E.g., curses.wrapper):
+        _import(str(name))
+        if str(name) in sys.modules:
+            return sys.modules[str(name)]
+        else:
+            # Use this as a fallback -- it *shouldn't* ever be needed.
+            return get_value_from_name(name)
     finally:
         sys.path = old_sys_path
 
@@ -650,47 +672,25 @@ def get_value_from_name(name):
     Given a name, return the corresponding value.
     """
     name = DottedName(name)
-    # Break name up into two pieces name1,name2 such that we can do:
-    # >>> import name1 as module
-    # >>> self.inspect(module.name2)
+
+    # Import the module containing `name`.
     for i in range(len(name)):
-        # Import name1 as module
-        n = '.'.join(name[:len(name)-i])
-        try: module = _sandbox(__import__, n)
-        except ImportError, err: continue
-        # inspect(self.inspect(module.name2)
-        val = module
-        for identifier in name[1:]:
-            val = getattr(val, identifier)
-        return val
-    else:
-        raise ValueError, "didn't find %s" % name
+        module = _import('.'.join(name[:i+1]))
+        if (hasattr(module, name[i]) and
+            not isinstance(getattr(module, name[i]), ModuleType)):
+            break
 
-def _import(name):
-    # If we've already imported it, then just return it.
-    if sys.modules.has_key(name): return sys.modules[name]
-
-    # Import the module.  Note that if "name" has a package component,
-    # then this just gives us the top-level object, so we have to
-    # manually go down the package tree.
-    try:
-        m = __import__(name)
-    except KeyboardInterrupt:
-        raise # don't capture keyboard interrupts!
-    except Exception, e:
-        raise ImportError('Error importing %r: %s' % (name, e))
-    except SystemExit, e:
-        raise ImportError('Error importing %r: %s' % (name, e))
-    except:
-        raise ImportError('Error importing %r' % name)
-    for p in name.split(".")[1:]:
-        try: m = getattr(m, p)
+    # Look up `name` in the module
+    val = module
+    for i, identifier in enumerate(name[1:]):
+        try: val = getattr(val, identifier)
         except AttributeError:
-            estr = 'Error importing %r: getattr failed' % name
-            raise ImportError(estr)
-    return m
-
-def _sandbox(callback, *args, **kwargs):
+            exc_msg = ('Could not import %s:\nNo variable named %s in %s' %
+                       (name, identifier, '.'.join(name[:1+i])))
+            raise ImportError(exc_msg)
+    return val
+            
+def _import(name):
     """
     Run the given callable in a 'sandboxed' environment.
     Currently, this includes saving and restoring the contents of
@@ -715,7 +715,20 @@ def _sandbox(callback, *args, **kwargs):
     sys.argv = ['(imported)']
 
     try:
-        return callback(*args, **kwargs)
+        try:
+            return __import__(name)
+        except KeyboardInterrupt:
+            raise # don't capture keyboard interrupts!
+        except Exception, e:
+            estr = e.__class__.__name__
+            if ('%s'%e): estr += ' -- %s' % e
+            raise ImportError('Could not import %s:\n%s' % (name, estr))
+        except SystemExit, e:
+            estr = e.__class__.__name__
+            if ('%s'%e): estr += ' (%s)' % e
+            raise ImportError('Could not import %s:\n%s' % (name, estr))
+        except:
+            raise ImportError('Could not import %s' % name)
     finally:
         # Restore the important values that we saved.
         if type(__builtins__) == types.DictionaryType:
@@ -753,7 +766,7 @@ class _DevNull:
     """
     A "file-like" object that discards anything that is written and
     always reports end-of-file when read.  C{_DevNull} is used by
-    L{import_module} to discard output when importing modules; and to
+    L{_import()} to discard output when importing modules; and to
     ensure that stdin appears closed.
     """
     def __init__(self):
