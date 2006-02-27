@@ -193,10 +193,10 @@ class DocInspector:
         elif inspect.isclass(value):
             return self.inspect_class
         
-        elif isinstance(context, ClassDoc) and isinstance(value, classmethod):
+        elif isinstance(value, classmethod):
             return self.inspect_classmethod
         
-        elif isinstance(context, ClassDoc) and isinstance(value, staticmethod):
+        elif isinstance(value, staticmethod):
             return self.inspect_staticmethod
         
         elif isinstance(context, ClassDoc) and inspect.isroutine(value):
@@ -493,7 +493,9 @@ class DocInspector:
         docstring = getattr(value, '__doc__', None)
         if docstring is None:
             return None
-        elif isinstance(docstring, basestring):
+        elif isinstance(docstring, unicode):
+            return docstring
+        elif isinstance(docstring, str):
             try: return unicode(docstring, 'ascii')
             except UnicodeDecodeError:
                 if hasattr(value, '__name__'): name = value.__name__
