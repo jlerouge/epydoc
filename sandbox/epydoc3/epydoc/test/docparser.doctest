@@ -1,33 +1,11 @@
-Tests: epydoc.docparser
-~~~~~~~~~~~~~~~~~~~~~~~
-
-Base lists:
-   class A: pass                   # no bases
-   class B(A): pass                # single base
-   class C(A,B): pass              # multiple bases
-   class D( ((A)) ): pass          # extra parens around base
-   class E(Dotted.Name): pass      # dotted name
-   class F(B.__bases__[0]): pass   # calculated base
-
-Delete:
-   del x
-   del x,y
-   del (x,y)
-   del [x,y]
-   del ((((x))))
-   del [[[[x]]]]
-   del ((a, ((b, c)), d), [e])
-   del ((a, ((b.c.d, c)), d.q), [e.f])
-   del x[3]                             # not parsed
-
-
-
+                   Regression Testing for epydoc.docparser
+                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 DocParser is a processing class that extracts API documentation by
 parsing the source code of Python files.  Its primary interface is
-C{parse()}, which takes a module's filename, and returns a ModuleDoc
+`parse()`, which takes a module's filename, and returns a ModuleDoc
 describing that module and its contents.
 
-In order to properly link the documentation with the documentation of
+In order to properly link the parsed documentation with the docs for
 builtin objects, the DocParser constructor requires a ModuleDoc
 describing the builtin objects:
 
@@ -40,19 +18,23 @@ Test Function
 =============
 This test function takes a string containing the contents of a module,
 and writes it to a file, uses a DocParser to parse it, and pretty
-prints the resulting ModuleDoc object.
+prints the resulting ModuleDoc object.  The `attribs` argument
+specifies which attributes of the `APIDoc`s should be displayed.
 
-    >>> import tempfile, re
-    >>> def runparser(s, excludes=(), doc_parser=None):
-    ...     out = tempfile.NamedTemporaryFile('w', suffix='.py')
-    ...     out.write(s)
+    >>> import tempfile, re, os, os.path, textwrap
+    >>> def runparser(s, attribs='', doc_parser=None):
+    ...     tmp_dir = tempfile.mkdtemp()
+    ...     out = open(os.path.join(tmp_dir, 'test.py'), 'w')
+    ...     out.write(textwrap.dedent(s))
     ...     out.flush()
     ...     if doc_parser is None:
     ...         doc_parser = DocParser(builtins_doc)
-    ...     s = doc_parser.parse(out.name).pp(exclude=excludes)
-    ...     s = re.sub(r"DottedName\('[^']+'", "DottedName('...'", s)
+    ...     s = doc_parser.parse(out.name).pp(include=attribs.split())
+    ...     s = re.sub(r"filename = .*", "filename = ...", s)
     ...     print s
     ...     out.close()
+    ...     os.unlink(os.path.join(tmp_dir, 'test.py'))
+    ...     os.rmdir(tmp_dir)
 
 Module Variables
 ================
@@ -69,98 +51,108 @@ instance variable.  (For variables generated from module variable
 assignments, is_imported and is_instvar will always be False.)
 
     >>> runparser(s="""
-    ... x = 12
-    ... y = [1,2,3] + [4,5]
-    ... z = f(x,y)
-    ... """)
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-        |  +- name = 'x'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = '12'
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
-        |  +- is_imported = False
+    ...     x = 12
+    ...     y = [1,2,3] + [4,5]
+    ...     z = f(x,y)
+    ...     """)
+    ModuleDoc for test [0]
+     +- canonical_name = DottedName('test')
+     +- filename = ...
+     +- is_package = False
+     +- package = None
+     +- sort_spec = [u'x', u'y', u'z']
+     +- submodules = []
+     +- variables
+        +- x => VariableDoc for test.x [1]
+        |  +- container
+        |  |  +- ModuleDoc for test [0] (defined above)
         |  +- is_alias = False
-        |  +- is_instvar = False
-        +- y => VariableDoc [3]
-        |  +- name = 'y'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [4]
-        |  |     +- repr = '[1, 2, 3]+ [4, 5]'
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
         |  +- is_imported = False
-        |  +- is_alias = False
         |  +- is_instvar = False
-        +- z => VariableDoc [5]
-           +- name = 'z'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [6]
-           |     +- repr = 'f(x, y)'
-           |     +- ast = [320, [298, [299, [300, [301, [303, [...
-           +- is_imported = False
+        |  +- is_public = True
+        |  +- name = u'x'
+        |  +- value
+        |     +- ValueDoc [2]
+        |        +- repr = u'12'
+        |        +- toktree = [(2, u'12')]
+        +- y => VariableDoc for test.y [3]
+        |  +- container
+        |  |  +- ModuleDoc for test [0] (defined above)
+        |  +- is_alias = False
+        |  +- is_imported = False
+        |  +- is_instvar = False
+        |  +- is_public = True
+        |  +- name = u'y'
+        |  +- value
+        |     +- ValueDoc [4]
+        |        +- repr = u'[1,2,3]+ [4,5]'
+        |        +- toktree = [[(51, u'['), (2, u'1'), (51, u','), ...
+        +- z => VariableDoc for test.z [5]
+           +- container
+           |  +- ModuleDoc for test [0] (defined above)
            +- is_alias = False
+           +- is_imported = False
            +- is_instvar = False
+           +- is_public = True
+           +- name = u'z'
+           +- value
+              +- ValueDoc [6]
+                 +- repr = u'f(x,y)'
+                 +- toktree = [(1, u'f'), [(51, u'('), (1, u'x'), (...
 
 In this example, DocParser decides that the assignment to y is
-creating an alias:
+creating an alias.  The same `ValueDoc` is shared by both variables.
 
     >>> runparser(s="""
-    ... x = [1,2]
-    ... y = x
-    ... """)
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-        |  +- name = 'x'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = '[1, 2]'
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
-        |  +- is_imported = False
+    ...     x = [1,2]
+    ...     y = x
+    ...     """,
+    ...     attribs='variables is_alias name value repr')
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
         |  +- is_alias = False
-        |  +- is_instvar = False
-        +- y => VariableDoc [3]
-           +- name = 'y'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [2] (defined above)
-           +- is_imported = False
+        |  +- name = u'x'
+        |  +- value
+        |     +- ValueDoc [2]
+        |        +- repr = u'[1,2]'
+        +- y => VariableDoc for test.y [3]
            +- is_alias = True
-           +- is_instvar = False
+           +- name = u'y'
+           +- value
+              +- ValueDoc [2] (defined above)
 
 DocParser can also parse assignments where the left-hand side is a
 tuple or list; however, it will not extract values.
 
     >>> runparser(s="""
-    ... a,b = (5,6)
-    ... [a,(b,[c,d],e),(f,g)] = [1,(2,[3,4],5),(6,7)]""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- a => VariableDoc [1]
-        |  +- name = 'a'
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  +- is_imported = False
-        +- b => VariableDoc [3]
-        |  +- name = 'b'
-        |  +- val_doc
-        |  |  +- ValueDoc [4]
-        |  +- is_imported = False
-    ...
-        +- g => VariableDoc [13]
-           +- name = 'g'
-           +- val_doc
-           |  +- ValueDoc [14]
-           +- is_imported = False
+    ...     a,b = (5,6)
+    ...     [a,(b,[c,d],e),(f,g)] = [1,(2,[3,4],5),(6,7)]
+    ...     """,
+    ...     attribs='variables is_alias name value')
+    ModuleDoc for test [0]
+     +- variables
+        +- a => VariableDoc for test.a [1]
+        |  +- is_alias = False
+        |  +- name = u'a'
+        +- b => VariableDoc for test.b [2]
+        |  +- is_alias = False
+        |  +- name = u'b'
+        +- c => VariableDoc for test.c [3]
+        |  +- is_alias = False
+        |  +- name = u'c'
+        +- d => VariableDoc for test.d [4]
+        |  +- is_alias = False
+        |  +- name = u'd'
+        +- e => VariableDoc for test.e [5]
+        |  +- is_alias = False
+        |  +- name = u'e'
+        +- f => VariableDoc for test.f [6]
+        |  +- is_alias = False
+        |  +- name = u'f'
+        +- g => VariableDoc for test.g [7]
+           +- is_alias = False
+           +- name = u'g'
 
 DocParser can also parse 'multi-assignment' statements, containing
 more than one assignment.  Note that the ValueDoc object is shared;
@@ -169,36 +161,43 @@ result, the value's canonical name will use the name of the rightmost
 variable.)
 
     >>> runparser(s="""
-    ... x = y = z = 0""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-        |  +- name = 'x'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = '0'
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
-        |  +- is_imported = False
+    ...     x = y = z = 0
+    ...     """,
+    ...     attribs="variables is_alias name value repr")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
         |  +- is_alias = True
-        |  +- is_instvar = False
-        +- y => VariableDoc [3]
-        |  +- name = 'y'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2] (defined above)
-        |  +- is_imported = False
+        |  +- name = u'x'
+        |  +- value
+        |     +- ValueDoc [2]
+        |        +- repr = u'0'
+        +- y => VariableDoc for test.y [3]
         |  +- is_alias = True
-        |  +- is_instvar = False
-        +- z => VariableDoc [4]
-           +- name = 'z'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [2] (defined above)
-           +- is_imported = False
+        |  +- name = u'y'
+        |  +- value
+        |     +- ValueDoc [2] (defined above)
+        +- z => VariableDoc for test.z [4]
            +- is_alias = False
-           +- is_instvar = False
+           +- name = u'z'
+           +- value
+              +- ValueDoc [2] (defined above)
+
+If a variable is assigned to twice, then the later assignment
+overwrites the earlier one:
+
+    >>> runparser(s="""
+    ...     x = 22
+    ...     x = 33
+    ...     """,
+    ...     attribs="variables name value repr")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
+           +- name = u'x'
+           +- value
+              +- ValueDoc [2]
+                 +- repr = u'33'
 
 Module Control Blocks
 =====================
@@ -217,114 +216,64 @@ By default, DocParse does not look inside the following block types:
 
     >>> # DocParser looks inside if/elif/else blocks.
     >>> runparser(s="""
-    ... if condition:
-    ...     if_gated = 'x'
-    ... elif condition2:
-    ...     elif_gated = 'y'
-    ... elif condition3:
-    ...     elif_gated2 = 'x'
-    ... else:
-    ...     else_gated = 'z'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- elif_gated => VariableDoc [1]
-        |  +- name = 'elif_gated'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = "'y'"
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- elif_gated2 => VariableDoc [3]
-        |  +- name = 'elif_gated2'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [4]
-        |  |     +- repr = "'x'"
-        |  |     +- ast = [320, [298, [299, [300, [301, [303, [...
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- if_gated => VariableDoc [5]
-           +- name = 'if_gated'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [6]
-           |     +- repr = "'x'"
-           |     +- ast = [320, [298, [299, [300, [301, [303, [...
-           +- is_imported = False
-           +- is_alias = False
-           +- is_instvar = False
+    ...     if condition:
+    ...         if_gated = 'x'
+    ...     elif condition2:
+    ...         elif_gated = 'y'
+    ...     elif condition3:
+    ...         elif_gated2 = 'x'
+    ...     else:
+    ...         else_gated = 'z'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables
+        +- elif_gated => VariableDoc for test.elif_gated [1]
+        |  +- name = u'elif_gated'
+        +- elif_gated2 => VariableDoc for test.elif_gated2 [2]
+        |  +- name = u'elif_gated2'
+        +- else_gated => VariableDoc for test.else_gated [3]
+        |  +- name = u'else_gated'
+        +- if_gated => VariableDoc for test.if_gated [4]
+           +- name = u'if_gated'
 
     >>> # DocParser looks inside try/except and try/finally blocks:
-    >>> runparser(excludes=['ast'], s="""
-    ... try:
+    >>> runparser(s="""
     ...     try:
-    ...         try_gated = 'x'
-    ...     except Exception1:
-    ...         except_gated = 'x'
-    ...     except:
-    ...         except_gated2 = 'y'
-    ... finally:
-    ...     finally_gated = 'z'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- except_gated => VariableDoc [1]
-        |  +- name = 'except_gated'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = "'x'"
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- except_gated2 => VariableDoc [3]
-        |  +- name = 'except_gated2'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [4]
-        |  |     +- repr = "'y'"
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- finally_gated => VariableDoc [5]
-        |  +- name = 'finally_gated'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [6]
-        |  |     +- repr = "'z'"
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- try_gated => VariableDoc [7]
-           +- name = 'try_gated'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [8]
-           |     +- repr = "'x'"
-           +- is_imported = False
-           +- is_alias = False
-           +- is_instvar = False
+    ...         try:
+    ...             try_gated = 'x'
+    ...         except Exception1:
+    ...             except_gated = 'x'
+    ...         except:
+    ...             except_gated2 = 'y'
+    ...     finally:
+    ...         finally_gated = 'z'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables
+        +- except_gated => VariableDoc for test.except_gated [1]
+        |  +- name = u'except_gated'
+        +- except_gated2 => VariableDoc for test.except_gated2 [2]
+        |  +- name = u'except_gated2'
+        +- finally_gated => VariableDoc for test.finally_gated [3]
+        |  +- name = u'finally_gated'
+        +- try_gated => VariableDoc for test.try_gated [4]
+           +- name = u'try_gated'
 
     >>> # By default, DocParser does not look inside for blocks
-    >>> runparser(excludes=['ast'], s="""
-    ... for itervar in [5]*3:
-    ...     for_gated = 'x'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children = {}
+    >>> runparser(s="""
+    ...     for itervar in [5]*3:
+    ...         for_gated = 'x'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables = {}
     
     >>> # By default, DocParser does not look inside while blocks
-    >>> runparser(excludes=['ast'], s="""
-    ... while condition:
-    ...     while_gated = 'x'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children = {}
+    >>> runparser(s="""
+    ...     while condition:
+    ...         while_gated = 'x'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables = {}
 
 The set of blocks that DocParser looks inside are controlled by a set
 of class variables.  To change the behavior, either subclass
@@ -335,43 +284,25 @@ inside for blocks and while blocks:
     >>> modified_parser = DocParser(builtins_doc)
     >>> modified_parser.PARSE_FOR_BLOCKS = True
     >>> modified_parser.PARSE_WHILE_BLOCKS = True
-    >>> 
-    >>> runparser(excludes=['ast'], doc_parser=modified_parser, s="""
-    ... for itervar in [5]*3:
-    ...     for_gated = 'x'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- for_gated => VariableDoc [1]
-        |  +- name = 'for_gated'
-        |  +- docstring = None
-        |  +- val_doc
-        |  |  +- ValueDoc [2]
-        |  |     +- repr = "'x'"
-        |  +- is_imported = False
-        |  +- is_alias = False
-        |  +- is_instvar = False
-        +- itervar => VariableDoc [3]
-           +- name = 'itervar'
-           +- is_imported = False
-           +- is_alias = False
-           +- is_instvar = False
+    >>> runparser(doc_parser=modified_parser, s="""
+    ...     for itervar in [5]*3:
+    ...         for_gated = 'x'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables
+        +- for_gated => VariableDoc for test.for_gated [1]
+        |  +- name = u'for_gated'
+        +- itervar => VariableDoc for test.itervar [2]
+           +- name = u'itervar'
     
-    >>> runparser(excludes=['ast'], doc_parser=modified_parser, s="""
-    ... while condition:
-    ...     while_gated = 'x'""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- while_gated => VariableDoc [1]
-           +- name = 'while_gated'
-           +- docstring = None
-           +- val_doc
-           |  +- ValueDoc [2]
-           |     +- repr = "'x'"
-           +- is_imported = False
-           +- is_alias = False
-           +- is_instvar = False
+    >>> runparser(doc_parser=modified_parser, s="""
+    ...     while condition:
+    ...         while_gated = 'x'""",
+    ...     attribs="variables name")
+    ModuleDoc for test [0]
+     +- variables
+        +- while_gated => VariableDoc for test.while_gated [1]
+           +- name = u'while_gated'
 
 Note that when DocParser examines a for block, it also creates a
 VariableDoc for the loop variable (itervar in this case).
@@ -384,53 +315,49 @@ follow the assignment statement; or comments starting with the special
 sequence "#:" that occur before the assignment or on the same line as
 it.
 
-    >>> runparser(excludes=['ast'], s="""
-    ... x = 12
-    ... '''docstring for x.
-    ... (can be multiline)'''""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-           +- name = 'x'
+    >>> runparser(s="""
+    ...     x = 12
+    ...     '''docstring for x.
+    ...     (can be multiline)'''""",
+    ...     attribs="variables name docstring")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
            +- docstring = 'docstring for x.\n(can be multiline)'
-           ...
+           +- name = u'x'
 
-    >>> runparser(excludes=['ast'], s="""
-    ... x = 12 #: comment docstring for x""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-           +- name = 'x'
-           +- docstring = 'comment docstring for x'
-           ...
+    >>> runparser(s="""
+    ...     x = 12 #: comment docstring for x""",
+    ...     attribs="variables name docstring")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
+           +- docstring = u'comment docstring for x\n'
+           +- name = u'x'
 
-    >>> runparser(excludes=['ast'], s="""
-    ... #: comment docstring for x.
-    ... #: (can be multiline)
-    ... x = 12""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-           +- name = 'x'
-           +- docstring = 'comment docstring for x.\n(can be mu...
-           ...
+    >>> runparser(s="""
+    ...     #: comment docstring for x.
+    ...     #: (can be multiline)
+    ...     x = 12""",
+    ...     attribs="variables name docstring")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
+           +- docstring = u'comment docstring for x.\n(can be m...
+           +- name = u'x'
 
 If comments and a string constant are both used, they will be combined:
 
-    >>> runparser(excludes=['ast'], s="""
-    ... #: comment1
-    ... x = 12 #: comment2
-    ... '''string'''""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- x => VariableDoc [1]
-           +- name = 'x'
-           +- docstring = 'comment1\ncomment2\nstring'
-           ...
+    >>> runparser(s="""
+    ...     #: comment1
+    ...     x = 12 #: comment2
+    ...     '''string'''""",
+    ...     attribs="variables name docstring")
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
+           +- docstring = u'comment1\ncomment2\nstring'
+           +- name = u'x'
 
 Functions
 =========
@@ -438,88 +365,358 @@ When DocParser encounters a function definition statement, it creates
 a corresponding FunctionDoc object (as the valuedoc attribute of a
 VariableDoc object in the module's children list).
 
-    >>> runparser(excludes=['ast'], s="""
-    ... def f(x):
-    ...     'docstring for f'
-    ...     print 'inside f'
-    ... """)
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- f => VariableDoc [1]
-           +- name = 'f'
-           +- val_doc
-           |  +- FunctionDoc [2]
-           |     +- canonical_name = DottedName('...', 'f')
-           |     +- docstring = 'docstring for f'
-           |     +- args
-           |     |  +- ArgDoc [3]
-           |     |     +- name = 'x'
-           |     |     +- default = None
-           |     +- vararg = None
-           |     +- kwarg = None
-           +- is_imported = False
+    >>> runparser(s="""
+    ...     def f(x):
+    ...         'docstring for f'
+    ...         print 'inside f'
+    ...     """)
+    ModuleDoc for test [0]
+     +- canonical_name = DottedName('test')
+     +- filename = ...
+     +- is_package = False
+     +- package = None
+     +- sort_spec = [u'f']
+     +- submodules = []
+     +- variables
+        +- f => VariableDoc for test.f [1]
+           +- container
+           |  +- ModuleDoc for test [0] (defined above)
            +- is_alias = False
-
-Each FunctionDoc object contains a set of ArgDoc objects that describe
-the function's arguments:
-
-    >>> runparser(excludes=['ast'], s="""
-    ... def f(x, y=22, z=(1,), *v, **kw):
-    ...     'docstring for f'
-    ...     print 'inside f'
-    ... """)
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- f => VariableDoc [1]
-           +- name = 'f'
-           +- val_doc
-           |  +- FunctionDoc [2]
-           |     +- canonical_name = DottedName('...', 'f')
-           |     +- docstring = 'docstring for f'
-           |     +- args
-           |     |  +- ArgDoc [3]
-           |     |  |  +- name = 'x'
-           |     |  |  +- default = None
-           |     |  +- ArgDoc [4]
-           |     |  |  +- name = 'y'
-           |     |  |  +- default
-           |     |  |     +- ValueDoc [5]
-           |     |  |        +- repr = '22'
-           |     |  +- ArgDoc [6]
-           |     |     +- name = 'z'
-           |     |     +- default
-           |     |        +- ValueDoc [7]
-           |     |           +- repr = '(1,)'
-           |     +- vararg
-           |     |  +- ArgDoc [8]
-           |     |     +- name = 'v'
-           |     |     +- default = None
-           |     +- kwarg
-           |        +- ArgDoc [9]
-           |           +- name = 'kw'
-           |           +- default = None
            +- is_imported = False
-           +- is_alias = False
+           +- is_public = True
+           +- name = u'f'
+           +- value
+              +- FunctionDoc for test.f [2]
+                 +- canonical_name = DottedName('test', u'f')
+                 +- docstring = 'docstring for f'
+                 +- docstring_lineno = 3
+                 +- kwarg = None
+                 +- posarg_defaults = [None]
+                 +- posargs = [u'x']
+                 +- vararg = None
+
+The function's arguments are described by the properties `posargs`,
+`posarg_defaults`, `kwarg`, and `vararg`.  `posargs` is a list of
+argument names (or nested tuples of names, for tuple-unpacking args).
+`posarg_defaults` is a list of `ValueDoc`s for default values,
+corresponding 1:1 with `posargs`.  `posarg_defaults` is None for
+arguments with no default value.  `vararg` and `kwarg` are the names
+of the variable argument and keyword argument, respectively:
+
+    >>> runparser(s="""
+    ...     def f(x, y=22, z=(1,), *v, **kw):
+    ...         'docstring for f'
+    ...         print 'inside f'
+    ...     """,
+    ...     attribs='variables value posargs posarg_defaults vararg kwarg')
+    ModuleDoc for test [0]
+     +- variables
+        +- f => VariableDoc for test.f [1]
+           +- value
+              +- FunctionDoc for test.f [2]
+                 +- kwarg = u'kw'
+                 +- posarg_defaults = [None, <ValueDoc 22>, <ValueDoc (1,)>]
+                 +- posargs = [u'x', u'y', u'z']
+                 +- vararg = u'v'
 
 Tuple arguments are encoded as a single ArgDoc with a complex name:
-    >>> runparser(excludes=['ast'], s="""
-    ... def f( (x, (y,z)) ): pass""")
-    ModuleDoc [0]
-     +- canonical_name = DottedName('...')
-     +- children
-        +- f => VariableDoc [1]
-           +- name = 'f'
-           +- val_doc
-           |  +- FunctionDoc [2]
-           |     +- canonical_name = DottedName('...', 'f')
-           |     +- docstring = None
-           |     +- args
-           |     |  +- ArgDoc [3]
-           |     |     +- name = ('x', ('y', 'z'))
-           |     |     +- default = None
-           |     +- vararg = None
-           |     +- kwarg = None
-           +- is_imported = False
-           +- is_alias = False
+    >>> runparser(s="""
+    ...     def f( (x, (y,z)) ): pass""",
+    ...     attribs='variables value posargs posarg_defaults vararg kwarg')
+    ModuleDoc for test [0]
+     +- variables
+        +- f => VariableDoc for test.f [1]
+           +- value
+              +- FunctionDoc for test.f [2]
+                 +- kwarg = None
+                 +- posarg_defaults = [None]
+                 +- posargs = [(u'x', (u'y', u'z'))]
+                 +- vararg = None
+
+Decorators & Wrapper Assignments
+================================
+
+    >>> runparser(s="""
+    ...     @classmethod
+    ...     def f(cls, x): 'docstring for f'
+    ...     """,
+    ...     attribs='variables value docstring posargs')
+    ModuleDoc for test [0]
+     +- variables
+        +- f => VariableDoc for test.f [1]
+           +- value
+              +- ClassMethodDoc [2]
+                 +- docstring = 'docstring for f'
+                 +- posargs = [u'cls', u'x']
+
+Classes
+=======
+
+    >>> runparser(s="""
+    ...     class A:
+    ...         "no bases"
+    ...         class Nested: "nested class"
+    ...     class B(A): "single base"
+    ...     class C(A,B): "multiple bases"
+    ...     class D( ((A)) ): "extra parens around base"
+    ...     class E(A.Nested): "dotted name"
+    ...     class F(((A).Nested)): "parens with dotted name"
+    ...     class Z(B.__bases__[0]): "calculated base" # not handled!
+    ...     """,
+    ...     attribs='variables value bases docstring')
+    ModuleDoc for test [0]
+     +- variables
+        +- A => VariableDoc for test.A [1]
+        |  +- value
+        |     +- ClassDoc for test.A [2]
+        |        +- bases = []
+        |        +- docstring = 'no bases'
+        +- B => VariableDoc for test.B [3]
+        |  +- value
+        |     +- ClassDoc for test.B [4]
+        |        +- bases
+        |        |  +- ClassDoc for test.A [2] (defined above)
+        |        +- docstring = 'single base'
+        +- C => VariableDoc for test.C [5]
+        |  +- value
+        |     +- ClassDoc for test.C [6]
+        |        +- bases
+        |        |  +- ClassDoc for test.A [2] (defined above)
+        |        |  +- ClassDoc for test.B [4] (defined above)
+        |        +- docstring = 'multiple bases'
+        +- D => VariableDoc for test.D [7]
+        |  +- value
+        |     +- ClassDoc for test.D [8]
+        |        +- bases
+        |        |  +- ClassDoc for test.A [2] (defined above)
+        |        +- docstring = 'extra parens around base'
+        +- E => VariableDoc for test.E [9]
+        |  +- value
+        |     +- ClassDoc for test.E [10]
+        |        +- bases
+        |        |  +- ClassDoc for test.A.Nested [11]
+        |        |     +- bases = []
+        |        |     +- docstring = 'nested class'
+        |        +- docstring = 'dotted name'
+        +- F => VariableDoc for test.F [12]
+        |  +- value
+        |     +- ClassDoc for test.F [13]
+        |        +- bases
+        |        |  +- ClassDoc for test.A.Nested [11] (defined above)
+        |        +- docstring = 'parens with dotted name'
+        +- Z => VariableDoc for test.Z [14]
+           +- value
+              +- ClassDoc for test.Z [15]
+                 +- bases = <UNKNOWN>
+                 +- docstring = 'calculated base'
+
+
+Base lists:
+
+
+Delete Statements
+=================
+
+Deleting variables:
+
+    >>> runparser(s="""
+    ...     x = y = 12
+    ...     del y
+    ...     """,
+    ...     attribs='variables value repr is_alias')
+    ModuleDoc for test [0]
+     +- variables
+        +- x => VariableDoc for test.x [1]
+           +- is_alias = True
+           +- value
+              +- ValueDoc [2]
+                 +- repr = u'12'
+
+The right-hand side of a `del` statement may contain a nested
+combination of lists, tuples, and parenthases.  All variables found
+anywhere in this nested structure should be deleted:
+    
+    >>> runparser(s="""
+    ...     a=b=c=d=e=f=g=1
+    ...     del a
+    ...     del (b)
+    ...     del [c]
+    ...     del (d,)
+    ...     del (((e,)),)
+    ...     del [[[[f]]]]
+    ...     """,
+    ...     attribs='variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- g => VariableDoc for test.g [1]
+    >>> runparser(s="""
+    ...     a=b=c=d=e=f=g=1
+    ...     del a,b
+    ...     del (c,d)
+    ...     del [e,f]
+    ...     """,
+    ...     attribs='variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- g => VariableDoc for test.g [1]
+    >>> runparser(s="""
+    ...     a=b=c=d=e=f=g=1
+    ...     del ((a, (((a, ((b, c)), d), [e]))), f)
+    ...     """,
+    ...     attribs='variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- g => VariableDoc for test.g [1]
+
+The right-hand side of a `del` statement may contain a dotted name, in
+which case the named variable should be deleted from its containing
+namespace.
+
+    >>> runparser(s=""":
+    ...     class A: a = b = 1
+    ...     del A.a
+    ...     """,
+    ...     attribs='variables value local_variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- A => VariableDoc for test.A [1]
+           +- value
+              +- ClassDoc for test.A [2]
+                 +- local_variables
+                    +- b => VariableDoc for test.A.b [3]
+                       +- value
+                          +- ValueDoc [4]
+
+If one of the variables to be deleted is expressed as anything other
+than a simple identifier or a dotted name, then ignore it.  (In
+particular, if we encounter 'del x[2]' then do not delete x.)
+
+    >>> runparser(s=""":
+    ...     a = b = [1,2,3,4]
+    ...     del a[2]
+    ...     del a[1:]
+    ...     del ([b], a[1])
+    ...     """,
+    ...     attribs='variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- a => VariableDoc for test.a [1]
+
+Single-Line Blocks
+==================
+
+    >>> runparser(s="""
+    ...     class A: 'docstring for A'
+    ...     
+    ... 
+    ...     """,
+    ...     attribs='variables value docstring')
+    ModuleDoc for test [0]
+     +- variables
+        +- A => VariableDoc for test.A [1]
+           +- value
+              +- ClassDoc for test.A [2]
+                 +- docstring = 'docstring for A'
+
+Imports
+=======
+
+    >>> runparser(s="""
+    ...     import re
+    ...     from re import match
+    ...     """,
+    ...     attribs='variables value is_imported')
+    ModuleDoc for test [0]
+     +- variables
+        +- match => VariableDoc for test.match [1]
+        |  +- is_imported = True
+        |  +- value
+        |     +- ValueDoc [2]
+        +- re => VariableDoc for test.re [3]
+           +- is_imported = True
+           +- value
+              +- ValueDoc [4]
+
+
+Unicode
+=======
+
+    >>> runparser(s="""
+    ...     def f(x):
+    ...         u"unicode in docstring: \u1000"
+    ...     """,
+    ...     attribs='variables value docstring')
+    ModuleDoc for test [0]
+     +- variables
+        +- f => VariableDoc for test.f [1]
+           +- value
+              +- FunctionDoc for test.f [2]
+                 +- docstring = u'unicode in docstring: \u1000'
+
+Instance Variables
+==================
+
+    >>> runparser(s="""
+    ...     class A:
+    ...         def __init__(self, x, y):
+    ...             self.x = 10
+    ...             
+    ...             self.y = 20 #: docstring for y
+    ...             
+    ...             self.z = 30
+    ...             '''docstring for z'''
+    ...     
+    ...     """,
+    ...     attribs='variables value is_instvar docstring local_variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- A => VariableDoc for test.A [1]
+           +- value
+              +- ClassDoc for test.A [2]
+                 +- local_variables
+                    +- __init__ => VariableDoc for test.A.__init__ [3]
+                    |  +- value
+                    |     +- InstanceMethodDoc for test.A.__init__ [4]
+                    +- y => VariableDoc for test.A.y [5]
+                    |  +- docstring = u'docstring for y\n'
+                    |  +- is_instvar = True
+                    |  +- value
+                    |     +- ValueDoc [6]
+                    +- z => VariableDoc for test.A.z [7]
+                       +- docstring = 'docstring for z'
+                       +- is_instvar = True
+                       +- value
+                          +- ValueDoc [8]
+
+Assignments Into Namespaces
+===========================
+
+    >>> runparser(s="""
+    ...     class A: pass
+    ...     A.x = 22
+    ...     """,
+    ...     attribs='variables value local_variables')
+    ModuleDoc for test [0]
+     +- variables
+        +- A => VariableDoc for test.A [1]
+           +- value
+              +- ClassDoc for test.A [2]
+                 +- local_variables
+                    +- x => VariableDoc for test.A.x [3]
+                       +- value
+                          +- ValueDoc [4]
+
+
+
+Base lists:
+   class A: pass                   # no bases
+   class B(A): pass                # single base
+   class C(A,B): pass              # multiple bases
+   class D( ((A)) ): pass          # extra parens around base
+   class E(Dotted.Name): pass      # dotted name
+   class F(B.__bases__[0]): pass   # calculated base
+
+Delete:
+
+
+

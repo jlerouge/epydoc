@@ -1,5 +1,12 @@
-APIDoc Test file
-~~~~~~~~~~~~~~~~
+                    Regression Testing for epydoc.apidoc
+                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This file serves to provide both documentation and regression tests
+for the epydoc.apidoc module.  The main purpose of this module is to
+define the `APIDoc` class hierarchy, which is used to encode API
+documentation about Python programs.  The API documentation for a
+Python program is encoded using a graph of `APIDoc` objects, each of
+which encodes information about a single Python variable or value.
+
     >>> from epydoc.apidoc import *
 
 Unknown Value
@@ -34,7 +41,7 @@ UNKNOWN value as true or false:
     >>> if UNKNOWN:
     ...     print 'ok'
     Traceback (most recent call last):
-    ValueError: Sentinel values can not be used as booleans
+    ValueError: Sentinel value <UNKNOWN> can not be used as a boolean
 
 To test an attribute whose value might be UNKNOWN, you should
 explicitly compare that value to True or False.  E.g.:
@@ -127,19 +134,19 @@ Dotted names may be combined with the addition operator:
     >>> name2 + name1 == name3
     False
 
-The parent method may be used to construct a new dotted name with the
+The container method may be used to construct a new dotted name with the
 last identifier stripped off:
 
-    >>> name1.parent()
+    >>> name1.container()
     DottedName('foo')
-    >>> name3.parent()
+    >>> name3.container()
     DottedName('foo', 'bar', 'x', 'y')
 
-If a dotted name has only one identifier, then its parent is None:
+If a dotted name has only one identifier, then its container is None:
 
-    >>> print DottedName('baz').parent()
+    >>> print DottedName('baz').container()
     None
-    >>> print name1.parent().parent()
+    >>> print name1.container().container()
     None
 
 It is an error to create an empty dotted name; or a dotted name that
@@ -171,16 +178,17 @@ API documentation about Python programs is broken into small pieces,
 each of which is encoded using a single APIDoc object.  Each APIDoc
 object describes a single value, variable, or function argument.
 
-The APIDoc base class has 3 direct subclasses, for the 3 basic types
-of entity that it can record information about: ValueDoc; VariableDoc;
-and ArgDoc.  ValueDoc is further subclassed to specify the different
+The APIDoc base class has 2 direct subclasses, for the 2 basic types
+of entity that it can record information about: ValueDoc and
+VariableDoc.  ValueDoc is further subclassed to specify the different
 pieces of information that should be recorded about each value type.
 
-APIDoc objects record information about each object using attributes.
+APIDoc objects record information about each entity using attributes.
 Attribute values may be specified in the constructor.  Any attributes
 that are not specified will be given a default value (usually
 UNKNOWN).  The APIDoc base class defines the attributes shared by all
-APIDoc objects: docstring, descr, summary, and metadata.
+APIDoc objects: docstring, docstring_lineno, descr, summary, metadata,
+and extra_docstring_fields.
 
     >>> api_doc = APIDoc(docstring='foo')
     >>> api_doc.docstring
@@ -205,26 +213,28 @@ TypeError:
     >>> api_doc = APIDoc(docstring='ds')
     >>> api_doc.foo = 0
     Traceback (most recent call last):
-    TypeError: APIDoc does not define attribute 'foo'
+    AttributeError: APIDoc does not define attribute 'foo'
 
 APIDoc defines a pretty-print method, pp(), which can be used to
 display the information that an APIDoc contains:
 
-    >>> val_doc = ValueDoc(value=3)
-    >>> var_doc = VariableDoc(name='x', val_doc=val_doc)
-    >>> class_doc = ClassDoc(bases=(), children={'x':var_doc})
+    >>> val_doc = ValueDoc(pyval=3)
+    >>> var_doc = VariableDoc(name='x', value=val_doc)
+    >>> class_doc = ClassDoc(bases=(), variables={'x':var_doc})
     >>> print class_doc.pp()
     ClassDoc [0]
-     +- children
-     |  +- x => VariableDoc [1]
-     |     +- name = 'x'
-     |     +- val_doc
-     |        +- ValueDoc [2]
-     |           +- value = 3
      +- bases = ()
+     +- variables
+        +- x => VariableDoc for x [1]
+           +- is_public = True
+           +- name = 'x'
+           +- value
+              +- ValueDoc [2]
+                 +- pyval = 3
 
 This is mainly intended to be used as a debugging and testing tool.
 The attributes that will be pretty-printed for an APIDoc object are
 determined by its class's _STR_FIELDS variable.  (But any attribute
-whose value is UNKNOWN will not be displayed.)
+whose value is UNKNOWN will not be displayed.)  Attributes are listed
+in alphabetical order.
 
