@@ -951,7 +951,12 @@ def pp_apidoc(api_doc, doublespace=0, depth=-1, exclude=(), include=(),
                   (getattr(api_doc, field) is not UNKNOWN
                    and field not in exclude))]
     if include:
-        fields = [f for f in fields if f in include]
+        fields = [field for field in dir(api_doc)
+                  if field in include]
+    else:
+        fields = [field for field in api_doc.__dict__.keys()
+                  if (getattr(api_doc, field) is not UNKNOWN
+                      and field not in exclude)]
     fields.sort()
     
     for field in fields:
