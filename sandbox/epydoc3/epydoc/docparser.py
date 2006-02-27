@@ -529,7 +529,13 @@ class DocParser:
                     parent_docs.append(prev_line_doc)
             # Dedent token: update the parent_doc stack.
             elif toktype == token.DEDENT:
-                parent_docs.pop()
+                if line_toks == []:
+                    parent_docs.pop()
+                else:
+                    # This *should* only happen if the file ends on an
+                    # indented line, with no final newline.
+                    # (otherwise, this is the wrong thing to do.)
+                    pass
             # Line-internal newline token: ignore it.
             elif toktype == tokenize.NL:
                 pass
@@ -650,6 +656,17 @@ class DocParser:
     def process_control_flow_line(self, line, parent_docs, prev_line_doc,
                                   lineno, comments, decorators):
         keyword = line[0][1]
+
+        # If it's a 'for' block: create the loop variable.
+        if keyword == 'for' and self.PARSE_FOR_BLOCKS:
+            loopvar_name = self.parse_dotted_name(
+                self.split_on(line[1:], (token.NAME, 'in'))[0])
+            parent = self.lhs_parent(loopvar_name, parent_docs)
+            if parent is not None:
+                var_doc = VariableDoc(name=loopvar_name[-1], is_alias=False, 
+                                      is_imported=False, is_instvar=False)
+                self.set_variable(parent, var_doc)
+        
         if ((keyword == 'if' and self.PARSE_IF_BLOCKS) or
             (keyword == 'elif' and self.PARSE_ELSE_BLOCKS) or
             (keyword == 'else' and self.PARSE_ELSE_BLOCKS) or
@@ -923,6 +940,8 @@ class DocParser:
         rhs_val, is_alias = self.rhs_to_valuedoc(rhs, parent_docs)
 
         # Assign the right hand side value to each left hand side.
+        # (Do the rightmost assignment first)
+        lhs_pieces.reverse()
         for lhs in lhs_pieces:
             # Try treating the LHS as a simple dotted name.
             try: lhs_name = self.parse_dotted_name(lhs)
@@ -970,6 +989,11 @@ class DocParser:
                                           is_alias=is_alias,
                                           is_instvar=is_instvar)
                     self.set_variable(lhs_parent, var_doc)
+
+            # If we have multiple left-hand-sides, then all but the
+            # rightmost one are considered aliases.
+            is_alias = True
+            
 
     def lhs_is_instvar(self, lhs_pieces, parent_doc):
         return (isinstance(parent_doc, InstanceMethodDoc) and
@@ -1302,9 +1326,10 @@ class DocParser:
             class_doc.bases = []
 
         # Register ourselves as a subclass to our bases.
-        for basedoc in class_doc.bases:
-            if isinstance(basedoc, ClassDoc):
-                basedoc.subclasses.append(class_doc)
+        if class_doc.bases is not UNKNOWN:
+            for basedoc in class_doc.bases:
+                if isinstance(basedoc, ClassDoc):
+                    basedoc.subclasses.append(class_doc)
         
         # If the preceeding comment includes a docstring, then add it.
         self.add_docstring_from_comments(class_doc, comments)
@@ -1337,25 +1362,40 @@ class DocParser:
                     pass # complex expression -- ignore
         return names
     
-    def parse_name(self, elt):
+    def parse_name(self, elt, strip_parens=False):
         """
         If the given token tree element is a name token, then return
         that name as a string.  Otherwise, raise ParseError.
+        @param strip_parens: If true, then if elt is a single name
+            enclosed in parenthases, then return that name.
         """
+        if strip_parens and isinstance(elt, list):
+            while (isinstance(elt, list) and len(elt) == 3 and
+                   elt[0] == (token.OP, '(') and
+                   elt[-1] == (token.OP, ')')):
+                elt = elt[1]
         if isinstance(elt, list) or elt[0] != token.NAME:
             raise ParseError()
         return elt[1]
 
-    def parse_dotted_name(self, elt_list):
+    def parse_dotted_name(self, elt_list, strip_parens=True):
         """
         @bug: does not handle 'x.(y).z'
         """
         if len(elt_list) % 2 != 1: raise ParseError()
-        name = DottedName(self.parse_name(elt_list[0]))
+        
+        # Handle ((x.y).z)
+        while (isinstance(elt_list[0], list) and 
+               elt_list[0][0] == (token.OP, '(') and
+               elt_list[0][-1] == (token.OP, ')')):
+            elt_list[:1] = elt_list[0][1:-1]
+
+        name = DottedName(self.parse_name(elt_list[0], True))
         for i in range(2, len(elt_list), 2):
-            if  elt_list[i-1] != (token.OP, '.'):
+            dot, identifier = elt_list[i-1], elt_list[i]
+            if  dot != (token.OP, '.'):
                 raise ParseError()
-            name = DottedName(name, self.parse_name(elt_list[i]))
+            name = DottedName(name, self.parse_name(identifier, True))
         return name
             
     def split_on(self, elt_list, split_tok):
@@ -1400,13 +1440,15 @@ class DocParser:
         list of L{DottedName}s.  Otherwise, raise a ParseError.
         
         @bug: Does not handle either of::
-            class A( (base.in.parens) ): pass
-            class B( (lambda:calculated.base)() ): pass
+            - class A( (base.in.parens) ): pass
+            - class B( (lambda:calculated.base)() ): pass
         """
         if (not isinstance(elt, list) or
             elt[0] != (token.OP, '(')):
             raise ParseError()
-        return self.parse_dotted_name_list(elt[1:-1])
+
+        return [self.parse_dotted_name(n)
+                for n in self.split_on(elt[1:-1], (token.OP, ','))]
 
     # Used by: base list; 'del'; ...
     def parse_dotted_name_list(self, elt_list):
@@ -1494,7 +1536,6 @@ class DocParser:
         assert var_doc.container is UNKNOWN
         var_doc.container = namespace
     
-    # need to handle things like 'del A.B.c'
     def del_variable(self, namespace, name):
         if not isinstance(namespace, NamespaceDoc):
             return
@@ -1503,7 +1544,6 @@ class DocParser:
         else:
             var_dict = namespace.variables
 
-        name = DottedName(name)
         if name[0] in var_dict:
             if len(name) == 1:
                 var_doc = var_dict[name[0]]
@@ -1512,7 +1552,8 @@ class DocParser:
                 if not var_doc.is_alias and var_doc.value is not UNKNOWN:
                     var_doc.value.canonical_name = UNKNOWN
             else:
-                self.del_variable(var_dict[name[0]], name[1:])
+                self.del_variable(var_dict[name[0]].value,
+                                  DottedName(*name[1:]))
                 
     #/////////////////////////////////////////////////////////////////
     # Name Lookup
