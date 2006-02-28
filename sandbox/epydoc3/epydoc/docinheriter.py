@@ -42,13 +42,7 @@ class DocInheriter:
                 # If class_doc doesn't have a variable with this name,
                 # then inherit it.
                 if name not in class_doc.variables:
-                    # [xx] could I get away with just copying it??
-                    # I'd have to do away with the is_inherited field;
-                    # but that might be ok, since I could just check
-                    # the .container attribute??
-                    inherited_var = VariableDoc(**var_doc.__dict__)
-                    inherited_var.is_inherited = True
-                    class_doc.variables[name] = inherited_var
+                    class_doc.variables[name] = var_doc
 
                 # Otherwise, class_doc already contains a variable
                 # that shadows var_doc.  But if class_doc's var is

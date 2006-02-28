@@ -370,7 +370,6 @@ class VariableDoc(APIDoc):
     is_public = UNKNOWN
     overrides = UNKNOWN #: rename -- don't use a verb.
     type_descr = UNKNOWN
-    is_inherited = False
     
     def __init__(self, **kwargs):
         APIDoc.__init__(self, **kwargs)
@@ -770,9 +769,9 @@ class ClassDoc(NamespaceDoc):
         # Inherited filter (Count UNKNOWN as non-inherited)
         if inherited is None: pass
         elif inherited:
-            var_list = [v for v in var_list if v.is_inherited is True]
+            var_list = [v for v in var_list if v.container != self]
         else:
-            var_list = [v for v in var_list if v.is_inherited is not True]
+            var_list = [v for v in var_list if v.container == self ]
 
         # Imported filter (Count UNKNOWN as non-imported)
         if imported is True:
@@ -928,7 +927,7 @@ class PropertyDoc(ValueDoc):
 ## Pretty Printing
 ######################################################################
 
-def pp_apidoc(api_doc, doublespace=0, depth=-1, exclude=(), include=(),
+def pp_apidoc(api_doc, doublespace=0, depth=5, exclude=(), include=(),
               backpointers=None):
     """
     @return: A multiline pretty-printed string representation for the

@@ -1470,7 +1470,7 @@ class HTMLWriter:
         normal_vars = []
         for i in range(len(var_docs)-1, -1, -1):
             var_doc = var_docs[i]
-            if var_doc.is_inherited == True:
+            if var_doc.container != doc:
                 base = var_doc.container
                 if (base not in self.docindex.contained_valdocs
                     or self._inheritance == 'listed'):
@@ -1541,7 +1541,7 @@ class HTMLWriter:
         summary = self.summary(var_doc, indent=6)
 
         # If it's inherited, then add a note to the summary.
-        if var_doc.is_inherited and self._inheritance=="included":
+        if var_doc.container != container and self._inheritance=="included":
             summary += ("\n      <em>(Inherited from " +
                         self.href(var_doc.container) + ")</em>")
             
@@ -2480,6 +2480,8 @@ class HTMLWriter:
         else:
             raise ValueError, "Don't know what to do with %r" % obj
 
+    # [xx] returning None from here is somewhat problematic -- if we
+    # don't have one, then we dont' want to link...
     def pysrc_url(self, vardoc):
         if isinstance(vardoc, ModuleDoc):
             if vardoc.filename in (None, UNKNOWN):
@@ -2488,6 +2490,8 @@ class HTMLWriter:
                 return '%s-module-pysrc.html' % vardoc.canonical_name
         else:
             module = vardoc.containing_module()
+            if module in (None, UNKNOWN):
+                return None
             if module.filename in (None, UNKNOWN):
                 return None
             else:
