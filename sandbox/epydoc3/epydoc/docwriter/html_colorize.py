@@ -398,7 +398,7 @@ Goals:
 """
 
 #: Javascript code for the PythonSourceColorizer
-PYSRC_JS = '''
+PYSRC_JAVASCRIPTS = '''
 <script type="text/javascript">
 <!--
 function expand(id) {
@@ -677,10 +677,10 @@ class PythonSourceColorizer:
         # Decode the html string into unicode, and then encode it back
         # into ascii, replacing any non-ascii characters with xml
         # character references.
-        unicode_html = unicode(html, coding)
-        html = codecs.encode(unicode_html, 'ascii', 'xmlcharrefreplace')
+        html = html.decode(coding).encode('ascii', 'xmlcharrefreplace')
 
-        html += PYSRC_JS
+        # Add on the javascripts.
+        html += PYSRC_JAVASCRIPTS
 
         return html
     

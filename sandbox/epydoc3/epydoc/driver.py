@@ -27,6 +27,9 @@ from epydoc import log
 
 from epydoc.util import * # [xx] hmm
 
+# Backwards compatibility imports:
+try: sorted
+except NameError: from epydoc.util import py_sorted as sorted
 
 ######################################################################
 ## The Driver

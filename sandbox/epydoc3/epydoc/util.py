@@ -70,6 +70,30 @@ def py_src_filename(filename):
                              'Python source file.')
 
 ######################################################################
+## Backwards compatibility
+######################################################################
+
+def py_sorted(iterable, cmp=None, key=None, reverse=False):
+    """
+    A python drop-in replacement for the builtin C{sorted}, which was
+    introduced in Python 2.4.  This is used for backwards
+    compatibility.
+    """
+    if key is None:
+        elts = list(iterable)
+    else:
+        elts = [(key(v), v) for v in iterable]
+
+    if reverse: elts.reverse()
+    if cmp is None: elts.sort()
+    else: elts.sort(cmp)
+
+    if key is None:
+        return elts
+    else:
+        return [v for (k,v) in elts]
+
+######################################################################
 ## Text Processing
 ######################################################################
 

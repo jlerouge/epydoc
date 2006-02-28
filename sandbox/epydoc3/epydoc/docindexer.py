@@ -21,6 +21,10 @@ from epydoc.apidoc import *
 from epydoc import log
 from sets import Set
 
+# Backwards compatibility imports:
+try: sorted
+except NameError: from epydoc.util import py_sorted as sorted
+
 class DocIndex:
     """
     An index of all the C{APIDoc} objects that can be reached from a
