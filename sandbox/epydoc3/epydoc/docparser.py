@@ -1382,14 +1382,18 @@ class DocParser:
         """
         @bug: does not handle 'x.(y).z'
         """
-        if len(elt_list) % 2 != 1: raise ParseError()
+        if len(elt_list) == 0: raise ParseError()
         
-        # Handle ((x.y).z)
-        while (isinstance(elt_list[0], list) and 
+        # Handle ((x.y).z).  (If the contents of the parens include
+        # anything other than dotted names, such as (x,y), then we'll
+        # catch it below and raise a ParseError.
+        while (isinstance(elt_list[0], list) and
+               len(elt_list[0]) >= 3 and
                elt_list[0][0] == (token.OP, '(') and
                elt_list[0][-1] == (token.OP, ')')):
             elt_list[:1] = elt_list[0][1:-1]
 
+        if len(elt_list) % 2 != 1: raise ParseError()
         name = DottedName(self.parse_name(elt_list[0], True))
         for i in range(2, len(elt_list), 2):
             dot, identifier = elt_list[i-1], elt_list[i]
