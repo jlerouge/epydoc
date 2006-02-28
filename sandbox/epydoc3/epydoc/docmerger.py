@@ -80,9 +80,13 @@ class DocMerger:
         assert isinstance(inspect_doc, APIDoc)
         assert isinstance(parse_doc, APIDoc)
 
-        if (inspect_doc, parse_doc) in cyclecheck:
+        # If we've already examined this pair, then there's nothing
+        # more to do.  The reason that we check id's here is that we
+        # want to avoid hashing the APIDoc objects for now, so we can
+        # use APIDoc.merge_and_overwrite() later.
+        if (id(inspect_doc), id(parse_doc)) in cyclecheck:
             return inspect_doc
-        cyclecheck.add( (inspect_doc, parse_doc) )
+        cyclecheck.add( (id(inspect_doc), id(parse_doc)) )
 
         # Sanity check:
         if (isinstance(inspect_doc, ValueDoc) and
@@ -101,17 +105,14 @@ class DocMerger:
             # They can't be coerced; throw away whatever is
             # disfavored by DEFAULT_PRECEDENCE.
             if self.DEFAULT_PRECEDENCE == 'inspect':
-                parse_doc.__class__ = inspect_doc.__class__
-                parse_doc.__dict__ = inspect_doc.__dict__
-                return inspect_doc
+                return inspect_doc.merge_and_overwrite(parse_doc)
             else:
-                inspect_doc.__class__ = parse_doc.__class__
-                inspect_doc.__dict__ = parse_doc.__dict__
-                return inspect_doc
+                return parse_doc.merge_and_overwrite(inspect_doc)
 
-        # If these two are already merged, then we're done.  We can
-        # tell if they're merged by checking if they share a __dict__.
-        if inspect_doc.__dict__ is parse_doc.__dict__:
+        # If these two are already merged, then we're done.  (Two
+        # APIDoc's compare equal iff they are identical or have been
+        # merged.)
+        if inspect_doc == parse_doc:
             return inspect_doc
 
         # The posargs and defaults are tied together -- if we merge
@@ -127,9 +128,8 @@ class DocMerger:
             self.merge_attribute(attrib, inspect_doc, parse_doc,
                                  cyclecheck, path)
 
-        # Set the dictionaries to be shared
-        parse_doc.__dict__ = inspect_doc.__dict__
-        return inspect_doc
+        # Set the dictionaries to be shared.
+        return inspect_doc.merge_and_overwrite(parse_doc)
 
     def merge_attribute(self, attrib, inspect_doc, parse_doc,
                         cyclecheck, path):
