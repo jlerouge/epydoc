@@ -419,9 +419,6 @@ class DocstringParser:
                 if var_name_re.match(var_name):
                     # Remove the variable from `variables`.
                     api_doc.variables.pop(var_name, None)
-                    # Remove the variable from `local_variables`.
-                    if isinstance(api_doc, ClassDoc):
-                        api_doc.local_variables.pop(var_name, None)
 
     def process_group_field(self, api_doc, tag, arg, descr):
         self.check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=True)
@@ -481,13 +478,13 @@ class DocstringParser:
         self.check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
         for ident in re.split('[:;, ] *', arg):
             self.set_var_descr(api_doc, ident, descr)
-            api_doc.local_variables[ident].is_instvar = False
+            api_doc.variables[ident].is_instvar = False
             
     def process_ivar_field(self, api_doc, tag, arg, descr):
         self.check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
         for ident in re.split('[:;, ] *', arg):
             self.set_var_descr(api_doc, ident, descr)
-            api_doc.local_variables[ident].is_instvar = True
+            api_doc.variables[ident].is_instvar = True
 
     def process_return_field(self, api_doc, tag, arg, descr):
         self.check(api_doc, tag, arg, context=RoutineDoc, expect_arg=False)
@@ -518,13 +515,11 @@ class DocstringParser:
     #////////////////////////////////////////////////////////////
 
     def set_var_descr(self, api_doc, ident, descr):
-        if isinstance(api_doc, ClassDoc): var_dict = api_doc.local_variables
-        else: var_dict = api_doc.variables
-        
-        if ident not in var_dict:
-            var_dict[ident] = VariableDoc(container=api_doc, name=ident)
+        if ident not in api_doc.variables:
+            api_doc.variables[ident] = VariableDoc(container=api_doc,
+                                                   name=ident)
                                           
-        var_doc = var_dict[ident]
+        var_doc = api_doc.variables[ident]
         if var_doc.descr not in (None, UNKNOWN):
             raise ValueError(self.REDEFINED % ('description for '+ident))
         var_doc.descr = descr
@@ -532,12 +527,10 @@ class DocstringParser:
             var_doc.summary = var_doc.descr.summary()
 
     def set_var_type(self, api_doc, ident, descr):
-        if isinstance(api_doc, ClassDoc): var_dict = api_doc.local_variables
-        else: var_dict = api_doc.variables
-        
-        if ident not in var_dict:
-            var_dict[ident] = VariableDoc(container=api_doc, name=ident)
-        var_doc = var_dict[ident]
+        if ident not in api_doc.variables:
+            api_doc.variables[ident] = VariableDoc(container=api_doc,
+                                                   name=ident)
+        var_doc = api_doc.variables[ident]
         if var_doc.type_descr not in (None, UNKNOWN):
             raise ValueError(self.REDEFINED % ('type for '+ident))
         var_doc.type_descr = descr

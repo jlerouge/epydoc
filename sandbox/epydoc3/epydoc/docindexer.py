@@ -174,10 +174,6 @@ class DocIndex:
                             for var in container_doc.variables.values():
                                 if var.value == val_doc:
                                     val_doc.canonical_container = container_doc
-                    if isinstance(container_doc, ClassDoc):
-                        for var in container_doc.local_variables.values():
-                            if var.value == val_doc:
-                                val_doc.canonical_container = container_doc
         log.end_progress()
 
         # [XX] conflict check turned off!
@@ -393,14 +389,11 @@ class DocIndex:
         Return a list of all C{VariableDoc}s that are directly
         reachable from the given C{ValueDoc}.
         """
-        val_docs = []
-        if (isinstance(val_doc, ClassDoc)
-            and val_doc.local_variables is not UNKNOWN):
-            val_docs += val_doc.local_variables.values()
         if (isinstance(val_doc, NamespaceDoc)
             and val_doc.variables is not UNKNOWN):
-            val_docs += val_doc.variables.values()
-        return val_docs
+            return val_doc.variables.values()
+        else:
+            return []
 
     def _valdocs_reachable_from(self, val_doc):
         """

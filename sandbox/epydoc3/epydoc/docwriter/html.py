@@ -2360,12 +2360,9 @@ class HTMLWriter:
                     for descr in descrlist:
                         self._get_index_terms(descr, doc, terms, links)
             # summary?
-            if isinstance(doc, ClassDoc):
-                for var in doc.local_variables.items():
-                    pass
-            elif isinstance(doc, NamespaceDoc):
+            if isinstance(doc, NamespaceDoc):
                 for var in doc.variables.items():
-                    pass
+                    pass # [XX] ????? add these???
             elif isinstance(doc, RoutineDoc):
                 self._get_index_terms(doc.return_descr, doc, terms, links)
                 self._get_index_terms(doc.return_type, doc, terms, links)

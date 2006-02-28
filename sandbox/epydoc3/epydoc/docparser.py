@@ -1135,7 +1135,7 @@ class DocParser:
         docstring = self.parse_string(line)
 
         # If the modified APIDoc is an instance variable, and it has
-        # not yet been added to its class's C{local_variables} list,
+        # not yet been added to its class's C{variables} list,
         # then add it now.  This is done here, rather than in the
         # process_assignment() call that created the variable, because
         # we only want to add instance variables if they have an
@@ -1301,7 +1301,7 @@ class DocParser:
         canonical_name = DottedName(parent_doc.canonical_name, class_name)
 
         # Create the class's ClassDoc & VariableDoc.
-        class_doc = ClassDoc(local_variables={}, sort_spec=[],
+        class_doc = ClassDoc(variables={}, sort_spec=[],
                             bases=[], subclasses=[],
                             canonical_name=canonical_name)
         var_doc = VariableDoc(name=class_name, value=class_doc,
@@ -1316,7 +1316,7 @@ class DocParser:
                 for base in self.parse_classdef_bases(line[2]):
                     base_doc = self.lookup_value(base, parent_docs)
                     if base_doc is None: # [XX] This might be a problem??
-                        base_doc = ClassDoc(local_variables={}, sort_spec=[],
+                        base_doc = ClassDoc(variables={}, sort_spec=[],
                                             bases=[], subclasses=[],
                                             imported_from = base)
                     class_doc.bases.append(base_doc)
@@ -1521,21 +1521,17 @@ class DocParser:
         # Choose which dictionary we'll be storing the variable in.
         if not isinstance(namespace, NamespaceDoc):
             return
-        elif isinstance(namespace, ClassDoc):
-            var_dict = namespace.local_variables
-        else:
-            var_dict = namespace.variables
         # If we already have a variable with this name, then remove the
         # old VariableDoc from the sort_spec list; and if we gave its
         # value a canonical name, then delete it.
-        if var_doc.name in var_dict:
+        if var_doc.name in namespace.variables:
             namespace.sort_spec.remove(var_doc.name)
-            old_var_doc = var_dict[var_doc.name]
+            old_var_doc = namespace.variables[var_doc.name]
             if (old_var_doc.is_alias == False and
                 old_var_doc.value != UNKNOWN):
                 old_var_doc.value.canonical_name = UNKNOWN
         # Add the variable to the namespace.
-        var_dict[var_doc.name] = var_doc
+        namespace.variables[var_doc.name] = var_doc
         namespace.sort_spec.append(var_doc.name)
         assert var_doc.container is UNKNOWN
         var_doc.container = namespace
@@ -1543,20 +1539,16 @@ class DocParser:
     def del_variable(self, namespace, name):
         if not isinstance(namespace, NamespaceDoc):
             return
-        elif isinstance(namespace, ClassDoc):
-            var_dict = namespace.local_variables
-        else:
-            var_dict = namespace.variables
 
-        if name[0] in var_dict:
+        if name[0] in namespace.variables:
             if len(name) == 1:
-                var_doc = var_dict[name[0]]
+                var_doc = namespace.variables[name[0]]
                 namespace.sort_spec.remove(name[0])
-                del var_dict[name[0]]
+                del namespace.variables[name[0]]
                 if not var_doc.is_alias and var_doc.value is not UNKNOWN:
                     var_doc.value.canonical_name = UNKNOWN
             else:
-                self.del_variable(var_dict[name[0]].value,
+                self.del_variable(namespace.variables[name[0]].value,
                                   DottedName(*name[1:]))
                 
     #/////////////////////////////////////////////////////////////////
@@ -1588,12 +1580,7 @@ class DocParser:
 
         # Check the namespaces, from closest to farthest.
         for namespace in namespaces:
-            # In classes, check local_variables.
-            if isinstance(namespace, ClassDoc):
-                if namespace.local_variables.has_key(identifier):
-                    return namespace.local_variables[identifier]
-            # In modules, check variables.
-            elif isinstance(namespace, NamespaceDoc):
+            if isinstance(namespace, NamespaceDoc):
                 if namespace.variables.has_key(identifier):
                     return namespace.variables[identifier]
 
@@ -1617,9 +1604,7 @@ class DocParser:
                                        *dotted_name[i:])
                 return ValueDoc(imported_from=from_name)
 
-            if isinstance(var_doc.value, ClassDoc):
-                var_dict = var_doc.value.local_variables
-            elif isinstance(var_doc.value, NamespaceDoc):
+            if isinstance(var_doc.value, NamespaceDoc):
                 var_dict = var_doc.value.variables
             else:
                 return None

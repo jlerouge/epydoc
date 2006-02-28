@@ -141,10 +141,6 @@ class DocBuilder:
                 log.progress(float(i)/len(val_docs),
                              str(val_doc.canonical_name))
             self.docstring_parser.parse_docstring(val_doc)
-            if (isinstance(val_doc, ClassDoc) and
-                val_doc.local_variables not in (None, UNKNOWN)):
-                for var_doc in val_doc.local_variables.values():
-                    self.docstring_parser.parse_docstring(var_doc)
             if (isinstance(val_doc, NamespaceDoc) and
                 val_doc.variables not in (None, UNKNOWN)):
                 for var_doc in val_doc.variables.values():
