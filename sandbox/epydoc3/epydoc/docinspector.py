@@ -32,8 +32,8 @@ from types import *
 from sets import Set
 # Error reporting:
 from epydoc import log
-
-from epydoc.util import * # [xx] hmm
+# Helper functions:
+from epydoc.util import is_package_dir, decode_with_backslashreplace
 
 class DocInspector:
     """
@@ -159,11 +159,14 @@ class DocInspector:
         if val_doc is None:
             val_doc = self._valuedoc_cache[pyid] = ValueDoc()
             val_doc.pyval = value
-            val_doc.canonical_name = self.get_canonical_name(value)
             try:
-                # iso-8859-1 is Python's default encoding.. is
-                # that ok to use here?
-                val_doc.repr = unicode('%r' % value, 'iso-8859-1')
+                val_doc.canonical_name = self.get_canonical_name(value)
+            except ValueError:
+                val_doc.canonical_name = UNKNOWN
+            try:
+                val_doc.repr = '%r' % value
+                if isinstance(val_doc, str):
+                    val_doc.repr = decode_with_backslashreplace(val_doc.repr)
             except: pass
         return val_doc
 
@@ -355,12 +358,8 @@ class DocInspector:
                 class_doc.bases.append(basedoc)
                 basedoc.subclasses.append(class_doc)
 
-        # Initialize the class's variable dictionary.  (Leave it emtpy
-        # for now; it will be filled in when we do inheritance.)
-        class_doc.variables = {}
-        
         # Record the class's local variables.
-        class_doc.local_variables = {}
+        class_doc.variables = {}
         private_prefix = '_%s__' % cls.__name__
         if hasattr(cls, '__dict__'):
             for child_name, child in cls.__dict__.items():
@@ -372,7 +371,7 @@ class DocInspector:
                 val_doc = self.inspect(child, context=class_doc)
                 var_doc = VariableDoc(name=child_name, value=val_doc,
                                       container=class_doc)
-                class_doc.local_variables[child_name] = var_doc
+                class_doc.variables[child_name] = var_doc
 
     #////////////////////////////////////////////////////////////
     # Routine Inspection
@@ -637,7 +636,7 @@ def get_value_from_filename(filename, context=None):
     # for the parent packages; if the parent packages override their
     # __path__s, then this can cause us not to find the value.)
     if context is None:
-        while is_package_dir(basedir): # [XX] NOT DEFINED HERE
+        while is_package_dir(basedir):
             basedir, pkg_name = os.path.split(basedir)
             name = DottedName(pkg_name, name)
             
