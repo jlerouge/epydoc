@@ -397,10 +397,10 @@ Goals:
   - 
 """
 
-PYSRC_JAVASCRIPTS = '''
+#: Javascript code for the PythonSourceColorizer
+PYSRC_JS = '''
 <script type="text/javascript">
 <!--
-
 function expand(id) {
   document.getElementById(id+"-collapsed").style.display = "none";
   document.getElementById(id+"-expanded").style.display = "block";
@@ -443,37 +443,10 @@ function expandto(href) {
     }
   }
 }
-
-// -->
-</script>'''
-
-PYSRC_TEMPLATE = '''\
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
-          "DTD/xhtml1-frameset.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<title>color test</title>
-  <link rel="stylesheet" href="epydoc.css" type="text/css" />
-</head>'''+PYSRC_JAVASCRIPTS.replace('%','%%')+'''<body>
-<h2 class="py-src">%s</h1>
-<div class="py-src">
-<pre class="py-src">
-%s
-</pre>
-</div>
-<script type="text/javascript">
-<!--
 expandto(location.href);
 // -->
 </script>
-</body>
-</html>
 '''
-
-
-
-
-
 
 import tokenize, sys, token, cgi, keyword
 try: from cStringIO import StringIO
@@ -701,8 +674,12 @@ class PythonSourceColorizer:
         unicode_html = unicode(html, coding)
         html = codecs.encode(unicode_html, 'ascii', 'xmlcharrefreplace')
 
+        html += PYSRC_JS
+
+        return html
+    
         # Add header/footer and return
-        return PYSRC_TEMPLATE % (self.module_name, html)
+        #return PYSRC_TEMPLATE % (self.module_name, html)
 
     def tokeneater(self, toktype, toktext, (srow,scol), (erow,ecol), line):
         """
@@ -775,7 +752,10 @@ class PythonSourceColorizer:
                 if None not in self.context:
                     cls_name = '.'.join(self.context+[def_name])
                     href = self.name2href(cls_name)
-
+                    s = re.sub('(.*)\Z',
+                               r'<a name="%s"></a><div id="%s-def">\1' %
+                               (cls_name, cls_name), s)
+                    
             # Is this token the function name in a function def?  If
             # so, then make it a link back into the API docs.
             elif i>=2 and line[i-2][1] == 'def':
@@ -784,7 +764,11 @@ class PythonSourceColorizer:
                 def_name = toktext
                 if None not in self.context:
                     cls_name = '.'.join(self.context)
+                    func_name = '.'.join(self.context+[def_name])
                     href = self.name2href(cls_name, def_name)
+                    s = re.sub('(.*)\Z',
+                               r'<a name="%s"></a><div id="%s-def">\1' %
+                               (func_name, func_name), s)
 
             # For each indent, update the indents list (which we use
             # to keep track of indentation strings) and the context
@@ -874,17 +858,9 @@ class PythonSourceColorizer:
             for i in range(ended_def_blocks):
                 self.out(self.END_DEF_BLOCK)
 
+        self.out(s)
         if def_name and None not in self.context:
-            name='.'.join(self.context+[def_name])
-            pieces = s.split('\n')
-            self.out('\n'.join(pieces[:-2]))
-            if len(pieces) > 2: self.out('\n')
-            self.out('<a name="%s"></a>' % name)
-            self.out('<div id="%s-def">' % name)
-            self.out('\n'.join(pieces[-2:]))
             self.out('</div>')
-        else:
-            self.out(s)
 
         # Add divs if we're starting a def block.
         if (self.ADD_DEF_BLOCKS and def_name and
