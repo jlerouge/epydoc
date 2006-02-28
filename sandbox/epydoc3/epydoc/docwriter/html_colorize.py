@@ -402,18 +402,24 @@ PYSRC_JS = '''
 <script type="text/javascript">
 <!--
 function expand(id) {
-  document.getElementById(id+"-collapsed").style.display = "none";
-  document.getElementById(id+"-expanded").style.display = "block";
+  var elt = document.getElementById(id+"-collapsed");
+  if (elt) elt.style.display = "none";
+  var elt = document.getElementById(id+"-expanded");
+  if (elt) elt.style.display = "block";
 }
 
 function collapse(id) {
-  document.getElementById(id+"-collapsed").style.display = "block";
-  document.getElementById(id+"-expanded").style.display = "none";
+  var elt = document.getElementById(id+"-collapsed");
+  if (elt) elt.style.display = "block";
+  var elt = document.getElementById(id+"-expanded");
+  if (elt) elt.style.display = "none";
 }
 
 function highlight(id) {
-  document.getElementById(id+"-def").className = "highlight-hdr";
-  document.getElementById(id+"-expanded").className = "highlight";
+  var elt = document.getElementById(id+"-def");
+  if (elt) elt.className = "highlight-hdr";
+  var elt = document.getElementById(id+"-expanded");
+  if (elt) elt.className = "highlight";
 }
 
 function collapse_all() {
