@@ -16,6 +16,8 @@ from epydoc.apidoc import *
 from epydoc.docstringparser import DocstringParser
 import time, epydoc, epydoc.markup
 from epydoc.docwriter.html_colorize import colorize_re
+from epydoc.docwriter.html_colorize import PythonSourceColorizer
+from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc import log
@@ -274,6 +276,9 @@ class HTMLWriter:
               end of their group; if C{inheritance='included'}, then
               inherited objects are mixed in with non-inherited
               objects.  The default is 'grouped'.
+        @type include_sourcecode: C{boolean}
+        @param include_sourcecode: If true, then generate colorized
+              source code files for each python module.
         """
         self.docindex = docindex
 
@@ -326,6 +331,9 @@ class HTMLWriter:
         """How should inheritance be displayed?  'listed', 'included',
         or 'grouped'"""
 
+        self._incl_sourcecode = kwargs.get('include_soucre_code', True)
+        """Should pages be generated for source code of modules?"""
+
         # Make sure inheritance has a sane value.
         if self._inheritance not in ('listed', 'included', 'grouped'):
             raise ValueError, 'Bad value for inheritance'
@@ -365,11 +373,16 @@ class HTMLWriter:
         """
         # Keep track of total number of files..
         contained_valdocs = self.docindex.contained_valdocs
+        modules_with_sourcecode = [d for d in contained_valdocs
+                                   if (isinstance(d, ModuleDoc) and
+                                       d.filename not in (None, UNKNOWN))]
         self._num_files = (len([d for d in contained_valdocs
                                 if isinstance(d, ClassDoc)]) +
                            2*len([d for d in contained_valdocs
                                 if isinstance(d, ModuleDoc)]) +
                            9)
+        if self._incl_sourcecode:
+            self._num_files += len(modules_with_sourcecode)
         self._files_written = 0.
         
         # Keep track of failed xrefs, and report them at the end.
@@ -389,17 +402,6 @@ class HTMLWriter:
         log.progress(self._files_written/self._num_files, 'epydoc.js')
         self.write_javascript(directory)
 
-        # Write the object documentation.
-        for doc in contained_valdocs:
-            if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
-            filename = self.url(doc)
-            if isinstance(doc, ModuleDoc):
-                self._write(self.write_module, directory, filename, doc)
-            else:
-                self._write(self.write_class, directory, filename, doc)
-
-        # [XX] Write source code files.
-        
         # Write the term & identifier indices
         self._write(self.write_indices, directory, 'indices.html')
         
@@ -418,7 +420,23 @@ class HTMLWriter:
                 filename = 'toc-%s' % self.url(doc)
                 self._write(self.write_module_toc, directory, filename, doc)
 
+        # Write the object documentation.
+        for doc in contained_valdocs:
+            if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
+            filename = self.url(doc)
+            if isinstance(doc, ModuleDoc):
+                self._write(self.write_module, directory, filename, doc)
+            else:
+                self._write(self.write_class, directory, filename, doc)
+
+        # Write source code files.
+        if self._incl_sourcecode:
+            for doc in modules_with_sourcecode:
+                filename = self.pysrc_url(doc)
+                self._write(self.write_sourcecode, directory, filename, doc)
+
         # Write the index.html files.
+        # (this must be done last, since it might copy another file)
         self._files_written += 1
         log.progress(self._files_written/self._num_files, 'index.html')
         self.write_homepage(directory)
@@ -481,16 +499,19 @@ class HTMLWriter:
         self.write_navbar(out, doc)
         self.write_breadcrumbs(out, doc)
 
-        # [XX] source code link
-
         # Write the name of the module we're describing.
         if doc.is_package is True: typ = 'Package'
         else: typ = 'Module'
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
-        out('<h2 class="%s">%s %s</h2>\n' % (typ.lower(), typ, shortname))
+        out('<h2 class="%s">%s %s' % (typ.lower(), typ, shortname))
+        if self._incl_sourcecode:
+            out('\n<span class="codelink"><br/>'
+                '<a href="%s">source code</a></span>' %
+                self.pysrc_url(doc))
+        out('</h2>\n')
+        
             
-
         # If the module has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
             out(self.descr(doc, 2)+'<br /><br />\n\n')
@@ -524,6 +545,31 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
+    # 2.??. Source Code Pages
+    #////////////////////////////////////////////////////////////
+
+    def write_sourcecode(self, out, doc):
+        filename = doc.filename
+        name = str(doc.canonical_name)
+        
+        # Header
+        self.write_header(out, name)
+        self.write_navbar(out, doc)
+        self.write_breadcrumbs(out, doc)
+
+        # Source code listing
+        out('<h2 class="py-src">Source Code for %s</h2>\n' %
+            self.href(doc, label='%s %s' % (self.doc_kind(doc), name)))
+        out('<div class="py-src">\n')
+        out('<pre class="py-src">\n')
+        out(PythonSourceColorizer(filename, name).colorize())
+        out('</pre>\n</div>\n<br />\n')
+
+        # Footer
+        self.write_navbar(out, doc)
+        self.write_footer(out)
+
+    #////////////////////////////////////////////////////////////
     # 2.2. Class Pages
     #////////////////////////////////////////////////////////////
 
@@ -543,16 +589,19 @@ class HTMLWriter:
         self.write_navbar(out, doc)
         self.write_breadcrumbs(out, doc)
 
-        # [XX] source code link
-
         # Write the name of the class we're describing.
         if doc.is_type(): typ = 'Type'
         elif doc.is_exception(): typ = 'Exception'
         else: typ = 'Class'
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
-        out('<h2 class="%s">%s %s</h2>\n' %
+        out('<h2 class="%s">%s %s' %
             (typ.lower(), typ, shortname))
+        if self._incl_sourcecode:
+            out('\n<span class="codelink"><br/>'
+                '<a href="%s">source code</a></span>' %
+                self.pysrc_url(doc))
+        out('</h2>\n')
 
         # Write the base class tree.
         if doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0:
@@ -1637,11 +1686,20 @@ class HTMLWriter:
         <a name="$var_doc.name$"></a>
         <div$div_class$>
         <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
+        >>> if self._incl_sourcecode:
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr valign="top"><td>
+        >>> #endif
           <h3>$self.function_signature(var_doc)$
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
-        >>> #endif
           </h3>
+        >>> if self._incl_sourcecode:
+          </td><td align="right" valign="top"
+            ><span class="codelink"><a href="$self.pysrc_url(func_doc)$"
+            >source&nbsp;code</a>&nbsp;</span></td>
+          </table>
+        >>> #endif
           $descr$
           <dl><dt></dt><dd>
         >>> # === parameters ===
@@ -2424,6 +2482,22 @@ class HTMLWriter:
             return 'trees.html'
         else:
             raise ValueError, "Don't know what to do with %r" % obj
+
+    def pysrc_url(self, vardoc):
+        if isinstance(vardoc, ModuleDoc):
+            if vardoc.filename in (None, UNKNOWN):
+                return None
+            else:
+                return '%s-module-pysrc.html' % vardoc.canonical_name
+        else:
+            module = vardoc.containing_module()
+            if module.filename in (None, UNKNOWN):
+                return None
+            else:
+                mname_len = len(module.canonical_name)
+                anchor = DottedName(*vardoc.canonical_name[mname_len:])
+                return ('%s-module-pysrc.html#%s' % 
+                        (module.canonical_name, anchor))
 
     # [xx] add code to automatically do <code> wrapping or the like?
     def href(self, target, label=None, css_class=None):
