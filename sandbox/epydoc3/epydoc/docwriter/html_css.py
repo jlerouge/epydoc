@@ -44,7 +44,9 @@ th.group           { text-align: left; font-size: 120%;
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
 h2.class           { margin-top: 0.2em; }
- 
+h2.type            { margin-top: 0.2em; }
+h2.py-src          { margin-top: 0.2em; }
+
 /* Headings */
 hq.help            { text-align: center; }
 h1.heading         { font-size: +140%; font-style: italic;
@@ -108,7 +110,6 @@ a.navbar:link      { text-decoration: none; }
 a.navbar:visited   { text-decoration: none; }  
 
 /* Source Code Listings */
-h2.py-src          { margin-top: 0.2em; }
 div.py-src         { border: 2px solid; }
 div.highlight-hdr  { border-top: 2px solid; }
 div.highlight      { border-top: 1px solid;
@@ -129,7 +130,11 @@ ul { margin-top: 0; }
                    { font-size: 85%; }
 dt                 { font-weight: bold; }
 .small             { font-size: 85%; }
+
+h2 span.codelink { font-size: 58%; font-weight: normal; }
+span.codelink { font-size: 85%; font-weight; normal; }
 """
+#(* (/ 1. 1.2) .7)
 
 # Black on white, with blue highlights.  This is similar to how
 # javadoc looks.
@@ -184,6 +189,10 @@ pre.doctestblock   { background: #f4faff; color: #000000;
 table pre.doctestblock
                    { background: #dce4ec; color: #000000; 
                      border-color: #708890; }
+div.py-src         { background: #f0f0f0; }
+div.highlight-hdr  { background: #d8e8e8; }
+div.highlight      { background: #d0e0e0; }
+
 
 /* Variable values */
 pre.variable       { background: #dce4ec; color: #000000;
@@ -252,7 +261,7 @@ h3.var-details     { background: transparent; color: #000000; }
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                    { background: transparent; color: #008060; }  
 
-/* Doctest blocks */
+/* Souce code listings & doctest blocks */
 .py-src            { background: transparent; color: #000000; }
 .py-prompt         { background: transparent; color: #005050; }
 .py-string         { background: transparent; color: #006030; }
@@ -273,6 +282,9 @@ pre.doctestblock   { background: #90a8b0; color: #000000; }
 table pre.doctestblock
                    { background: #b0c8d0; color: #000000; 
                      border-color: #708890; }
+div.py-src         { background: #f0f0f0; }
+div.highlight-hdr  { background: #d8e8e8; }
+div.highlight      { background: #d0e0e0; }
  
 /* Variable values */
 pre.variable       { background: #b0c8d0; color: #000000; 
@@ -341,7 +353,7 @@ h3.var-details     { background: transparent; color: #000000; }
 .summary-sig-arg, .summary-sig-kwarg, .summary-sig-vararg
                    { background: transparent; color: #008060; }  
 
-/* Doctest blocks */
+/* Souce code listings & doctest blocks */
 .py-src            { background: transparent; color: #000000; }
 .py-prompt         { background: transparent; color: #006070; }
 .py-string         { background: transparent; color: #007050; }
@@ -362,6 +374,9 @@ pre.doctestblock   { background: #c8e0e8; color: #000000;
 table pre.doctestblock
                    { background: #c0d8e0; color: #000000; 
                      border-color: #708890; }
+div.py-src         { background: #f0f0f0; }
+div.highlight-hdr  { background: #d8e8e8; }
+div.highlight      { background: #d0e0e0; }
  
 /* Variable values */
 pre.variable       { background: #c0d8e0; color: #000000; 
