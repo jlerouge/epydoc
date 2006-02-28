@@ -7,6 +7,7 @@
 # $Id$
 
 from epydoc.apidoc import *
+from sets import Set
 
 # [XX] should we add the new variables to the docindex?? hm..  But
 # then this wouldn't just be direct children, could potentailly be
@@ -22,42 +23,41 @@ class DocInheriter:
             if isinstance(val_doc, ClassDoc):
                 self._inherit(val_doc)
 
+            # [xx] hm -- does this really belong here??
             # Sorting & grouping of variables in namespaces.
             if isinstance(val_doc, NamespaceDoc):
                 self.init_sorted_variables(val_doc)
                 self.init_groups(val_doc)
 
-            ## While we're at it, publicify!
-            #if isinstance(val_doc, NamespaceDoc):
-            #    if val_doc.public_names
-            #    for var in 
-        
-                
     def _inherit(self, class_doc):
-        class_doc.variables = class_doc.local_variables.copy()
-        
-        mro = list(class_doc.mro())
-        
-        for cls in mro:
-            if cls == class_doc: continue
-            if cls.local_variables is UNKNOWN: continue
-            
-            for name, var_doc in cls.local_variables.items():
-                if name not in class_doc.variables:
-                    # Inherit this variable.
-                    self._inherit_var(class_doc, name, var_doc)
-                else:
-                    # Record the fact that we override this variable.
-                    if class_doc.variables[name].overrides is UNKNOWN:
-                        class_doc.variables[name].overrides = var_doc
-                        self._inherit_info(class_doc.variables[name])
+        for base_class in list(class_doc.mro()):
+            if base_class == class_doc: continue
+            if base_class.variables is UNKNOWN: continue
 
-    def _inherit_var(self, dst_class, name, src_var):
-        dst_var = VariableDoc(**src_var.__dict__)
-        # [xx] keep pointer to *original* container?
-        #dst_var.container = src_var.container
-        dst_var.is_inherited = True
-        dst_class.variables[name] = dst_var
+            for name, var_doc in base_class.variables.items():
+                # If it's a __private variable, then don't inherit it.
+                if name.startswith('__') and not name.endswith('__'):
+                    continue
+                
+                # If class_doc doesn't have a variable with this name,
+                # then inherit it.
+                if name not in class_doc.variables:
+                    # [xx] could I get away with just copying it??
+                    # I'd have to do away with the is_inherited field;
+                    # but that might be ok, since I could just check
+                    # the .container attribute??
+                    inherited_var = VariableDoc(**var_doc.__dict__)
+                    inherited_var.is_inherited = True
+                    class_doc.variables[name] = inherited_var
+
+                # Otherwise, class_doc already contains a variable
+                # that shadows var_doc.  But if class_doc's var is
+                # local, then record the fact that it overrides
+                # var_doc.
+                elif (class_doc.variables[name].container==class_doc and
+                      class_doc.variables[name].overrides is UNKNOWN):
+                    class_doc.variables[name].overrides = var_doc
+                    self._inherit_info(class_doc.variables[name])
 
     def _inherit_info(self, var_doc):
         """
@@ -74,8 +74,6 @@ class DocInheriter:
         if (var_doc.value not in (None, UNKNOWN) and
             var_doc.value.descr in (None, UNKNOWN)):
             var_doc.value.descr = var_doc.overrides.value.descr
-
-
 
     #////////////////////////////////////////////////////////////
     # Group & sort!
