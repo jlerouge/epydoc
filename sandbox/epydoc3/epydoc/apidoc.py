@@ -281,13 +281,43 @@ class APIDoc(object):
         # DO THIS [xx]?
         self.__init__(**self.__dict__)
 
+    # [xx] consider making them un-hashable??
+    __has_been_hashed = False
     def __hash__(self):
+        self.__has_been_hashed = True
         return id(self.__dict__)
 
     def __cmp__(self, other):
         if not isinstance(other, APIDoc): return -1
         if self.__dict__ is other.__dict__: return 0
         else: return -1
+
+    def merge_and_overwrite(self, other):
+        """
+        Combine C{self} and C{other} into a X{merged object}, such
+        that any changes made to one will affect the other.  Any
+        attributes that C{other} had before merging will be discarded.
+        This is accomplished by copying C{self.__dict__} over
+        C{other.__dict__} and C{self.__class__} over C{other.__class__}.
+
+        Care must be taken with this method, since it modifies the
+        hash value of C{other}.  To help avoid the problems that this
+        can cause, C{merge_and_overwrite} will raise an exception if
+        C{other} has ever been hashed.
+
+        @return: C{self}
+        @raise ValueError: If C{other} has ever been hashed.
+        """
+        if other.__has_been_hashed:
+            raise ValueError("Can only merge with APIDoc objects that "
+                             "have never been hashed")
+        # Clear the dict that we're discarding -- this might help with
+        # garbage collection.
+        other.__dict__.clear()
+        other.__dict__ = self.__dict__
+        other.__class__ = self.__class__
+        # Return ourselves.
+        return self
 
 ######################################################################
 # Variable Documentation Objects
@@ -479,13 +509,14 @@ class NamespaceDoc(ValueDoc):
         dictionary mapping from identifiers to C{VariableDoc}s.  This
         dictionary contains all names defined by the namespace,
         including imported variables, aliased variables, and variables
-        that were inherited from base classes.
+        inherited from base classes (once L{DocInheriter
+        <epydoc.docinheriter.DocInheriter>} has added them).
     @type variables: C{dict} from C{string} to L{VariableDoc}
-
-    @ivar sorted_variables: A list of the variables defined by this
+    @ivar sorted_variables: A list of all variables defined by this
         namespace, in sorted order.  The elements of this list should
         exactly match the values of L{variables}.  The sort order for
         this list is defined as follows:
+        
           - Any variables listed in a C{@sort} docstring field are
             listed in the order given by that field.
           - These are followed by any variables that were found while
@@ -494,10 +525,6 @@ class NamespaceDoc(ValueDoc):
           - Finally, any remaining variables are listed in
             alphabetical order.
     @type sorted_variables: C{list} of L{VariableDoc}
-    
-    @ivar public_names: A list of the names of ..., extracted from __all__
-    @type public_names: C{string}
-
     @ivar group_names: A list of the names of the group, in the order
         in which they should be listed.  The first element of this
         list is always the special group name C{''}, which is used for
@@ -512,11 +539,8 @@ class NamespaceDoc(ValueDoc):
     """
     variables = UNKNOWN
     sorted_variables = UNKNOWN
-    #public_names = UNKNOWN # [XX] for classes in parser.
-    
     group_names = UNKNOWN
     groups = UNKNOWN
-
     group_specs = UNKNOWN #: list of (groupname, (identnames))
     sort_spec = UNKNOWN #: list of names
 
@@ -615,15 +639,11 @@ class ClassDoc(NamespaceDoc):
     """
     API documentation information about a single class.
 
-    @ivar local_variables: A list of the variables that are defined in
-        this class, X{not including inherited variables}.
-    @type local_variables: C{list} of L{VariableDoc}
     @ivar bases: API documentation for the class's base classes.
     @type bases: C{list} of L{ClassDoc}
     @ivar subclasses: API documentation for the class's known subclasses.
     @type subclasses: C{list} of L{ClassDoc}
     """
-    local_variables = UNKNOWN
     bases = UNKNOWN
     subclasses = UNKNOWN
 
@@ -666,7 +686,7 @@ class ClassDoc(NamespaceDoc):
                 if isinstance(base, ClassDoc):
                     base._dfs_bases(mro, seen)
                 else:
-                   log.warn("Non-class base?: %s" % base)
+                   log.warn("Non-class base?: %r" % base)
         return mro
 
     def _c3_mro(self):
