@@ -272,7 +272,7 @@ def _sandbox(func, docindex, options):
 
 def _html(docindex, options):
     html_writer = HTMLWriter(docindex, **options.__dict__)
-    log.start_progress('Writing HTML docs to %r.' % options.target)
+    log.start_progress('Writing HTML docs to %r' % options.target)
     html_writer.write(options.target)
     log.end_progress()
     
