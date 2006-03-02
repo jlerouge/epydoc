@@ -301,26 +301,27 @@ class ConsoleLogger(log.Logger):
         self._message_blocks = []
         
         # Examine the capabilities of our terminal.
-        try:
-            curses.setupterm()
-            self._TERM_CR = curses.tigetstr('cr') or ''
-            self.TERM_WIDTH = curses.tigetnum('cols')-1
-            self._TERM_CLR_EOL = curses.tigetstr('el') or ''
-            self._TERM_NORM =  curses.tigetstr('sgr0') or ''
-            self._TERM_HIDE_CURSOR = curses.tigetstr('civis') or ''
-            self._TERM_SHOW_CURSOR = curses.tigetstr('cnorm') or ''
-            self._TERM_UP = curses.tigetstr('cuu1') or ''
-            if self._TERM_NORM:
-                self._TERM_BOLD = curses.tigetstr('bold') or ''
-                term_setf = curses.tigetstr('setf')
-                if term_setf or self._DISABLE_COLOR:
-                    self._TERM_RED = curses.tparm(term_setf, 4) or ''
-                    self._TERM_YELLOW = curses.tparm(term_setf, 6) or ''
-                    self._TERM_GREEN = curses.tparm(term_setf, 2) or ''
-                    self._TERM_CYAN = curses.tparm(term_setf, 3) or ''
-                    self._TERM_BLUE = curses.tparm(term_setf, 1) or ''
-        except:
-            pass
+        if sys.stdout.isatty():
+            try:
+                curses.setupterm()
+                self._TERM_CR = curses.tigetstr('cr') or ''
+                self.TERM_WIDTH = curses.tigetnum('cols')-1
+                self._TERM_CLR_EOL = curses.tigetstr('el') or ''
+                self._TERM_NORM =  curses.tigetstr('sgr0') or ''
+                self._TERM_HIDE_CURSOR = curses.tigetstr('civis') or ''
+                self._TERM_SHOW_CURSOR = curses.tigetstr('cnorm') or ''
+                self._TERM_UP = curses.tigetstr('cuu1') or ''
+                if self._TERM_NORM:
+                    self._TERM_BOLD = curses.tigetstr('bold') or ''
+                    term_setf = curses.tigetstr('setf')
+                    if term_setf or self._DISABLE_COLOR:
+                        self._TERM_RED = curses.tparm(term_setf, 4) or ''
+                        self._TERM_YELLOW = curses.tparm(term_setf, 6) or ''
+                        self._TERM_GREEN = curses.tparm(term_setf, 2) or ''
+                        self._TERM_CYAN = curses.tparm(term_setf, 3) or ''
+                        self._TERM_BLUE = curses.tparm(term_setf, 1) or ''
+            except:
+                pass
 
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
@@ -409,6 +410,7 @@ class ConsoleLogger(log.Logger):
 
             # Display the message message.
             print message
+            sys.stdout.flush()
                 
     def progress(self, percent, message=''):
         percent = min(1.0, percent)
@@ -417,6 +419,7 @@ class ConsoleLogger(log.Logger):
         if self._progress_mode == 'list':
             if message:
                 print '[%3d%%] %s' % (100*percent, message)
+                sys.stdout.flush()
                 
         elif self._progress_mode == 'bar':
             dots = int((self.TERM_WIDTH/2-5)*percent)
@@ -457,12 +460,13 @@ class ConsoleLogger(log.Logger):
             sys.stdout.flush()
             self._progress = percent
         elif self._progress_mode == 'simple-bar':
+            if self._progress is None: self._progress = 0.0
             dots = int((self.TERM_WIDTH-2)*percent)
             progress_dots = int((self.TERM_WIDTH-2)*self._progress)
             if dots > progress_dots:
                 sys.stdout.write('.'*(dots-progress_dots))
                 sys.stdout.flush()
-                self._progress = progress
+                self._progress = percent
 
     def start_progress(self, header=None):
         if self._progress is not None:
@@ -473,6 +477,7 @@ class ConsoleLogger(log.Logger):
             print self._TERM_BOLD + header + self._TERM_NORM
         if self._progress_mode == 'simple-bar':
             sys.stdout.write('  [')
+            sys.stdout.flush()
         self._progress = 0.0
 
     def end_progress(self):
@@ -489,7 +494,7 @@ class ConsoleLogger(log.Logger):
 class UnifiedProgressConsoleLogger(ConsoleLogger):
     def __init__(self, verbosity, stages=5):
         self.stage = 0
-        self.stages = 5
+        self.stages = stages
         self.task = None
         ConsoleLogger.__init__(self, verbosity)
         
