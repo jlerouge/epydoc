@@ -123,9 +123,9 @@ class DocBuilder:
                     docs.append(parse_doc)
             log.end_progress()
         elif self.inspect:
-            docs = [doc_pair[0] for doc_pair in doc_pairs]
+            docs = [doc_pair[0] for doc_pair in doc_pairs if doc_pair[0]]
         else:
-            docs = [doc_pair[1] for doc_pair in doc_pairs]
+            docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[0]]
 
         # Index the docs.
         docindex = DocIndex(docs)
