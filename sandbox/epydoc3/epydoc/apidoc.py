@@ -252,8 +252,9 @@ class APIDoc(object):
         @raise AttributeError: If C{attr} is not a valid attribute for
             this (sub)class of C{APIDoc}.
         """
-        # Don't intercept special assignments like __class__.
-        if attr.startswith('__') and attr.endswith('__'):
+        # Don't intercept special assignments like __class__, or
+        # assignments to private variables.
+        if attr.startswith('_'):
             return object.__setattr__(self, attr, val)
         if not hasattr(self, attr):
             raise AttributeError('%s does not define attribute %r' %
@@ -263,7 +264,7 @@ class APIDoc(object):
     def __repr__(self):
        return '<%s>' % self.__class__.__name__
     
-    def pp(self, doublespace=0, depth=-1, exclude=(), include=()):
+    def pp(self, doublespace=0, depth=5, exclude=(), include=()):
         """
         Return a pretty-printed string representation for the
         information contained in this C{APIDoc}.
@@ -292,6 +293,7 @@ class APIDoc(object):
         if self.__dict__ is other.__dict__: return 0
         else: return -1
 
+    __mergeset = None
     def merge_and_overwrite(self, other):
         """
         Combine C{self} and C{other} into a X{merged object}, such
@@ -308,17 +310,32 @@ class APIDoc(object):
         @return: C{self}
         @raise ValueError: If C{other} has ever been hashed.
         """
+        # If we're already merged, then there's nothing to do.
+        if (self.__dict__ is other.__dict__ and
+            self.__class__ is other.__class__): return self
+            
         if other.__has_been_hashed:
-            raise ValueError("Can only merge with APIDoc objects that "
-                             "have never been hashed")
-        # Clear the dict that we're discarding -- this might help with
-        # garbage collection.
-        other.__dict__.clear()
-        other.__dict__ = self.__dict__
-        other.__class__ = self.__class__
-        # Return ourselves.
-        return self
+            pass # [XX !!]
+#             raise ValueError("Can only merge with APIDoc objects that "
+#                              "have never been hashed")
 
+        # If other was itself already merged with anything,
+        # then we need to merge those too.
+        a,b = (self.__mergeset, other.__mergeset)
+        mergeset = (self.__mergeset or [self]) + (other.__mergeset or [other])
+        other.__dict__.clear()
+        for apidoc in mergeset:
+            #if apidoc is self: pass
+            apidoc.__class__ = self.__class__
+            apidoc.__dict__ = self.__dict__
+        self.__mergeset = mergeset
+        # Sanity chacks.
+        assert self in mergeset and other in mergeset
+        for apidoc in mergeset:
+            assert apidoc.__dict__ is self.__dict__
+        # Return self.
+        return self
+        
 ######################################################################
 # Variable Documentation Objects
 ######################################################################
@@ -523,6 +540,7 @@ class NamespaceDoc(ValueDoc):
             defined in the source file.
           - Finally, any remaining variables are listed in
             alphabetical order.
+            
     @type sorted_variables: C{list} of L{VariableDoc}
     @ivar group_names: A list of the names of the group, in the order
         in which they should be listed.  The first element of this
@@ -542,6 +560,11 @@ class NamespaceDoc(ValueDoc):
     groups = UNKNOWN
     group_specs = UNKNOWN #: list of (groupname, (identnames))
     sort_spec = UNKNOWN #: list of names
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('variables', {})
+        APIDoc.__init__(self, **kwargs)
+        assert self.variables != UNKNOWN
 
 class ModuleDoc(NamespaceDoc):
     """
@@ -574,11 +597,8 @@ class ModuleDoc(NamespaceDoc):
 
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
-              - 'class' - variables whose values are classes (not
-                including exceptions or types)
-              - 'type' - variables whose values are types
-              - 'exception' - variables whose values are exceptions
-              - 'function' - variables whose values are functions
+              - 'class' - variables whose values are classes or types.
+              - 'function' - variables whose values are functions.
               - 'other' - variables whose values are not classes,
                  exceptions, types, or functions.
         @type value_type: C{string}
@@ -611,26 +631,13 @@ class ModuleDoc(NamespaceDoc):
         elif value_type == 'class':
             return [var_doc for var_doc in var_list
                     if (isinstance(var_doc.value, ClassDoc))]
-        #elif value_type == 'class':
-        #    return [var_doc for var_doc in var_list
-        #            if (isinstance(var_doc.value, ClassDoc) and
-        #                var_doc.value.is_type() in (False, UNKNOWN) and
-        #                var_doc.value.is_exception() in (False, UNKNOWN))]
-        #elif value_type == 'type':
-        #    return [var_doc for var_doc in var_list
-        #            if (isinstance(var_doc.value, ClassDoc) and
-        #                var_doc.value.is_type() is True)]
-        #elif value_type == 'exception':
-        #    return [var_doc for var_doc in var_list
-        #            if (isinstance(var_doc.value, ClassDoc) and
-        #                var_doc.value.is_exception() is True)]
         elif value_type == 'function':
             return [var_doc for var_doc in var_list
-                    if isinstance(var_doc.value, FunctionDoc)]
+                    if isinstance(var_doc.value, RoutineDoc)]
         elif value_type == 'other':
             return [var_doc for var_doc in var_list
                     if not isinstance(var_doc.value,
-                                      (ClassDoc, FunctionDoc))]
+                                      (ClassDoc, RoutineDoc))]
         else:
             raise ValueError('Bad value type %r' % value_type)
 
@@ -684,8 +691,11 @@ class ClassDoc(NamespaceDoc):
             for base in self.bases:
                 if isinstance(base, ClassDoc):
                     base._dfs_bases(mro, seen)
+                elif base.imported_from is not UNKNOWN:
+                    log.info("No information available for base %r" % base)
                 else:
-                   log.warn("Non-class base?: %r" % base)
+                   log.warn("While calculating the MRO for %r, encountered "
+                            "a base that's not a class: %r" % (self, base))
         return mro
 
     def _c3_mro(self):
@@ -783,11 +793,13 @@ class ClassDoc(NamespaceDoc):
             return var_list
         elif value_type == 'method':
             return [var_doc for var_doc in var_list
-                    if (isinstance(var_doc.value, MethodDoc) and
+                    if (isinstance(var_doc.value, RoutineDoc) and
                         var_doc.is_instvar in (False, UNKNOWN))]
         elif value_type == 'instancemethod':
             return [var_doc for var_doc in var_list
-                    if (isinstance(var_doc.value, InstanceMethodDoc) and
+                    if (isinstance(var_doc.value, RoutineDoc) and
+                        not isinstance(var_doc.value, ClassMethodDoc) and
+                        not isinstance(var_doc.value, StaticMethodDoc) and
                         var_doc.is_instvar in (False, UNKNOWN))]
         elif value_type == 'classmethod':
             return [var_doc for var_doc in var_list
@@ -811,8 +823,7 @@ class ClassDoc(NamespaceDoc):
         elif value_type == 'classvariable':
             return [var_doc for var_doc in var_list
                     if (var_doc.is_instvar in (False, UNKNOWN) and
-                        not isinstance(var_doc.value,
-                                       (ClassDoc, PropertyDoc, MethodDoc)))]
+                        not isinstance(var_doc.value, RoutineDoc))]
         else:
             raise ValueError('Bad value type %r' % value_type)
 
@@ -821,7 +832,11 @@ class RoutineDoc(ValueDoc):
     API documentation information about a single routine.
 
     @ivar posargs: The names of the routine's positional arguments.
-    @type posargs: C{list} of C{string} or C{tuple}
+        If an argument list contains \"unpacking\" arguments, then
+        their names will be specified using nested lists.  E.g., if
+        a function's argument list is C{((x1,y1), (x2,y2))}, then
+        posargs will be C{[['x1','y1'], ['x2','y2']]}.
+    @type posargs: C{list}
     @ivar posarg_defaults: API documentation for the positional arguments'
         default values.  This list has the same length as C{posargs}, and
         each element of C{posarg_defaults} describes the corresponding
@@ -901,11 +916,8 @@ def _flatten(lst, out=None):
             out.append(elt)
     return out
 
-class MethodDoc(RoutineDoc): pass
-class FunctionDoc(RoutineDoc): pass
-class InstanceMethodDoc(MethodDoc): pass
-class ClassMethodDoc(MethodDoc): pass
-class StaticMethodDoc(MethodDoc): pass
+class ClassMethodDoc(RoutineDoc): pass
+class StaticMethodDoc(RoutineDoc): pass
 
 class PropertyDoc(ValueDoc):
     """
