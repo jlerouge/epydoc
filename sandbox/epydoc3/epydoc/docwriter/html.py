@@ -90,7 +90,7 @@ def compile_template(docstring, template_string,
     # If we're debugging, then we'll store the generated function,
     # so we can print it along with any tracebacks that depend on it.
     if debug:
-        signature = re.sub(r'\)\s*$', ', pysrc=pysrc)', signature)
+        signature = re.sub(r'\)\s*$', ', __debug=__debug)', signature)
 
     # Funciton declaration line
     pysrc_lines = ['def %s:' % signature]
@@ -131,14 +131,15 @@ def compile_template(docstring, template_string,
         
     if debug:
         pysrc_lines.append('    except Exception,e:')
-        pysrc_lines.append('        if pysrc:') # only print it once.
-        pysrc_lines.append('            print "Exception in template code:"')
-        pysrc_lines.append('            print "="*70+"\\n"+pysrc[0]+"="*70')
-        pysrc_lines.append('            del pysrc[:]')
+        pysrc_lines.append('        pysrc, func_name = __debug ')
+        pysrc_lines.append('        lineno = sys.exc_info()[2].tb_lineno')
+        pysrc_lines.append('        print ("Exception in template %s() on "')
+        pysrc_lines.append('               "line %d:" % (func_name, lineno))')
+        pysrc_lines.append('        print pysrc[lineno-1]')
         pysrc_lines.append('        raise')
         
     pysrc = '\n'.join(pysrc_lines)+'\n'
-    if debug: localdict = {'pysrc': pysrc_lines}
+    if debug: localdict = {'__debug': (pysrc_lines, func_name)}
     else: localdict = {}
     try: exec pysrc in globals(), localdict
     except SyntaxError:
@@ -940,7 +941,8 @@ class HTMLWriter:
 
         # List the functions.
         funcs = [d for d in self.docindex.contained_valdocs
-                 if isinstance(d, FunctionDoc)]
+                 if (isinstance(d, RoutineDoc) and
+                     not isinstance(d.canonical_container, ClassDoc))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
@@ -2086,8 +2088,9 @@ class HTMLWriter:
             func_doc = api_doc.value
             # This should never happen, but just in case:
             if api_doc.value in (None, UNKNOWN):
-                return (('<span class="%s"><span class="%s-name">%s</span>'+
-                         '(...)</span>') % (css_class, css_class, api_doc.name))
+                return (('<span class="%s"><span class="%s-name">%s'+
+                         '</span>(...)</span>') %
+                        (css_class, css_class, api_doc.name))
             # Get the function's name.
             if link_name:
                 name = self.href(api_doc, css_class=css_class+'-name')
@@ -2098,9 +2101,11 @@ class HTMLWriter:
             func_doc = api_doc
             name = self.href(api_doc, css_class=css_class+'-name')
             
-        
-        args = [self.func_arg(n, d, css_class) for (n, d)
-                in zip(func_doc.posargs, func_doc.posarg_defaults)]
+        if func_doc.posargs == UNKNOWN:
+            args = ['...']
+        else:
+            args = [self.func_arg(n, d, css_class) for (n, d)
+                    in zip(func_doc.posargs, func_doc.posarg_defaults)]
         if func_doc.vararg:
             args.append('<span class="%s-arg">*%s</span>' %
                         (css_class, func_doc.vararg))
@@ -2599,10 +2604,15 @@ class HTMLWriter:
             return 'Module'
         elif isinstance(doc, ClassDoc):
             return 'Class'
-        elif isinstance(doc, MethodDoc):
-            return 'Method'
-        elif isinstance(doc, FunctionDoc):
-            return 'Function'
+        elif isinstance(doc, ClassMethodDoc):
+            return 'Class Method'
+        elif isinstance(doc, StaticMethodDoc):
+            return 'Static Method'
+        elif isinstance(doc, RoutineDoc):
+            if isinstance(doc.canonical_container, ClassDoc):
+                return 'Method'
+            else:
+                return 'Function'
         else:
             return 'Variable'
         
