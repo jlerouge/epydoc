@@ -202,14 +202,8 @@ class DocInspector:
         elif isinstance(value, staticmethod):
             return self.inspect_staticmethod
         
-        elif isinstance(context, ClassDoc) and inspect.isroutine(value):
-            return self.inspect_instancemethod
-        
-        elif inspect.isfunction(value):
-            return self.inspect_function
-        
         elif inspect.isroutine(value):
-            return self.inspect_builtin
+            return self.inspect_routine
         
         elif isinstance(value, property):
             return self.inspect_property
@@ -393,28 +387,18 @@ class DocInspector:
         self.inspect_routine(sm.__get__(0), routinedoc)
         routinedoc.specialize_to(StaticMethodDoc)
 
-    def inspect_instancemethod(self, im, routinedoc):
-        """Add API documentation information about the instance method
-        C{im} to C{routinedoc} (specializing it to
-        C{InstanceMethodDoc})."""
-        # Extract the underlying function from the instance method.
-        self.inspect_routine(im, routinedoc)
-        routinedoc.specialize_to(InstanceMethodDoc)
-
-    def inspect_function(self, func, routinedoc):
-        """Add API documentation information about the function
-        C{func} to C{routinedoc} (specializing it to C{FunctionDoc})."""
-        self.inspect_routine(func, routinedoc)
-        routinedoc.specialize_to(FunctionDoc)
-
     def inspect_routine(self, func, routinedoc):
         """Add API documentation information about the function
         C{func} to C{routinedoc} (specializing it to C{RoutineDoc})."""
         routinedoc.specialize_to(RoutineDoc)
-        
+
         # Record the function's docstring.
         routinedoc.docstring = self.get_docstring(func)
 
+        # If it's a (bound) instance method, then extract its func.
+        if isinstance(func, MethodType):
+            func = func.im_func
+        
         # Record the function's signature.
         if isinstance(func, FunctionType):
             (args, vararg, kwarg, defaults) = inspect.getargspec(func)
@@ -433,6 +417,7 @@ class DocInspector:
                     routinedoc.posarg_defaults[i+offset] = default_val
 
         else:
+            # [XX] I should probably use UNKNOWN here??
             routinedoc.posargs = ['...']
             routinedoc.posarg_defaults = [None]
             routinedoc.kwarg = None
@@ -441,14 +426,15 @@ class DocInspector:
     def inspect_builtin(self, func, func_doc):
         """Add API documentation information about the builtin
         function C{func} to C{func_doc} (specializing it to
-        C{FunctionDoc})."""        
-        func_doc.specialize_to(FunctionDoc)
+        C{RoutineDoc})."""
+        func_doc.specialize_to(RoutineDoc)
         
         # Record the builtin's docstring.
         func_doc.docstring = self.get_docstring(func)
 
         # Use a generic signature; this will hopefully get overridden
         # by the docstring parser.
+        # [XX] I should probably use UNKNOWN here??
         func_doc.posargs = ['...']
         func_doc.posarg_defaults = [None]
         func_doc.kwarg = None
