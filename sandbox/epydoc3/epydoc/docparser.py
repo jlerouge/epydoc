@@ -232,11 +232,13 @@ class DocParser:
             # Use a python source version, if possible.
             try: filename = py_src_filename(filename)
             except ValueError, e: raise ImportError('%s' % e)
-                
+
             # Check the cache, first.
             if self.moduledoc_cache.has_key(filename):
                 return self.moduledoc_cache[filename]
             
+            log.info("Parsing %s" % filename)
+                
             # If the context wasn't provided, then check if the file is in
             # a package directory.  If so, then update basedir & name to
             # contain the topmost package's directory and the fully
@@ -771,18 +773,19 @@ class DocParser:
             except ImportError: module_doc = None
             if isinstance(module_doc, ModuleDoc):
                 for name, imp_var in module_doc.variables.items():
-                    if imp_var.is_public:
+                    # [xx] this is not exactly correct, but close.  It
+                    # does the wrong thing if a __var__ is explicitly
+                    # listed in __all__.
+                    if (imp_var.is_public and
+                        not (name.startswith('__') and name.endswith('__'))):
+                        if self.IMPORT_HANDLING == 'link':
+                            val_src = DottedName(src, name)
+                            val_doc = ValueDoc(imported_from=val_src)
+                        else:
+                            val_doc = imp_var.value
                         var_doc = VariableDoc(name=name, is_alias=False,
-                                              value=imp_var.value,
-                                              is_imported=True)
+                                              value=val_doc, is_imported=True)
                         self.set_variable(parent_docs[-1], var_doc)
-#                 if self.IMPORT_HANDLING == 'parse':
-#                 else:
-#                     for name, imp_var in module_doc.variables.items():
-#                         if imp_var.is_public:
-#                             self._add_import_var(DottedName(src,name),
-#                                                  name, parent_docs[-1])
-#                 return
 
         # If we got here, then either IMPORT_HANDLING='link' or we
         # failed to parse the `src` module.
@@ -927,7 +930,7 @@ class DocParser:
 
         # Decide whether the variable is an instance variable or not.
         # If it's an instance var, then discard the value.
-        is_instvar = self.lhs_is_instvar(lhs_pieces, parent_docs[-1])
+        is_instvar = self.lhs_is_instvar(lhs_pieces, parent_docs)
         
         if is_instvar: rhs_val = UNKNOWN
 
@@ -995,12 +998,27 @@ class DocParser:
             is_alias = True
             
 
-    def lhs_is_instvar(self, lhs_pieces, parent_doc):
-        return (isinstance(parent_doc, InstanceMethodDoc) and
-                len(lhs_pieces)==1 and len(lhs_pieces[0]) == 3 and
-                lhs_pieces[0][0] == (token.NAME, parent_doc.posargs[0]) and
+    def lhs_is_instvar(self, lhs_pieces, parent_docs):
+        if not isinstance(parent_docs[-1], RoutineDoc):
+            return False
+        # make sure that lhs_pieces is <self>.<name>, where <self> is
+        # the name of the first arg to the containing routinedoc, and
+        # <name> is a simple name.
+        posargs = parent_docs[-1].posargs
+        if not (len(lhs_pieces)==1 and len(posargs) > 0 and 
+                len(lhs_pieces[0]) == 3 and
+                lhs_pieces[0][0] == (token.NAME, posargs[0]) and
                 lhs_pieces[0][1] == (token.OP, '.') and
-                lhs_pieces[0][2][0] == token.NAME)
+                lhs_pieces[0][2][0] == token.NAME):
+            return False
+        # Make sure we're in an instance method, and not a
+        # module-level function.
+        for i in range(len(parent_docs)-1, -1, -1):
+            if isinstance(parent_docs[i], ClassDoc):
+                return True
+            elif parent_docs[i] != parent_docs[-1]:
+                return False
+        return False
             
     def rhs_to_valuedoc(self, rhs, parent_docs):
         # Dotted variable:
@@ -1029,17 +1047,22 @@ class DocParser:
 
     def lhs_parent(self, lhs_name, parent_docs):
         assert isinstance(lhs_name, DottedName)
-        
-        if isinstance(parent_docs[-1], InstanceMethodDoc):
+
+        # For instance vars inside an __init__ method:
+        if isinstance(parent_docs[-1], RoutineDoc):
             for i in range(len(parent_docs)-1, -1, -1):
                 if isinstance(parent_docs[i], ClassDoc):
                     return parent_docs[i]
-            
-        elif len(lhs_name) == 1:
+            else:
+                raise ValueError("%r is not a namespace or method" %
+                                 parent_docs[-1])
+
+        # For local variables:
+        if len(lhs_name) == 1:
             return parent_docs[-1]
-        
-        else:
-            return self.lookup_value(lhs_name.container(), parent_docs)
+
+        # For non-local variables:
+        return self.lookup_value(lhs_name.container(), parent_docs)
 
     #/////////////////////////////////////////////////////////////////
     # Line handler: single-line blocks
@@ -1185,10 +1208,7 @@ class DocParser:
         canonical_name = DottedName(parent_doc.canonical_name, func_name)
 
         # Create the function's RoutineDoc.
-        if isinstance(parent_doc, ClassDoc):
-            func_doc = InstanceMethodDoc(canonical_name=canonical_name)
-        else:
-            func_doc = FunctionDoc(canonical_name=canonical_name)
+        func_doc = RoutineDoc(canonical_name=canonical_name)
 
         # Process the signature.
         self.init_arglist(func_doc, line[2])
@@ -1417,9 +1437,9 @@ class DocParser:
     def parse_funcdef_arg(self, elt):
         """
         If the given tree token element contains a valid function
-        definition argument (i.e., an identifier token or nested tuple
+        definition argument (i.e., an identifier token or nested list
         of identifiers), then return a corresponding string identifier
-        or nested tuple of string identifiers.  Otherwise, raise a
+        or nested list of string identifiers.  Otherwise, raise a
         ParseError.
         """
         if isinstance(elt, list):
@@ -1427,9 +1447,9 @@ class DocParser:
                 if len(elt) == 3:
                     return self.parse_funcdef_arg(elt[1])
                 else:
-                    return tuple([self.parse_funcdef_arg(e)
-                                  for e in elt[1:-1]
-                                  if e != (token.OP, ',')])
+                    return [self.parse_funcdef_arg(e)
+                            for e in elt[1:-1]
+                            if e != (token.OP, ',')]
             else:
                 raise ParseError()
         elif elt[0] == token.NAME:
