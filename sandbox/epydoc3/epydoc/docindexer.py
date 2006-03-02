@@ -151,8 +151,8 @@ class DocIndex:
                     if src_doc in self.contained_valdocs:
                         self.contained_valdocs.discard(val_doc)
                     # Merge them.
-                    val_doc.__class__ = src_doc.__class__
-                    val_doc.__dict__ = src_doc.__dict__
+                    val_doc.__has_been_hashed = False # [xx HUGE HACK]
+                    src_doc.merge_and_overwrite(val_doc)
                 else:
                     break
 
@@ -198,6 +198,12 @@ class DocIndex:
     #////////////////////////////////////////////////////////////
     # Lookup methods
     #////////////////////////////////////////////////////////////
+    # [xx]
+    # Currently these only work for things reachable from the
+    # root... :-/  I might want to change this so that imported
+    # values can be accessed even if they're not contained.  
+    # Also, I might want canonical names to not start with ??
+    # if the thing is a top-level imported module..?
 
     def get_vardoc(self, name):
         """
@@ -362,15 +368,31 @@ class DocIndex:
 
         # Recurse to any directly reachable values.
         for val_doc_2 in self._valdocs_reachable_from(val_doc):
-            name = self._unreachable_name(val_doc_2)
-            self._assign_canonical_names(val_doc_2, name, -10000, val_doc)
+            name, val_score = self._unreachable_name(val_doc_2)
+            self._assign_canonical_names(val_doc_2, name, val_score, val_doc)
 
     def _unreachable_name(self, val_doc):
+        
+        # [xx] (when) does this help?
+        if (isinstance(val_doc, ModuleDoc) and
+            len(val_doc.canonical_name)==1 and val_doc.package is None):
+            for root_val in self._root_list:
+                if root_val.canonical_name == val_doc.canonical_name:
+                    if root_val != val_doc: 
+                        log.error("Name conflict: %r vs %r" %
+                                  (val_doc, root_val))
+                    break
+            else:
+                return val_doc.canonical_name, -1000
+        
         if val_doc.imported_from not in (UNKNOWN, None):
             name = DottedName('??', val_doc.imported_from)
         elif (val_doc.pyval is not UNKNOWN and
               hasattr(val_doc.pyval, '__name__')):
-            name = DottedName('??', val_doc.pyval.__name__)
+            try:
+                name = DottedName('??', val_doc.pyval.__name__)
+            except ValueError:
+                name = DottedName('??')
         else:
             name = DottedName('??')
 
@@ -382,7 +404,7 @@ class DocIndex:
             name = DottedName('%s-%s' % (name,n))
         self._unreachable_names.add(name)
         
-        return name
+        return name, -10000
 
     def _vardocs_reachable_from(self, val_doc):
         """
@@ -405,7 +427,7 @@ class DocIndex:
         reachable = []
         # Recurse to any other valuedocs reachable from this val_doc.
         if (isinstance(val_doc, ModuleDoc) and
-            val_doc.package not in(UNKNOWN, None)):
+            val_doc.package not in (UNKNOWN, None)):
             reachable.append(val_doc.package)
         if isinstance(val_doc, ClassDoc):
             if val_doc.bases is not UNKNOWN:
