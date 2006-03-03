@@ -14,7 +14,7 @@ this module is the L{HTMLWriter} class.
 import re, os, sys, codecs, sre_constants
 import urllib
 from epydoc.apidoc import *
-from epydoc.docstringparser import DocstringParser
+import epydoc.docstringparser
 import time, epydoc, epydoc.markup
 from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_colorize import PythonSourceColorizer
@@ -944,7 +944,7 @@ class HTMLWriter:
         # List the functions.
         funcs = [d for d in self.contained_valdocs
                  if (isinstance(d, RoutineDoc) and
-                     not isinstance(self._container(d), ClassDoc))]
+                     not isinstance(self.docindex.container(d), ClassDoc))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
@@ -1385,7 +1385,7 @@ class HTMLWriter:
 
         # Generate the crumbs for uid's ancestors.
         while True:
-            container = self._container(doc)
+            container = self.docindex.container(doc)
             if container is None:
                 # Use canonical_name, if we can.
                 if doc.canonical_name is UNKNOWN:
@@ -2286,7 +2286,7 @@ class HTMLWriter:
             described.
         """,
         """
-        >>> for field in DocstringParser.STANDARD_FIELDS:
+        >>> for field in epydoc.docstringparser.STANDARD_FIELDS:
         >>>   vals = doc.metadata.get(field.tags[0])
         >>>   if vals is None: continue
         >>>   if len(vals) == 1:
@@ -2392,15 +2392,6 @@ class HTMLWriter:
     # Helper functions
     #////////////////////////////////////////////////////////////
 
-    def _container(self, api_doc):
-        if len(api_doc.canonical_name) == 1:
-            return None
-        elif isinstance(api_doc, ModuleDoc) and api_doc.package != UNKNOWN:
-            return api_doc.package
-        else:
-            parent = api_doc.canonical_name.container()
-            return self.docindex.get_valdoc(parent)
-
     # [XX] Is it worth-while to pull the anchor tricks that I do here?
     # Or should I just live with the fact that show/hide private moves
     # stuff around?
@@ -2476,7 +2467,7 @@ class HTMLWriter:
                 return '%s#%s' % (container_url, urllib.quote('%s'%obj.name))
         # Value (other than module or class)
         elif isinstance(obj, ValueDoc):
-            container = self._container(obj)
+            container = self.docindex.container(obj)
             if container is None:
                 return None # We couldn't find it!
             else:
@@ -2510,24 +2501,13 @@ class HTMLWriter:
                 return ('%s-module-pysrc.html' %
                         urllib.quote('%s' % vardoc.canonical_name))
         else:
-            module = self._module_that_defines(vardoc)
+            module = self.docindex.module_that_defines(vardoc)
             if module:
                 mname_len = len(module.canonical_name)
                 anchor = DottedName(*vardoc.canonical_name[mname_len:])
                 return ('%s-module-pysrc.html#%s' % 
                         (urllib.quote('%s' % module.canonical_name),
                          urllib.quote('%s' % anchor)))
-
-    # [xx] exact same function is in docstringparser -- should this
-    # perhaps be put elsewhere?  method of DocIndex??
-    def _module_that_defines(self, api_doc):
-        while api_doc not in (None, UNKNOWN):
-            if isinstance(api_doc, ModuleDoc):
-                return api_doc
-            else:
-                api_doc = self._container(api_doc)
-        else:
-            return None
 
     # [xx] add code to automatically do <code> wrapping or the like?
     def href(self, target, label=None, css_class=None):
@@ -2633,7 +2613,7 @@ class HTMLWriter:
         elif isinstance(doc, StaticMethodDoc):
             return 'Static Method'
         elif isinstance(doc, RoutineDoc):
-            if isinstance(self._container(doc), ClassDoc):
+            if isinstance(self.docindex.container(doc), ClassDoc):
                 return 'Method'
             else:
                 return 'Function'
