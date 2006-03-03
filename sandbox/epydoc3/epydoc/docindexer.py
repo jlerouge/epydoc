@@ -128,7 +128,7 @@ class DocIndex:
         # here, because when we merge srcdoc & val_doc, we might
         # unintentionally create a duplicate entry in
         # reachable/contained valdocs sets.
-        reachable_val_docs = reachable_valdocs(self._root_list)
+        reachable_val_docs = reachable_valdocs(*self._root_list)
         for i, val_doc in enumerate(reachable_val_docs):
             if i % 100 == 0:
                 log.progress(.1*i/len(reachable_val_docs), 'Resolving imports')
