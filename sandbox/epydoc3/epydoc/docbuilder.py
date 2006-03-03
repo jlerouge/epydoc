@@ -13,12 +13,11 @@ The top-level programmatic interface to epydoc.
 ######################################################################
 ## Contents
 ######################################################################
-## 0. Imports
-## 1. build_docs()
-## 2. merge_docs()
-## 3. link_imports()
-## 4. assign_canonical_names()
-## 5. 
+## 1. build_docs() -- the main interface.
+## 2. merge_docs() -- helper, used to merge parse & inspect info
+## 3. link_imports() -- helper, used to connect imported vars w/ values
+## 4. assign_canonical_names() -- helper, used to set canonical names
+## 5. inherit_docs() -- helper, used to inherit docs from base classes
 
 ######################################################################
 ## Imports
@@ -28,7 +27,7 @@ import sys, os, os.path, __builtin__
 from epydoc.apidoc import *
 from epydoc.docinspector import DocInspector
 from epydoc.docparser import DocParser, ParseError
-from epydoc.docstringparser import DocstringParser
+from epydoc.docstringparser import parse_docstring
 from epydoc import log
 
 from epydoc.util import * # [xx] hmm
@@ -38,8 +37,11 @@ try: sorted
 except NameError: from epydoc.util import py_sorted as sorted
 
 ######################################################################
-## The Driver
+## 1. build_docs()
 ######################################################################
+
+def build_doc_index(self, items, inspect=True, parse=True):
+    return DocBuilder(inspect, parse).build_doc_index(*items)
 
 class DocBuilder:
     def __init__(self, inspect=True, parse=True):
@@ -48,22 +50,13 @@ class DocBuilder:
         self.inspect = inspect
         self.parse = parse
 
-        # Defaults for the tool chain.
-        inspector = DocInspector()
-        parser = DocParser(inspector.inspect(value=__builtin__))
-        docstring_parser = DocstringParser()
-
-        self.inspector = inspector
+        self.inspector = DocInspector()
         """The L{DocInspector} that should be used to inspect python
         objects and extract their documentation information."""
         
-        self.parser = parser
+        self.parser = DocParser(self.inspector.inspect(value=__builtin__))
         """The L{DocParser} that should be used to parse python source
         files, and extract documentation about the objects they contain."""
-        
-        self.docstring_parser = docstring_parser
-        """The L{DocstringParser} that should be used to parse
-        the docstrings of the documented objects."""
         
         self._progress_estimator = None
         """A L{_ProgressEstimator} used to keep track of progress when
@@ -73,8 +66,16 @@ class DocBuilder:
         values.)"""
             
     #/////////////////////////////////////////////////////////////////
-    # Interface Method
+    # Interface Methods
     #/////////////////////////////////////////////////////////////////
+
+    def build_doc(self, item):
+        """
+        Build API documentation for a given item, and return it as
+        an L{APIDoc} object.
+        """
+        docindex = self.build_doc_index(item)
+        return docindex.root[0]
 
     def build_doc_index(self, *items):
         """
@@ -115,44 +116,66 @@ class DocBuilder:
         else:
             docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[1]]
 
-        # Index the docs.
+        # Collect the docs into a single index.
         docindex = DocIndex(docs)
-
-        # Linking
-        link_imports(docindex)
-
-        # Canonical names
-        assign_canonical_names(docindex)
-    
-        # Parse all docstrings.  (Sort them first, so that warnings
-        # from the same module get listed consecutively.)
-        log.start_progress('Parsing docstrings')
         reachable_valdocs = sorted(docindex.reachable_valdocs(),
                                    key=lambda doc: doc.canonical_name)
+
+        # Replace any proxy valuedocs that we got from importing with
+        # their targets.
+        if self.parse:
+            log.start_progress('Linking imported variables')
+            for i, val_doc in enumerate(reachable_valdocs):
+                self._report_valdoc_progress(i, val_doc, reachable_valdocs)
+                link_imports(val_doc, docindex)
+            log.end_progress()
+
+        # Assign canonical names.
+        log.start_progress('Indexing documentation')
+        for i, val_doc in enumerate(docindex.root):
+            log.progress(float(i)/len(docindex.root), val_doc.canonical_name)
+            assign_canonical_names(val_doc, val_doc.canonical_name, docindex)
+        log.end_progress()
+    
+        # Parse the docstrings for each object.
+        log.start_progress('Parsing docstrings')
         for i, val_doc in enumerate(reachable_valdocs):
-            if (isinstance(val_doc, (ModuleDoc, ClassDoc)) and
-                val_doc.canonical_name[0] != '??'):
-                log.progress(float(i)/len(reachable_valdocs),
-                             str(val_doc.canonical_name))
-            self.docstring_parser.parse_docstring(val_doc, docindex)
+            self._report_valdoc_progress(i, val_doc, reachable_valdocs)
+            # the value's docstring
+            parse_docstring(val_doc, docindex)
+            # the value's variables' docstrings
             if (isinstance(val_doc, NamespaceDoc) and
                 val_doc.variables not in (None, UNKNOWN)):
                 for var_doc in val_doc.variables.values():
-                    self.docstring_parser.parse_docstring(var_doc, docindex)
+                    parse_docstring(var_doc, docindex)
         log.end_progress()
     
         # Take care of inheritance.
-        for val_doc in docindex.reachable_valdocs():
+        log.start_progress('Inheriting documentation')
+        for i, val_doc in enumerate(reachable_valdocs):
             if isinstance(val_doc, ClassDoc):
+                percent = float(i)/len(reachable_valdocs)
+                log.progress(percent, val_doc.canonical_name)
                 inherit_docs(val_doc)
+        log.end_progress()
 
-        # Init groups & sortedvars
-        for val_doc in docindex.reachable_valdocs():
+        # Initialize the groups & sortedvars attributes.
+        log.start_progress('Sorting & Grouping')
+        for i, val_doc in enumerate(docindex.reachable_valdocs()):
             if isinstance(val_doc, NamespaceDoc):
-                init_sorted_variables(val_doc)
-                init_groups(val_doc)
+                percent = float(i)/len(reachable_valdocs)
+                log.progress(percent, val_doc.canonical_name)
+                val_doc.init_sorted_variables()
+                val_doc.init_groups()
+        log.end_progress()
 
         return docindex
+
+    def _report_valdoc_progress(self, i, val_doc, val_docs):
+        if (isinstance(val_doc, (ModuleDoc, ClassDoc)) and
+            val_doc.canonical_name != UNKNOWN and
+            val_doc.canonical_name[0] != '??'):
+            log.progress(float(i)/len(val_docs), val_doc.canonical_name)
 
     #/////////////////////////////////////////////////////////////////
     # Documentation Generation
@@ -692,50 +715,37 @@ register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 ## Import Linking
 ######################################################################
 
-def link_imports(docindex):
-    log.start_progress('Resolving imports')
+def link_imports(val_doc, docindex):
+    # Check if the ValueDoc has an unresolved imported_from link.
+    # If so, then resolve it.
+    while val_doc.imported_from not in (UNKNOWN, None):
+        # Find the valuedoc that the imported_from name points to.
+        src_doc = docindex.get_valdoc(val_doc.imported_from)
 
-    # Get the set of all ValueDocs that are reachable from the root.
-    reachable_val_docs = docindex.reachable_valdocs()
-    
-    for i, val_doc in enumerate(reachable_val_docs):
-        # Report on our progress.
-        if i % 100 == 0:
-            percent = float(i)/len(reachable_val_docs)
-            log.progress(percent, '%d%% resolved' % (100.*percent))
+        # If we don't have any valuedoc at that address, then
+        # promote this proxy valuedoc to a full (albeit empty)
+        # one.
+        if src_doc is None:
+            val_doc.canonical_name = val_doc.imported_from
+            val_doc.imported_from = None
+            break
 
-        # Check if the ValueDoc has an unresolved imported_from link.
-        # If so, then resolve it.
-        while val_doc.imported_from not in (UNKNOWN, None):
-            # Find the valuedoc that the imported_from name points to.
-            src_doc = docindex.get_valdoc(val_doc.imported_from)
+        # If we *do* have something at that address, then
+        # merge the proxy `val_doc` with it.
+        elif src_doc != val_doc:
+            src_doc.merge_and_overwrite(val_doc)
 
-            # If we don't have any valuedoc at that address, then
-            # promote this proxy valuedoc to a full (albeit empty)
-            # one.
-            if src_doc is None:
-                val_doc.canonical_name = val_doc.imported_from
-                val_doc.imported_from = None
-                break
-
-            # If we *do* have something at that address, then
-            # merge the proxy `val_doc` with it.
-            elif src_doc != val_doc:
-                src_doc.merge_and_overwrite(val_doc)
-
-            # If the imported_from link points back at src_doc
-            # itself, then we most likely have a variable that's
-            # shadowing a submodule that it should be equal to.
-            # So just get rid of the variable.
-            elif src_doc == val_doc:
-                parent_name = DottedName(*val_doc.imported_from[:-1])
-                var_name = val_doc.imported_from[-1]
-                parent = docindex.get_valdoc(parent_name)
-                if parent is not None and var_name in parent.variables:
-                    del parent.variables[var_name]
-                src_doc.imported_from = None
-
-    log.end_progress()
+        # If the imported_from link points back at src_doc
+        # itself, then we most likely have a variable that's
+        # shadowing a submodule that it should be equal to.
+        # So just get rid of the variable.
+        elif src_doc == val_doc:
+            parent_name = DottedName(*val_doc.imported_from[:-1])
+            var_name = val_doc.imported_from[-1]
+            parent = docindex.get_valdoc(parent_name)
+            if parent is not None and var_name in parent.variables:
+                del parent.variables[var_name]
+            src_doc.imported_from = None
 
 ######################################################################
 ## Canonical Name Assignment
@@ -744,22 +754,14 @@ def link_imports(docindex):
 _name_scores = {}
 """A dictionary mapping from each C{ValueDoc} to the score that has
 been assigned to its current cannonical name.  If
-L{_assign_canonical_names()} finds a cannonical name with a better
+L{assign_canonical_names()} finds a canonical name with a better
 score, then it will replace the old name."""
 
 _unreachable_names = Set()
 """The set of names that have been used for unreachable objects.  This
 is used to ensure there are no duplicate cannonical names assigned."""
 
-def assign_canonical_names(docindex):
-    log.start_progress('Indexing documentation')
-    for i, val_doc in enumerate(docindex.root):
-        log.progress(float(i)/len(docindex.root), val_doc.canonical_name)
-        _assign_canonical_names(val_doc, val_doc.canonical_name,
-                                docindex, 0)
-    log.end_progress()
-
-def _assign_canonical_names(val_doc, name, docindex, score):
+def assign_canonical_names(val_doc, name, docindex, score=0):
     """
     Assign a canonical name to C{val_doc} (if it doesn't have one
     already), and (recursively) to each variable in C{val_doc}.
@@ -772,10 +774,6 @@ def _assign_canonical_names(val_doc, name, docindex, score):
         
     Note that canonical names will even be assigned to values
     like integers and C{None}; but these should be harmless.
-
-    This method also initializes the instance variable
-    L{reachable_vardocs}.
-
     """
     # If we've already visited this node, and our new score
     # doesn't beat our old score, then there's nothing more to do.
@@ -817,12 +815,12 @@ def _assign_canonical_names(val_doc, name, docindex, score):
         if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
         elif var_doc.is_alias: vardoc_score -= 1000
         
-        _assign_canonical_names(var_doc.value, varname, docindex, vardoc_score)
+        assign_canonical_names(var_doc.value, varname, docindex, vardoc_score)
 
     # Recurse to any directly reachable values.
     for val_doc_2 in val_doc.valdoc_links():
         val_name, val_score = _unreachable_name_for(val_doc_2, docindex)
-        _assign_canonical_names(val_doc_2, val_name, docindex, val_score)
+        assign_canonical_names(val_doc_2, val_name, docindex, val_score)
 
 def _var_shadows_self(var_doc, varname):
     return (var_doc.value not in (None, UNKNOWN) and
@@ -927,77 +925,3 @@ def _inherit_info(var_doc):
         var_doc.value.descr in (None, UNKNOWN)):
         var_doc.value.descr = var_doc.overrides.value.descr
 
-######################################################################
-## Grouping & Sorting
-######################################################################
-
-def init_sorted_variables(api_doc):
-    unsorted = api_doc.variables.copy()
-    api_doc.sorted_variables = []
-
-    # Add any variables that are listed in sort_spec
-    if api_doc.sort_spec is not UNKNOWN:
-        for ident in api_doc.sort_spec:
-            var_doc = unsorted.pop(ident, None)
-            if var_doc is not None:
-                api_doc.sorted_variables.append(var_doc)
-            elif '*' in ident:
-                regexp = re.compile('^%s$' % ident.replace('*', '(.*)'))
-                # sort within matching group?
-                for name, var_doc in unsorted.items():
-                    if regexp.match(name):
-                        api_doc.sorted_variables.append(var_doc)
-                        unsorted.remove(var_doc)
-
-    # Add any remaining variables in alphabetical order.
-    var_docs = unsorted.items()
-    var_docs.sort()
-    for name, var_doc in var_docs:
-        api_doc.sorted_variables.append(var_doc)
-
-def init_groups(api_doc):
-    assert len(api_doc.sorted_variables) == len(api_doc.variables)
-    
-    api_doc.group_names = [''] + [n for (n,vs) in api_doc.group_specs]
-    api_doc.groups = {}
-    
-    # Make the common case fast:
-    if len(api_doc.group_names) == 1:
-        api_doc.groups[''] = api_doc.sorted_variables
-        return
-
-    for group in api_doc.group_names:
-        api_doc.groups[group] = []
-
-    # Create a mapping from elt -> group name.
-    varname2groupname = {}
-    regexp_groups = []
-
-    for group_name, var_names in api_doc.group_specs:
-        for var_name in var_names:
-            if '*' not in var_name:
-                varname2groupname[var_name] = group_name
-            else:
-                var_name_re = '^%s$' % var_name.replace('*', '(.*)')
-                var_name_re = re.compile(var_name_re)
-                regexp_groups.append( (group_name, var_name_re) )
-
-    # Use the elt -> group name mapping to put each elt in the
-    # right group.
-    for var_doc in api_doc.sorted_variables:
-        group_name = varname2groupname.get(var_doc.name, '')
-        api_doc.groups[group_name].append(var_doc)
-
-    # Handle any regexp groups, by moving elements from the
-    # ungrouped list to the appropriate group.
-    ungrouped = api_doc.groups['']
-    for (group_name, regexp) in regexp_groups:
-        for i in range(len(ungrouped)-1, -1, -1):
-            elt = ungrouped[i]
-            if regexp.match(elt.name):
-                api_doc.groups[group_name].append(elt)
-                del ungrouped[i]
-
-    # [xx] check for empty groups???
-
-        
