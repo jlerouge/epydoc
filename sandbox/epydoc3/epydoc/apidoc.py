@@ -488,15 +488,16 @@ class ValueDoc(APIDoc):
             return '<%s>' % self.__class__.__name__
 
     def valdoc_links(self):
-        raise NotImplementedError('subclasses must implement this')
+        return []
     def vardoc_links(self):
-        raise NotImplementedError('subclasses must implement this')
+        return []
 
 def reachable_valdocs(*root):
     val_queue = list(root)
-    val_set = Set()
+    val_set = Set(root)
     while val_queue:
         val_doc = val_queue.pop()
+        val_set.add(val_doc)
         val_queue.extend([v for v in val_doc.valdoc_links()
                           if v not in val_set])
         val_queue.extend([v.value for v in val_doc.vardoc_links()
@@ -506,9 +507,10 @@ def reachable_valdocs(*root):
 def contained_valdocs(*root):
     "Does not include imports"
     val_queue = list(root)
-    val_set = Set()
+    val_set = Set(root)
     while val_queue:
         val_doc = val_queue.pop()
+        val_set.add(val_doc)
         val_queue.extend([v.value for v in val_doc.vardoc_links()
                           if (v.value not in val_set and
                               v.is_imported != True)])
