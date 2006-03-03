@@ -55,7 +55,7 @@ would hide them.  So verbosity levels would be...
 import sys, os
 from optparse import OptionParser, OptionGroup
 import epydoc
-from epydoc.driver import DocBuilder
+from epydoc.docbuilder import DocBuilder
 from epydoc.docwriter.html import HTMLWriter
 from epydoc import log
 from epydoc.util import wordwrap
