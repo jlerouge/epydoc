@@ -12,6 +12,7 @@ this module is the L{HTMLWriter} class.
 """
 
 import re, os, sys, codecs, sre_constants
+import urllib
 from epydoc.apidoc import *
 from epydoc.docstringparser import DocstringParser
 import time, epydoc, epydoc.markup
@@ -418,13 +419,13 @@ class HTMLWriter:
         self._write(self.write_project_toc, directory, 'toc-everything.html')
         for doc in contained_valdocs:
             if isinstance(doc, ModuleDoc):
-                filename = 'toc-%s' % self.url(doc)
+                filename = 'toc-%s' % urllib.unquote(self.url(doc))
                 self._write(self.write_module_toc, directory, filename, doc)
 
         # Write the object documentation.
         for doc in contained_valdocs:
             if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
-            filename = self.url(doc)
+            filename = urllib.unquote(self.url(doc))
             if isinstance(doc, ModuleDoc):
                 self._write(self.write_module, directory, filename, doc)
             else:
@@ -942,7 +943,7 @@ class HTMLWriter:
         # List the functions.
         funcs = [d for d in self.docindex.contained_valdocs
                  if (isinstance(d, RoutineDoc) and
-                     not isinstance(d.canonical_container, ClassDoc))]
+                     not isinstance(self._container(d), ClassDoc))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
@@ -1383,9 +1384,8 @@ class HTMLWriter:
 
         # Generate the crumbs for uid's ancestors.
         while True:
-            if doc.canonical_container is None:
-                return crumbs
-            if doc.canonical_container is UNKNOWN:
+            container = self._container(doc)
+            if container is None:
                 # Use canonical_name, if we can.
                 if doc.canonical_name is UNKNOWN:
                     return ['??']+crumbs
@@ -1394,11 +1394,11 @@ class HTMLWriter:
                             for ident in doc.canonical_name[:-1]]+crumbs
                 else:
                     return list(doc.canonical_name)+crumbs
-            doc = doc.canonical_container
-            label = self._crumb(doc)
-            name = doc.canonical_name
-            crumbs.insert(0, self.href(doc, label)) # [xx] code=0??
-            #crumbs.insert(0, self._dotted_name_to_href(name, label, code=0))
+            else:
+                label = self._crumb(container)
+                name = container.canonical_name
+                crumbs.insert(0, self.href(container, label)) # [xx] code=0??
+                doc = container
         
     def _crumb(self, doc):
         return '%s&nbsp;%s' % (self.doc_kind(doc), doc.canonical_name[-1])
@@ -2071,8 +2071,7 @@ class HTMLWriter:
         return width
 
     def base_label(self, doc, base):
-        if (base.canonical_container not in (None, UNKNOWN) and
-            base.canonical_container == doc.canonical_container):
+        if (base.canonical_name[:-1] == doc.canonical_name[:-1]):
             return base.canonical_name[-1]
         else:
             return str(base.canonical_name)
@@ -2392,6 +2391,15 @@ class HTMLWriter:
     # Helper functions
     #////////////////////////////////////////////////////////////
 
+    def _container(self, api_doc):
+        if len(api_doc.canonical_name) == 1:
+            return None
+        elif isinstance(api_doc, ModuleDoc) and api_doc.package != UNKNOWN:
+            return api_doc.package
+        else:
+            parent = api_doc.canonical_name.container()
+            return self.docindex.get_valdoc(parent)
+
     # [XX] Is it worth-while to pull the anchor tricks that I do here?
     # Or should I just live with the fact that show/hide private moves
     # stuff around?
@@ -2446,12 +2454,15 @@ class HTMLWriter:
         Return the URL for the given object, which can be a
         C{VariableDoc}, a C{ValueDoc}, or a C{DottedName}.
         """
+        # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
             if obj not in self.docindex.contained_valdocs: return None
-            return '%s-module.html' % obj.canonical_name
+            return urllib.quote('%s'%obj.canonical_name) + '-module.html'
+        # Class: <canonical_name>-class.html
         elif isinstance(obj, ClassDoc):
             if obj not in self.docindex.contained_valdocs: return None
-            return '%s-class.html' % obj.canonical_name
+            return urllib.quote('%s'%obj.canonical_name) + '-class.html'
+        # Variable
         elif isinstance(obj, VariableDoc):
             val_doc = obj.value
             if isinstance(val_doc, (ModuleDoc, ClassDoc)):
@@ -2461,21 +2472,23 @@ class HTMLWriter:
             else:
                 container_url = self.url(obj.container)
                 if container_url is None: return None
-                return '%s#%s' % (container_url, obj.name)
+                return '%s#%s' % (container_url, urllib.quote('%s'%obj.name))
+        # Value (other than module or class)
         elif isinstance(obj, ValueDoc):
-            if obj.canonical_container in (None, UNKNOWN):
-                return None # [xx] hmm...
+            container = self._container(obj)
+            if container is None:
+                return None # We couldn't find it!
             else:
-                container_url = self.url(obj.canonical_container)
+                container_url = self.url(container)
                 if container_url is None: return None
-                return '%s#%s' % (container_url,
-                                  obj.canonical_name[-1])
+                anchor = urllib.quote('%s'%obj.canonical_name[-1])
+                return '%s#%s' % (container_url, anchor)
+        # Dotted name: look up the corresponding APIDoc
         elif isinstance(obj, DottedName):
             val_doc = self.docindex.get_valdoc(obj)
-            if val_doc is not None:
-                return self.url(val_doc)
-            else:
-                return None # [xx] hmm...
+            if val_doc is None: return None
+            return self.url(val_doc)
+        # Special pages:
         elif obj == 'indices':
             return 'indices.html'
         elif obj == 'help':
@@ -2486,24 +2499,34 @@ class HTMLWriter:
             raise ValueError, "Don't know what to do with %r" % obj
 
     # [xx] returning None from here is somewhat problematic -- if we
-    # don't have one, then we dont' want to link...
+    # don't have one, then we dont' want to link...  I guess really
+    # this should be replaced by a pysrc_link() method.
     def pysrc_url(self, vardoc):
         if isinstance(vardoc, ModuleDoc):
             if vardoc.filename in (None, UNKNOWN):
                 return None
             else:
-                return '%s-module-pysrc.html' % vardoc.canonical_name
+                return ('%s-module-pysrc.html' %
+                        urllib.quote('%s' % vardoc.canonical_name))
         else:
-            module = vardoc.containing_module()
-            if module in (None, UNKNOWN):
-                return None
-            if module.filename in (None, UNKNOWN):
-                return None
-            else:
+            module = self._module_that_defines(vardoc)
+            if module:
                 mname_len = len(module.canonical_name)
                 anchor = DottedName(*vardoc.canonical_name[mname_len:])
                 return ('%s-module-pysrc.html#%s' % 
-                        (module.canonical_name, anchor))
+                        (urllib.quote('%s' % module.canonical_name),
+                         urllib.quote('%s' % anchor)))
+
+    # [xx] exact same function is in docstringparser -- should this
+    # perhaps be put elsewhere?  method of DocIndex??
+    def _module_that_defines(self, api_doc):
+        while api_doc not in (None, UNKNOWN):
+            if isinstance(api_doc, ModuleDoc):
+                return api_doc
+            else:
+                api_doc = self._container(api_doc)
+        else:
+            return None
 
     # [xx] add code to automatically do <code> wrapping or the like?
     def href(self, target, label=None, css_class=None):
@@ -2609,7 +2632,7 @@ class HTMLWriter:
         elif isinstance(doc, StaticMethodDoc):
             return 'Static Method'
         elif isinstance(doc, RoutineDoc):
-            if isinstance(doc.canonical_container, ClassDoc):
+            if isinstance(self._container(doc), ClassDoc):
                 return 'Method'
             else:
                 return 'Function'
