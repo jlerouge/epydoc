@@ -176,7 +176,7 @@ class DocInspector:
                 val_doc.canonical_name = UNKNOWN
             try:
                 val_doc.repr = '%r' % value
-                if isinstance(val_doc, str):
+                if isinstance(val_doc.repr, str):
                     val_doc.repr = decode_with_backslashreplace(val_doc.repr)
             except: pass
         return val_doc
