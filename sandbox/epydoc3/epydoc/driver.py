@@ -125,7 +125,7 @@ class DocBuilder:
         elif self.inspect:
             docs = [doc_pair[0] for doc_pair in doc_pairs if doc_pair[0]]
         else:
-            docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[0]]
+            docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[1]]
 
         # Index the docs.
         docindex = DocIndex(docs)
@@ -140,11 +140,11 @@ class DocBuilder:
                 val_doc.canonical_name[0] != '??'):
                 log.progress(float(i)/len(val_docs),
                              str(val_doc.canonical_name))
-            self.docstring_parser.parse_docstring(val_doc)
+            self.docstring_parser.parse_docstring(val_doc, docindex)
             if (isinstance(val_doc, NamespaceDoc) and
                 val_doc.variables not in (None, UNKNOWN)):
                 for var_doc in val_doc.variables.values():
-                    self.docstring_parser.parse_docstring(var_doc)
+                    self.docstring_parser.parse_docstring(var_doc, docindex)
         log.end_progress()
     
         # Take care of inheritance.
