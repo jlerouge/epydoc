@@ -141,8 +141,19 @@ class DocInspector:
         inspector_method(value, val_doc)
 
         # Set canonical name, if it was given
-        if name is not None and val_doc.canonical_name == UNKNOWN:
+        if val_doc.canonical_name == UNKNOWN and name is not None:
             val_doc.canonical_name = name
+
+        # If we were given a filename, but didn't manage to get a
+        # canonical name, then the module defined by the given file
+        # must be shadowed by a variable in its parent package(s).
+        # E.g., this happens with `curses.wrapper`.  Add a "'" to
+        # the end of the name to distinguish it from the variable.
+        if val_doc.canonical_name == UNKNOWN and filename is not None:
+            shadowed_name = DottedName(value.__name__)
+            log.warn("Module %s is shadowed by a variable with "
+                     "the same name." % shadowed_name)
+            val_doc.canonical_name = DottedName(str(shadowed_name)+"'")
 
         return val_doc
 

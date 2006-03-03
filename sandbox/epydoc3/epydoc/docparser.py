@@ -255,7 +255,7 @@ class DocParser:
     
             # Figure out the canonical name of the module we're parsing.
             module_name, is_pkg = _get_module_name(filename, context)
-    
+
             # Create a new ModuleDoc for the module, & add it to the cache.
             module_doc = ModuleDoc(canonical_name=module_name, variables={},
                                    sort_spec=[],
@@ -1760,14 +1760,27 @@ def _get_module_name(filename, package_doc):
         name = os.path.split(os.path.split(filename)[0])[1]
     else:
         is_package = False
-        
+
     # [XX] if the module contains a script, then `name` may not
     # necessarily be a valid identifier -- which will cause
     # DottedName to raise an exception.  Is that what I want?
     if package_doc is None:
-        return DottedName(name), is_package
+        dotted_name = DottedName(name)
     else:
-        return DottedName(package_doc.canonical_name, name), is_package
+        dotted_name = DottedName(package_doc.canonical_name, name)
+
+    # Check if the module looks like it's shadowed by a variable.
+    # If so, then add a "'" to the end of its canonical name, to
+    # distinguish it from the variable.
+    if package_doc is not None and name in package_doc.variables:
+        valdoc = package_doc.variables[name].value
+        if (valdoc not in (None, UNKNOWN) and
+            valdoc.imported_from != dotted_name):
+            log.warn("Module %s might be shadowed by a variable with "
+                     "the same name." % dotted_name)
+            dotted_name = DottedName(str(dotted_name)+"'")
+
+    return dotted_name, is_package
 
 def flatten(lst, out=None):
     """
