@@ -39,8 +39,7 @@ from epydoc import log
 ######################################################################
 # Dotted Names
 ######################################################################
-_IDENTIFIER_RE = re.compile(r'[a-zA-Z_]\w*(.[a-zA-Z_]\w*)*' + '|'
-                            r'\?\?(.[a-zA-Z_]\w*)*(-\d+)?')
+
 class DottedName:
     """
     A sequence of identifiers, separated by periods, used to name a
@@ -53,6 +52,11 @@ class DottedName:
         >>> name[1]
         'api_doc'
     """
+    UNREACHABLE = "??"
+    _IDENTIFIER_RE = re.compile(r"[a-zA-Z_]\w*'?(\.[a-zA-Z_]\w*'?)*$" + "|" +
+                                re.escape(UNREACHABLE)+
+                                r"(\.[a-zA-Z_]\w*'?)*(-\d+)?$")
+    
     def __init__(self, *pieces):
         """
         Construct a new dotted name from the given sequence of pieces,
@@ -71,7 +75,7 @@ class DottedName:
             if isinstance(piece, DottedName):
                 self._identifiers += piece._identifiers
             elif isinstance(piece, basestring):
-                if not _IDENTIFIER_RE.match(piece):
+                if not self._IDENTIFIER_RE.match(piece):
                     raise ValueError('Bad identifier %r' % (piece,))
                 self._identifiers += piece.split('.')
             else:
@@ -127,7 +131,6 @@ class DottedName:
         """
         return len(self._identifiers)
 
-    # [xx] hmm...
     def container(self):
         """
         Return the DottedName formed by removing the last identifier
@@ -335,7 +338,7 @@ class APIDoc(object):
             assert apidoc.__dict__ is self.__dict__
         # Return self.
         return self
-        
+
 ######################################################################
 # Variable Documentation Objects
 ######################################################################
@@ -404,7 +407,7 @@ class VariableDoc(APIDoc):
         else:                     
             return '<%s>' % self.__class__.__name__
 
-    def canonical_name(self):
+    def _get_canonical_name(self):
         if self.container is UNKNOWN:
             raise ValueError, `self`
         if (self.container is UNKNOWN or
@@ -412,7 +415,7 @@ class VariableDoc(APIDoc):
             return UNKNOWN
         else:
             return self.container.canonical_name + self.name
-    canonical_name = property(canonical_name, doc="""
+    canonical_name = property(_get_canonical_name, doc="""
     A read-only property that can be used to get the variable's
     canonical name.  This is formed by taking the varaible's
     container's cannonical name, and adding the variable's name
@@ -446,17 +449,6 @@ class ValueDoc(APIDoc):
         C{ValueDoc} is created, then one will be assigned during
         indexing.
     @type canonical_name: L{DottedName}
-    @ivar canonical_container: The API documentation for the namespace
-        that contains this value and is identified by
-        C{M{cn}.container()} (where C{M{cn}} is this C{ValueDoc}'s
-        canonical name.  In particular, C{canonical_container} is a
-        C{NamespaceDoc} whose canonical name is C{M{cn}.container()},
-        that contains a variable named C{M{cn}[-1]} whose value is
-        this C{ValueDoc}.  If no such C{ValueDoc} exists (e.g., if
-        this C{ValueDoc} cannot be reached by any sequence of
-        identifiers), then C{canonical_container} is C{None}.  This
-        variable is initialized during indexing.
-    @type canonical_container: L{NamespaceDoc} or C{None}
 
     @ivar pyval: A pointer to the actual Python object described by
         this C{ValueDoc}.
@@ -479,7 +471,6 @@ class ValueDoc(APIDoc):
         imported value's C{ValueDoc} during indexing.
     """
     canonical_name = UNKNOWN
-    canonical_container = UNKNOWN
     pyval = UNKNOWN
     ast = UNKNOWN
     repr = UNKNOWN
@@ -496,25 +487,34 @@ class ValueDoc(APIDoc):
         else:                     
             return '<%s>' % self.__class__.__name__
 
-    def containing_module(self):
-        """
-        @rtype: L{ModuleDoc} or C{None}
-        @return: The API documentation for the module that contains
-        this value, or C{None} if the API documentation is
-        unavailable.  This documentation is found by following
-        L{canonical_container} links until a module is found.  As a
-        result, it should not be used until after the
-        L{canonical_container} attributes have been set (i.e., after
-        indexing).
-        """
-        container = self.canonical_container
-        while True:
-            if container in (UNKNOWN, None):
-                return None
-            if isinstance(container, ModuleDoc):
-                return container
-            else:
-                container = container.canonical_container
+    def valdoc_links(self):
+        raise NotImplementedError('subclasses must implement this')
+    def vardoc_links(self):
+        raise NotImplementedError('subclasses must implement this')
+
+def reachable_valdocs(*root):
+    val_queue = list(root)
+    val_set = Set()
+    while val_queue:
+        val_doc = val_queue.pop()
+        val_queue.extend([v for v in val_doc.valdoc_links()
+                          if v not in val_set])
+        val_queue.extend([v.value for v in val_doc.vardoc_links()
+                          if v.value not in val_set])
+    return val_set
+
+def contained_valdocs(*root):
+    "Does not include imports"
+    val_queue = list(root)
+    val_set = Set()
+    while val_queue:
+        val_doc = val_queue.pop()
+        val_queue.extend([v.value for v in val_doc.vardoc_links()
+                          if (v.value not in val_set and
+                              v.is_imported != True)])
+    return val_set
+
+        
     
 class NamespaceDoc(ValueDoc):
     """
@@ -566,6 +566,11 @@ class NamespaceDoc(ValueDoc):
         APIDoc.__init__(self, **kwargs)
         assert self.variables != UNKNOWN
 
+    def valdoc_links(self):
+        return []
+    def vardoc_links(self):
+        return self.variables.values()
+
 class ModuleDoc(NamespaceDoc):
     """
     API documentation information about a single module.
@@ -586,6 +591,14 @@ class ModuleDoc(NamespaceDoc):
     is_package = UNKNOWN
     filename = UNKNOWN
     path = UNKNOWN
+
+    def valdoc_links(self):
+        val_docs = []
+        if self.package not in (None, UNKNOWN): val_docs.append(self.package)
+        if self.submodules not in (None, UNKNOWN): val_docs += self.submodules
+        return val_docs
+    def vardoc_links(self):
+        return self.variables.values()
 
     def select_variables(self, group=None, value_type=None, public=None,
                          imported=None):
@@ -653,6 +666,14 @@ class ClassDoc(NamespaceDoc):
     bases = UNKNOWN
     subclasses = UNKNOWN
 
+    def valdoc_links(self):
+        val_docs = []
+        if self.bases not in (None, UNKNOWN): val_docs += self.bases
+        if self.subclasses not in (None, UNKNOWN): val_docs += self.subclasses
+        return val_docs
+    def vardoc_links(self):
+        return self.variables.values()
+    
     def is_type(self):
         if self.canonical_name == DottedName('type'): return True
         if self.bases is UNKNOWN: return False
@@ -890,6 +911,11 @@ class RoutineDoc(ValueDoc):
     return_type = UNKNOWN
     exception_descrs = UNKNOWN
 
+    def valdoc_links(self):
+        return []
+    def vardoc_links(self):
+        return []
+    
     def all_args(self):
         """
         @return: A list of the names of all arguments (positional,
@@ -934,7 +960,16 @@ class PropertyDoc(ValueDoc):
     fset = UNKNOWN
     fdel = UNKNOWN
     type_descr = UNKNOWN # [XX]?? type of value that should be stored in the prop
-    
+
+    def valdoc_links(self):
+        val_docs = []
+        if self.fget not in (None, UNKNOWN): val_docs.append(self.fget)
+        if self.fset not in (None, UNKNOWN): val_docs.append(self.fset)
+        if self.fdel not in (None, UNKNOWN): val_docs.append(self.fdel)
+        return val_docs
+    def vardoc_links(self):
+        return []
+
 ######################################################################
 ## Pretty Printing
 ######################################################################
