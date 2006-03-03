@@ -32,9 +32,17 @@ C{ValueDoc}, since they share a single value.
 """
 __docformat__ = 'epytext en'
 
+######################################################################
+## Imports
+######################################################################
+
 import types, re
 from sets import Set
 from epydoc import log
+
+# Backwards compatibility imports:
+try: sorted
+except NameError: from epydoc.util import py_sorted as sorted
 
 ######################################################################
 # Dotted Names
@@ -493,6 +501,13 @@ class ValueDoc(APIDoc):
         return []
 
 def reachable_valdocs(*root):
+    """
+    @return: The set of all C{ValueDoc}s that are directly or
+    indirectly reachable from the root set.  In particular, this set
+    contains all C{ValueDoc}s that can be reached from the root set by
+    following I{any} sequence of pointers to C{ValueDoc}s or
+    C{VariableDoc}s.
+    """
     val_queue = list(root)
     val_set = Set(root)
     while val_queue:
@@ -501,18 +516,27 @@ def reachable_valdocs(*root):
         val_queue.extend([v for v in val_doc.valdoc_links()
                           if v not in val_set])
         val_queue.extend([v.value for v in val_doc.vardoc_links()
-                          if v.value not in val_set])
+                          if (v.value not in (None, UNKNOWN) and
+                              v.value not in val_set)])
     return val_set
 
 def contained_valdocs(*root):
-    "Does not include imports"
+    """
+    @return: The set of all C{ValueDoc}s that are directly or
+    indirectly contained in the root set.  In particular, this set
+    contains all C{ValueDoc}s that can be reached from the root set by
+    following only the C{ValueDoc} pointers defined by non-imported
+    C{VariableDoc}s.  This will always be a subset of
+    L{reachable_valdocs}.
+    """
     val_queue = list(root)
     val_set = Set(root)
     while val_queue:
         val_doc = val_queue.pop()
         val_set.add(val_doc)
         val_queue.extend([v.value for v in val_doc.vardoc_links()
-                          if (v.value not in val_set and
+                          if (v.value not in (None, UNKNOWN) and 
+                              v.value not in val_set and
                               v.is_imported != True)])
     return val_set
 
@@ -971,6 +995,167 @@ class PropertyDoc(ValueDoc):
         return val_docs
     def vardoc_links(self):
         return []
+
+######################################################################
+## Index
+######################################################################
+
+class DocIndex:
+    """
+    An index that .. hmm...  it *can't* be used to access some things,
+    cuz they're not at the root level.  Do I want to add them or what?
+    And if so, then I have a sort of a new top level.  hmm..  so
+    basically the question is what to do with a name that's not in the
+    root var's name space.  2 types:
+      - entirely outside (eg os.path)
+      - inside but not known (eg a submodule that we didn't look at?)
+      - container of current thing not examined?
+    
+    An index of all the C{APIDoc} objects that can be reached from a
+    root set of C{ValueDoc}s.  As a side effect of constructing this
+    index, the reachable C{APIDoc}s are modified in several ways:
+    
+      - Canonicalization:
+        - A cannonical name is assigned to any C{ValueDoc} that does
+          not already have one.
+          
+      - Linking:
+        - Any C{ValueDoc}s that define the C{imported_from} attribute
+          are replaced by the referenced C{ValueDoc}, if it is
+          reachable from the root set.
+    
+    The members of this index can be accessed by dotted name.  In
+    particular, C{DocIndex} defines two mappings, accessed via the
+    L{get_vardoc()} and L{get_valdoc()} methods, which can be used to
+    access C{VariableDoc}s or C{ValueDoc}s respectively by name.  (Two
+    separate mappings are necessary because a single name can be used
+    to refer to both a variable and to the value contained by that
+    variable.)
+
+    Additionally, the index defines two sets of C{ValueDoc}s:
+    \"reachable C{ValueDoc}s\" and \"contained C{ValueDoc}s\".  The
+    X{reachable C{ValueDoc}s} are defined as the set of all
+    C{ValueDoc}s that can be reached from the root set by following
+    I{any} sequence of pointers to C{ValueDoc}s or C{VariableDoc}s.
+    The X{contained C{ValueDoc}s} are defined as the set of all
+    C{ValueDoc}s that can be reached from the root set by following
+    only the C{ValueDoc} pointers defined by non-imported
+    C{VariableDoc}s.  For example, if the root set contains a module
+    C{m}, then the contained C{ValueDoc}s includes the C{ValueDoc}s
+    for any functions, variables, or classes defined in that module,
+    as well as methods and variables defined in classes defined in the
+    module.  The reachable C{ValueDoc}s includes all of those
+    C{ValueDoc}s, as well as C{ValueDoc}s for any values imported into
+    the module, and base classes for classes defined in the module.
+    """
+
+    def __init__(self, root):
+        """
+        Create a new documentation index, based on the given root set
+        of C{ValueDoc}s.  If any C{APIDoc}s reachable from the root
+        set does not have a canonical name, then it will be assigned
+        one.  etc.
+        
+        @param root: A list of C{ValueDoc}s.
+        """
+        for apidoc in root:
+            if apidoc.canonical_name in (None, UNKNOWN):
+                raise ValueError("All APIdocs passed to DocIndexer "
+                                 "must already have canonical names.")
+        
+        # Initialize the root items list.  We sort them by length in
+        # ascending order.  (This ensures that variables will shadow
+        # submodules when appropriate.)
+        self.root = sorted(root, key=lambda d:len(d.canonical_name))
+
+    # make root_list public and make these go away?
+    def reachable_valdocs(self):
+        return reachable_valdocs(*self.root)
+    
+    def contained_valdocs(self):
+        return contained_valdocs(*self.root)
+
+    #////////////////////////////////////////////////////////////
+    # Lookup methods
+    #////////////////////////////////////////////////////////////
+    # [xx]
+    # Currently these only work for things reachable from the
+    # root... :-/  I might want to change this so that imported
+    # values can be accessed even if they're not contained.  
+    # Also, I might want canonical names to not start with ??
+    # if the thing is a top-level imported module..?
+
+    def get_vardoc(self, name):
+        """
+        Return the C{VariableDoc} with the given name, or C{None} if this
+        index does not contain a C{VariableDoc} with the given name.
+        """
+        var, val = self._get(name)
+        return var
+
+    def get_valdoc(self, name):
+        """
+        Return the C{ValueDoc} with the given name, or C{None} if this
+        index does not contain a C{ValueDoc} with the given name.
+        """
+        var, val = self._get(name)
+        return val
+
+    def _get(self, name):
+        """
+        A helper function that's used to implement L{get_vardoc()}
+        and L{get_valdoc()}.
+        """
+        # Convert name to a DottedName, if necessary.
+        name = DottedName(name)
+
+        # Look for an element in the root set whose name is a prefix
+        # of `name`.  If we can't find one, then return None.
+        for root_valdoc in self.root:
+            if root_valdoc.canonical_name.dominates(name):
+                var_doc, val_doc = self._get_from(
+                    root_valdoc, name[len(root_valdoc.canonical_name):])
+                if var_doc is not None or val_doc is not None:
+                    return var_doc, val_doc
+
+        # We didn't find it.
+        return None, None
+        
+    def _get_from(self, root_valdoc, name):
+        # Starting at the selected root val_doc, walk down the variable
+        # chain until we find the requested value/variable.
+        var_doc = None
+        val_doc = root_valdoc
+    
+        for identifier in name:
+            if val_doc == None:
+                return None, None
+            
+            # First, check for variables in namespaces.
+            for child_var in val_doc.vardoc_links():
+                if child_var.name == identifier:
+                    var_doc = child_var
+                    val_doc = var_doc.value
+                    if val_doc is UNKNOWN: val_doc = None
+                    break
+
+            # If that fails, then see if it's a submodule.
+            else:
+                if (isinstance(val_doc, ModuleDoc) and
+                    val_doc.submodules is not UNKNOWN):
+                    for submodule in val_doc.submodules:
+                        if (submodule.canonical_name ==
+                            DottedName(val_doc.canonical_name, identifier)):
+                            var_doc = None
+                            val_doc = submodule
+                            if val_doc is UNKNOWN: val_doc = None
+                            break
+                    else:
+                        return None, None
+                else:
+                    return None, None
+            
+        return (var_doc, val_doc)
 
 ######################################################################
 ## Pretty Printing
