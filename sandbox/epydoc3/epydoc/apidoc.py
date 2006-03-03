@@ -597,6 +597,90 @@ class NamespaceDoc(ValueDoc):
     def vardoc_links(self):
         return self.variables.values()
 
+    def init_sorted_variables(self):
+        """
+        Initialize the L{sorted_variables} attribute, based on the
+        L{variables} and L{sort_spec} attributes.  This should usually
+        be called after all variables have been added to C{variables}
+        (including any inherited variables for classes).  
+        """
+        unsorted = self.variables.copy()
+        self.sorted_variables = []
+    
+        # Add any variables that are listed in sort_spec
+        if self.sort_spec is not UNKNOWN:
+            for ident in self.sort_spec:
+                var_doc = unsorted.pop(ident, None)
+                if var_doc is not None:
+                    self.sorted_variables.append(var_doc)
+                elif '*' in ident:
+                    regexp = re.compile('^%s$' % ident.replace('*', '(.*)'))
+                    # sort within matching group?
+                    for name, var_doc in unsorted.items():
+                        if regexp.match(name):
+                            self.sorted_variables.append(var_doc)
+                            unsorted.remove(var_doc)
+    
+        # Add any remaining variables in alphabetical order.
+        var_docs = unsorted.items()
+        var_docs.sort()
+        for name, var_doc in var_docs:
+            self.sorted_variables.append(var_doc)
+
+    def init_groups(self):
+        """
+        Initialize the L{groups} attribute, based on the
+        L{sorted_variables} and L{group_specs} attributes.
+        """
+        if self.sorted_variables == UNKNOWN:
+            self.init_sorted_variables
+        assert len(self.sorted_variables) == len(self.variables)
+        
+        self.group_names = [''] + [n for (n,vs) in self.group_specs]
+        self.groups = {}
+        
+        # Make the common case fast:
+        if len(self.group_names) == 1:
+            self.groups[''] = self.sorted_variables
+            return
+    
+        for group in self.group_names:
+            self.groups[group] = []
+    
+        # Create a mapping from elt -> group name.
+        varname2groupname = {}
+        regexp_groups = []
+    
+        for group_name, var_names in self.group_specs:
+            for var_name in var_names:
+                if '*' not in var_name:
+                    varname2groupname[var_name] = group_name
+                else:
+                    var_name_re = '^%s$' % var_name.replace('*', '(.*)')
+                    var_name_re = re.compile(var_name_re)
+                    regexp_groups.append( (group_name, var_name_re) )
+    
+        # Use the elt -> group name mapping to put each elt in the
+        # right group.
+        for var_doc in self.sorted_variables:
+            group_name = varname2groupname.get(var_doc.name, '')
+            self.groups[group_name].append(var_doc)
+    
+        # Handle any regexp groups, by moving elements from the
+        # ungrouped list to the appropriate group.
+        ungrouped = self.groups['']
+        for (group_name, regexp) in regexp_groups:
+            for i in range(len(ungrouped)-1, -1, -1):
+                elt = ungrouped[i]
+                if regexp.match(elt.name):
+                    self.groups[group_name].append(elt)
+                    del ungrouped[i]
+    
+        # [xx] check for empty groups???
+        
+        
+        
+    
 class ModuleDoc(NamespaceDoc):
     """
     API documentation information about a single module.
@@ -634,6 +718,10 @@ class ModuleDoc(NamespaceDoc):
         whose values have the specified type.  If C{group} is given,
         then only return variables that belong to the specified group.
 
+        @require: The L{sorted_variables} and L{groups} attributes
+            must be initialized before this method can be used.  See
+            L{init_sorted_variables()} and L{init_groups()}.
+
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
               - 'class' - variables whose values are classes or types.
@@ -650,6 +738,10 @@ class ModuleDoc(NamespaceDoc):
             variables that do not belong to any group.
         @type group: C{string}
         """
+        if self.sorted_variables == UNKNOWN or self.groups == UNKNOWN:
+            raise ValueError('sorted_variables and groups must be '
+                             'initialized first.')
+        
         if group is None: var_list = self.sorted_variables
         else: var_list = self.groups[group]
 
@@ -782,6 +874,10 @@ class ClassDoc(NamespaceDoc):
         If C{inherited} is True, then only return inherited variables;
         if C{inherited} is False, then only return local variables.
 
+        @require: The L{sorted_variables} and L{groups} attributes
+            must be initialized before this method can be used.  See
+            L{init_sorted_variables()} and L{init_groups()}.
+
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
               - 'instancemethod' - variables whose values are
@@ -814,6 +910,10 @@ class ClassDoc(NamespaceDoc):
             local variables; if C{True}, then return only inherited
             variables; if C{False}, then return only local variables.
         """
+        if self.sorted_variables == UNKNOWN or self.groups == UNKNOWN:
+            raise ValueError('sorted_variables and groups must be '
+                             'initialized first.')
+        
         if group is None: var_list = self.sorted_variables
         else: var_list = self.groups[group]
 
@@ -1068,13 +1168,6 @@ class DocIndex:
         # submodules when appropriate.)
         self.root = sorted(root, key=lambda d:len(d.canonical_name))
 
-    # make root_list public and make these go away?
-    def reachable_valdocs(self):
-        return reachable_valdocs(*self.root)
-    
-    def contained_valdocs(self):
-        return contained_valdocs(*self.root)
-
     #////////////////////////////////////////////////////////////
     # Lookup methods
     #////////////////////////////////////////////////////////////
@@ -1157,6 +1250,40 @@ class DocIndex:
             
         return (var_doc, val_doc)
 
+    #////////////////////////////////////////////////////////////
+    # etc
+    #////////////////////////////////////////////////////////////
+
+    def contained_valdocs(self):
+        return contained_valdocs(*self.root)
+    def reachable_valdocs(self):
+        return reachable_valdocs(*self.root)
+
+    def container(self, api_doc):
+        """
+        Return the C{ValueDoc} that contains the given C{APIDoc}, or
+        C{None} if its container is not in the index.
+        """
+        if isinstance(api_doc, VariableDoc):
+            return api_doc.container
+        if len(api_doc.canonical_name) == 1:
+            return None
+        elif isinstance(api_doc, ModuleDoc) and api_doc.package != UNKNOWN:
+            return api_doc.package
+        else:
+            parent = api_doc.canonical_name.container()
+            return self.get_valdoc(parent)
+
+    def module_that_defines(self, api_doc):
+        """
+        Return the C{ModuleDoc} of the module that defines C{api_doc},
+        or C{None} if that module is not in the index.  If C{api_doc}
+        is itself a module, then C{api_doc} will be returned.
+        """
+        while not (isinstance(api_doc, ModuleDoc) or api_doc is None):
+            api_doc = self.container(api_doc)
+        return api_doc
+    
 ######################################################################
 ## Pretty Printing
 ######################################################################
