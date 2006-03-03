@@ -398,7 +398,7 @@ VariableDoc object in the module's children list).
     ...         'docstring for f'
     ...         print 'inside f'
     ...     """, show="f")
-    FunctionDoc for test.f [0]
+    RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
      +- docstring = 'docstring for f'
      +- docstring_lineno = 3
@@ -420,7 +420,7 @@ of the variable argument and keyword argument, respectively:
     ...         'docstring for f'
     ...         print 'inside f'
     ...     """, show="f")
-    FunctionDoc for test.f [0]
+    RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
      +- docstring = 'docstring for f'
      +- docstring_lineno = 3
@@ -432,11 +432,11 @@ of the variable argument and keyword argument, respectively:
 Tuple arguments are encoded as a single ArgDoc with a complex name:
     >>> runparser(s="""
     ...     def f( (x, (y,z)) ): pass""", show="f")
-    FunctionDoc for test.f [0]
+    RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
      +- kwarg = None
      +- posarg_defaults = [None]
-     +- posargs = [(u'x', (u'y', u'z'))]
+     +- posargs = [[u'x', [u'y', u'z']]]
      +- vararg = None
 
 Decorators & Wrapper Assignments
@@ -481,58 +481,62 @@ Classes
         |     +- ClassDoc for test.A [2]
         |        +- bases = []
         |        +- docstring = 'no bases'
-        |        +- variables = <UNKNOWN>
-        +- B => VariableDoc for test.B [3]
+        |        +- variables
+        |           +- Nested => VariableDoc for test.A.Nested [3]
+        |              +- docstring = <UNKNOWN>
+        |              +- value
+        |                 +- ClassDoc for test.A.Nested [4]
+        |                    +- bases = []
+        |                    +- docstring = 'nested class'
+        |                    +- variables = {}
+        +- B => VariableDoc for test.B [5]
         |  +- docstring = <UNKNOWN>
         |  +- value
-        |     +- ClassDoc for test.B [4]
+        |     +- ClassDoc for test.B [6]
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
         |        +- docstring = 'single base'
-        |        +- variables = <UNKNOWN>
-        +- C => VariableDoc for test.C [5]
+        |        +- variables = {}
+        +- C => VariableDoc for test.C [7]
         |  +- docstring = <UNKNOWN>
         |  +- value
-        |     +- ClassDoc for test.C [6]
+        |     +- ClassDoc for test.C [8]
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
-        |        |  +- ClassDoc for test.B [4] (defined above)
+        |        |  +- ClassDoc for test.B [6] (defined above)
         |        +- docstring = 'multiple bases'
-        |        +- variables = <UNKNOWN>
-        +- D => VariableDoc for test.D [7]
+        |        +- variables = {}
+        +- D => VariableDoc for test.D [9]
         |  +- docstring = <UNKNOWN>
         |  +- value
-        |     +- ClassDoc for test.D [8]
+        |     +- ClassDoc for test.D [10]
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
         |        +- docstring = 'extra parens around base'
-        |        +- variables = <UNKNOWN>
-        +- E => VariableDoc for test.E [9]
+        |        +- variables = {}
+        +- E => VariableDoc for test.E [11]
         |  +- docstring = <UNKNOWN>
         |  +- value
-        |     +- ClassDoc for test.E [10]
+        |     +- ClassDoc for test.E [12]
         |        +- bases
-        |        |  +- ClassDoc for test.A.Nested [11]
-        |        |     +- bases = []
-        |        |     +- docstring = 'nested class'
-        |        |     +- variables = <UNKNOWN>
+        |        |  +- ClassDoc for test.A.Nested [4] (defined above)
         |        +- docstring = 'dotted name'
-        |        +- variables = <UNKNOWN>
-        +- F => VariableDoc for test.F [12]
+        |        +- variables = {}
+        +- F => VariableDoc for test.F [13]
         |  +- docstring = <UNKNOWN>
         |  +- value
-        |     +- ClassDoc for test.F [13]
+        |     +- ClassDoc for test.F [14]
         |        +- bases
-        |        |  +- ClassDoc for test.A.Nested [11] (defined above)
+        |        |  +- ClassDoc for test.A.Nested [4] (defined above)
         |        +- docstring = 'parens with dotted name'
-        |        +- variables = <UNKNOWN>
-        +- Z => VariableDoc for test.Z [14]
+        |        +- variables = {}
+        +- Z => VariableDoc for test.Z [15]
            +- docstring = <UNKNOWN>
            +- value
-              +- ClassDoc for test.Z [15]
+              +- ClassDoc for test.Z [16]
                  +- bases = <UNKNOWN>
                  +- docstring = 'calculated base'
-                 +- variables = <UNKNOWN>
+                 +- variables = {}
 
 
 Base lists:
@@ -607,11 +611,10 @@ namespace.
         +- A => VariableDoc for test.A [1]
            +- value
               +- ClassDoc for test.A [2]
-                 +- local_variables
-                 |  +- b => VariableDoc for test.A.b [3]
-                 |     +- value
-                 |        +- ValueDoc [4]
-                 +- variables = <UNKNOWN>
+                 +- variables
+                    +- b => VariableDoc for test.A.b [3]
+                       +- value
+                          +- ValueDoc [4]
 
 If one of the variables to be deleted is expressed as anything other
 than a simple identifier or a dotted name, then ignore it.  (In
@@ -645,7 +648,7 @@ Single-Line Blocks
            +- value
               +- ClassDoc for test.A [2]
                  +- docstring = 'docstring for A'
-                 +- variables = <UNKNOWN>
+                 +- variables = {}
 
 Imports
 =======
@@ -681,7 +684,7 @@ Unicode
         +- f => VariableDoc for test.f [1]
            +- docstring = <UNKNOWN>
            +- value
-              +- FunctionDoc for test.f [2]
+              +- RoutineDoc for test.f [2]
                  +- docstring = u'unicode in docstring: \u1000'
 
 Instance Variables
@@ -708,26 +711,25 @@ Instance Variables
            +- value
               +- ClassDoc for test.A [2]
                  +- docstring = <UNKNOWN>
-                 +- local_variables
-                 |  +- __init__ => VariableDoc for test.A.__init__ [3]
-                 |  |  +- docstring = <UNKNOWN>
-                 |  |  +- is_instvar = <UNKNOWN>
-                 |  |  +- value
-                 |  |     +- InstanceMethodDoc for test.A.__init__ [4]
-                 |  |        +- docstring = <UNKNOWN>
-                 |  +- y => VariableDoc for test.A.y [5]
-                 |  |  +- docstring = u'docstring for y\n'
-                 |  |  +- is_instvar = True
-                 |  |  +- value
-                 |  |     +- ValueDoc [6]
-                 |  |        +- docstring = <UNKNOWN>
-                 |  +- z => VariableDoc for test.A.z [7]
-                 |     +- docstring = 'docstring for z'
-                 |     +- is_instvar = True
-                 |     +- value
-                 |        +- ValueDoc [8]
-                 |           +- docstring = <UNKNOWN>
-                 +- variables = <UNKNOWN>
+                 +- variables
+                    +- __init__ => VariableDoc for test.A.__init__ [3]
+                    |  +- docstring = <UNKNOWN>
+                    |  +- is_instvar = <UNKNOWN>
+                    |  +- value
+                    |     +- RoutineDoc for test.A.__init__ [4]
+                    |        +- docstring = <UNKNOWN>
+                    +- y => VariableDoc for test.A.y [5]
+                    |  +- docstring = u'docstring for y\n'
+                    |  +- is_instvar = True
+                    |  +- value
+                    |     +- ValueDoc [6]
+                    |        +- docstring = <UNKNOWN>
+                    +- z => VariableDoc for test.A.z [7]
+                       +- docstring = 'docstring for z'
+                       +- is_instvar = True
+                       +- value
+                          +- ValueDoc [8]
+                             +- docstring = <UNKNOWN>
 
 Assignments Into Namespaces
 ===========================
@@ -742,10 +744,9 @@ Assignments Into Namespaces
         +- A => VariableDoc for test.A [1]
            +- value
               +- ClassDoc for test.A [2]
-                 +- local_variables
-                 |  +- x => VariableDoc for test.A.x [3]
-                 |     +- value
-                 |        +- ValueDoc [4]
-                 +- variables = <UNKNOWN>
+                 +- variables
+                    +- x => VariableDoc for test.A.x [3]
+                       +- value
+                          +- ValueDoc [4]
 
 
