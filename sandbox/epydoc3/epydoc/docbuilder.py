@@ -726,16 +726,14 @@ def link_imports(docindex):
             # If the imported_from link points back at src_doc
             # itself, then we most likely have a variable that's
             # shadowing a submodule that it should be equal to.
-            # So just get rid of the variable. [xx] ??
+            # So just get rid of the variable.
             elif src_doc == val_doc:
                 parent_name = DottedName(*val_doc.imported_from[:-1])
                 var_name = val_doc.imported_from[-1]
                 parent = docindex.get_valdoc(parent_name)
-                try:
+                if parent is not None and var_name in parent.variables:
                     del parent.variables[var_name]
-                except KeyError:
-                    log.error("HMmm %s %s %r %r" %
-                              (parent_name, var_name, parent, src_doc))
+                src_doc.imported_from = None
 
     log.end_progress()
 
