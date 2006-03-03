@@ -225,9 +225,16 @@ def cli(args):
         logger = ConsoleLogger(options.verbosity)
     else:
         if options.parse and options.inspect:
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 6)
+            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
+                                                  [3,1,1,1,1,1,1,1])
+        elif options.parse:
+            # no merging.
+            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
+                                                  [3,1,1,1,1,1,1])
         else:
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 5)
+            # no merging or linking.
+            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
+                                                  [3,1,1,1,1,1])
     log.register_logger(logger)
     print
 
@@ -492,14 +499,18 @@ class ConsoleLogger(log.Logger):
         self._progress = None
 
 class UnifiedProgressConsoleLogger(ConsoleLogger):
-    def __init__(self, verbosity, stages=5):
+    def __init__(self, verbosity, stages):
         self.stage = 0
         self.stages = stages
         self.task = None
         ConsoleLogger.__init__(self, verbosity)
         
     def progress(self, percent, message=''):
-        p = float(self.stage-1+percent)/self.stages
+        #p = float(self.stage-1+percent)/self.stages
+        i = self.stage-1
+        p = ((sum(self.stages[:i]) + percent*self.stages[i]) /
+             float(sum(self.stages)))
+
         if message == UNKNOWN: message = None
         if message: message = '%s: %s' % (self.task, message)
         ConsoleLogger.progress(self, p, message)
@@ -511,7 +522,7 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         self.stage += 1
 
     def end_progress(self):
-        if self.stages == self.stage:
+        if self.stage == len(self.stages):
             ConsoleLogger.end_progress(self)
 
 ######################################################################
@@ -522,5 +533,5 @@ if __name__ == '__main__':
     try:
         cli(sys.argv[1:])
     except:
-        print
+        print '\n\n'
         raise
