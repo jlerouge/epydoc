@@ -139,7 +139,16 @@ class DocstringParser:
         DocstringField(['todo'], 'To Do', takes_arg=True),
         ]
 
-    def parse_docstring(self, api_doc):
+    # [xx] keep track of which ones we've already done, in case we're
+    # asked to process one twice?  e.g., for @include we might have to
+    # parse the included docstring earlier than we might otherwise..??
+    
+    def parse_docstring(self, api_doc, docindex):
+        """
+        @param docindex: A DocIndex, used to find the containing
+            module (to look up the docformat); and to find any
+            user docfields defined by containing objects.
+        """
         self.initialize_api_doc(api_doc)
 
         # If there's no docstring, then there's nothing more to do.
@@ -156,7 +165,7 @@ class DocstringParser:
 
         # Parse the docstring.  Any errors encountered are stored as
         # `ParseError` objects in the errors list.
-        docformat = self.docformat(api_doc)
+        docformat = self.docformat(api_doc, docindex)
         parse_errors = []
         parsed_docstring = markup.parse(api_doc.docstring, docformat,
                                         parse_errors)
@@ -170,15 +179,15 @@ class DocstringParser:
         field_warnings = []
         for field in fields:
             try:
-                self.process_field(api_doc, field.tag(), field.arg(),
-                                   field.body())
+                self.process_field(api_doc, docindex, field.tag(),
+                                   field.arg(), field.body())
             except ValueError, e: field_warnings.append(str(e))
 
         # Take care of any postprocessing tasks.
         self.postprocess_api_doc(api_doc, field_warnings)
 
         # Report any errors that occured
-        self.report_errors(api_doc, parse_errors, field_warnings)
+        self.report_errors(api_doc, docindex, parse_errors, field_warnings)
 
     def initialize_api_doc(self, api_doc):
         # Initialize the attributes that are set by the docstring
@@ -217,22 +226,14 @@ class DocstringParser:
         # Make sure we don't have types/param descrs for unknown
         # vars/params.
 
-    def report_errors(self, api_doc, parse_errors, field_warnings):
+    def report_errors(self, api_doc, docindex, parse_errors, field_warnings):
         if not parse_errors and not field_warnings: return
 
-        # Get the name of the item containing the error, and of its
-        # containing module.
-        if isinstance(api_doc, ModuleDoc):
-            module = api_doc
-            name = api_doc.canonical_name
-        elif isinstance(api_doc, ValueDoc):
-            module = api_doc.containing_module()
-            name = api_doc.canonical_name
-        else:
-            module = api_doc.container.containing_module()
-            name = '%s.%s' % (api_doc.container.canonical_name, api_doc.name)
-        if (module not in (None, UNKNOWN) and
-            module.filename not in (None, UNKNOWN)):
+        # Get the name of the item containing the error, and the
+        # filename of its containing module.
+        name = api_doc.canonical_name
+        module = self._module_that_defines(api_doc, docindex)
+        if module is not None and module.filename not in (None, UNKNOWN):
             try: filename = py_src_filename(module.filename)
             except: filename = module.filename
         else:
@@ -297,7 +298,7 @@ class DocstringParser:
     # Field Processing
     #////////////////////////////////////////////////////////////
     
-    def process_field(self, api_doc, tag, arg, descr):
+    def process_field(self, api_doc, docindex, tag, arg, descr):
         """
         @type warnings: C{list} of C{string}
         """
@@ -314,7 +315,7 @@ class DocstringParser:
                 return
 
         # 3. user-defined fields
-        for field in self.user_docfields(api_doc):
+        for field in self.user_docfields(api_doc, docindex):
             if tag in field.tags:
                 self.process_standard_field(api_doc, tag, arg, descr)
                 return
@@ -322,15 +323,16 @@ class DocstringParser:
         # If we didn't handle the field, then report a warning.
         raise ValueError(self.UNKNOWN_TAG % tag)
 
-    def user_docfields(self, api_doc):
+    def user_docfields(self, api_doc, docindex):
         docfields = []
-        while api_doc not in (None, UNKNOWN):
-            if api_doc.extra_docstring_fields not in (None, UNKNOWN):
-                docfields += api_doc.extra_docstring_fields
-            if isinstance(api_doc, VariableDoc):
-                api_doc = api_doc.container
-            else:
-                api_doc = api_doc.canonical_container
+        # Get any docfields from `api_doc` itself
+        if api_doc.extra_docstring_fields not in (None, UNKNOWN):
+            docfields += api_doc.extra_docstring_fields
+        # Get any docfields from `api_doc`'s ancestors
+        for i in range(len(api_doc.canonical_name)-1, 0, -1):
+            ancestor = docindex.get_valdoc(api_doc.canonical_name.container())
+            if ancestor.extra_docstring_fields not in (None, UNKNOWN):
+                docfields += ancestor.extra_docstring_fields
         return docfields
 
     def process_standard_field(self, api_doc, tag, arg, descr):
@@ -556,24 +558,31 @@ class DocstringParser:
     # Helper functions (1)
     #////////////////////////////////////////////////////////////
 
-    def docformat(self, api_doc):
+    # [xx] shadowing hurts here.
+    def _module_that_defines(self, api_doc, docindex):
+        while api_doc not in (None, UNKNOWN):
+            if isinstance(api_doc, ModuleDoc):
+                return api_doc
+            elif len(api_doc.canonical_name) == 1:
+                return None # e.g., for the builtin 'dict'.
+            else:
+                parent = api_doc.canonical_name.container()
+                api_doc = docindex.get_valdoc(parent)
+        else:
+            return None
+
+    def docformat(self, api_doc, docindex):
         """
         Return the name of the markup language that should be used to
         parse the API documentation for the given object.
         """
-        if isinstance(api_doc, ModuleDoc):
-            containing_module = api_doc
-        elif isinstance(api_doc, VariableDoc):
-            containing_module = api_doc.container.containing_module()
-        else:
-            containing_module = api_doc.containing_module()
-            
-        if ((containing_module not in (None, UNKNOWN)) and
-            (containing_module.docformat not in (None, UNKNOWN))):
-            docformat = containing_module.docformat
+        # Find the module that defines api_doc.
+        module = self._module_that_defines(api_doc, docindex)
+        # Look up its docformat.
+        if module is not None and module.docformat not in (None, UNKNOWN):
+            docformat = module.docformat
         else:
             docformat = self.DEFAULT_DOCFORMAT
-
         # Convert to lower case & strip region codes.
         try: return docformat.lower().split()[0]
         except: return self.DEFAULT_DOCFORMAT
