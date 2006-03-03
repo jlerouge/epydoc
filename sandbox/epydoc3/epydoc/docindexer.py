@@ -25,6 +25,10 @@ from sets import Set
 try: sorted
 except NameError: from epydoc.util import py_sorted as sorted
 
+######################################################################
+## Index
+######################################################################
+
 class DocIndex:
     """
     An index of all the C{APIDoc} objects that can be reached from a
@@ -122,18 +126,7 @@ class DocIndex:
 
         # [xx] this should really be separated out into a separate
         # step (linking):
-        
-        # Resolve any imported_from links, if the target of the link
-        # is contained in the index.  We have to be a bit careful
-        # here, because when we merge srcdoc & val_doc, we might
-        # unintentionally create a duplicate entry in
-        # reachable/contained valdocs sets.
-        reachable_val_docs = reachable_valdocs(*self._root_list)
-        for i, val_doc in enumerate(reachable_val_docs):
-            if i % 100 == 0:
-                log.progress(.1*i/len(reachable_val_docs), 'Resolving imports')
-            if val_doc.imported_from not in (UNKNOWN, None):
-                self._resolve_imports(val_doc)
+        link_imports(self._root_list, self)
 
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
@@ -166,37 +159,6 @@ class DocIndex:
                                (valdoc1, valdoc2, valdoc1, 
                                 self.get_valdoc(valdoc2.canonical_name)))
                         raise ValueError, 'Inconsistant root set'
-
-    def _resolve_imports(self, val_doc):
-        while val_doc.imported_from not in (UNKNOWN, None):
-            # Find the valuedoc that the imported_from name points to.
-            src_doc = self.get_valdoc(val_doc.imported_from)
-
-            # If we don't have any valuedoc at that address, then
-            # promote this proxy valuedoc to a full (albeit empty)
-            # one, and add it to our root set.
-            if src_doc is None:
-                val_doc.canonical_name = val_doc.imported_from
-                val_doc.imported_from = None
-                self._root_list.append(val_doc) # <- should I do this? [xx]
-                if isinstance(val_doc, NamespaceDoc):
-                    log.warn("hoomy %r" % val_doc)
-                break
-
-            # If we *do* have something at that address, then
-            # merge the proxy `val_doc` with it.
-            elif src_doc != val_doc:
-                src_doc.merge_and_overwrite(val_doc)
-
-            # If the imported_from link points back at src_doc
-            # itself, then we most likely have a variable that's
-            # shadowing a submodule that it should be equal to.
-            # So just get rid of the variable. [xx] ??
-            elif src_doc == val_doc:
-                parent_name = DottedName(*val_doc.imported_from[:-1])
-                var_name = val_doc.imported_from[-1]
-                parent = self.get_valdoc(parent_name)
-                del parent.variables[var_name]
 
     #////////////////////////////////////////////////////////////
     # Lookup methods
@@ -474,3 +436,50 @@ class DocIndex:
         return reachable
     
 
+
+######################################################################
+## Linking
+######################################################################
+
+def link_imports(root, docindex):
+    log.start_progress('Resolving imports')
+
+    # Get the set of all ValueDocs that are reachable from the root.
+    reachable_val_docs = reachable_valdocs(*root)
+    
+    for i, val_doc in enumerate(reachable_val_docs):
+        # Report on our progress.
+        if i % 100 == 0:
+            percent = float(i)/len(reachable_val_docs)
+            log.progress(percent, '%d%% resolved' % (100.*percent))
+
+        # Check if the ValueDoc has an unresolved imported_from link.
+        # If so, then resolve it.
+        while val_doc.imported_from not in (UNKNOWN, None):
+            # Find the valuedoc that the imported_from name points to.
+            src_doc = docindex.get_valdoc(val_doc.imported_from)
+
+            # If we don't have any valuedoc at that address, then
+            # promote this proxy valuedoc to a full (albeit empty)
+            # one, and add it to our root set.
+            if src_doc is None:
+                val_doc.canonical_name = val_doc.imported_from
+                val_doc.imported_from = None
+                break
+
+            # If we *do* have something at that address, then
+            # merge the proxy `val_doc` with it.
+            elif src_doc != val_doc:
+                src_doc.merge_and_overwrite(val_doc)
+
+            # If the imported_from link points back at src_doc
+            # itself, then we most likely have a variable that's
+            # shadowing a submodule that it should be equal to.
+            # So just get rid of the variable. [xx] ??
+            elif src_doc == val_doc:
+                parent_name = DottedName(*val_doc.imported_from[:-1])
+                var_name = val_doc.imported_from[-1]
+                parent = docindex.get_valdoc(parent_name)
+                del parent.variables[var_name]
+
+    log.end_progress()
