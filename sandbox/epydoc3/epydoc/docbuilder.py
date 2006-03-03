@@ -395,9 +395,73 @@ DEFAULT_MERGE_PRECEDENCE = 'inspect'
 
 _attribute_mergefunc_registry = {}
 def register_attribute_mergefunc(attrib, mergefunc):
+    """
+    Register an attribute merge function.  This function will be
+    called by L{merge_docs()} when it needs to merge the attribute
+    values of two C{APIDoc}s.
+
+    @param attrib: The name of the attribute whose values are merged
+    by C{mergefunc}.
+
+    @param mergefun: The merge function, whose sinature is:
+
+    >>> def mergefunc(inspect_val, parse_val, precedence, cyclecheck, path):
+    ...     return calculate_merged_value(inspect_val, parse_val)
+
+    Where C{inspect_val} and C{parse_val} are the two values to
+    combine; C{precedence} is a string indicating which value takes
+    precedence for this attribute (C{'inspect'} or C{'parse'});
+    C{cyclecheck} is a value used by C{merge_docs()} to make sure that
+    it only visits each pair of docs once; and C{path} is a string
+    describing the path that was taken from the root to this
+    attribute (used to generate log messages).
+
+    If the merge function needs to call C{merge_docs}, then it should
+    pass C{cyclecheck} and C{path} back in.  (When appropriate, a
+    suffix should be added to C{path} to describe the path taken to
+    the merged values.)
+    """
     _attribute_mergefunc_registry[attrib] = mergefunc
 
 def merge_docs(inspect_doc, parse_doc, cyclecheck=None, path=None):
+    """
+    Merge the API documentation information that was obtained from
+    inspection with information that was obtained from parsing.
+    C{inspect_doc} and C{parse_doc} should be two C{APIDoc} instances
+    that describe the same object.  C{merge_docs} combines the
+    information from these two instances, and returns the merged
+    C{APIDoc}.
+
+    If C{inspect_doc} and C{parse_doc} are compatible, then they will
+    be I{merged} -- i.e., they will be coerced to a common class, and
+    their state will be stored in a shared dictionary.  Once they have
+    been merged, any change made to the attributes of one will affect
+    the other.  The value for the each of the merged C{APIDoc}'s
+    attributes is formed by combining the values of the source
+    C{APIDoc}s' attributes, as follows:
+
+      - If either of the source attributes' value is C{UNKNOWN}, then
+        use the other source attribute's value.
+      - Otherwise, if an attribute merge function has been registered
+        for the attribute, then use that function to calculate the
+        merged value from the two source attribute values.
+      - Otherwise, if L{MERGE_PRECEDENCE} is defined for the
+        attribute, then use the attribute value from the source that
+        it indicates.
+      - Otherwise, use the attribute value from the source indicated
+        by L{DEFAULT_MERGE_PRECEDENCE}.
+
+    If C{inspect_doc} and C{parse_doc} are I{not} compatible (e.g., if
+    their values have incompatible types), then C{merge_docs()} will
+    simply return either C{inspect_doc} or C{parse_doc}, depending on
+    the value of L{DEFAULT_MERGE_PRECEDENCE}.  The two input
+    C{APIDoc}s will not be merged or modified in any way.
+
+    @param cyclecheck, path: These arguments should only be provided
+        when C{merge_docs()} is called by an attribute merge
+        function.  See L{register_attribute_mergefunc()} for more
+        details.
+    """
     assert isinstance(inspect_doc, APIDoc)
     assert isinstance(parse_doc, APIDoc)
 
