@@ -18,7 +18,7 @@ from sets import Set
 class DocInheriter:
 
     def inherit(self, docindex):
-        for val_doc in docindex.reachable_valdocs:
+        for val_doc in docindex.reachable_valdocs():
             # Do inheritance
             if isinstance(val_doc, ClassDoc):
                 self._inherit(val_doc)
