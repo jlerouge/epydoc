@@ -225,9 +225,9 @@ def cli(args):
         logger = ConsoleLogger(options.verbosity)
     else:
         if options.parse and options.inspect:
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 5)
+            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 6)
         else:
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 4)
+            logger = UnifiedProgressConsoleLogger(options.verbosity+1, 5)
     log.register_logger(logger)
     print
 
