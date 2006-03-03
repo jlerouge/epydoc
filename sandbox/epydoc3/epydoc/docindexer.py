@@ -34,8 +34,6 @@ class DocIndex:
       - Canonicalization:
         - A cannonical name is assigned to any C{ValueDoc} that does
           not already have one.
-        - The C{canonical_container} attribute is initialized for all
-          C{ValueDoc} objects where a value can be found.
           
       - Linking:
         - Any C{ValueDoc}s that define the C{imported_from} attribute
@@ -121,7 +119,22 @@ class DocIndex:
         # ascending order.  (This ensures that variables will shadow
         # submodules when appropriate.)
         self._root_list = sorted(root, key=lambda d:len(d.canonical_name))
+
+        # [xx] this should really be separated out into a separate
+        # step (linking):
         
+        # Resolve any imported_from links, if the target of the link
+        # is contained in the index.  We have to be a bit careful
+        # here, because when we merge srcdoc & val_doc, we might
+        # unintentionally create a duplicate entry in
+        # reachable/contained valdocs sets.
+        reachable_val_docs = reachable_valdocs(self._root_list)
+        for i, val_doc in enumerate(reachable_val_docs):
+            if i % 100 == 0:
+                log.progress(.1*i/len(reachable_val_docs), 'Resolving imports')
+            if val_doc.imported_from not in (UNKNOWN, None):
+                self._resolve_imports(val_doc)
+
         # Initialize _contained_valdocs and _reachable_valdocs; and
         # assign canonical names to any ValueDocs that don't already
         # have them.
@@ -134,46 +147,6 @@ class DocIndex:
             # and initialization of reachable_valdocs:
             self._assign_canonical_names(val_doc, val_doc.canonical_name)
 
-        # Resolve any imported_from links, if the target of the link
-        # is contained in the index.  We have to be a bit careful
-        # here, because when we merge srcdoc & val_doc, we might
-        # unintentionally create a duplicate entry in
-        # reachable/contained valdocs sets.
-        log.progress(.8, 'Resolving imports')
-        for val_doc in list(self.reachable_valdocs):
-            while val_doc.imported_from not in (UNKNOWN, None):
-                src_doc = self.get_valdoc(val_doc.imported_from)
-                # Should we merge them?
-                if src_doc != val_doc and src_doc is not None:
-                    # avoid duplicates in sets: [xx hmm but dups elsewhere??]
-                    if src_doc in self.reachable_valdocs:
-                        self.reachable_valdocs.discard(val_doc)
-                    if src_doc in self.contained_valdocs:
-                        self.contained_valdocs.discard(val_doc)
-                    # Merge them.
-                    val_doc.__has_been_hashed = False # [xx HUGE HACK]
-                    src_doc.merge_and_overwrite(val_doc)
-                else:
-                    break
-
-        # Set the canonical_container attribute on all reachable
-        # valuedocs (where possible).
-        log.progress(.9, 'Finding canonical containers')
-        for val_doc in self.reachable_valdocs:
-            if val_doc.canonical_container is not UNKNOWN: continue
-            if isinstance(val_doc, ModuleDoc):
-               val_doc.canonical_container = val_doc.package
-            else:
-                container_name = val_doc.canonical_name.container()
-                if container_name is None:
-                    val_doc.canonical_container = None
-                else:
-                    container_doc = self.get_valdoc(container_name)
-                    if isinstance(container_doc, NamespaceDoc):
-                        if container_doc.variables != UNKNOWN:
-                            for var in container_doc.variables.values():
-                                if var.value == val_doc:
-                                    val_doc.canonical_container = container_doc
         log.end_progress()
 
         # [XX] conflict check turned off!
@@ -194,6 +167,36 @@ class DocIndex:
                                 self.get_valdoc(valdoc2.canonical_name)))
                         raise ValueError, 'Inconsistant root set'
 
+    def _resolve_imports(self, val_doc):
+        while val_doc.imported_from not in (UNKNOWN, None):
+            # Find the valuedoc that the imported_from name points to.
+            src_doc = self.get_valdoc(val_doc.imported_from)
+
+            # If we don't have any valuedoc at that address, then
+            # promote this proxy valuedoc to a full (albeit empty)
+            # one, and add it to our root set.
+            if src_doc is None:
+                val_doc.canonical_name = val_doc.imported_from
+                val_doc.imported_from = None
+                self._root_list.append(val_doc) # <- should I do this? [xx]
+                if isinstance(val_doc, NamespaceDoc):
+                    log.warn("hoomy %r" % val_doc)
+                break
+
+            # If we *do* have something at that address, then
+            # merge the proxy `val_doc` with it.
+            elif src_doc != val_doc:
+                src_doc.merge_and_overwrite(val_doc)
+
+            # If the imported_from link points back at src_doc
+            # itself, then we most likely have a variable that's
+            # shadowing a submodule that it should be equal to.
+            # So just get rid of the variable. [xx] ??
+            elif src_doc == val_doc:
+                parent_name = DottedName(*val_doc.imported_from[:-1])
+                var_name = val_doc.imported_from[-1]
+                parent = self.get_valdoc(parent_name)
+                del parent.variables[var_name]
 
     #////////////////////////////////////////////////////////////
     # Lookup methods
@@ -300,7 +303,7 @@ class DocIndex:
             if var_doc.is_imported is not True:#not in (True, UNKNOWN):
                 self._find_contained_valdocs(var_doc.value)
         
-    def _assign_canonical_names(self, val_doc, name, score=0, parent=None):
+    def _assign_canonical_names(self, val_doc, name, score=0):
         """
         Assign a canonical name to C{val_doc} (if it doesn't have one
         already), and (recursively) to each variable in C{val_doc}.
@@ -342,20 +345,18 @@ class DocIndex:
             if (val_doc not in self._score_dict or
                 score > self._score_dict[val_doc]):
                 val_doc.canonical_name = name
-                val_doc.canonical_container = parent
                 self._score_dict[val_doc] = score
 
         # Recurse to any contained values.
         for var_doc in self._vardocs_reachable_from(val_doc):
             if var_doc.value is UNKNOWN: continue
-
-            # Get the name.  (If it's an imported variable, then use
-            # the imported name instead.)
             varname = DottedName(name, var_doc.name)
-            if (var_doc.value not in (None, UNKNOWN) and
-                var_doc.value.imported_from not in (None, UNKNOWN)):
-                varname = var_doc.value.imported_from
-            
+
+            # This check is for cases like curses.wrapper, where an
+            # imported variable shadows its value's "real" location.
+            if self._var_shadows_self(var_doc, varname):
+                self._fix_self_shadowing_var(var_doc, varname)
+
             # Find the score for this new name.            
             vardoc_score = score-1
             if var_doc.is_imported is UNKNOWN: vardoc_score -= 10
@@ -363,15 +364,38 @@ class DocIndex:
             if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
             elif var_doc.is_alias: vardoc_score -= 1000
             
-            self._assign_canonical_names(var_doc.value, varname,
-                                         vardoc_score, val_doc)
+            self._assign_canonical_names(var_doc.value, varname, vardoc_score)
 
         # Recurse to any directly reachable values.
         for val_doc_2 in self._valdocs_reachable_from(val_doc):
-            name, val_score = self._unreachable_name(val_doc_2)
-            self._assign_canonical_names(val_doc_2, name, val_score, val_doc)
+            val_name, val_score = self._unreachable_name(val_doc_2)
+            self._assign_canonical_names(val_doc_2, val_name, val_score)
+
+    def _var_shadows_self(self, var_doc, varname):
+        return (var_doc.value not in (None, UNKNOWN) and
+                var_doc.value.canonical_name not in (None, UNKNOWN) and
+                var_doc.value.canonical_name != varname and
+                varname.dominates(var_doc.value.canonical_name))
+
+    def _fix_self_shadowing_var(self, var_doc, varname):
+        # If possible, find another name for the shadowed value.
+        cname = var_doc.value.canonical_name
+        for i in range(1, len(cname)-1):
+            new_name = DottedName(*(cname[:i]+(cname[i]+"'",)+cname[i+1:]))
+            val_doc = self.get_valdoc(new_name)
+            if val_doc is not None:
+                log.warn("%s shadows its own value -- using %s instead" %
+                         (varname, new_name))
+                var_doc.value = val_doc
+                return
+
+        # If we couldn't find the actual value, then at least
+        # invalidate the canonical name.
+        log.warn('%s shadows itself' % varname)
+        del var_doc.value.canonical_name
 
     def _unreachable_name(self, val_doc):
+        assert isinstance(val_doc, ValueDoc)
         
         # [xx] (when) does this help?
         if (isinstance(val_doc, ModuleDoc) and
@@ -384,17 +408,18 @@ class DocIndex:
                     break
             else:
                 return val_doc.canonical_name, -1000
-        
+
         if val_doc.imported_from not in (UNKNOWN, None):
-            name = DottedName('??', val_doc.imported_from)
+            name = DottedName(DottedName.UNREACHABLE, val_doc.imported_from)
         elif (val_doc.pyval is not UNKNOWN and
               hasattr(val_doc.pyval, '__name__')):
             try:
-                name = DottedName('??', val_doc.pyval.__name__)
+                name = DottedName(DottedName.UNREACHABLE,
+                                  val_doc.pyval.__name__)
             except ValueError:
-                name = DottedName('??')
+                name = DottedName(DottedName.UNREACHABLE)
         else:
-            name = DottedName('??')
+            name = DottedName(DottedName.UNREACHABLE)
 
         # Uniquify the name.
         if name in self._unreachable_names:
