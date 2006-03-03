@@ -104,7 +104,7 @@ class Logger:
         """
         raise NotImplementedError()
 
-    def progress(self, percent, message):
+    def progress(self, percent, message=''):
         """
         Update the progress display.
         
@@ -169,7 +169,7 @@ def end_progress():
     for logger in _loggers: logger.end_progress()
 end_progress.__doc__ = Logger.end_progress.__doc__
     
-def progress(percent, message):
+def progress(percent, message=''):
     for logger in _loggers: logger.progress(percent, message)
 progress.__doc__ = Logger.progress.__doc__
 

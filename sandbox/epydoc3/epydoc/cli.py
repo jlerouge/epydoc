@@ -498,7 +498,7 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         self.task = None
         ConsoleLogger.__init__(self, verbosity)
         
-    def progress(self, percent, message=None):
+    def progress(self, percent, message=''):
         p = float(self.stage-1+percent)/self.stages
         if message == UNKNOWN: message = None
         if message: message = '%s: %s' % (self.task, message)
