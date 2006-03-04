@@ -499,14 +499,10 @@ class ConsoleLogger(log.Logger):
 
     def _timestr(self, dt):
         dt = int(dt)
-        s = ''
-        if dt > 3600:
-            s += '%d:' % (dt/3600)
-            dt %= 3600
-        s += '%02d:' % (dt/60)
-        dt %= 60
-        s += '%02d' % dt
-        return s
+        if dt >= 3600:
+            return '%d:%02d:%02d' % (dt/3600, dt%3600/60, dt%60)
+        else:
+            return '%02d:%02d' % (dt/60, dt%60)
 
     def start_progress(self, header=None):
         if self._progress is not None:
