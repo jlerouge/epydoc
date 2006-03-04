@@ -608,8 +608,8 @@ _SIGNATURE_RE = re.compile(
     # The function name (must match exactly) [XX] not anymore!
     r'(?P<func>\w+)' +
     # The parameters
-    r'\((?P<params>(\s*\[?\s*[\w\-\.]+(=.+?)?'+
-    r'(\s*\[?\s*,\s*\]?\s*[\w\-\.]+(=.+?)?)*\]*)?)\s*\)' +
+    r'\((?P<params>(\s*\[?\s*\*{0,2}[\w\-\.]+(=.+?)?'+
+    r'(\s*\[?\s*,\s*\]?\s*\*{0,2}[\w\-\.]+(=.+?)?)*\]*)?)\s*\)' +
     # The return value (optional)
     r'(\s*(->)\s*(?P<return>\S.*?))?'+
     # The end marker
@@ -635,8 +635,12 @@ def parse_function_signature(func_doc):
     m = _SIGNATURE_RE.match(func_doc.docstring)
     if m is None: return False
 
-    #if not m or m.group('func') != func.__name__:
-    #    return False
+    if not (m.group('func') == func_doc.canonical_name[-1] or
+            '_'+m.group('func') == func_doc.canonical_name[-1]):
+        log.warning("Not extracting function signature from %s's "
+                    "docstring, since the name doesn't match." %
+                    func_doc.canonical_name)
+        return False
     
     params = m.group('params')
     rtype = m.group('return')
