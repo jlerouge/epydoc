@@ -1697,10 +1697,8 @@ class HTMLWriter:
         <a name="$var_doc.name$"></a>
         <div$div_class$>
         <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
-        >>> if self._incl_sourcecode:
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr valign="top"><td>
-        >>> #endif
           <h3>$self.function_signature(var_doc)$
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
@@ -2510,7 +2508,7 @@ class HTMLWriter:
             raise ValueError, "Don't know what to do with %r" % obj
 
     def pysrc_link(self, api_doc):
-        if not self._include_sourcecode:
+        if not self._incl_sourcecode:
             return ''
         url = self.pysrc_url(api_doc)
         if url is not None: 
