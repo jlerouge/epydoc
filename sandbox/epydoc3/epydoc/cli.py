@@ -233,7 +233,7 @@ def main(options, names):
         if options.parse and not options.inspect:
             del stages[1] # no merging
         if options.inspect and not options.parse:
-            del stages[1:2] # no merging or linking
+            del stages[1:3] # no merging or linking
         logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
     log.register_logger(logger)
 
