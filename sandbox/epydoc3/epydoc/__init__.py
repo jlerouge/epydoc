@@ -11,61 +11,43 @@ Automatic Python reference documentation generator.  Epydoc processes
 Python modules and docstrings to generate formatted API documentation,
 in the form of HTML pages.  Epydoc can be used via a command-line
 interface (L{epydoc.cli}) and a graphical interface (L{epydoc.gui}).
-Both interfaces let the user specify a set of modules to document, and
-produce API documentation using the following steps:
+Both interfaces let the user specify a set of modules or other objects
+to document, and produce API documentation using the following steps:
 
-Architecture graph::
+  1. Extract basic information about the specified objects, and objects
+     that are related to them (such as the values defined by a module).
+     This can be done via inspection, parsing, or both:
+  
+     1.1 Use inspection to examine the objects directly.
+     
+     1.2. Parse the Python source files that define the objects,
+          and extract information from those files.
 
-   Python object             Module source code
-         |                           |
-         V                           V
-  +--------------+             +-----------+
-  | DocInspector |             | DocParser |
-  +--------------+             +-----------+
-         |                           |
-         +---------+     +-----------+
-                   |     |
-                   V     V
-                +-----------+     Merges the output from DocParser
-                | DocMerger |     into the output from DocInspector.
-                +-----------+     
-                      |
-                      V
-               +------------+     Creates an index for the ValueDoc
-               | DocIndexer |     objects; and assigns canonical names
-               +------------+     to any ValueDocs that don't have them.
-                      |
-                      V
-             +-----------------+  Parses all docstrings, and
-             | DocstringParser |  processes all docstring fields.
-             +-----------------+
-                      |
-                      V
-              +--------------+    Handles documentation inheritance?
-              | DocInheriter |
-              +--------------+
-                      |
-                      V
-               +------------+     Outputs the APIDoc objects to
-               | DocWriters |     appropriate formats
-               +------------+
+  2. Combine and process that information.
 
+    2.1. Merge the information obtained from inspection & parsing each
+         object into a single structure.  (This step is skipped if
+         information was extracted from only inspection or only parsing.)
 
-[XX] Out of date::
+    2.2. Replace any 'pointers' that were created for imported
+         variables with the documentation that they point to (if it's
+         available).
 
-  1. Import the requested modules, using L{epydoc.imports}.
-  2. Construct documentation for each object, using L{epydoc.objdoc}.
-     - L{epydoc.uid} is used to create unique identifiers for each
-       object.
-     - The L{epydoc.markup} package is used to parse the objects'
-       documentation strings.
-  3. Generate output, using L{epydoc.html} or L{epydoc.latex}.
-     - L{epydoc.css} is used to generate the CSS stylehseet for HTML output.
-     - L{epydoc.help} is used to generate the help page for HTML output.
-     - L{epydoc.colorize} is used to colorize doctest blocks and
-       regular expressions variable values for HTML output.
+    2.3. Assign unique 'canonical names' to each of the specified
+         objects, and any related objects.
 
-[XX] Add groups later.
+    2.4. Parse the docstrings of each of the specified objects, and
+         any related objects.
+
+    2.5. Add variables to classes for any values that they inherit
+         from their base classes.
+
+  3. Generate output.  Output can be generated in a variety of
+     formats:
+
+     3.1. An HTML webpage
+
+     3.2. other formats (under construction)
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1+, or Python 2.0 with
@@ -108,14 +90,9 @@ __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
 __url__ = 'http://epydoc.sourceforge.net'
 __license__ = 'IBM Open Source License'
 
-# Is debugging turned on by default?
+# [xx] this should probably be a private variable:
 DEBUG = True
-
-# Issues
-#   - curses.wrapper names both a function and a module; how to
-#     distinguish them?  Of course, we can't even *access* the module
-#     (without going through sys.modules['curses.wrapper']),
-#     since "import curses.wrapper" gives us a function. :-/
+"""True if debugging is turned on."""
 
 # Changes needed for docs:
 #   - document the method for deciding what's public/private
