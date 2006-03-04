@@ -36,23 +36,18 @@ Usage::
  Run \"epydoc --help\" for a complete option list.
  See the epydoc(1) man page for more information.
 
-@todo: By default, don't list markup warnings as you find them; just
-keep track of whether any occur, and if so, then tell the user that
-they occured and that they can use some switch to view them.  Perhaps
-just increase the verbosity level?  I.e., the default verbosity level
-would hide them.  So verbosity levels would be...
-               Progress    Markup warnings   Errors/other warnings
--2               none            no                 no
--1               none            no                 yes
- 0 (default)     bar             no                 yes
- 1               bar             yes                yes
- 2               bars            yes                yes
- 3               list            yes                yes
+Verbosity levels::
 
-
+                Progress    Markup warnings   Warnings   Errors
+ -3               none            no             no        no
+ -2               none            no             no        yes
+ -1               none            no             yes       yes
+  0 (default)     bar             no             yes       yes
+  1               bar             yes            yes       yes
+  2               list            yes            yes       yes
 """
 
-import sys, os
+import sys, os, time
 from optparse import OptionParser, OptionGroup
 import epydoc
 from epydoc.docbuilder import DocBuilder
@@ -65,7 +60,7 @@ from epydoc.apidoc import UNKNOWN
 ## Argument Parsing
 ######################################################################
 
-def parse_arguments(args):
+def parse_arguments():
     # Construct the option parser.
     usage = '%prog ACTION [options] NAMES...'
     version = "Epydoc, version %s" % epydoc.__version__
@@ -217,26 +212,29 @@ def parse_arguments(args):
 ## Interface
 ######################################################################
 
-def cli(args):
-    options, names = parse_arguments(args)
+def cli():
+    options, names = parse_arguments()
 
     # Set up the logger
-    if options.verbosity > 0:
+    if options.verbosity > 1:
         logger = ConsoleLogger(options.verbosity)
     else:
-        if options.parse and options.inspect:
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
-                                                  [3,1,1,1,1,1,1,1])
-        elif options.parse:
-            # no merging.
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
-                                                  [3,1,1,1,1,1,1])
-        else:
-            # no merging or linking.
-            logger = UnifiedProgressConsoleLogger(options.verbosity+1,
-                                                  [3,1,1,1,1,1])
+        # Each number is a rough approximation of how long we spend on
+        # that task, used to divide up the unified progress bar.
+        stages = [40,  # Building documentation
+                  7,   # Merging parsed & inspected information
+                  1,   # Linking imported variables
+                  3,   # Indexing documentation
+                  30,  # Parsing Docstrings
+                  1,   # Inheriting documentation
+                  2,   # Sorting & Grouping
+                  100] # Generating output
+        if options.parse and not options.inspect:
+            del stages[1] # no merging
+        if options.inspect and not options.parse:
+            del stages[1:2] # no merging or linking
+        logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
     log.register_logger(logger)
-    print
 
     # create the output directory.
     if os.path.exists(options.target):
@@ -255,9 +253,20 @@ def cli(args):
     # Perform the specified action.
     if options.action == 'html':
         _sandbox(_html, docindex, options)
-        print
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
+
+    # If we supressed docstring warnings, then let the user know.
+    if logger.supressed_docstring_warning:
+        log.warning("%d markup error(s) were found while processing "
+                    "docstrings.  Use the verbose switch (-v) to "
+                    "display markup errors." %
+                    logger.supressed_docstring_warning)
+
+    # Basic timing breakdown:
+    if isinstance(logger, UnifiedProgressConsoleLogger):
+        logger.print_times()
+        
 
 # this is useless [XXX] -- inline it.
 _encountered_internal_error = 0
@@ -307,6 +316,11 @@ class ConsoleLogger(log.Logger):
         self._progress = None
         self._message_blocks = []
         
+        self.supressed_docstring_warning = 0
+        """This variable will be incremented once every time a
+        docstring warning is reported tothe logger, but the verbosity
+        level is too low for it to be displayed."""
+        
         # Examine the capabilities of our terminal.
         if sys.stdout.isatty():
             try:
@@ -332,7 +346,7 @@ class ConsoleLogger(log.Logger):
 
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
-        elif verbosity >= 1:
+        elif verbosity >= 0:
             if self._TERM_CR and self._TERM_CLR_EOL and self._TERM_UP:
                 self._progress_mode = 'multiline-bar'
             elif self._TERM_CR and self._TERM_CLR_EOL:
@@ -366,7 +380,6 @@ class ConsoleLogger(log.Logger):
         Rewrap the message; but preserve newlines, and don't touch any
         lines that begin with spaces.
         """
-        message = '%s' % message
         lines = message.split('\n')
         startindex = indent = len(prefix)
         for i in range(len(lines)):
@@ -378,26 +391,25 @@ class ConsoleLogger(log.Logger):
             startindex = 0
         return color+prefix+self._TERM_NORM+''.join(lines)
 
-    def error(self, message):
-        message = '%s' % message
-        if self._verbosity >= -1:
+    def log(self, level, message):
+        if self._verbosity >= -2 and level >= log.ERROR:
             message = self._format('  Error: ', message, self._TERM_RED)
-            self._report(message)
-        
-    def warn(self, message):
-        message = '%s' % message
-        if self._verbosity >= 0:
+        elif self._verbosity >= -1 and level >= log.WARNING:
             message = self._format('Warning: ', message, self._TERM_YELLOW)
-            self._report(message)
-        
-    def info(self, message):
-        message = '%s' % message
-        if self._verbosity >= 3:
+        elif self._verbosity >= 1 and level >= log.DOCSTRING_WARNING:
+            message = self._format('Warning: ', message, self._TERM_YELLOW)
+        elif self._verbosity >= 3 and level >= log.INFO:
             message = self._format('   Info: ', message, self._TERM_NORM)
-            self._report(message)
+        elif epydoc.DEBUG and level == log.DEBUG:
+            message = self._format('  Debug: ', message, self._TERM_CYAN)
+        else:
+            if level >= log.DOCSTRING_WARNING:
+                self.supressed_docstring_warning += 1
+            return
+            
+        self._report(message)
 
     def _report(self, message, rstrip=True):
-        message = '%s' % message
         if rstrip: message = message.rstrip()
         
         if self._message_blocks:
@@ -467,7 +479,9 @@ class ConsoleLogger(log.Logger):
             sys.stdout.flush()
             self._progress = percent
         elif self._progress_mode == 'simple-bar':
-            if self._progress is None: self._progress = 0.0
+            if self._progress is None:
+                sys.stdout.write('  [')
+                self._progress = 0.0
             dots = int((self.TERM_WIDTH-2)*percent)
             progress_dots = int((self.TERM_WIDTH-2)*self._progress)
             if dots > progress_dots:
@@ -482,10 +496,7 @@ class ConsoleLogger(log.Logger):
             return
         if header:
             print self._TERM_BOLD + header + self._TERM_NORM
-        if self._progress_mode == 'simple-bar':
-            sys.stdout.write('  [')
-            sys.stdout.flush()
-        self._progress = 0.0
+        self._progress = None
 
     def end_progress(self):
         self.progress(1.)
@@ -504,6 +515,7 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         self.stages = stages
         self.task = None
         ConsoleLogger.__init__(self, verbosity)
+        self._times = []
         
     def progress(self, percent, message=''):
         #p = float(self.stage-1+percent)/self.stages
@@ -520,18 +532,42 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         if self.stage == 0:
             ConsoleLogger.start_progress(self)
         self.stage += 1
+        self._times.append([message, time.time(), None])
 
     def end_progress(self):
+        self._times[-1][2] = time.time()
         if self.stage == len(self.stages):
             ConsoleLogger.end_progress(self)
+
+    def print_times(self):
+        times = [(e-s,t) for (t,s,e) in self._times]
+        times.sort()
+        total = sum([time for (time, task) in times])
+        for (time, task) in times:
+            task = task[:31]
+            print '%s%s %.4f secs' % (task, '.'*(35-len(task)), time),
+            print '|'+'=' * min(30,int(50*time/total))
+
+                                           
 
 ######################################################################
 ## main
 ######################################################################
+PROFILE = True
 
 if __name__ == '__main__':
     try:
-        cli(sys.argv[1:])
+        if PROFILE:
+            import profile, pstats, tempfile
+            filename = tempfile.mktemp()
+            profile.run('cli()', filename)
+            p = pstats.Stats(filename)
+            #p.strip_dirs().sort_stats('time', 'cum').print_stats(60)
+            p.strip_dirs().sort_stats('cum', 'time').print_stats(600)
+            os.unlink(filename)
+        else:
+            cli()
     except:
         print '\n\n'
         raise
+
