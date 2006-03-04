@@ -19,13 +19,19 @@ this functionality.  However, I found that it would be too difficult
 to get that package to provide the behavior I want (esp. with respect
 to progress displays; but also with respect to message blocks).
 
-@group Logging Functions: error, warn, info, start_block, end_block,
-    start_progress, progress, end_progress
+@group Message Severity Levels: DEBUG, INFO, WARNING, ERROR, FATAL
 """
 __docformat__ = 'plaintext en'
 
 import sys, os
 from sets import Set
+
+DEBUG = 10
+INFO = 20
+DOCSTRING_WARNING = 25
+WARNING = 30
+ERROR = 40
+FATAL = 40
 
 ######################################################################
 # Logger Base Class
@@ -45,30 +51,24 @@ class Logger:
     logger, create a subclass of C{Logger} that overrides all methods,
     and register it using L{register_logger}.
     """
-    def info(self, message):
+    #////////////////////////////////////////////////////////////
+    # Messages
+    #////////////////////////////////////////////////////////////
+
+    def log(self, level, message):
         """
-        Display an informational message.  If C{message} is not a
-        string, then it will be cast to a string.  C{message} may
+        Display a message.
+
+        @param message: The message string to display.  C{message} may
         contain newlines, but does not need to end in a newline.
+        @param level: An integer value indicating the severity of the
+        message.
         """
-        raise NotImplementedError()
 
-    def warn(self, message):
-        """
-        Display a warning message.  If C{message} is not a string,
-        then it will be cast to a string.  C{message} may contain
-        newlines, but does not need to end in a newline.
-        """
-        raise NotImplementedError()
-
-    def error(self, message):
-        """
-        Display an error message.  If C{message} is not a string, then
-        it will be cast to a string.  C{message} may contain newlines,
-        but does not need to end in a newline.
-        """
-        raise NotImplementedError()
-
+    #////////////////////////////////////////////////////////////
+    # Message blocks
+    #////////////////////////////////////////////////////////////
+    
     def start_block(self, header):
         """
         Start a new message block.  Any calls to L{info}, L{warn}, or
@@ -79,14 +79,16 @@ class Logger:
         to C{start_block} I{must} be balanced by a call to
         C{end_block}.
         """
-        raise NotImplementedError()
         
     def end_block(self):
         """
         End a warning block.  See L{start_block} for details.
         """
-        raise NotImplementedError()
 
+    #////////////////////////////////////////////////////////////
+    # Progress bar
+    #////////////////////////////////////////////////////////////
+    
     def start_progress(self, header=None):
         """
         Begin displaying progress for a new task.  C{header} is a
@@ -95,14 +97,12 @@ class Logger:
         C{end_progress} (with no intervening calls to
         C{start_progress}).
         """
-        raise NotImplementedError()
 
     def end_progress(self):
         """
         Finish off the display of progress for the current task.  See
         L{start_progress} for more information.
         """
-        raise NotImplementedError()
 
     def progress(self, percent, message=''):
         """
@@ -113,7 +113,6 @@ class Logger:
         @param message: A message indicating the most recent action
             that contributed towards that progress.
         """
-        raise NotImplementedError()
 
 ######################################################################
 # Logger Registry
@@ -141,17 +140,29 @@ def remove_logger(logger):
 # The following methods all just delegate to the corresponding 
 # methods in the Logger class (above) for each registered logger.
 
-def error(message):
-    for logger in _loggers: logger.error(message)
-error.__doc__ = Logger.error.__doc__
+def fatal(message):
+    """Display the given fatal message."""
+    for logger in _loggers: logger.log(FATAL, '%s' % message)
     
-def warn(message):
-    for logger in _loggers: logger.warn(message)
-warn.__doc__ = Logger.warn.__doc__
+def error(message):
+    """Display the given error message."""
+    for logger in _loggers: logger.log(ERROR, '%s' % message)
+    
+def warning(message):
+    """Display the given warning message."""
+    for logger in _loggers: logger.log(WARNING, '%s' % message)
+    
+def docstring_warning(message):
+    """Display the given docstring warning message."""
+    for logger in _loggers: logger.log(DOCSTRING_WARNING, '%s' % message)
     
 def info(message):
-    for logger in _loggers: logger.info(message)
-info.__doc__ = Logger.info.__doc__
+    """Display the given informational message."""
+    for logger in _loggers: logger.log(INFO, '%s' % message)
+    
+def debug(message):
+    """Display the given debugging message."""
+    for logger in _loggers: logger.log(DEBUG, '%s' % message)
     
 def start_block(header):
     for logger in _loggers: logger.start_block(header)
@@ -170,7 +181,7 @@ def end_progress():
 end_progress.__doc__ = Logger.end_progress.__doc__
     
 def progress(percent, message=''):
-    for logger in _loggers: logger.progress(percent, message)
+    for logger in _loggers: logger.progress(percent, '%s' % message)
 progress.__doc__ = Logger.progress.__doc__
 
 
