@@ -702,12 +702,13 @@ class PythonSourceColorizer:
         # for it, with toktype=None.  (Note -- this skipped string
         # might also contain continuation slashes; but I won't bother
         # to colorize them.)
-        skipped = self.text[self.pos:self.line_offsets[srow] + scol]
-        if skipped:
+        startpos = self.line_offsets[srow] + scol
+        if startpos > self.pos:
+            skipped = self.text[startpos + scol]
             self.cur_line.append( (None, skipped) )
 
         # Update our position.
-        self.pos = self.line_offsets[srow] + scol + len(toktext)
+        self.pos = startpos + len(toktext)
 
         # Update our current line.
         self.cur_line.append( (toktype, toktext) )
