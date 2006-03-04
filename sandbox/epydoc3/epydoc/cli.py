@@ -315,6 +315,7 @@ class ConsoleLogger(log.Logger):
         self._verbosity = verbosity
         self._progress = None
         self._message_blocks = []
+        self._progress_start_time = None
         
         self.supressed_docstring_warning = 0
         """This variable will be incremented once every time a
@@ -462,11 +463,18 @@ class ConsoleLogger(log.Logger):
             else:
                 message = message.center(self.TERM_WIDTH-10)
 
+            time_elapsed = time.time()-self._progress_start_time
+            if percent > 0:
+                time_remain = (time_elapsed / percent) * (1-percent)
+            else:
+                time_remain = 0
+
             sys.stdout.write(
                 # Line 1:
-                self._TERM_CLR_EOL + '      ' + self._TERM_BOLD + 
-                'Progress:'.center(self.TERM_WIDTH-10) + '\n' +
-                self._TERM_NORM +
+                self._TERM_CLR_EOL + '      ' +
+                '%-10s' % self._timestr(time_elapsed) +
+                self._TERM_BOLD + 'Progress:'.center(self.TERM_WIDTH-30) +
+                self._TERM_NORM + '%10s' % self._timestr(time_remain) + '\n' +
                 # Line 2:
                 self._TERM_CLR_EOL + ('%3d%% ' % (100*percent)) +
                 self._TERM_GREEN + '[' +  self._TERM_BOLD + '='*dots +
@@ -489,6 +497,17 @@ class ConsoleLogger(log.Logger):
                 sys.stdout.flush()
                 self._progress = percent
 
+    def _timestr(self, dt):
+        dt = int(dt)
+        s = ''
+        if dt > 3600:
+            s += '%d:' % (dt/3600)
+            dt %= 3600
+        s += '%02d:' % (dt/60)
+        dt %= 60
+        s += '%02d' % dt
+        return s
+
     def start_progress(self, header=None):
         if self._progress is not None:
             raise ValueError
@@ -497,6 +516,7 @@ class ConsoleLogger(log.Logger):
         if header:
             print self._TERM_BOLD + header + self._TERM_NORM
         self._progress = None
+        self._progress_start_time = time.time()
 
     def end_progress(self):
         self.progress(1.)
