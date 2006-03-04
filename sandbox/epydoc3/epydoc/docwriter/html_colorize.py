@@ -704,7 +704,7 @@ class PythonSourceColorizer:
         # to colorize them.)
         startpos = self.line_offsets[srow] + scol
         if startpos > self.pos:
-            skipped = self.text[startpos + scol]
+            skipped = self.text[self.pos:startpos]
             self.cur_line.append( (None, skipped) )
 
         # Update our position.
