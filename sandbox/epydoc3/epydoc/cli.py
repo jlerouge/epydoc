@@ -541,11 +541,10 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
 
     def print_times(self):
         times = [(e-s,t) for (t,s,e) in self._times]
-        times.sort()
         total = sum([time for (time, task) in times])
         for (time, task) in times:
             task = task[:31]
-            print '%s%s %.4f secs' % (task, '.'*(35-len(task)), time),
+            print '%s%s %6.2f secs' % (task, '.'*(35-len(task)), time),
             print '|'+'=' * min(30,int(50*time/total))
 
                                            
@@ -553,7 +552,7 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
 ######################################################################
 ## main
 ######################################################################
-PROFILE = True
+PROFILE = False
 
 if __name__ == '__main__':
     try:
