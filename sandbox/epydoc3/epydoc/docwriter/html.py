@@ -435,7 +435,7 @@ class HTMLWriter:
         # Write source code files.
         if self._incl_sourcecode:
             for doc in modules_with_sourcecode:
-                filename = self.pysrc_url(doc)
+                filename = urllib.unquote(self.pysrc_url(doc))
                 self._write(self.write_sourcecode, directory, filename, doc)
 
         # Write the index.html files.
@@ -508,10 +508,8 @@ class HTMLWriter:
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
         out('<h2 class="%s">%s %s' % (typ.lower(), typ, shortname))
-        if self._incl_sourcecode:
-            out('\n<span class="codelink"><br/>'
-                '<a href="%s">source code</a></span>' %
-                self.pysrc_url(doc))
+        src_link = self.pysrc_link(doc)
+        if src_link: out('\n<br/>' + src_link)
         out('</h2>\n')
         
             
@@ -600,10 +598,8 @@ class HTMLWriter:
             'DESCRIPTION ==================== -->\n')
         out('<h2 class="%s">%s %s' %
             (typ.lower(), typ, shortname))
-        if self._incl_sourcecode:
-            out('\n<span class="codelink"><br/>'
-                '<a href="%s">source code</a></span>' %
-                self.pysrc_url(doc))
+        src_link = self.pysrc_link(doc)
+        if src_link: out('\n<br/>' + src_link)
         out('</h2>\n')
 
         # Write the base class tree.
@@ -728,7 +724,7 @@ class HTMLWriter:
             name = doc.canonical_name
             if self.url(doc) is None: continue
             key = name[-1].lower()
-            key = (key[:1] in 'abcdefghijklmnopqrstuvwxyz' and 1 or -1, key)
+            key = (key[:1] in 'abcdefghijklmnopqrstuvwxyz', key)
             identifiers.append( (key, name, doc) )
             
         identifiers.sort()
@@ -743,13 +739,14 @@ class HTMLWriter:
         """
         write_identifier_index_header(self, out)
         """,
+        # /------------------------- Template -------------------------\
         '''
         <!-- ==================== IDENTIFIER INDEX ==================== -->
         <table class="index" border="1" cellpadding="3"
                cellspacing="0" width="100%" bgcolor="white">
         <tr bgcolor="#70b0f0" class="index"><th colspan="2">
           <table border="0" cellpadding="0" cellspacing="0" width="100%">
-            <tr><td>Identifier&nbsp;Index</td>
+            <tr><th class="index">Identifier&nbsp;Index</th>
               <td width="100%" align="right"> [
                 <a href="#_">_</a>
         >>> for c in "abcdefghijklmnopqrstuvwxyz":
@@ -759,21 +756,23 @@ class HTMLWriter:
             </tr></table>
         </th></tr>
         ''')
+        # \------------------------------------------------------------/
     
     write_identifier_index = compile_template(
         """
         write_identifier_index(self, out, index)
         """,
+        # /------------------------- Template -------------------------\
         '''
         >>> #self.write_table_header(out, "index", "Identifier Index")
         >>> self.write_identifier_index_header(out)
-        >>> letters = "_abcdefghijklmnopqrstuvwxyz"
+        >>> letters = "abcdefghijklmnopqrstuvwxyz"
+          <a name="_"></a>
         >>> for sortkey, name, doc in index:
           <tr><td width="15%">
-        >>>     if letters and (letters[0] == "_" or
-        >>>                     letters[0] <= name[-1][:1].lower()):
+        >>>     while letters and letters[0] <= name[-1][:1].lower():
                   <a name="$letters[0]$"></a>
-        >>>             letters = letters[1:]
+        >>>       letters = letters[1:]
         >>>     #endif
                 $self.href(doc, name[-1])$
               </td>
@@ -794,11 +793,13 @@ class HTMLWriter:
         >>> #endfor
         <br />
         ''')
+        # \------------------------------------------------------------/
 
     write_term_index = compile_template(
         """
         write_term_index(self, out, index)
         """,
+        # /------------------------- Template -------------------------\
         '''
         >>> if not index: return
         >>> self.write_table_header(out, "index", "Term Index")
@@ -815,6 +816,7 @@ class HTMLWriter:
         </table>
         <br />
         ''')
+        # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
     # 2.5. Help Page
@@ -864,6 +866,7 @@ class HTMLWriter:
         Write the frames index file for the frames-based table of
         contents to the given streams.
         """,
+        # /------------------------- Template -------------------------\
         '''
         <?xml version="1.0" encoding="iso-8859-1"?>
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN"
@@ -883,11 +886,13 @@ class HTMLWriter:
         </frameset>
         </html>
         ''')
+        # \------------------------------------------------------------/
     
     write_toc = compile_template(
         """
         write_toc(self, out)
         """,
+        # /------------------------- Template -------------------------\
         '''
         >>> self.write_header(out, "Table of Contents")
         <h1 class="tocheading">Table&nbsp;of&nbsp;Contents</h1>
@@ -902,6 +907,7 @@ class HTMLWriter:
         $self.PRIVATE_LINK$
         >>> self.write_footer(out, short=True)
         ''')
+        # \------------------------------------------------------------/
 
     def write_toc_section(self, out, name, docs, fullname=True):
         if not docs: return
@@ -1041,6 +1047,7 @@ class HTMLWriter:
         """
         write_redirect_index(self, out, top, name)
         """,
+        # /------------------------- Template -------------------------\
         '''
         <?xml version="1.0" encoding="iso-8859-1"?>
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
@@ -1057,6 +1064,7 @@ class HTMLWriter:
         </body>
         </html>
         ''')
+        # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
     # 2.8. Stylesheet (epydoc.css)
@@ -1697,12 +1705,9 @@ class HTMLWriter:
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
           </h3>
-        >>> if self._incl_sourcecode:
           </td><td align="right" valign="top"
-            ><span class="codelink"><a href="$self.pysrc_url(func_doc)$"
-            >source&nbsp;code</a>&nbsp;</span></td>
+            >$self.pysrc_link(func_doc)$&nbsp;</span></td>
           </table>
-        >>> #endif
           $descr$
           <dl><dt></dt><dd>
         >>> # === parameters ===
@@ -1788,6 +1793,7 @@ class HTMLWriter:
         write_property_details_entry(self, out, var_doc, descr, \
                                      accessors, div_class)
         ''',
+        # /------------------------- Template -------------------------\
         '''
         >>> prop_doc = var_doc.value
         <a name="$var_doc.name$"></a>
@@ -1812,6 +1818,7 @@ class HTMLWriter:
         </td></tr></table>
         </div>
         ''')
+        # \------------------------------------------------------------/
         
     write_variable_details_entry = compile_template(
         '''
@@ -2170,6 +2177,7 @@ class HTMLWriter:
         '''
         write_module_list(self, out, doc)
         ''',
+        # /------------------------- Template -------------------------\
         '''
         >>> if len(doc.submodules) == 0: return
         >>> self.write_table_header(out, "details", "Submodules")
@@ -2181,11 +2189,13 @@ class HTMLWriter:
         $self.TABLE_FOOTER$
         <br />
         ''')
+        # \------------------------------------------------------------/
 
     write_module_tree_item = compile_template(
         '''
         write_module_tree_item(self, out, doc)
         ''',
+        # /------------------------- Template -------------------------\
         '''
         >>> if doc.summary in (None, UNKNOWN):
             <li> <strong class="uidlink">$self.href(doc)$</strong>
@@ -2202,6 +2212,7 @@ class HTMLWriter:
         >>> #endif
             </li>
         ''')
+        # \------------------------------------------------------------/
 
 
     #////////////////////////////////////////////////////////////
@@ -2250,6 +2261,7 @@ class HTMLWriter:
         '''
         write_class_tree_item(self, out, doc, classes)
         ''',
+        # /------------------------- Template -------------------------\
         '''
         >>> if doc.summary in (None, UNKNOWN):
             <li> <strong class="uidlink">$self.href(doc)$</strong>
@@ -2268,6 +2280,7 @@ class HTMLWriter:
         >>> #endif
             </li>
         ''')
+        # \------------------------------------------------------------/
     
     #////////////////////////////////////////////////////////////
     # Standard Fields
@@ -2285,6 +2298,7 @@ class HTMLWriter:
             for the object whose standard markup fields should be
             described.
         """,
+        # /------------------------- Template -------------------------\
         """
         >>> for field in epydoc.docstringparser.STANDARD_FIELDS:
         >>>   vals = doc.metadata.get(field.tags[0])
@@ -2314,6 +2328,7 @@ class HTMLWriter:
         >>>   # end else
         >>> # end for
         """)
+        # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
     # Term index generation
@@ -2400,6 +2415,7 @@ class HTMLWriter:
         write_table_header(self, out, css_class, heading=None, \
                            private_link=True)
         ''',
+        # /------------------------- Template -------------------------\
         '''
         >>> if heading is not None:
         >>>     anchor = "section-%s" % re.sub("\W", "", heading)
@@ -2428,6 +2444,7 @@ class HTMLWriter:
         </tr>
         >>> #endif
         ''')
+        # \------------------------------------------------------------/
 
     TABLE_FOOTER = '</table>\n'
 
@@ -2435,11 +2452,13 @@ class HTMLWriter:
         '''
         write_group_header(self, out, group, css_class="group")
         ''',
+        # /------------------------- Template -------------------------\
         '''
         <tr bgcolor="#e8f0f8" class="$css_class$">
           <th colspan="2" class="$css_class$"
             >&nbsp;&nbsp;&nbsp;&nbsp;$group$</th></tr>
         ''')
+        # \------------------------------------------------------------/
 
     def url(self, obj):
         """
@@ -2490,24 +2509,36 @@ class HTMLWriter:
         else:
             raise ValueError, "Don't know what to do with %r" % obj
 
-    # [xx] returning None from here is somewhat problematic -- if we
-    # don't have one, then we dont' want to link...  I guess really
-    # this should be replaced by a pysrc_link() method.
-    def pysrc_url(self, vardoc):
-        if isinstance(vardoc, ModuleDoc):
-            if vardoc.filename in (None, UNKNOWN):
-                return None
-            else:
-                return ('%s-module-pysrc.html' %
-                        urllib.quote('%s' % vardoc.canonical_name))
+    def pysrc_link(self, api_doc):
+        if not self._include_sourcecode:
+            return ''
+        url = self.pysrc_url(api_doc)
+        if url is not None: 
+            return ('<span class="codelink"><a href="%s">source&nbsp;'
+                    'code</a></span>' % url)
         else:
-            module = self.docindex.module_that_defines(vardoc)
-            if module:
+            return ''
+    
+    def pysrc_url(self, api_doc):
+        if isinstance(api_doc, VariableDoc):
+            if api_doc.value not in (None, UNKNOWN):
+                return pysrc_link(api_doc.value)
+        elif isinstance(api_doc, ModuleDoc):
+            if api_doc.filename not in (None, UNKNOWN):
+                return ('%s-module-pysrc.html' %
+                       urllib.quote('%s' % api_doc.canonical_name))
+        else:
+            module = self.docindex.module_that_defines(api_doc)
+            if module is None: return None
+            module_pysrc_url = self.pysrc_url(module)
+            if module_pysrc_url is not None:
                 mname_len = len(module.canonical_name)
-                anchor = DottedName(*vardoc.canonical_name[mname_len:])
+                anchor = DottedName(*api_doc.canonical_name[mname_len:])
                 return ('%s-module-pysrc.html#%s' % 
                         (urllib.quote('%s' % module.canonical_name),
                          urllib.quote('%s' % anchor)))
+        # We didn't find it:
+        return None
 
     # [xx] add code to automatically do <code> wrapping or the like?
     def href(self, target, label=None, css_class=None):
