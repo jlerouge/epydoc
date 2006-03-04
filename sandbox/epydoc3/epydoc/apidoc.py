@@ -513,7 +513,7 @@ def reachable_valdocs(*root):
     C{VariableDoc}s.
     """
     val_queue = list(root)
-    val_set = Set(root)
+    val_set = Set()
     while val_queue:
         val_doc = val_queue.pop()
         val_set.add(val_doc)
@@ -534,7 +534,7 @@ def contained_valdocs(*root):
     L{reachable_valdocs}.
     """
     val_queue = list(root)
-    val_set = Set(root)
+    val_set = Set()
     while val_queue:
         val_doc = val_queue.pop()
         val_set.add(val_doc)
