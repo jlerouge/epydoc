@@ -277,7 +277,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
         for error in parse_errors:
             message = error.descr()
             if message not in dups:
-                log.info(message)
+                log.docstring_warning(message)
                 dups[message] = 1
     else:
         # Combine line number fields for dup messages:
@@ -290,14 +290,14 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
         message_items.sort(lambda a,b:cmp(min(a[1]), min(b[1])))
         for message, linenums in message_items:
             if len(linenums) == 1:
-                log.info("Line %s: %s" % (linenums[0], message))
+                log.docstring_warning("Line %s: %s" % (linenums[0], message))
             else:
                 linenums = ', '.join(['%s' % l for l in linenums])
-                log.info("Lines %s: %s" % (linenums, message))
+                log.docstring_warning("Lines %s: %s" % (linenums, message))
 
     # Display all field warnings.
     for warning in field_warnings:
-        log.info(warning)
+        log.docstring_warning(warning)
 
     # End the message block.
     log.end_block()

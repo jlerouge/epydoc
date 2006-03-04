@@ -460,7 +460,7 @@ class HTMLWriter:
                     estr += '\n'
                     for name in names:
                         estr += '      (from %s)\n' % name
-            log.warn(estr)
+            log.docstring_warning(estr)
 
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
