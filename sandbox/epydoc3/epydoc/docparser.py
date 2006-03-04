@@ -1776,8 +1776,8 @@ def _get_module_name(filename, package_doc):
         valdoc = package_doc.variables[name].value
         if (valdoc not in (None, UNKNOWN) and
             valdoc.imported_from != dotted_name):
-            log.warn("Module %s might be shadowed by a variable with "
-                     "the same name." % dotted_name)
+            log.warning("Module %s might be shadowed by a variable with "
+                        "the same name." % dotted_name)
             dotted_name = DottedName(str(dotted_name)+"'")
 
     return dotted_name, is_package

@@ -145,7 +145,7 @@ def _parse_warn(estr):
     global _parse_warnings
     if _parse_warnings.has_key(estr): return
     _parse_warnings[estr] = 1
-    log.warn(estr)
+    log.warning(estr)
 
 ##################################################
 ## ParsedDocstring

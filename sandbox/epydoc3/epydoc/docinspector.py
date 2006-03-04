@@ -151,8 +151,8 @@ class DocInspector:
         # the end of the name to distinguish it from the variable.
         if val_doc.canonical_name == UNKNOWN and filename is not None:
             shadowed_name = DottedName(value.__name__)
-            log.warn("Module %s is shadowed by a variable with "
-                     "the same name." % shadowed_name)
+            log.warning("Module %s is shadowed by a variable with "
+                        "the same name." % shadowed_name)
             val_doc.canonical_name = DottedName(str(shadowed_name)+"'")
 
         return val_doc
@@ -496,16 +496,17 @@ class DocInspector:
             except UnicodeDecodeError:
                 if hasattr(value, '__name__'): name = value.__name__
                 else: name = `value`
-                log.warn("%s's docstring is not a unicode string, but it "
-                         "contains non-ascii data -- treating it as "
-                         "latin-1." % name)
+                log.warning("%s's docstring is not a unicode string, but it "
+                            "contains non-ascii data -- treating it as "
+                            "latin-1." % name)
                 # Assume it's latin-1.
                 return unicode(docstring, 'latin-1')
             return None
         else:
             if hasattr(value, '__name__'): name = value.__name__
             else: name = `value`
-            log.warn("%s's docstring is not a string -- ignoring it." % name)
+            log.warning("%s's docstring is not a string -- ignoring it." %
+                        name)
             return None
 
     def get_canonical_name(self, value):

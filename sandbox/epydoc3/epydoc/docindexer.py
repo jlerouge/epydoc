@@ -124,14 +124,14 @@ def _fix_self_shadowing_var(var_doc, varname, docindex):
         new_name = DottedName(*(cname[:i]+(cname[i]+"'",)+cname[i+1:]))
         val_doc = docindex.get_valdoc(new_name)
         if val_doc is not None:
-            log.warn("%s shadows its own value -- using %s instead" %
-                     (varname, new_name))
+            log.warning("%s shadows its own value -- using %s instead" %
+                        (varname, new_name))
             var_doc.value = val_doc
             return
 
     # If we couldn't find the actual value, then at least
     # invalidate the canonical name.
-    log.warn('%s shadows itself' % varname)
+    log.warning('%s shadows itself' % varname)
     del var_doc.value.canonical_name
 
 def _unreachable_name_for(val_doc, docindex):
