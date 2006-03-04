@@ -25,8 +25,8 @@ The top-level programmatic interface to epydoc.
 
 import sys, os, os.path, __builtin__
 from epydoc.apidoc import *
-from epydoc.docinspector import DocInspector
-from epydoc.docparser import DocParser, ParseError
+from epydoc.docinspector import inspect_docs
+from epydoc.docparser import parse_docs, ParseError
 from epydoc.docstringparser import parse_docstring
 from epydoc import log
 
@@ -50,14 +50,6 @@ class DocBuilder:
         self.inspect = inspect
         self.parse = parse
 
-        self.inspector = DocInspector()
-        """The L{DocInspector} that should be used to inspect python
-        objects and extract their documentation information."""
-        
-        self.parser = DocParser(self.inspector.inspect(value=__builtin__))
-        """The L{DocParser} that should be used to parse python source
-        files, and extract documentation about the objects they contain."""
-        
         self._progress_estimator = None
         """A L{_ProgressEstimator} used to keep track of progress when
         generating the initial docs for the given items.  (It is not
@@ -223,7 +215,7 @@ class DocBuilder:
         inspect_doc = parse_doc = None
         if self.inspect:
             try:
-                inspect_doc = self.inspector.inspect(value=obj)
+                inspect_doc = inspect_docs(value=obj)
             except ImportError, e:
                 log.error(e)
         if self.parse:
@@ -237,14 +229,14 @@ class DocBuilder:
         inspect_doc = parse_doc = None
         if self.parse:
             try:
-                parse_doc = self.parser.parse(name=name)
+                parse_doc = parse_docs(name=name)
             except ParseError, e:
                 log.error(e)
             except ImportError, e:
                 log.error('While parsing %s: %s' % (name, e))
         if self.inspect:
             try:
-                inspect_doc = self.inspector.inspect(name=name)
+                inspect_doc = inspect_docs(name=name)
             except ImportError, e:
                 log.error(e)
         return (inspect_doc, parse_doc)
@@ -283,13 +275,13 @@ class DocBuilder:
         inspect_doc = parse_doc = None
         if self.inspect:
             try:
-                inspect_doc = self.inspector.inspect(
+                inspect_doc = inspect_docs(
                     filename=filename, context=parent_docs[0])
             except ImportError, e:
                 log.error(e)
         if self.parse:
             try:
-                parse_doc = self.parser.parse(
+                parse_doc = parse_docs(
                     filename=filename, context=parent_docs[1])
             except ParseError, e:
                 log.error(e)
