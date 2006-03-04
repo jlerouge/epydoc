@@ -447,6 +447,9 @@ def get_docstring(value):
             # Assume it's latin-1.
             return unicode(docstring, 'latin-1')
         return None
+    elif value is BuiltinMethodType:
+        # Don't issue a warning for this special case.
+        return None
     else:
         if hasattr(value, '__name__'): name = value.__name__
         else: name = `value`

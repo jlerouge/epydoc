@@ -171,6 +171,9 @@ def parse_arguments():
     options_group.add_option(                                # --inspect-only
         "--inspect-only", action="store_false", dest="parse",
         help="Get all information from inspecting (don't parse)")
+    options_group.add_option(
+        "--profile", action="store_true", dest="profile",
+        help="Run the profiler.  Output will be written to profile.out")
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -183,7 +186,7 @@ def parse_arguments():
                            inheritance="grouped",
                            verbose=0, quiet=0,
                            parse=True, inspect=True,
-                           debug=epydoc.DEBUG)
+                           debug=epydoc.DEBUG, profile=False)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -212,9 +215,7 @@ def parse_arguments():
 ## Interface
 ######################################################################
 
-def cli():
-    options, names = parse_arguments()
-
+def main(options, names):
     # Set up the logger
     if options.verbosity > 1:
         logger = ConsoleLogger(options.verbosity)
@@ -252,7 +253,7 @@ def cli():
 
     # Perform the specified action.
     if options.action == 'html':
-        _sandbox(_html, docindex, options)
+        _html(docindex, options)
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
@@ -264,27 +265,8 @@ def cli():
                     logger.supressed_docstring_warning)
 
     # Basic timing breakdown:
-    if isinstance(logger, UnifiedProgressConsoleLogger):
+    if options.verbosity >= 2:
         logger.print_times()
-        
-
-# this is useless [XXX] -- inline it.
-_encountered_internal_error = 0
-def _sandbox(func, docindex, options):
-    error = None
-    try:
-        func(docindex, options)
-    except Exception, e:
-        if options.debug: raise # [XX] options isn't available here!!
-        if isinstance(e, (OSError, IOError)):
-            print >>sys.stderr, '\nFile error:\n%s\n' % e
-        else:
-            print >>sys.stderr, '\nINTERNAL ERROR:\n%s\n' % e
-            _encountered_internal_error = 1
-    except:
-        if options.debug: raise
-        print >>sys.stderr, '\nINTERNAL ERROR\n'
-        _encountered_internal_error = 1
 
 def _html(docindex, options):
     html_writer = HTMLWriter(docindex, **options.__dict__)
@@ -295,6 +277,44 @@ def _html(docindex, options):
     html_writer.write(options.target)
     log.end_progress()
     
+def cli():
+    # Parse command-line arguments.
+    options, names = parse_arguments()
+
+    try:
+        if options.profile:
+            _profile()
+        else:
+            main(options, names)
+    except KeyboardInterrupt:
+        print >>sys.stderr, 'Keyboard interrupt.'
+    except:
+        if options.debug: raise
+        print '\n\n'
+        exc_info = sys.exc_info()
+        if isinstance(exc_info[0], basestring): e = exc_info[0]
+        else: e = exc_info[1]
+        print >>sys.stderr, ('\nUNEXPECTED ERROR:\n'
+                             '%s\n' % (str(e) or e.__class__.__name__))
+        print >>sys.stderr, 'Use --debug to see trace information.'
+
+def _profile():
+    import profile, pstats, code
+    profile.run('main(*parse_arguments())', 'profile.out')
+
+    # Use the pstats statistical browser.  This is made unnecessarily
+    # difficult because the whole browser is wrapped in an
+    # if __name__=='__main__' clause.
+    try:
+        pstats_pyfile = os.path.splitext(pstats.__file__)[0]+'.py'
+        sys.argv = ['pstats.py', 'profile.out']
+        print
+        execfile(pstats_pyfile, {'__name__':'__main__'})
+    except:
+        print 'Could not run the pstats browser'
+    
+    print 'Profiling output is in "profile.out"'
+        
 ######################################################################
 ## Logging
 ######################################################################
@@ -315,7 +335,11 @@ class ConsoleLogger(log.Logger):
         self._verbosity = verbosity
         self._progress = None
         self._message_blocks = []
+        # For ETA display:
         self._progress_start_time = None
+        # For per-task times:
+        self._task_times = []
+        self._progress_header = None
         
         self.supressed_docstring_warning = 0
         """This variable will be incremented once every time a
@@ -348,6 +372,8 @@ class ConsoleLogger(log.Logger):
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
         elif verbosity >= 0:
+            if self.TERM_WIDTH < 15:
+                self._progress_mode = 'simple-bar'
             if self._TERM_CR and self._TERM_CLR_EOL and self._TERM_UP:
                 self._progress_mode = 'multiline-bar'
             elif self._TERM_CR and self._TERM_CLR_EOL:
@@ -472,9 +498,9 @@ class ConsoleLogger(log.Logger):
             sys.stdout.write(
                 # Line 1:
                 self._TERM_CLR_EOL + '      ' +
-                '%-10s' % self._timestr(time_elapsed) +
-                self._TERM_BOLD + 'Progress:'.center(self.TERM_WIDTH-30) +
-                self._TERM_NORM + '%10s' % self._timestr(time_remain) + '\n' +
+                '%-8s' % self._timestr(time_elapsed) +
+                self._TERM_BOLD + 'Progress:'.center(self.TERM_WIDTH-26) +
+                self._TERM_NORM + '%8s' % self._timestr(time_remain) + '\n' +
                 # Line 2:
                 self._TERM_CLR_EOL + ('%3d%% ' % (100*percent)) +
                 self._TERM_GREEN + '[' +  self._TERM_BOLD + '='*dots +
@@ -513,6 +539,7 @@ class ConsoleLogger(log.Logger):
             print self._TERM_BOLD + header + self._TERM_NORM
         self._progress = None
         self._progress_start_time = time.time()
+        self._progress_header = header
 
     def end_progress(self):
         self.progress(1.)
@@ -524,6 +551,22 @@ class ConsoleLogger(log.Logger):
         if self._progress_mode == 'simple-bar':
             print ']'
         self._progress = None
+        self._task_times.append( (time.time()-self._progress_start_time,
+                                  self._progress_header) )
+
+    def print_times(self):
+        print
+        print 'Timing summary:'
+        total = sum([time for (time, task) in self._task_times])
+        max_t = max([time for (time, task) in self._task_times])
+        for (time, task) in self._task_times:
+            task = task[:31]
+            print '  %s%s %7.1fs' % (task, '.'*(35-len(task)), time),
+            if self.TERM_WIDTH > 55:
+                print '|'+'=' * int((self.TERM_WIDTH-53) * time / max_t)
+            else:
+                print
+        print
 
 class UnifiedProgressConsoleLogger(ConsoleLogger):
     def __init__(self, verbosity, stages):
@@ -531,7 +574,6 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         self.stages = stages
         self.task = None
         ConsoleLogger.__init__(self, verbosity)
-        self._times = []
         
     def progress(self, percent, message=''):
         #p = float(self.stage-1+percent)/self.stages
@@ -548,40 +590,21 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         if self.stage == 0:
             ConsoleLogger.start_progress(self)
         self.stage += 1
-        self._times.append([message, time.time(), None])
 
     def end_progress(self):
-        self._times[-1][2] = time.time()
         if self.stage == len(self.stages):
             ConsoleLogger.end_progress(self)
 
     def print_times(self):
-        times = [(e-s,t) for (t,s,e) in self._times]
-        total = sum([time for (time, task) in times])
-        for (time, task) in times:
-            task = task[:31]
-            print '%s%s %6.2f secs' % (task, '.'*(35-len(task)), time),
-            print '|'+'=' * min(30,int(50*time/total))
-
-                                           
+        pass
 
 ######################################################################
 ## main
 ######################################################################
-PROFILE = False
 
 if __name__ == '__main__':
     try:
-        if PROFILE:
-            import profile, pstats, tempfile
-            filename = tempfile.mktemp()
-            profile.run('cli()', filename)
-            p = pstats.Stats(filename)
-            #p.strip_dirs().sort_stats('time', 'cum').print_stats(60)
-            p.strip_dirs().sort_stats('cum', 'time').print_stats(600)
-            os.unlink(filename)
-        else:
-            cli()
+        cli()
     except:
         print '\n\n'
         raise
