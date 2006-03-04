@@ -39,6 +39,7 @@ __docformat__ = 'epytext en'
 import types, re
 from sets import Set
 from epydoc import log
+import epydoc
 
 # Backwards compatibility imports:
 try: sorted
@@ -256,7 +257,7 @@ class APIDoc(object):
                                 (self.__class__.__name__, key))
         self.__dict__.update(kwargs)
 
-    def __setattr__(self, attr, val):
+    def _debug_setattr(self, attr, val):
         """
         Modify an C{APIDoc}'s attribute.
 
@@ -271,6 +272,9 @@ class APIDoc(object):
             raise AttributeError('%s does not define attribute %r' %
                             (self.__class__.__name__, attr))
         self.__dict__[attr] = val
+
+    if epydoc.DEBUG:
+        __setattr__ = _debug_setattr
 
     def __repr__(self):
        return '<%s>' % self.__class__.__name__
@@ -833,8 +837,8 @@ class ClassDoc(NamespaceDoc):
                 elif base.imported_from is not UNKNOWN:
                     log.info("No information available for base %r" % base)
                 else:
-                   log.warn("While calculating the MRO for %r, encountered "
-                            "a base that's not a class: %r" % (self, base))
+                   log.warning("While calculating the MRO for %r, encountered "
+                               "a base that's not a class: %r" % (self, base))
         return mro
 
     def _c3_mro(self):
