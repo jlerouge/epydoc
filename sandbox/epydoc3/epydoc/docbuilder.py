@@ -166,7 +166,7 @@ class DocBuilder:
     def _report_valdoc_progress(self, i, val_doc, val_docs):
         if (isinstance(val_doc, (ModuleDoc, ClassDoc)) and
             val_doc.canonical_name != UNKNOWN and
-            val_doc.canonical_name[0] != '??'):
+            not val_doc.canonical_name[0].startswith('??')):
             log.progress(float(i)/len(val_docs), val_doc.canonical_name)
 
     #/////////////////////////////////////////////////////////////////
