@@ -477,35 +477,19 @@ def process_file(module_doc):
     module_file = codecs.open(module_doc.filename, 'r', encoding)
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
-        # Update lineno when we reach a new logical line.
-        # [xx] but don't count comments for this?
-        if lineno is None: lineno = srow
-
-        # If it's a non-unicode string literal, then we need to
-        # re-encode using the file's encoding (to get back to the
-        # original 8-bit data); and then convert that string with
-        # 8-bit data to a 7-bit ascii representation.
-        if toktype == token.STRING:
-            str_prefixes = re.match('[^\'"]*', toktext).group()
-            if 'u' not in str_prefixes:
-                s = toktext.encode(encoding)
-                toktext = decode_with_backslashreplace(s)
-
-        # Non-unicode string tokens need to be reencoded into
-        # 8-bit string data.  But, in order to make sure we can
-        # display it properly, we will convert any 
-            
         # Error token: abort
         if toktype == token.ERRORTOKEN:
             raise ParseError('Error during parsing: invalid '
                              'syntax (%s, line %d)' %
                              (module_doc.filename, lineno))
+        
         # Indent token: update the parent_doc stack.
         elif toktype == token.INDENT:
             if prev_line_doc is None:
                 parent_docs.append(parent_docs[-1])
             else:
                 parent_docs.append(prev_line_doc)
+                
         # Dedent token: update the parent_doc stack.
         elif toktype == token.DEDENT:
             if line_toks == []:
@@ -515,19 +499,34 @@ def process_file(module_doc):
                 # indented line, with no final newline.
                 # (otherwise, this is the wrong thing to do.)
                 pass
+            
         # Line-internal newline token: ignore it.
         elif toktype == tokenize.NL:
             pass
+        
         # Comment token: add to comments if appropriate.
         elif toktype == tokenize.COMMENT:
             comments.append( [toktext, srow])
-        # Normal token: just add it to line_toks
+            
+        # Normal token: Add it to line_toks.  (If it's a non-unicode
+        # string literal, then we need to re-encode using the file's
+        # encoding, to get back to the original 8-bit data; and then
+        # convert that string with 8-bit data to a 7-bit ascii
+        # representation.)
         elif toktype != token.NEWLINE and toktype != token.ENDMARKER:
+            if lineno is None: lineno = srow
+            if toktype == token.STRING:
+                str_prefixes = re.match('[^\'"]*', toktext).group()
+                if 'u' not in str_prefixes:
+                    s = toktext.encode(encoding)
+                    toktext = decode_with_backslashreplace(s)
             line_toks.append( (toktype, toktext) )
+            
         # Decorator line: add it to the decorators list.
         elif line_toks and line_toks[0] == (token.OP, '@'):
             decorators.append(shallow_parse(line_toks))
             line_toks = []
+            
         # End of line token: parse the logical line & process it.
         else:
             if parent_docs[-1] != 'skip_block':
