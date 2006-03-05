@@ -32,10 +32,6 @@ from epydoc import log
 
 from epydoc.util import * # [xx] hmm
 
-# Backwards compatibility imports:
-try: sorted
-except NameError: from epydoc.util import py_sorted as sorted
-
 ######################################################################
 ## 1. build_docs()
 ######################################################################
@@ -110,13 +106,12 @@ class DocBuilder:
 
         # Collect the docs into a single index.
         docindex = DocIndex(docs)
-        reachable_valdocs = sorted(docindex.reachable_valdocs(),
-                                   key=lambda doc: doc.canonical_name)
 
         # Replace any proxy valuedocs that we got from importing with
         # their targets.
         if self.parse:
             log.start_progress('Linking imported variables')
+            reachable_valdocs = docindex.reachable_valdocs(True)
             for i, val_doc in enumerate(reachable_valdocs):
                 self._report_valdoc_progress(i, val_doc, reachable_valdocs)
                 link_imports(val_doc, docindex)
@@ -124,7 +119,8 @@ class DocBuilder:
 
         # Assign canonical names.
         log.start_progress('Indexing documentation')
-        for i, val_doc in enumerate(docindex.root):
+        reachable_valdocs = docindex.reachable_valdocs(True)
+        for i, val_doc in enumerate(reachable_valdocs):
             log.progress(float(i)/len(docindex.root), val_doc.canonical_name)
             assign_canonical_names(val_doc, val_doc.canonical_name, docindex)
         log.end_progress()
@@ -153,7 +149,7 @@ class DocBuilder:
 
         # Initialize the groups & sortedvars attributes.
         log.start_progress('Sorting & Grouping')
-        for i, val_doc in enumerate(docindex.reachable_valdocs()):
+        for i, val_doc in enumerate(reachable_valdocs):
             if isinstance(val_doc, NamespaceDoc):
                 percent = float(i)/len(reachable_valdocs)
                 log.progress(percent, val_doc.canonical_name)
