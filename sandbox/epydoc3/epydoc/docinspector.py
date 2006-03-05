@@ -34,6 +34,12 @@ from sets import Set
 from epydoc import log
 # Helper functions:
 from epydoc.util import is_package_dir, decode_with_backslashreplace
+# Builtin values
+import __builtin__
+
+######################################################################
+## Caches
+######################################################################
 
 _valuedoc_cache = {}
 """A cache containing the API documentation for values that we've
@@ -48,6 +54,10 @@ in L{_inspected_values}."""
 _inspected_values = {}
 """A record which values we've inspected, encoded as a dictionary from
 pyid to C{bool}."""
+
+######################################################################
+## Inspection
+######################################################################
 
 # [xx] old:
 """
@@ -509,7 +519,7 @@ def verify_name(value, dotted_name):
     able to find it with the name we constructed.
     """
     if dotted_name == UNKNOWN: return UNKNOWN
-    if len(dotted_name) == 1 and dotted_name[0] in __builtins__:
+    if len(dotted_name) == 1 and hasattr(__builtin__, dotted_name[0]):
         return dotted_name
     named_value = sys.modules.get(dotted_name[0])
     if named_value is None: return UNKNOWN
@@ -664,17 +674,33 @@ def get_value_from_filename(filename, context=None):
     finally:
         sys.path = old_sys_path
 
-def get_value_from_name(name):
+def get_value_from_name(name, globs=None):
     """
     Given a name, return the corresponding value.
+    
+    @param globals: A namespace to check for the value, if there is no
+        module containing the named value.  Defaults to __builtin__.
     """
     name = DottedName(name)
-    module = _import(name[0])
+
+    # Import the topmost module/package.  If we fail, then check if
+    # the requested name refers to a builtin.
+    try:
+        module = _import(name[0])
+    except ImportError:
+        if globs is None: globs = __builtin__.__dict__
+        if name[0] in globs:
+            try: return _lookup(globs[name[0]], name[1:])
+            except: raise
+        else:
+            raise
+
+    # Find the requested value in the module/package or its submodules.
     for i in range(1, len(name)):
-        try: return _lookup(module, DottedName(*name[i:]))
+        try: return _lookup(module, name[i:])
         except ImportError: pass
         module = _import('.'.join(name[:i+1]))
-        module = _lookup(module, DottedName(*name[1:i+1]))
+        module = _lookup(module, name[1:i+1])
     return module
 
 def _lookup(module, name):
@@ -698,10 +724,7 @@ def _import(name):
     # explicitly store sys.path.
     old_sys = sys.__dict__.copy()
     old_sys_path = sys.path[:]
-    if type(__builtins__) == types.DictionaryType:
-        old_builtins = __builtins__.copy()
-    else:
-        old_builtins = __builtins__.__dict__.copy()
+    old_builtins = __builtin__.__dict__.copy()
 
     # Supress input and output.  (These get restored when we restore
     # sys to old_sys).  
@@ -728,12 +751,8 @@ def _import(name):
             raise ImportError('Could not import %s' % name)
     finally:
         # Restore the important values that we saved.
-        if type(__builtins__) == types.DictionaryType:
-            __builtins__.clear()
-            __builtins__.update(old_builtins)
-        else:
-            __builtins__.__dict__.clear()
-            __builtins__.__dict__.update(old_builtins)
+        __builtin__.__dict__.clear()
+        __builtin__.__dict__.update(old_builtins)
         sys.__dict__.clear()
         sys.__dict__.update(old_sys)
         sys.path = old_sys_path
