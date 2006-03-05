@@ -36,14 +36,22 @@ import os, os.path
 import codecs
 # API documentation encoding:
 from epydoc.apidoc import *
-
-from epydoc.util import * # [xx] hmm
-
-class ParseError(Exception): pass
+# For looking up the docs of builtins:
+import __builtin__
+from epydoc.docinspector import inspect_docs
+# Misc utility functions:
+from epydoc.util import *
 
 ######################################################################
 ## Doc Parser
 ######################################################################
+
+class ParseError(Exception):
+    """
+    An exception that is used to signify that C{docparser} encountered
+    syntactically invalid Python code while processing a Python source
+    file.
+    """
 
 _moduledoc_cache = {}
 """A cache of C{ModuleDoc}s that we've already created.
@@ -1577,8 +1585,6 @@ def lookup_name(identifier, parent_docs):
             return parent_docs[0].variables[identifier]
 
     # Builtins
-    import __builtin__
-    from epydoc.docinspector import inspect_docs
     builtins = inspect_docs(__builtin__)
     if isinstance(builtins, NamespaceDoc):
         if builtins.variables.has_key(identifier):
