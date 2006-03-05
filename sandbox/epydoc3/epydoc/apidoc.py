@@ -1258,10 +1258,19 @@ class DocIndex:
     # etc
     #////////////////////////////////////////////////////////////
 
-    def contained_valdocs(self):
-        return contained_valdocs(*self.root)
-    def reachable_valdocs(self):
-        return reachable_valdocs(*self.root)
+    def contained_valdocs(self, sorted_by_name=False):
+        if sorted_by_name:
+            return sorted(contained_valdocs(*self.root),
+                          key=lambda doc:doc.canonical_name)
+        else:
+            return contained_valdocs(*self.root)
+        
+    def reachable_valdocs(self, sorted_by_name=False):
+        if sorted_by_name:
+            return sorted(reachable_valdocs(*self.root),
+                          key=lambda doc:doc.canonical_name)
+        else:
+            return reachable_valdocs(*self.root)
 
     def container(self, api_doc):
         """
