@@ -15,7 +15,7 @@ Parse the docstrings of APIDoc objects.
 ## Imports
 ######################################################################
 
-import logging, re, sys, string
+import logging, re, sys
 from epydoc import markup
 from epydoc.apidoc import *
 from epydoc.docinspector import inspect_docstring_lineno
@@ -283,7 +283,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
         # Combine line number fields for dup messages:
         messages = {} # maps message -> list of linenum
         for error in parse_errors:
-            error.set_linenum_offset(startline+1)
+            error.set_linenum_offset(startline)
             message = error.descr()
             messages.setdefault(message, []).append(error.linenum())
         message_items = messages.items()
@@ -581,7 +581,7 @@ def unindent_docstring(docstring):
     # Find minimum indentation of any non-blank lines after first line.
     margin = sys.maxint
     for line in lines[1:]:
-        content = len(string.lstrip(line))
+        content = len(line.strip())
         if content:
             indent = len(line) - content
             margin = min(margin, indent)
@@ -590,12 +590,12 @@ def unindent_docstring(docstring):
         lines[0] = lines[0].lstrip()
     if margin < sys.maxint:
         for i in range(1, len(lines)): lines[i] = lines[i][margin:]
-    # Remove any trailing or leading blank lines.
+    # Remove any trailing (but not leading!) blank lines.
     while lines and not lines[-1]:
         lines.pop()
-    while lines and not lines[0]:
-        lines.pop(0)
-    return string.join(lines, '\n')
+    #while lines and not lines[0]:
+    #    lines.pop(0)
+    return '\n'.join(lines)
                            
 #////////////////////////////////////////////////////////////
 # Function signature extraction.
