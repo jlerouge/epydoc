@@ -453,13 +453,9 @@ class HTMLWriter:
                 names = self._failed_xrefs[identifier].keys()
                 names.sort()
                 estr += '- %s' % identifier
-                if (len(names)==1 and len(identifier)+
-                    len(str(names[0]))+14 < 70):
-                    estr += ' (from %s)\n' % names[0]
-                else:
-                    estr += '\n'
-                    for name in names:
-                        estr += '      (from %s)\n' % name
+                estr += '\n'
+                for name in names:
+                    estr += '      (from %s)\n' % name
             log.docstring_warning(estr)
 
     def _write(self, write_func, directory, filename, *args):
@@ -1565,7 +1561,7 @@ class HTMLWriter:
 
     write_function_summary_line = compile_template(
         """
-        write_variable_summary_line(self, out, var_doc, tr_class, summary)
+        write_function_summary_line(self, out, var_doc, tr_class, summary)
 
         Generate HTML code for a single line of a summary table,
         describing a variable whose value is a function, and write
@@ -1702,6 +1698,7 @@ class HTMLWriter:
           <h3>$self.function_signature(var_doc)$
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
+        >>> #endif
           </h3>
           </td><td align="right" valign="top"
             >$self.pysrc_link(func_doc)$&nbsp;</span></td>
