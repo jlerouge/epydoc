@@ -287,6 +287,7 @@ def cli():
         else:
             main(options, names)
     except KeyboardInterrupt:
+        print '\n\n'
         print >>sys.stderr, 'Keyboard interrupt.'
     except:
         if options.debug: raise
