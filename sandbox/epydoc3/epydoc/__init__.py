@@ -18,36 +18,37 @@ to document, and produce API documentation using the following steps:
      that are related to them (such as the values defined by a module).
      This can be done via inspection, parsing, or both:
   
-     1.1 Use inspection to examine the objects directly.
-     
-     1.2. Parse the Python source files that define the objects,
-          and extract information from those files.
+       1.1. Use inspection to examine the objects directly.
+   
+       1.2. Parse the Python source files that define the objects,
+            and extract information from those files.
 
   2. Combine and process that information.
 
-    2.1. Merge the information obtained from inspection & parsing each
-         object into a single structure.  (This step is skipped if
-         information was extracted from only inspection or only parsing.)
+       2.1. Merge the information obtained from inspection & parsing
+            each object into a single structure.  (This step is
+            skipped if information was extracted from only inspection
+            or only parsing.)
 
-    2.2. Replace any 'pointers' that were created for imported
-         variables with the documentation that they point to (if it's
-         available).
+       2.2. Replace any 'pointers' that were created for imported
+            variables with the documentation that they point to (if
+            it's available).
 
-    2.3. Assign unique 'canonical names' to each of the specified
-         objects, and any related objects.
+       2.3. Assign unique 'canonical names' to each of the specified
+            objects, and any related objects.
 
-    2.4. Parse the docstrings of each of the specified objects, and
-         any related objects.
+       2.4. Parse the docstrings of each of the specified objects, and
+            any related objects.
 
-    2.5. Add variables to classes for any values that they inherit
-         from their base classes.
+       2.5. Add variables to classes for any values that they inherit
+            from their base classes.
 
   3. Generate output.  Output can be generated in a variety of
      formats:
 
-     3.1. An HTML webpage
+        3.1. An HTML webpage
 
-     3.2. other formats (under construction)
+        3.2. other formats (under construction)
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1+, or Python 2.0 with
@@ -57,16 +58,16 @@ to document, and produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo: Consider other names for C{@undocumented}:
-    C{@bypass}, C{@nodoc}, C{@exclude}, C{@omit}?
-
-@todo 3.0: Support encodings.
-@todo 3.0: Create a better default top_page than trees.html.
-@todo 3.0: Add the man-page style outputter. (epyman)
-@todo 3.0: Docstring inheritance for overridden properties.
-@todo 3.0: Optimize epytext
-    - Use classes instead of minidom nodes?
-@todo 3.0: Rewrite C{epydoc.uid.findUID} to be more robust.
+@todo: Create a better default top_page than trees.html.
+@todo: Fix trees.html to work when documenting non-top-level
+       modules/packages
+@todo: Implement lots more of _inherit_info()
+@todo: Implement @include
+@todo: Optimize epytext
+@todo: More doctests
+@todo: When inspecting, limit how much inspection you do (eg,
+       don't construct docs for imported modules' vars if it's
+       not necessary)
 
 @license: IBM Open Source License
 @copyright: (C) 2003 Edward Loper
@@ -75,9 +76,9 @@ to document, and produce API documentation using the following steps:
 @contributor: U{Glyph Lefkowitz <mailto:glyph@twistedmatrix.com>}
 @contributor: U{Edward Loper <mailto:edloper@gradient.cis.upenn.edu>}
 @contributor: U{Bruce Mitchener <mailto:bruce@cubik.org>}
+@contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
 @contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
 @contributor: U{Christian Reis <mailto:kiko@async.com.br>}
-@contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
 
 @var __license__: The license governing the use and distribution of
     epydoc.
