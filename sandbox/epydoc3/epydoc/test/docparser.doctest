@@ -1,23 +1,14 @@
                    Regression Testing for epydoc.docparser
                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-DocParser is a processing class that extracts API documentation by
+The `epydoc.docparser` module is used to extract API documentation by
 parsing the source code of Python files.  Its primary interface is
-`parse()`, which takes a module's filename, and returns a ModuleDoc
-describing that module and its contents.
-
-In order to properly link the parsed documentation with the docs for
-builtin objects, the DocParser constructor requires a ModuleDoc
-describing the builtin objects:
-
-    >>> from epydoc.docparser import DocParser
-    >>> from epydoc.docinspector import DocInspector
-    >>> builtins_doc = DocInspector().inspect(__builtins__)
-    >>> doc_parser = DocParser(builtins_doc)
+`parse_docs()`, which takes a module's filename, and returns a
+ModuleDoc describing that module and its contents.
 
 Test Function
 =============
 This test function takes a string containing the contents of a module,
-and writes it to a file, uses a DocParser to parse it, and pretty
+and writes it to a file, uses `parse_docs` to parse it, and pretty
 prints the resulting ModuleDoc object.  The `attribs` argument
 specifies which attributes of the `APIDoc`s should be displayed.  The
 `show` argument, if specifies, gives the name of the object in the
@@ -26,16 +17,15 @@ inspected; this just selects what to display).
 
     >>> import tempfile, re, os, os.path, textwrap
     >>> from epydoc.apidoc import ClassDoc
-    >>> def runparser(s, attribs='', doc_parser=None, show=None):
-    ...     if doc_parser is None:
-    ...         doc_parser = DocParser(builtins_doc)
+    >>> from epydoc.docparser import parse_docs
+    >>> def runparser(s, attribs='', show=None):
     ...     # Write it to a temp file.
     ...     tmp_dir = tempfile.mkdtemp()
     ...     out = open(os.path.join(tmp_dir, 'test.py'), 'w')
     ...     out.write(textwrap.dedent(s))
     ...     out.close()
     ...     # Parse it.
-    ...     val_doc = doc_parser.parse(out.name)
+    ...     val_doc = parse_docs(out.name)
     ...     if show is not None:
     ...         for name in show.split('.'):
     ...             if isinstance(val_doc, ClassDoc):
@@ -300,15 +290,14 @@ By default, DocParse does not look inside the following block types:
      +- variables = {}
 
 The set of blocks that DocParser looks inside are controlled by a set
-of class variables.  To change the behavior, either subclass
-DocParser, or override the class variables with instance variables.
-For example, the following code creates a DocParser that does look
-inside for blocks and while blocks:
+of global variables in `epydoc.docparser`.  For example, the following
+code creates a DocParser that does look inside for blocks and while
+blocks:
 
-    >>> modified_parser = DocParser(builtins_doc)
-    >>> modified_parser.PARSE_FOR_BLOCKS = True
-    >>> modified_parser.PARSE_WHILE_BLOCKS = True
-    >>> runparser(doc_parser=modified_parser, s="""
+    >>> import epydoc.docparser
+    >>> epydoc.docparser.PARSE_FOR_BLOCKS = True
+    >>> epydoc.docparser.PARSE_WHILE_BLOCKS = True
+    >>> runparser(s="""
     ...     for itervar in [5]*3:
     ...         for_gated = 'x'""",
     ...     attribs="variables name")
@@ -319,7 +308,7 @@ inside for blocks and while blocks:
         +- itervar => VariableDoc for test.itervar [2]
            +- name = u'itervar'
     
-    >>> runparser(doc_parser=modified_parser, s="""
+    >>> runparser(s="""
     ...     while condition:
     ...         while_gated = 'x'""",
     ...     attribs="variables name")
@@ -327,6 +316,9 @@ inside for blocks and while blocks:
      +- variables
         +- while_gated => VariableDoc for test.while_gated [1]
            +- name = u'while_gated'
+
+    >>> # reset the globals:
+    >>> reload(epydoc.docparser) and None
 
 Note that when DocParser examines a for block, it also creates a
 VariableDoc for the loop variable (itervar in this case).
