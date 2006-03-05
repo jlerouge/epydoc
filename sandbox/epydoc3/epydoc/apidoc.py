@@ -62,7 +62,8 @@ class DottedName:
         'api_doc'
     """
     UNREACHABLE = "??"
-    _IDENTIFIER_RE = re.compile(r"[a-zA-Z_]\w*'?(\.[a-zA-Z_]\w*'?)*$" + "|" +
+    _IDENTIFIER_RE = re.compile(r"[a-zA-Z_]\w*(-script)?'?"
+                                r"(\.[a-zA-Z_]\w*'?)*$" + "|" +
                                 re.escape(UNREACHABLE)+
                                 r"(\.[a-zA-Z_]\w*'?)*(-\d+)?$")
     

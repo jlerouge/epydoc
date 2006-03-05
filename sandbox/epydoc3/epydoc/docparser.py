@@ -174,7 +174,7 @@ docstrings for variables."""
 # Top level: Module parsing
 #/////////////////////////////////////////////////////////////////
 
-def parse_docs(filename=None, name=None, context=None):
+def parse_docs(filename=None, name=None, context=None, is_script=False):
     """
     Generate the API documentation for a specified object by
     parsing Python source files, and return it as a L{ValueDoc}.
@@ -215,15 +215,16 @@ def parse_docs(filename=None, name=None, context=None):
     # and use process_file() to populate its attributes.
     elif filename is not None and name is None:
         # Use a python source version, if possible.
-        try: filename = py_src_filename(filename)
-        except ValueError, e: raise ImportError('%s' % e)
+        if not is_script:
+            try: filename = py_src_filename(filename)
+            except ValueError, e: raise ImportError('%s' % e)
 
         # Check the cache, first.
         if _moduledoc_cache.has_key(filename):
             return _moduledoc_cache[filename]
         
         log.info("Parsing %s" % filename)
-            
+
         # If the context wasn't provided, then check if the file is in
         # a package directory.  If so, then update basedir & name to
         # contain the topmost package's directory and the fully
@@ -231,7 +232,7 @@ def parse_docs(filename=None, name=None, context=None):
         # default value of __path__ for the parent packages; if the
         # parent packages override their __path__s, then this can
         # cause us not to find the value.)
-        if context is None:
+        if context is None and not is_script:
             basedir = os.path.split(filename)[0]
             name = os.path.splitext(os.path.split(filename)[1])[0]
             if name == '__init__':
@@ -240,6 +241,9 @@ def parse_docs(filename=None, name=None, context=None):
 
         # Figure out the canonical name of the module we're parsing.
         module_name, is_pkg = _get_module_name(filename, context)
+
+        # Mark scripts
+        if is_script: module_name = DottedName(str(module_name)+'-script')
 
         # Create a new ModuleDoc for the module, & add it to the cache.
         module_doc = ModuleDoc(canonical_name=module_name, variables={},
@@ -412,7 +416,9 @@ def _find_in_namespace(name, namespace_doc):
     
 def _get_filename(identifier, path=None):
     if path == UNKNOWN: path = None
-    file, filename, (s,m,typ) = imp.find_module(identifier, path)
+    try: file, filename, (s,m,typ) = imp.find_module(identifier, path)
+    except ImportError:
+        raise ImportError, 'No Python source file found.'
     try: file.close()
     except: pass
 

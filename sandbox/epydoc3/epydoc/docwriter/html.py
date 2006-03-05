@@ -2463,7 +2463,10 @@ class HTMLWriter:
         # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
             if obj not in self.contained_valdocs: return None
-            return urllib.quote('%s'%obj.canonical_name) + '-module.html'
+            if obj.canonical_name[-1].endswith('-script'):
+                return urllib.quote('%s'%obj.canonical_name) + '.html'
+            else:
+                return urllib.quote('%s'%obj.canonical_name) + '-module.html'
         # Class: <canonical_name>-class.html
         elif isinstance(obj, ClassDoc):
             if obj not in self.contained_valdocs: return None
@@ -2520,7 +2523,7 @@ class HTMLWriter:
                 return pysrc_link(api_doc.value)
         elif isinstance(api_doc, ModuleDoc):
             if api_doc.filename not in (None, UNKNOWN):
-                return ('%s-module-pysrc.html' %
+                return ('%s-pysrc.html' %
                        urllib.quote('%s' % api_doc.canonical_name))
         else:
             module = self.docindex.module_that_defines(api_doc)
@@ -2529,7 +2532,7 @@ class HTMLWriter:
             if module_pysrc_url is not None:
                 mname_len = len(module.canonical_name)
                 anchor = DottedName(*api_doc.canonical_name[mname_len:])
-                return ('%s-module-pysrc.html#%s' % 
+                return ('%s-pysrc.html#%s' % 
                         (urllib.quote('%s' % module.canonical_name),
                          urllib.quote('%s' % anchor)))
         # We didn't find it:

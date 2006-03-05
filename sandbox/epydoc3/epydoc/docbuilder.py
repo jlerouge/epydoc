@@ -66,7 +66,7 @@ perform individual steps in the creation of the documentation.
 ## Imports
 ######################################################################
 
-import sys, os, os.path, __builtin__
+import sys, os, os.path, __builtin__, imp
 from epydoc.apidoc import *
 from epydoc.docinspector import inspect_docs
 from epydoc.docparser import parse_docs, ParseError
@@ -228,15 +228,14 @@ def _get_docs_from_items(items, inspect, parse):
             elif is_package_dir(item):
                 doc_pairs += _get_docs_from_package_dir(
                     item, inspect, parse, progress_estimator)
-            # [xx] add a case for is_py_script.
-
-            ## builtins:
+            elif os.path.isfile(item):
+                doc_pairs.append(_get_docs_from_pyscript(
+                    item, inspect, parse, progress_estimator))
             elif hasattr(__builtin__, item):
                 val = getattr(__builtin__, item)
                 doc_pairs.append(_get_docs_from_pyobject(
                     val, inspect, parse, progress_estimator))
             elif is_pyname(item):
-                # what about builtins here..?
                 doc_pairs.append(_get_docs_from_pyname(
                     item, inspect, parse, progress_estimator))
             elif os.path.isdir(item):
@@ -257,6 +256,10 @@ def _get_docs_from_pyobject(obj, inspect, parse, progress_estimator):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), `obj`)
     
+    if not inspect:
+        log.error("Cannot get docs for Python objects without "
+                  "inspecting them.")
+            
     inspect_doc = parse_doc = None
     if inspect:
         try:
@@ -264,7 +267,10 @@ def _get_docs_from_pyobject(obj, inspect, parse, progress_estimator):
         except ImportError, e:
             log.error(e)
     if parse:
-        pass # [xx] do something for parse??
+        if inspect_doc.canonical_name is not None:
+            _, parse_docs = _get_docs_from_pyname(
+                str(inspect_doc.canonical_name), False, True,
+                progress_estimator)
     return (inspect_doc, parse_doc)
 
 def _get_docs_from_pyname(name, inspect, parse, progress_estimator):
@@ -272,20 +278,47 @@ def _get_docs_from_pyname(name, inspect, parse, progress_estimator):
     log.progress(progress_estimator.progress(), name)
     
     inspect_doc = parse_doc = None
+    if inspect:
+        try:
+            inspect_doc = inspect_docs(name=name)
+        except ImportError, e:
+            log.error(e)
     if parse:
         try:
             parse_doc = parse_docs(name=name)
         except ParseError, e:
             log.error(e)
         except ImportError, e:
-            log.error('While parsing %s: %s' % (name, e))
-    if inspect:
-        try:
-            inspect_doc = inspect_docs(name=name)
-        except ImportError, e:
-            log.error(e)
+            if inspect_doc is None:
+                log.error('Could not parse %s: %s' % (name, e))
+            else:
+                log.warning('Could not parse %s: %s\n' % (name, e) +
+                            'Using inspected documentation only.')
     return (inspect_doc, parse_doc)
 
+def _get_docs_from_pyscript(filename, inspect, parse, progress_estimator):
+    # [xx] I should be careful about what names I allow as filenames,
+    # and maybe do some munging to prevent problems.
+
+    inspect_doc = parse_doc = None
+    if inspect:
+        try:
+            inspect_doc = inspect_docs(filename=filename, is_script=True)
+        except ImportError, e:
+            log.error(e)
+    if parse:
+        try:
+            parse_doc = parse_docs(filename=filename, is_script=True)
+        except ParseError, e:
+            log.error(e)
+        except ImportError, e:
+            if inspect_doc is None:
+                log.error('Could not parse %s: %s' % (filename, e))
+            else:
+                log.warning('Could not parse %s: %s\n' % (filename, e) +
+                            'Using inspected documentation only.')
+    return (inspect_doc, parse_doc)
+    
 def _get_docs_from_module_file(filename, inspect, parse, progress_estimator,
                                parent_docs=(None,None)):
     """
@@ -332,7 +365,11 @@ def _get_docs_from_module_file(filename, inspect, parse, progress_estimator,
         except ParseError, e:
             log.error(e)
         except ImportError, e:
-            log.error('While parsing %s: %s' % (filename, e))
+            if inspect_doc is None:
+                log.error('Could not parse %s: %s' % (filename, e))
+            else:
+                log.warning('Could not parse %s: %s\n' % (filename, e) +
+                            'Using inspected documentation only.')
     return (inspect_doc, parse_doc)
 
 def _get_docs_from_package_dir(package_dir, inspect, parse,

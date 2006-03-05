@@ -23,7 +23,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import inspect, re, sys, os.path
+import inspect, re, sys, os.path, imp
 # API documentation encoding:
 from epydoc.apidoc import *
 # Type comparisons:
@@ -94,7 +94,8 @@ several different ways:
     return that method for values of the new type.
 """
 
-def inspect_docs(value=None, name=None, filename=None, context=None):
+def inspect_docs(value=None, name=None, filename=None, context=None,
+                 is_script=False):
     """
     Generate the API documentation for a specified object by
     inspecting Python values, and return it as a L{ValueDoc}.  The
@@ -119,7 +120,10 @@ def inspect_docs(value=None, name=None, filename=None, context=None):
     if value is None and name is not None and filename is None:
         value = get_value_from_name(DottedName(name))
     elif value is None and name is None and filename is not None:
-        value = get_value_from_filename(filename, context)
+        if is_script:
+            value = get_value_from_scriptname(filename)
+        else:
+            value = get_value_from_filename(filename, context)
     elif name is None and filename is None:
         # it's ok if value is None -- that's a value, after all.
         pass 
@@ -148,7 +152,7 @@ def inspect_docs(value=None, name=None, filename=None, context=None):
 
     # Set canonical name, if it was given
     if val_doc.canonical_name == UNKNOWN and name is not None:
-        val_doc.canonical_name = name
+        val_doc.canonical_name = DottedName(name)
 
     # If we were given a filename, but didn't manage to get a
     # canonical name, then the module defined by the given file
@@ -674,6 +678,10 @@ def get_value_from_filename(filename, context=None):
     finally:
         sys.path = old_sys_path
 
+def get_value_from_scriptname(filename):
+    name = '%s-script' % os.path.split(filename)[1]
+    return _import(name, filename)
+
 def get_value_from_name(name, globs=None):
     """
     Given a name, return the corresponding value.
@@ -713,7 +721,7 @@ def _lookup(module, name):
             raise ImportError(exc_msg)
     return val
             
-def _import(name):
+def _import(name, filename=None):
     """
     Run the given callable in a 'sandboxed' environment.
     Currently, this includes saving and restoring the contents of
@@ -736,7 +744,11 @@ def _import(name):
 
     try:
         try:
-            return __import__(name)
+            if filename is None:
+                return __import__(name)
+            else:
+                # For importing scripts:
+                return imp.load_source(name, filename)
         except KeyboardInterrupt:
             raise # don't capture keyboard interrupts!
         except Exception, e:
