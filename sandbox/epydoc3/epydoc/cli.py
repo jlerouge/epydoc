@@ -50,7 +50,7 @@ Verbosity levels::
 import sys, os, time
 from optparse import OptionParser, OptionGroup
 import epydoc
-from epydoc.docbuilder import DocBuilder
+from epydoc.docbuilder import build_doc_index
 from epydoc.docwriter.html import HTMLWriter
 from epydoc import log
 from epydoc.util import wordwrap
@@ -248,8 +248,7 @@ def main(options, names):
             return log.error(e)
 
     # Build docs for the named values.
-    docbuilder = DocBuilder(inspect=options.inspect, parse=options.parse)
-    docindex = docbuilder.build_doc_index(*names)
+    docindex = build_doc_index(names, options.inspect, options.parse)
 
     # Perform the specified action.
     if options.action == 'html':
