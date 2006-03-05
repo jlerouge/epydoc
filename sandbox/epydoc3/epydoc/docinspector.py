@@ -335,30 +335,22 @@ def inspect_class(cls):
 # Routine Inspection
 #////////////////////////////////////////////////////////////
 
-def inspect_classmethod(cm):
-    """Add API documentation information about the class method
-    C{cm} to C{routine_doc} (specializing it to
-    C{ClassMethodDoc})."""
-    # Extract the underlying function from the class method.
-    routine_doc = inspect_routine(cm.__get__(0).im_func)
-    routine_doc.specialize_to(ClassMethodDoc)
-    return routine_doc
-
-def inspect_staticmethod(sm):
-    """Add API documentation information about the static method
-    C{sm} to C{routine_doc} (specializing it to
-    C{StaticMethodDoc})."""
-    # Extract the underlying function from the static method.
-    routine_doc = inspect_routine(sm.__get__(0))
-    routine_doc.specialize_to(StaticMethodDoc)
-    return routine_doc
-
-def inspect_routine(func):
+def inspect_routine(routine):
     """Add API documentation information about the function
-    C{func} to C{routine_doc} (specializing it to C{Routine_doc})."""
+    C{routine} to C{routine_doc} (specializing it to C{Routine_doc})."""
     # Create the RoutineDoc.
-    routine_doc = RoutineDoc(pyval=func, repr=value_repr(func),
-                             canonical_name = get_canonical_name(func))
+    routine_doc = RoutineDoc(pyval=routine, repr=value_repr(routine),
+                             canonical_name = get_canonical_name(routine))
+
+    # Extract the underying function
+    if isinstance(routine, MethodType):
+        func = routine.im_func
+    elif isinstance(routine, staticmethod):
+        func = routine.__get__(0)
+    elif isinstance(routine, classmethod):
+        func = routine.__get__(0).im_func
+    else:
+        func = routine
 
     # Record the function's docstring.
     routine_doc.docstring = get_docstring(func)
@@ -380,6 +372,11 @@ def inspect_routine(func):
                 default_val = inspect_docs(defaults[i])
                 routine_doc.posarg_defaults[i+offset] = default_val
 
+        # If it's a bound method, then strip off the first argument.
+        if isinstance(routine, MethodType) and routine.im_self is not None:
+            routine_doc.posargs = routine_doc.posargs[1:]
+            routine_doc.posarg_defaults = routine_doc.posarg_defaults[1:]
+
     else:
         # [XX] I should probably use UNKNOWN here??
         routine_doc.posargs = ['...']
@@ -387,6 +384,12 @@ def inspect_routine(func):
         routine_doc.kwarg = None
         routine_doc.vararg = None
 
+    # Change type, if appropriate.
+    if isinstance(routine, staticmethod):
+        routine_doc.specialize_to(StaticMethodDoc)
+    if isinstance(routine, classmethod):
+        routine_doc.specialize_to(ClassMethodDoc)
+        
     return routine_doc
 
 #////////////////////////////////////////////////////////////
@@ -601,9 +604,7 @@ def is_classmethod(v): return isinstance(v, classmethod)
 def is_staticmethod(v): return isinstance(v, staticmethod)
 def is_property(v): return isinstance(v, property)
 register_inspector(inspect.ismodule, inspect_module, priority=20)
-register_inspector(inspect.isclass, inspect_class, priority=22)
-register_inspector(is_classmethod, inspect_classmethod, priority=24)
-register_inspector(is_staticmethod, inspect_staticmethod, priority=26)
+register_inspector(inspect.isclass, inspect_class, priority=24)
 register_inspector(inspect.isroutine, inspect_routine, priority=28)
 register_inspector(is_property, inspect_property, priority=30)
 
