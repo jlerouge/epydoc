@@ -669,17 +669,17 @@ def get_value_from_name(name):
     Given a name, return the corresponding value.
     """
     name = DottedName(name)
-
-    # Import the module containing `name`.
-    for i in range(len(name)):
+    module = _import(name[0])
+    for i in range(1, len(name)):
+        try: return _lookup(module, DottedName(*name[i:]))
+        except ImportError: pass
         module = _import('.'.join(name[:i+1]))
-        if (hasattr(module, name[i]) and
-            not isinstance(getattr(module, name[i]), ModuleType)):
-            break
+        module = _lookup(module, DottedName(*name[1:i+1]))
+    return module
 
-    # Look up `name` in the module
+def _lookup(module, name):
     val = module
-    for i, identifier in enumerate(name[1:]):
+    for i, identifier in enumerate(name):
         try: val = getattr(val, identifier)
         except AttributeError:
             exc_msg = ('Could not import %s:\nNo variable named %s in %s' %
