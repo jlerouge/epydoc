@@ -58,6 +58,7 @@ to document, and produce API documentation using the following steps:
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
+@todo: s/inspection/introspection/ ???
 @todo: Create a better default top_page than trees.html.
 @todo: Fix trees.html to work when documenting non-top-level
        modules/packages

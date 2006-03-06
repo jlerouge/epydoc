@@ -19,6 +19,7 @@ import sys, sre_parse, sre, re, codecs
 import sre_constants
 from epydoc import log
 from epydoc.util import decode_with_backslashreplace, plaintext_to_html
+from epydoc.util import py_src_filename
 
 ######################################################################
 ## Regular expression colorizer
@@ -576,6 +577,10 @@ class PythonSourceColorizer:
             be used to create links back into the API source
             documentation.
         """
+        # Get the source version, if possible.
+        try: module_filename = py_src_filename(module_filename)
+        except: pass
+        
         #: The filename of the module we're colorizing.
         self.module_filename = module_filename
         

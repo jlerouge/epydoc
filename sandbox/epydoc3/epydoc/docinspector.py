@@ -33,7 +33,7 @@ from sets import Set
 # Error reporting:
 from epydoc import log
 # Helper functions:
-from epydoc.util import is_package_dir, decode_with_backslashreplace
+from epydoc.util import *
 # Builtin values
 import __builtin__
 
@@ -159,6 +159,9 @@ def inspect_docs(value=None, name=None, filename=None, context=None,
     # must be shadowed by a variable in its parent package(s).
     # E.g., this happens with `curses.wrapper`.  Add a "'" to
     # the end of the name to distinguish it from the variable.
+    if is_script and filename is not None:
+        val_doc.canonical_name = DottedName(munge_script_name(str(filename)))
+        
     if val_doc.canonical_name == UNKNOWN and filename is not None:
         shadowed_name = DottedName(value.__name__)
         log.warning("Module %s is shadowed by a variable with "
@@ -679,7 +682,7 @@ def get_value_from_filename(filename, context=None):
         sys.path = old_sys_path
 
 def get_value_from_scriptname(filename):
-    name = '%s-script' % os.path.split(filename)[1]
+    name = munge_script_name(filename)
     return _import(name, filename)
 
 def get_value_from_name(name, globs=None):

@@ -28,7 +28,7 @@ def is_module_file(path):
     (dir, filename) = os.path.split(path)
     (basename, extension) = os.path.splitext(filename)
     return (os.path.isfile(path) and
-            re.match('\w+$', basename) and
+            re.match('[a-zA-Z_]\w*$', basename) and
             extension in PY_SRC_EXTENSIONS+PY_BIN_EXTENSIONS)
     
 def is_package_dir(dirname):
@@ -68,6 +68,11 @@ def py_src_filename(filename):
         else:
             raise ValueError('Could not find a corresponding '
                              'Python source file.')
+
+def munge_script_name(filename):
+    name = os.path.split(filename)[1]
+    name = re.sub(r'\W', '_', name)
+    return 'script-'+name
 
 ######################################################################
 ## Backwards compatibility

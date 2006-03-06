@@ -243,7 +243,8 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
         module_name, is_pkg = _get_module_name(filename, context)
 
         # Mark scripts
-        if is_script: module_name = DottedName(str(module_name)+'-script')
+        if is_script:
+            module_name = DottedName(munge_script_name(str(module_name)))
 
         # Create a new ModuleDoc for the module, & add it to the cache.
         module_doc = ModuleDoc(canonical_name=module_name, variables={},

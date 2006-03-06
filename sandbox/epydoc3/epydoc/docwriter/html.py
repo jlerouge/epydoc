@@ -501,6 +501,9 @@ class HTMLWriter:
         # Write the name of the module we're describing.
         if doc.is_package is True: typ = 'Package'
         else: typ = 'Module'
+        if longname[0].startswith('script-'):
+            shortname = str(longname)[7:]
+            typ = 'Script'
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
         out('<h2 class="%s">%s %s' % (typ.lower(), typ, shortname))
@@ -1391,8 +1394,9 @@ class HTMLWriter:
         while True:
             container = self.docindex.container(doc)
             if container is None:
-                # Use canonical_name, if we can.
-                if doc.canonical_name is UNKNOWN:
+                if doc.canonical_name[0].startswith('script-'):
+                    return ['Script %s' % str(doc.canonical_name)[7:]]
+                elif doc.canonical_name is UNKNOWN:
                     return ['??']+crumbs
                 elif isinstance(doc, ModuleDoc):
                     return ['Package&nbsp;%s' % ident
@@ -2463,10 +2467,7 @@ class HTMLWriter:
         # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
             if obj not in self.contained_valdocs: return None
-            if obj.canonical_name[-1].endswith('-script'):
-                return urllib.quote('%s'%obj.canonical_name) + '.html'
-            else:
-                return urllib.quote('%s'%obj.canonical_name) + '-module.html'
+            return urllib.quote('%s'%obj.canonical_name) + '-module.html'
         # Class: <canonical_name>-class.html
         elif isinstance(obj, ClassDoc):
             if obj not in self.contained_valdocs: return None
@@ -2553,6 +2554,8 @@ class HTMLWriter:
                 label = str(target.name)
             elif isinstance(target, ValueDoc):
                 label = str(target.canonical_name)
+                if label.startswith('script-'):
+                    label = label[7:] + ' (script)'
             elif isinstance(target, DottedName):
                 label = str(target)
             else:
