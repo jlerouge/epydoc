@@ -1394,9 +1394,9 @@ class HTMLWriter:
         while True:
             container = self.docindex.container(doc)
             if container is None:
-                if doc.canonical_name[0].startswith('script-'):
-                    return ['Script %s' % str(doc.canonical_name)[7:]]
-                elif doc.canonical_name is UNKNOWN:
+                #if doc.canonical_name[0].startswith('script-'):
+                #    return ['Script %s' % str(doc.canonical_name)[7:]]+crumbs
+                if doc.canonical_name is UNKNOWN:
                     return ['??']+crumbs
                 elif isinstance(doc, ModuleDoc):
                     return ['Package&nbsp;%s' % ident
@@ -1410,6 +1410,9 @@ class HTMLWriter:
                 doc = container
         
     def _crumb(self, doc):
+        if (len(doc.canonical_name)==1 and
+            doc.canonical_name[0].startswith('script-')):
+            return 'Script&nbsp;%s' % doc.canonical_name[0][7:]
         return '%s&nbsp;%s' % (self.doc_kind(doc), doc.canonical_name[-1])
 
     #////////////////////////////////////////////////////////////
@@ -2636,6 +2639,9 @@ class HTMLWriter:
     def doc_kind(self, doc):
         if isinstance(doc, ModuleDoc) and doc.is_package:
             return 'Package'
+        elif (isinstance(doc, ModuleDoc) and
+              doc.canonical_name[0].startswith('script')):
+            return 'Script'
         elif isinstance(doc, ModuleDoc):
             return 'Module'
         elif isinstance(doc, ClassDoc):
