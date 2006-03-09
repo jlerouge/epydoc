@@ -562,7 +562,7 @@ def get_containing_module(value):
         return DottedName(value.im_self.__module__)
     elif inspect.ismethod(value):
         return DottedName(value.im_class.__module__)
-    elif inspect.isfunction(value):
+    elif inspect.isroutine(value):
         return DottedName(_find_function_module(value))
     else:
         return None
