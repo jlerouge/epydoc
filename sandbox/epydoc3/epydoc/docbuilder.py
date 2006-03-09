@@ -78,7 +78,7 @@ from epydoc.util import *
 ## 1. build_docs()
 ######################################################################
 
-def build_doc(item, inspect=True, parse=True):
+def build_doc(item, inspect=True, parse=True, add_submodules=True):
     """
     Build API documentation for a given item, and return it as
     an L{APIDoc} object.
@@ -99,10 +99,11 @@ def build_doc(item, inspect=True, parse=True):
     @param parse: If true, then use parsing to examine the specified
         items.  Otherwise, just use inspection.
     """
-    docindex = build_doc_index(item, inspect, parse)
+    docindex = build_doc_index(item, inspect, parse, add_submodules)
     return docindex.root[0]
 
-def build_doc_index(items, inspect=True, parse=True):
+def build_doc_index(items, inspect=True, parse=True,
+                    add_submodules=True):
     """
     Build API documentation for the given list of items, and
     return it in the form of a L{DocIndex}.
@@ -124,7 +125,7 @@ def build_doc_index(items, inspect=True, parse=True):
         items.  Otherwise, just use inspection.
     """
     # Get the basic docs for each item.
-    doc_pairs = _get_docs_from_items(items, inspect, parse)
+    doc_pairs = _get_docs_from_items(items, inspect, parse, add_submodules)
 
     # Merge the inspection & parse docs.
     if parse and inspect:
@@ -213,7 +214,7 @@ def _report_valdoc_progress(i, val_doc, val_docs):
 # Documentation Generation
 #/////////////////////////////////////////////////////////////////
 
-def _get_docs_from_items(items, inspect, parse):
+def _get_docs_from_items(items, inspect, parse, add_submodules):
     # Start the progress bar.
     log.start_progress('Building documentation')
     progress_estimator = _ProgressEstimator(items)
@@ -226,8 +227,13 @@ def _get_docs_from_items(items, inspect, parse):
                 doc_pairs.append(_get_docs_from_module_file(
                     item, inspect, parse, progress_estimator))
             elif is_package_dir(item):
-                doc_pairs += _get_docs_from_package_dir(
-                    item, inspect, parse, progress_estimator)
+                if add_submodules:
+                    doc_pairs += _get_docs_from_package_dir(
+                        item, inspect, parse, progress_estimator)
+                else:
+                    item = os.path.join(item, '__init__')
+                    doc_pairs.append(_get_docs_from_module_file(
+                        item, inspect, parse, progress_estimator))
             elif os.path.isfile(item):
                 doc_pairs.append(_get_docs_from_pyscript(
                     item, inspect, parse, progress_estimator))
