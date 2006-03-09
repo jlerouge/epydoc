@@ -52,9 +52,11 @@ from optparse import OptionParser, OptionGroup
 import epydoc
 from epydoc.docbuilder import build_doc_index
 from epydoc.docwriter.html import HTMLWriter
+from epydoc.docwriter.plaintext import PlaintextWriter
 from epydoc import log
 from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
+from epydoc import docstringparser
 
 ######################################################################
 ## Argument Parsing
@@ -72,6 +74,9 @@ def parse_arguments():
     action_group.add_option(                                # --html
         "--html", action="store_const", dest="action", const="html",
         help="Write HTML output.")
+    action_group.add_option(                                # --latex
+        "--text", action="store_const", dest="action", const="text",
+        help="Write plaintext output. (not implemented yet)")
     action_group.add_option(                                # --latex
         "--latex", action="store_const", dest="action", const="latex",
         help="Write LaTeX output. (not implemented yet)")
@@ -200,6 +205,8 @@ def parse_arguments():
     if not options.parse and not options.inspect:
         optparser.error("Invalid option combination: --parse-only "
                         "and --inspect-only.")
+    if options.action == 'text' and len(names) > 1:
+        optparser.error("--text option takes only one name.")
 
     # Calculate verbosity.
     options.verbosity = options.verbose - options.quiet
@@ -216,9 +223,16 @@ def parse_arguments():
 ######################################################################
 
 def main(options, names):
+    if options.action == 'text':
+        if options.parse and options.inspect:
+            options.parse = False
+    
     # Set up the logger
-    if options.verbosity > 1:
+    if options.action == 'text':
+        logger = None # no logger for text output.
+    elif options.verbosity > 1:
         logger = ConsoleLogger(options.verbosity)
+        log.register_logger(logger)
     else:
         # Each number is a rough approximation of how long we spend on
         # that task, used to divide up the unified progress bar.
@@ -235,7 +249,7 @@ def main(options, names):
         if options.inspect and not options.parse:
             del stages[1:3] # no merging or linking
         logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
-    log.register_logger(logger)
+        log.register_logger(logger)
 
     # create the output directory.
     if os.path.exists(options.target):
@@ -247,35 +261,45 @@ def main(options, names):
         except Exception, e:
             return log.error(e)
 
+    # Set the default docformat
+    docstringparser.DEFAULT_DOCFORMAT = options.docformat
+
     # Build docs for the named values.
-    docindex = build_doc_index(names, options.inspect, options.parse)
+    docindex = build_doc_index(names, options.inspect, options.parse,
+                               add_submodules=(options.action!='text'))
 
     # Perform the specified action.
     if options.action == 'html':
-        _html(docindex, options)
+        html_writer = HTMLWriter(docindex, **options.__dict__)
+        if options.verbose > 0:
+            log.start_progress('Writing HTML docs to %r' % options.target)
+        else:
+            log.start_progress('Writing HTML docs')
+            html_writer.write(options.target)
+            log.end_progress()
+    elif options.action == 'text':
+        # hmm
+        log.start_progress('Writing output')
+        plaintext_writer = PlaintextWriter()
+        s = ''
+        for apidoc in docindex.root:
+            s += plaintext_writer.write(apidoc)
+        log.end_progress()
+        print s
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
     # If we supressed docstring warnings, then let the user know.
-    if logger.supressed_docstring_warning:
+    if logger is not None and logger.supressed_docstring_warning:
         log.warning("%d markup error(s) were found while processing "
                     "docstrings.  Use the verbose switch (-v) to "
                     "display markup errors." %
                     logger.supressed_docstring_warning)
 
     # Basic timing breakdown:
-    if options.verbosity >= 2:
+    if options.verbosity >= 2 and logger is not None:
         logger.print_times()
 
-def _html(docindex, options):
-    html_writer = HTMLWriter(docindex, **options.__dict__)
-    if options.verbose > 0:
-        log.start_progress('Writing HTML docs to %r' % options.target)
-    else:
-        log.start_progress('Writing HTML docs')
-    html_writer.write(options.target)
-    log.end_progress()
-    
 def cli():
     # Parse command-line arguments.
     options, names = parse_arguments()
@@ -533,13 +557,11 @@ class ConsoleLogger(log.Logger):
     def start_progress(self, header=None):
         if self._progress is not None:
             raise ValueError
-        if self._progress_mode == 'hide':
-            return
-        if header:
-            print self._TERM_BOLD + header + self._TERM_NORM
         self._progress = None
         self._progress_start_time = time.time()
         self._progress_header = header
+        if self._progress_mode != 'hide' and header:
+            print self._TERM_BOLD + header + self._TERM_NORM
 
     def end_progress(self):
         self.progress(1.)
@@ -585,8 +607,8 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         if message: message = '%s: %s' % (self.task, message)
         ConsoleLogger.progress(self, p, message)
 
-    def start_progress(self, message=None):
-        self.task = message
+    def start_progress(self, header=None):
+        self.task = header
         if self.stage == 0:
             ConsoleLogger.start_progress(self)
         self.stage += 1
