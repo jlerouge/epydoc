@@ -10,7 +10,7 @@
 Classes for encoding API documentation about Python programs.
 
 These classes are used as a common representation for combining
-information derived from inspection and from parsing.
+information derived from introspection and from parsing.
 
 The API documentation for a Python program is encoded using a graph of
 L{APIDoc} objects, each of which encodes information about a single
@@ -202,7 +202,7 @@ class APIDoc(object):
     it easier to merge two C{APIDoc} objects that are documenting the
     same element (in particular, to merge information about an element
     that was derived from parsing with information that was derived
-    from inspection).
+    from introspection).
 
     For all attributes with boolean values, use only the constants
     C{True} and C{False} to designate true and false.  In particular,

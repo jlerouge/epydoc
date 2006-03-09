@@ -12,10 +12,10 @@ objects.  These data structures are created using a series of steps:
 
   1. B{Building docs}: Extract basic information about the objects,
      and objects that are related to them.  This can be done by
-     inspecting the objects' values (with L{epydoc.docinspector}; or
+     introspecting the objects' values (with L{epydoc.docintrospecter}; or
      by parsing their source code (with L{epydoc.docparser}.
 
-  2. B{Merging}: Combine the information obtained from inspection &
+  2. B{Merging}: Combine the information obtained from introspection &
      parsing each object into a single structure.
 
   3. B{Linking}: Replace any 'pointers' that were created for imported
@@ -57,7 +57,7 @@ perform individual steps in the creation of the documentation.
 ## Contents
 ######################################################################
 ## 1. build_docs() -- the main interface.
-## 2. merge_docs() -- helper, used to merge parse & inspect info
+## 2. merge_docs() -- helper, used to merge parse & introspect info
 ## 3. link_imports() -- helper, used to connect imported vars w/ values
 ## 4. assign_canonical_names() -- helper, used to set canonical names
 ## 5. inherit_docs() -- helper, used to inherit docs from base classes
@@ -68,7 +68,7 @@ perform individual steps in the creation of the documentation.
 
 import sys, os, os.path, __builtin__, imp
 from epydoc.apidoc import *
-from epydoc.docinspector import inspect_docs
+from epydoc.docintrospecter import introspect_docs
 from epydoc.docparser import parse_docs, ParseError
 from epydoc.docstringparser import parse_docstring
 from epydoc import log
@@ -78,7 +78,7 @@ from epydoc.util import *
 ## 1. build_docs()
 ######################################################################
 
-def build_doc(item, inspect=True, parse=True, add_submodules=True):
+def build_doc(item, introspect=True, parse=True, add_submodules=True):
     """
     Build API documentation for a given item, and return it as
     an L{APIDoc} object.
@@ -94,15 +94,15 @@ def build_doc(item, inspect=True, parse=True, add_submodules=True):
             (e.g., C{'epydoc.docparser.DocParser'})
           - Any (non-string) python object
             (e.g., C{list.append})
-    @param inspect: If true, then use inspection to examine the
+    @param introspect: If true, then use introspection to examine the
         specified items.  Otherwise, just use parsing.
     @param parse: If true, then use parsing to examine the specified
-        items.  Otherwise, just use inspection.
+        items.  Otherwise, just use introspection.
     """
-    docindex = build_doc_index(item, inspect, parse, add_submodules)
+    docindex = build_doc_index(item, introspect, parse, add_submodules)
     return docindex.root[0]
 
-def build_doc_index(items, inspect=True, parse=True,
+def build_doc_index(items, introspect=True, parse=True,
                     add_submodules=True):
     """
     Build API documentation for the given list of items, and
@@ -119,32 +119,32 @@ def build_doc_index(items, inspect=True, parse=True,
             (e.g., C{'epydoc.docparser.DocParser'})
           - Any (non-string) python object
             (e.g., C{list.append})
-    @param inspect: If true, then use inspection to examine the
+    @param introspect: If true, then use introspection to examine the
         specified items.  Otherwise, just use parsing.
     @param parse: If true, then use parsing to examine the specified
-        items.  Otherwise, just use inspection.
+        items.  Otherwise, just use introspection.
     """
     # Get the basic docs for each item.
-    doc_pairs = _get_docs_from_items(items, inspect, parse, add_submodules)
+    doc_pairs = _get_docs_from_items(items, introspect, parse, add_submodules)
 
-    # Merge the inspection & parse docs.
-    if parse and inspect:
-        log.start_progress('Merging parsed & inspected information')
+    # Merge the introspection & parse docs.
+    if parse and introspect:
+        log.start_progress('Merging parsed & introspected information')
         docs = []
-        for i, (inspect_doc, parse_doc) in enumerate(doc_pairs):
-            if inspect_doc is not None and parse_doc is not None:
-                if inspect_doc.canonical_name not in (None, UNKNOWN):
-                    name = inspect_doc.canonical_name
+        for i, (introspect_doc, parse_doc) in enumerate(doc_pairs):
+            if introspect_doc is not None and parse_doc is not None:
+                if introspect_doc.canonical_name not in (None, UNKNOWN):
+                    name = introspect_doc.canonical_name
                 else:
                     name = parse_doc.canonical_name
                 log.progress(float(i)/len(doc_pairs), name)
-                docs.append(merge_docs(inspect_doc, parse_doc))
-            elif inspect_doc is not None:
-                docs.append(inspect_doc)
+                docs.append(merge_docs(introspect_doc, parse_doc))
+            elif introspect_doc is not None:
+                docs.append(introspect_doc)
             elif parse_doc is not None:
                 docs.append(parse_doc)
         log.end_progress()
-    elif inspect:
+    elif introspect:
         docs = [doc_pair[0] for doc_pair in doc_pairs if doc_pair[0]]
     else:
         docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[1]]
@@ -214,36 +214,36 @@ def _report_valdoc_progress(i, val_doc, val_docs):
 # Documentation Generation
 #/////////////////////////////////////////////////////////////////
 
-def _get_docs_from_items(items, inspect, parse, add_submodules):
+def _get_docs_from_items(items, introspect, parse, add_submodules):
     # Start the progress bar.
     log.start_progress('Building documentation')
     progress_estimator = _ProgressEstimator(items)
 
-    # Collect (inspectdoc, parsedoc) pairs for each item.
+    # Collect (introspectdoc, parsedoc) pairs for each item.
     doc_pairs = []
     for item in items:
         if isinstance(item, basestring):
             if is_module_file(item):
                 doc_pairs.append(_get_docs_from_module_file(
-                    item, inspect, parse, progress_estimator))
+                    item, introspect, parse, progress_estimator))
             elif is_package_dir(item):
                 if add_submodules:
                     doc_pairs += _get_docs_from_package_dir(
-                        item, inspect, parse, progress_estimator)
+                        item, introspect, parse, progress_estimator)
                 else:
                     item = os.path.join(item, '__init__')
                     doc_pairs.append(_get_docs_from_module_file(
-                        item, inspect, parse, progress_estimator))
+                        item, introspect, parse, progress_estimator))
             elif os.path.isfile(item):
                 doc_pairs.append(_get_docs_from_pyscript(
-                    item, inspect, parse, progress_estimator))
+                    item, introspect, parse, progress_estimator))
             elif hasattr(__builtin__, item):
                 val = getattr(__builtin__, item)
                 doc_pairs.append(_get_docs_from_pyobject(
-                    val, inspect, parse, progress_estimator))
+                    val, introspect, parse, progress_estimator))
             elif is_pyname(item):
                 doc_pairs.append(_get_docs_from_pyname(
-                    item, inspect, parse, progress_estimator))
+                    item, introspect, parse, progress_estimator))
             elif os.path.isdir(item):
                 log.error("Directory %r is not a package" % item)
             elif os.path.isfile(item):
@@ -253,40 +253,40 @@ def _get_docs_from_items(items, inspect, parse, add_submodules):
                           item)
         else:
             doc_pairs.append(_get_docs_from_pyobject(
-                item, inspect, parse, progress_estimator))
+                item, introspect, parse, progress_estimator))
             
     log.end_progress()
     return doc_pairs
 
-def _get_docs_from_pyobject(obj, inspect, parse, progress_estimator):
+def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), `obj`)
     
-    if not inspect:
+    if not introspect:
         log.error("Cannot get docs for Python objects without "
-                  "inspecting them.")
+                  "introspecting them.")
             
-    inspect_doc = parse_doc = None
-    if inspect:
+    introspect_doc = parse_doc = None
+    if introspect:
         try:
-            inspect_doc = inspect_docs(value=obj)
+            introspect_doc = introspect_docs(value=obj)
         except ImportError, e:
             log.error(e)
     if parse:
-        if inspect_doc.canonical_name is not None:
+        if introspect_doc.canonical_name is not None:
             _, parse_docs = _get_docs_from_pyname(
-                str(inspect_doc.canonical_name), False, True,
+                str(introspect_doc.canonical_name), False, True,
                 progress_estimator)
-    return (inspect_doc, parse_doc)
+    return (introspect_doc, parse_doc)
 
-def _get_docs_from_pyname(name, inspect, parse, progress_estimator):
+def _get_docs_from_pyname(name, introspect, parse, progress_estimator):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), name)
     
-    inspect_doc = parse_doc = None
-    if inspect:
+    introspect_doc = parse_doc = None
+    if introspect:
         try:
-            inspect_doc = inspect_docs(name=name)
+            introspect_doc = introspect_docs(name=name)
         except ImportError, e:
             log.error(e)
     if parse:
@@ -295,21 +295,21 @@ def _get_docs_from_pyname(name, inspect, parse, progress_estimator):
         except ParseError, e:
             log.error(e)
         except ImportError, e:
-            if inspect_doc is None:
+            if introspect_doc is None:
                 log.error('Could not parse %s: %s' % (name, e))
             else:
                 log.warning('Could not parse %s: %s\n' % (name, e) +
-                            'Using inspected documentation only.')
-    return (inspect_doc, parse_doc)
+                            'Using introspected documentation only.')
+    return (introspect_doc, parse_doc)
 
-def _get_docs_from_pyscript(filename, inspect, parse, progress_estimator):
+def _get_docs_from_pyscript(filename, introspect, parse, progress_estimator):
     # [xx] I should be careful about what names I allow as filenames,
     # and maybe do some munging to prevent problems.
 
-    inspect_doc = parse_doc = None
-    if inspect:
+    introspect_doc = parse_doc = None
+    if introspect:
         try:
-            inspect_doc = inspect_docs(filename=filename, is_script=True)
+            introspect_doc = introspect_docs(filename=filename, is_script=True)
         except ImportError, e:
             log.error(e)
     if parse:
@@ -318,14 +318,14 @@ def _get_docs_from_pyscript(filename, inspect, parse, progress_estimator):
         except ParseError, e:
             log.error(e)
         except ImportError, e:
-            if inspect_doc is None:
+            if introspect_doc is None:
                 log.error('Could not parse %s: %s' % (filename, e))
             else:
                 log.warning('Could not parse %s: %s\n' % (filename, e) +
-                            'Using inspected documentation only.')
-    return (inspect_doc, parse_doc)
+                            'Using introspected documentation only.')
+    return (introspect_doc, parse_doc)
     
-def _get_docs_from_module_file(filename, inspect, parse, progress_estimator,
+def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
                                parent_docs=(None,None)):
     """
     Construct and return the API documentation for the python
@@ -356,11 +356,11 @@ def _get_docs_from_module_file(filename, inspect, parse, progress_estimator,
     try: filename = py_src_filename(filename)
     except ValueError: pass
 
-    # Get the inspected & parsed docs (as appropriate)
-    inspect_doc = parse_doc = None
-    if inspect:
+    # Get the introspected & parsed docs (as appropriate)
+    introspect_doc = parse_doc = None
+    if introspect:
         try:
-            inspect_doc = inspect_docs(
+            introspect_doc = introspect_docs(
                 filename=filename, context=parent_docs[0])
         except ImportError, e:
             log.error(e)
@@ -371,19 +371,19 @@ def _get_docs_from_module_file(filename, inspect, parse, progress_estimator,
         except ParseError, e:
             log.error(e)
         except ImportError, e:
-            if inspect_doc is None:
+            if introspect_doc is None:
                 log.error('Could not parse %s: %s' % (filename, e))
             else:
                 log.warning('Could not parse %s: %s\n' % (filename, e) +
-                            'Using inspected documentation only.')
-    return (inspect_doc, parse_doc)
+                            'Using introspected documentation only.')
+    return (introspect_doc, parse_doc)
 
-def _get_docs_from_package_dir(package_dir, inspect, parse,
+def _get_docs_from_package_dir(package_dir, introspect, parse,
                                progress_estimator, parent_docs=(None,None)):
     pkg_dir = os.path.normpath(os.path.abspath(package_dir))
     pkg_file = os.path.join(pkg_dir, '__init__')
     pkg_docs = _get_docs_from_module_file(
-        pkg_file, inspect, parse, progress_estimator, parent_docs)
+        pkg_file, introspect, parse, progress_estimator, parent_docs)
 
     # Extract the package's __path__.
     if pkg_docs == (None, None):
@@ -416,11 +416,11 @@ def _get_docs_from_package_dir(package_dir, inspect, parse,
     docs = [pkg_docs]
     for module_filename in module_filenames.values():
         d = _get_docs_from_module_file(
-            module_filename, inspect, parse, progress_estimator, pkg_docs)
+            module_filename, introspect, parse, progress_estimator, pkg_docs)
         docs.append(d)
     for subpackage_dir in subpackage_dirs:
         docs += _get_docs_from_package_dir(
-            subpackage_dir, inspect, parse, progress_estimator, pkg_docs)
+            subpackage_dir, introspect, parse, progress_estimator, pkg_docs)
     return docs
 
 #/////////////////////////////////////////////////////////////////
@@ -474,22 +474,22 @@ class _ProgressEstimator:
 
 MERGE_PRECEDENCE = {
     'repr': 'parse',
-    'canonical_name': 'inspect', # hmm.. change this? [xx]
+    'canonical_name': 'introspect', # hmm.. change this? [xx]
     'is_imported': 'parse',
     'is_alias': 'parse',
     'docformat': 'parse',
     'is_package': 'parse',
     'sort_spec': 'parse',
-    'subpackages': 'inspect',
+    'subpackages': 'introspect',
     'filename': 'parse',
     }
-"""Indicates whether information from inspection or parsing should be
+"""Indicates whether information from introspection or parsing should be
 given precedence, for specific attributes.  This dictionary maps from
-attribute names to either C{'inspect'} or C{'parse'}."""
+attribute names to either C{'introspect'} or C{'parse'}."""
 
-DEFAULT_MERGE_PRECEDENCE = 'inspect'
-"""Indicates whether information from inspection or parsing should be
-given precedence.  Should be either C{'inspect'} or C{'parse'}"""
+DEFAULT_MERGE_PRECEDENCE = 'introspect'
+"""Indicates whether information from introspection or parsing should be
+given precedence.  Should be either C{'introspect'} or C{'parse'}"""
 
 _attribute_mergefunc_registry = {}
 def register_attribute_mergefunc(attrib, mergefunc):
@@ -503,12 +503,12 @@ def register_attribute_mergefunc(attrib, mergefunc):
 
     @param mergefun: The merge function, whose sinature is:
 
-    >>> def mergefunc(inspect_val, parse_val, precedence, cyclecheck, path):
-    ...     return calculate_merged_value(inspect_val, parse_val)
+    >>> def mergefunc(introspect_val, parse_val, precedence, cyclecheck, path):
+    ...     return calculate_merged_value(introspect_val, parse_val)
 
-    Where C{inspect_val} and C{parse_val} are the two values to
+    Where C{introspect_val} and C{parse_val} are the two values to
     combine; C{precedence} is a string indicating which value takes
-    precedence for this attribute (C{'inspect'} or C{'parse'});
+    precedence for this attribute (C{'introspect'} or C{'parse'});
     C{cyclecheck} is a value used by C{merge_docs()} to make sure that
     it only visits each pair of docs once; and C{path} is a string
     describing the path that was taken from the root to this
@@ -521,16 +521,16 @@ def register_attribute_mergefunc(attrib, mergefunc):
     """
     _attribute_mergefunc_registry[attrib] = mergefunc
 
-def merge_docs(inspect_doc, parse_doc, cyclecheck=None, path=None):
+def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     """
     Merge the API documentation information that was obtained from
-    inspection with information that was obtained from parsing.
-    C{inspect_doc} and C{parse_doc} should be two C{APIDoc} instances
+    introspection with information that was obtained from parsing.
+    C{introspect_doc} and C{parse_doc} should be two C{APIDoc} instances
     that describe the same object.  C{merge_docs} combines the
     information from these two instances, and returns the merged
     C{APIDoc}.
 
-    If C{inspect_doc} and C{parse_doc} are compatible, then they will
+    If C{introspect_doc} and C{parse_doc} are compatible, then they will
     be I{merged} -- i.e., they will be coerced to a common class, and
     their state will be stored in a shared dictionary.  Once they have
     been merged, any change made to the attributes of one will affect
@@ -549,9 +549,9 @@ def merge_docs(inspect_doc, parse_doc, cyclecheck=None, path=None):
       - Otherwise, use the attribute value from the source indicated
         by L{DEFAULT_MERGE_PRECEDENCE}.
 
-    If C{inspect_doc} and C{parse_doc} are I{not} compatible (e.g., if
+    If C{introspect_doc} and C{parse_doc} are I{not} compatible (e.g., if
     their values have incompatible types), then C{merge_docs()} will
-    simply return either C{inspect_doc} or C{parse_doc}, depending on
+    simply return either C{introspect_doc} or C{parse_doc}, depending on
     the value of L{DEFAULT_MERGE_PRECEDENCE}.  The two input
     C{APIDoc}s will not be merged or modified in any way.
 
@@ -560,13 +560,13 @@ def merge_docs(inspect_doc, parse_doc, cyclecheck=None, path=None):
         function.  See L{register_attribute_mergefunc()} for more
         details.
     """
-    assert isinstance(inspect_doc, APIDoc)
+    assert isinstance(introspect_doc, APIDoc)
     assert isinstance(parse_doc, APIDoc)
 
     if cyclecheck is None:
         cyclecheck = Set()
-        if inspect_doc.canonical_name not in (None, UNKNOWN):
-            path = '%s' % inspect_doc.canonical_name
+        if introspect_doc.canonical_name not in (None, UNKNOWN):
+            path = '%s' % introspect_doc.canonical_name
         elif parse_doc.canonical_name not in (None, UNKNOWN):
             path = '%s' % parse_doc.canonical_name
         else:
@@ -577,122 +577,122 @@ def merge_docs(inspect_doc, parse_doc, cyclecheck=None, path=None):
     # more to do.  The reason that we check id's here is that we
     # want to avoid hashing the APIDoc objects for now, so we can
     # use APIDoc.merge_and_overwrite() later.
-    if (id(inspect_doc), id(parse_doc)) in cyclecheck:
-        return inspect_doc
-    cyclecheck.add( (id(inspect_doc), id(parse_doc)) )
+    if (id(introspect_doc), id(parse_doc)) in cyclecheck:
+        return introspect_doc
+    cyclecheck.add( (id(introspect_doc), id(parse_doc)) )
 
     # If these two are already merged, then we're done.  (Two
     # APIDoc's compare equal iff they are identical or have been
     # merged.)
-    if inspect_doc == parse_doc:
-        return inspect_doc
+    if introspect_doc == parse_doc:
+        return introspect_doc
 
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
     # happen.
     mismatch = None
-    if (inspect_doc.__class__ != parse_doc.__class__ and
-        not (issubclass(inspect_doc.__class__, parse_doc.__class__) or
-             issubclass(parse_doc.__class__, inspect_doc.__class__))):
+    if (introspect_doc.__class__ != parse_doc.__class__ and
+        not (issubclass(introspect_doc.__class__, parse_doc.__class__) or
+             issubclass(parse_doc.__class__, introspect_doc.__class__))):
         mismatch = ("value types don't match -- i=%r, p=%r." %
-                    (inspect_doc.__class__, parse_doc.__class__))
-    if (isinstance(inspect_doc, ValueDoc) and
+                    (introspect_doc.__class__, parse_doc.__class__))
+    if (isinstance(introspect_doc, ValueDoc) and
         isinstance(parse_doc, ValueDoc)):
-        if (inspect_doc.pyval is not UNKNOWN and
+        if (introspect_doc.pyval is not UNKNOWN and
             parse_doc.pyval is not UNKNOWN and
-            inspect_doc.pyval is not parse_doc.pyval):
+            introspect_doc.pyval is not parse_doc.pyval):
             mismatch = "values don't match."
-        elif (inspect_doc.canonical_name not in (None, UNKNOWN) and
+        elif (introspect_doc.canonical_name not in (None, UNKNOWN) and
             parse_doc.canonical_name not in (None, UNKNOWN) and
-            inspect_doc.canonical_name != parse_doc.canonical_name):
+            introspect_doc.canonical_name != parse_doc.canonical_name):
             mismatch = "canonical names don't match."
     if mismatch is not None:
-        log.info("Not merging the parsed & inspected values of %s, "
+        log.info("Not merging the parsed & introspected values of %s, "
                  "since their %s" % (path, mismatch))
-        if DEFAULT_MERGE_PRECEDENCE == 'inspect':
-            return inspect_doc
+        if DEFAULT_MERGE_PRECEDENCE == 'introspect':
+            return introspect_doc
         else:
             return parse_doc
 
     # If one apidoc's class is a superclass of the other's, then
     # specialize it to the more specific class.
-    if inspect_doc.__class__ is not parse_doc.__class__:
-        if issubclass(inspect_doc.__class__, parse_doc.__class__):
-            parse_doc.specialize_to(inspect_doc.__class__)
-        if issubclass(parse_doc.__class__, inspect_doc.__class__):
-            inspect_doc.specialize_to(parse_doc.__class__)
-    assert inspect_doc.__class__ is parse_doc.__class__
+    if introspect_doc.__class__ is not parse_doc.__class__:
+        if issubclass(introspect_doc.__class__, parse_doc.__class__):
+            parse_doc.specialize_to(introspect_doc.__class__)
+        if issubclass(parse_doc.__class__, introspect_doc.__class__):
+            introspect_doc.specialize_to(parse_doc.__class__)
+    assert introspect_doc.__class__ is parse_doc.__class__
 
     # The posargs and defaults are tied together -- if we merge
     # the posargs one way, then we need to merge the defaults the
     # same way.  So check them first.  (This is a minor hack)
-    if (isinstance(inspect_doc, RoutineDoc) and
+    if (isinstance(introspect_doc, RoutineDoc) and
         isinstance(parse_doc, RoutineDoc)):
-        _merge_posargs_and_defaults(inspect_doc, parse_doc, path)
+        _merge_posargs_and_defaults(introspect_doc, parse_doc, path)
     
     # Merge the two api_doc's attributes.
-    for attrib in Set(inspect_doc.__dict__.keys() +
+    for attrib in Set(introspect_doc.__dict__.keys() +
                       parse_doc.__dict__.keys()):
         # Be sure not to merge any private attributes (especially
         # __mergeset or __has_been_hashed!)
         if attrib.startswith('_'): continue
-        merge_attribute(attrib, inspect_doc, parse_doc,
+        merge_attribute(attrib, introspect_doc, parse_doc,
                              cyclecheck, path)
 
     # Set the dictionaries to be shared.
-    return inspect_doc.merge_and_overwrite(parse_doc)
+    return introspect_doc.merge_and_overwrite(parse_doc)
 
-def _merge_posargs_and_defaults(inspect_doc, parse_doc, path):
+def _merge_posargs_and_defaults(introspect_doc, parse_doc, path):
     # If either is unknown, then let merge_attrib handle it.
-    if inspect_doc.posargs == UNKNOWN or parse_doc.posargs == UNKNOWN:
+    if introspect_doc.posargs == UNKNOWN or parse_doc.posargs == UNKNOWN:
         return 
         
-    # If the inspected doc just has '...', then trust the parsed doc.
-    if inspect_doc.posargs == ['...'] and parse_doc.posargs != ['...']:
-        inspect_doc.posargs = parse_doc.posargs
-        inspect_doc.posarg_defaults = parse_doc.posarg_defaults
+    # If the introspected doc just has '...', then trust the parsed doc.
+    if introspect_doc.posargs == ['...'] and parse_doc.posargs != ['...']:
+        introspect_doc.posargs = parse_doc.posargs
+        introspect_doc.posarg_defaults = parse_doc.posarg_defaults
 
     # If they are incompatible, then check the precedence.
-    elif inspect_doc.posargs != parse_doc.posargs:
-        log.info("Warning: Not merging the parsed & inspected arg "
+    elif introspect_doc.posargs != parse_doc.posargs:
+        log.info("Warning: Not merging the parsed & introspected arg "
                  "lists for %s, since they don't match (%s vs %s)"
-                  % (path, inspect_doc.posargs, parse_doc.posargs))
+                  % (path, introspect_doc.posargs, parse_doc.posargs))
         if (MERGE_PRECEDENCE.get('posargs', DEFAULT_MERGE_PRECEDENCE) ==
-            'inspect'):
-            parse_doc.posargs = inspect_doc.posargs
-            parse_doc.posarg_defaults = inspect_doc.posarg_defaults
+            'introspect'):
+            parse_doc.posargs = introspect_doc.posargs
+            parse_doc.posarg_defaults = introspect_doc.posarg_defaults
         else:
-            inspect_doc.posargs = parse_doc.posargs
-            inspect_doc.posarg_defaults = parse_doc.posarg_defaults
+            introspect_doc.posargs = parse_doc.posargs
+            introspect_doc.posarg_defaults = parse_doc.posarg_defaults
 
-def merge_attribute(attrib, inspect_doc, parse_doc, cyclecheck, path):
+def merge_attribute(attrib, introspect_doc, parse_doc, cyclecheck, path):
     precedence = MERGE_PRECEDENCE.get(attrib, DEFAULT_MERGE_PRECEDENCE)
-    if precedence not in ('parse', 'inspect'):
+    if precedence not in ('parse', 'introspect'):
         raise ValueError('Bad precedence value %r' % precedence)
     
-    if (getattr(inspect_doc, attrib) is UNKNOWN and
+    if (getattr(introspect_doc, attrib) is UNKNOWN and
         getattr(parse_doc, attrib) is not UNKNOWN):
-        setattr(inspect_doc, attrib, getattr(parse_doc, attrib))
-    elif (getattr(inspect_doc, attrib) is not UNKNOWN and
+        setattr(introspect_doc, attrib, getattr(parse_doc, attrib))
+    elif (getattr(introspect_doc, attrib) is not UNKNOWN and
           getattr(parse_doc, attrib) is UNKNOWN):
-        setattr(parse_doc, attrib, getattr(inspect_doc, attrib))
-    elif (getattr(inspect_doc, attrib) is UNKNOWN and
+        setattr(parse_doc, attrib, getattr(introspect_doc, attrib))
+    elif (getattr(introspect_doc, attrib) is UNKNOWN and
           getattr(parse_doc, attrib) is UNKNOWN):
         pass
     else:
         # Both APIDoc objects have values; we need to merge them.
-        inspect_val = getattr(inspect_doc, attrib)
+        introspect_val = getattr(introspect_doc, attrib)
         parse_val = getattr(parse_doc, attrib)
         if attrib in _attribute_mergefunc_registry:
             handler = _attribute_mergefunc_registry[attrib]
-            merged_val = handler(inspect_val, parse_val, precedence,
+            merged_val = handler(introspect_val, parse_val, precedence,
                                  cyclecheck, path)
-        elif precedence == 'inspect':
-            merged_val = inspect_val
+        elif precedence == 'introspect':
+            merged_val = introspect_val
         elif precedence == 'parse':
             merged_val = parse_val
 
-        setattr(inspect_doc, attrib, merged_val)
+        setattr(introspect_doc, attrib, merged_val)
         setattr(parse_doc, attrib, merged_val)
 
 def merge_variables(varlist1, varlist2, precedence, cyclecheck, path):
@@ -714,12 +714,12 @@ def merge_value(value1, value2, precedence, cyclecheck, path):
     if value1 is None and value2 is None:
         return None
     elif value1 is None or value2 is None:
-        if precedence == 'inspect': return value1
+        if precedence == 'introspect': return value1
         else: return value2
     elif value1 is UNKNOWN:
         return value2
     elif value2 is UNKNOWN:
-        if precedence == 'inspect': return value1
+        if precedence == 'introspect': return value1
         else: return value2
     else:
         return merge_docs(value1, value2, cyclecheck, path)
@@ -739,7 +739,7 @@ def merge_fdel(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.fdel')
 
 def merge_imported_from(v1, v2, precedence, cyclecheck, path):
-    # Anything we got from inspection shouldn't have an imported_from
+    # Anything we got from introspection shouldn't have an imported_from
     # attribute -- it should be the actual object's documentation.
     assert v1 is None
     return None
@@ -754,10 +754,10 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
     # If the lengths don't match up, then give up.  This is most
     # often caused by __metaclass__.
     if len(baselist1) != len(baselist2):
-        log.info("Warning: Not merging the inspected & parsed base lists "
+        log.info("Warning: Not merging the introspected & parsed base lists "
                  "for %s, since their lengths don't match (%s vs %s)" %
                  (path, len(baselist1), len(baselist2)))
-        if precedence == 'inspect': return baselist1
+        if precedence == 'introspect': return baselist1
         else: return baselist2
 
     # If any names disagree, then give up.
@@ -765,11 +765,11 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
         if ((base1.canonical_name not in (None, UNKNOWN) and
              base2.canonical_name not in (None, UNKNOWN)) and
             base1.canonical_name != base2.canonical_name):
-            log.info("Warning: Not merging the parsed & inspected base "
+            log.info("Warning: Not merging the parsed & introspected base "
                      "lists for %s, since the bases' names don't match "
                      "(%s vs %s)" % (path, base1.canonical_name,
                                      base2.canonical_name))
-            if precedence == 'inspect': return baselist1
+            if precedence == 'introspect': return baselist1
             else: return baselist2
 
     for i, (base1, base2) in enumerate(zip(baselist1, baselist2)):
@@ -782,14 +782,14 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
 def merge_posarg_defaults(defaults1, defaults2, precedence,
                           cyclecheck, path):
     if len(defaults1) != len(defaults2):
-        if precedence == 'inspect': return defaults1
+        if precedence == 'introspect': return defaults1
         else: return defaults2
     defaults = []
     for i, (d1, d2) in enumerate(zip(defaults1, defaults2)):
         if d1 is not None and d2 is not None:
             d_path = '%s.<default-arg-val>[%d]' % (path, i)
             defaults.append(merge_docs(d1, d2, cyclecheck, d_path))
-        elif precedence == 'inspect':
+        elif precedence == 'introspect':
             defaults.append(d1)
         else:
             defaults.append(d2)

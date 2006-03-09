@@ -18,7 +18,7 @@ Parse the docstrings of APIDoc objects.
 import logging, re, sys
 from epydoc import markup
 from epydoc.apidoc import *
-from epydoc.docinspector import inspect_docstring_lineno
+from epydoc.docintrospecter import introspect_docstring_lineno
 from epydoc.util import py_src_filename
 from epydoc import log
 import __builtin__, exceptions
@@ -167,7 +167,7 @@ def parse_docstring(api_doc, docindex):
     api_doc.docstring = unindent_docstring(api_doc.docstring)
 
     # Extract a signature from the docstring, if it has one.  This
-    # overrides any signature we got via inspection/parsing.
+    # overrides any signature we got via introspection/parsing.
     if isinstance(api_doc, RoutineDoc):
         parse_function_signature(api_doc)
 
@@ -257,7 +257,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
     # Get the start line of the docstring containing the error.
     startline = api_doc.docstring_lineno
     if startline in (None, UNKNOWN):
-        startline = inspect_docstring_lineno(api_doc)
+        startline = introspect_docstring_lineno(api_doc)
         if startline in (None, UNKNOWN):
             startline = None
 
@@ -573,7 +573,7 @@ def get_docformat(api_doc, docindex):
     except: return DEFAULT_DOCFORMAT
 
 def unindent_docstring(docstring):
-    # [xx] copied from inspect.
+    # [xx] copied from introspect.
     
     if docstring == '': return ''
     lines = docstring.expandtabs().split('\n')

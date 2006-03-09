@@ -1,4 +1,4 @@
-# epydoc -- Inspection
+# epydoc -- Introspection
 #
 # Copyright (C) 2005 Edward Loper
 # Author: Edward Loper <edloper@loper.org>
@@ -7,14 +7,14 @@
 # $Id$
 
 """
-Extract API documentation about python objects by directly inspecting
+Extract API documentation about python objects by directly introspecting
 their values.
 
-L{DocInspector} is a processing class that examines Python objects via
-inspection, and uses the information it finds to create L{APIDoc}
+L{DocIntrospecter} is a processing class that examines Python objects via
+introspection, and uses the information it finds to create L{APIDoc}
 objects containing the API documentation for those objects.
 
-C{DocInspector} can be subclassed to extend the set of object types
+C{DocIntrospecter} can be subclassed to extend the set of object types
 that it supports.
 """
 __docformat__ = 'epytext en'
@@ -46,29 +46,29 @@ _valuedoc_cache = {}
 already seen.  This cache is implemented as a dictionary that maps a
 value's pyid to its L{ValueDoc}.
 
-Note that if we encounter a value but decide not to inspect it
+Note that if we encounter a value but decide not to introspect it
 (because it's imported from another module), then C{_valuedoc_cache}
 will contain an entry for the value, but the value will not be listed
-in L{_inspected_values}."""
+in L{_introspected_values}."""
 
-_inspected_values = {}
-"""A record which values we've inspected, encoded as a dictionary from
+_introspected_values = {}
+"""A record which values we've introspected, encoded as a dictionary from
 pyid to C{bool}."""
 
 ######################################################################
-## Inspection
+## Introspection
 ######################################################################
 
 # [xx] old:
 """
-An API documentation extractor based on inspecting python values.
-C{DocInspector} examines Python objects via inspection, and uses
+An API documentation extractor based on introspecting python values.
+C{DocIntrospecter} examines Python objects via introspection, and uses
 the information it finds to create L{APIDoc} objects containing
 the API documentation for those objects.  The main interface to
-the C{DocInspector} class is the L{inspect} method, which takes a
+the C{DocIntrospecter} class is the L{introspect} method, which takes a
 Python value, and returns an L{APIDoc} that describes it.
 
-Currently, C{DocInspector} can extract documentation information
+Currently, C{DocIntrospecter} can extract documentation information
 from the following object types:
 
   - modules
@@ -82,23 +82,23 @@ from the following object types:
 
 Subclassing
 ===========
-C{DocInspector} can be subclassed, to extend the set of object
-types that it supports.  C{DocInspector} can be extended in
+C{DocIntrospecter} can be subclassed, to extend the set of object
+types that it supports.  C{DocIntrospecter} can be extended in
 several different ways:
 
-  - A subclass can override one of the existing inspection methods
+  - A subclass can override one of the existing introspection methods
     to modify the behavior for a currently supported object type.
 
   - A subclass can add support for a new type by adding a new
-    inspection method; and extending L{inspector_method()} to
+    introspection method; and extending L{introspecter_method()} to
     return that method for values of the new type.
 """
 
-def inspect_docs(value=None, name=None, filename=None, context=None,
+def introspect_docs(value=None, name=None, filename=None, context=None,
                  is_script=False):
     """
     Generate the API documentation for a specified object by
-    inspecting Python values, and return it as a L{ValueDoc}.  The
+    introspecting Python values, and return it as a L{ValueDoc}.  The
     object to generate documentation for may be specified using
     the C{value} parameter, the C{filename} parameter, I{or} the
     C{name} parameter.  (It is an error to specify more than one
@@ -107,7 +107,7 @@ def inspect_docs(value=None, name=None, filename=None, context=None,
     @param value: The python object that should be documented.
     @param filename: The name of the file that contains the python
         source code for a package, module, or script.  If
-        C{filename} is specified, then C{inspect} will return a
+        C{filename} is specified, then C{introspect} will return a
         C{ModuleDoc} describing its contents.
     @param name: The fully-qualified python dotted name of any
         value (including packages, modules, classes, and
@@ -133,18 +133,18 @@ def inspect_docs(value=None, name=None, filename=None, context=None,
     
     pyid = id(value)
 
-    # If we've already inspected this value, then simply return
+    # If we've already introspected this value, then simply return
     # its ValueDoc from our cache.
-    if pyid in _inspected_values:
+    if pyid in _introspected_values:
         return _valuedoc_cache[pyid]
 
-    # Inspect the value.
-    _inspected_values[pyid] = True
-    inspector = _get_inspector(value)
-    val_doc = inspector(value)
+    # Introspect the value.
+    _introspected_values[pyid] = True
+    introspecter = _get_introspecter(value)
+    val_doc = introspecter(value)
 
     # Add it to the cache (or merge it if we've seen this value but
-    # not inspected it before).
+    # not introspected it before).
     if pyid in _valuedoc_cache:
         val_doc.merge_and_overwrite(_valuedoc_cache[pyid])
     else:
@@ -171,7 +171,7 @@ def inspect_docs(value=None, name=None, filename=None, context=None,
     return val_doc
 
 #////////////////////////////////////////////////////////////
-# Module Inspection
+# Module Introspection
 #////////////////////////////////////////////////////////////
 
 #: A list of module variables that should not be included in a
@@ -180,7 +180,7 @@ UNDOCUMENTED_MODULE_VARS = (
     '__builtins__', '__doc__', '__all__', '__file__', '__path__',
     '__name__', '__extra_epydoc_fields__', '__docformat__')
 
-def inspect_module(module):
+def introspect_module(module):
     """
     Add API documentation information about the module C{module}
     to C{module_doc}.
@@ -232,7 +232,7 @@ def inspect_module(module):
         package_name = str(dotted_name.container())
         package = sys.modules.get(package_name)
         if package is not None:
-            module_doc.package = inspect_docs(package)
+            module_doc.package = introspect_docs(package)
     else:
         module_doc.package = None
 
@@ -249,19 +249,19 @@ def inspect_module(module):
         if child_name in UNDOCUMENTED_MODULE_VARS: continue
         child = getattr(module, child_name)
 
-        # Create a VariableDoc for the child, and inspect its
+        # Create a VariableDoc for the child, and introspect its
         # value if it's defined in this module.
         container = get_containing_module(child)
         if container != None and container == module_doc.canonical_name:
             # Local variable.
-            child_val_doc = inspect_docs(child, context=module_doc)
+            child_val_doc = introspect_docs(child, context=module_doc)
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
                                         is_imported=False,
                                         container=module_doc)
         elif container is None or module_doc.canonical_name is UNKNOWN:
             # Possibly imported variable.
-            child_val_doc = inspect_docs(child, context=module_doc)
+            child_val_doc = introspect_docs(child, context=module_doc)
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
                                         container=module_doc)
@@ -288,11 +288,11 @@ def _get_valuedoc(value):
     pyid = id(value)
     val_doc = _valuedoc_cache.get(pyid)
     if val_doc is None:
-        val_doc = _valuedoc_cache[pyid] = inspect_other(value)
+        val_doc = _valuedoc_cache[pyid] = introspect_other(value)
     return val_doc
 
 #////////////////////////////////////////////////////////////
-# Class Inspection
+# Class Introspection
 #////////////////////////////////////////////////////////////
 
 #: A list of class variables that should not be included in a
@@ -300,7 +300,7 @@ def _get_valuedoc(value):
 UNDOCUMENTED_CLASS_VARS = (
     '__doc__', '__module__', '__dict__', '__weakref__')
 
-def inspect_class(cls):
+def introspect_class(cls):
     """
     Add API documentation information about the class C{cls}
     to C{class_doc}.
@@ -327,7 +327,7 @@ def inspect_class(cls):
     if hasattr(cls, '__bases__'):
         class_doc.bases = []
         for base in cls.__bases__:
-            basedoc = inspect_docs(base)
+            basedoc = introspect_docs(base)
             class_doc.bases.append(basedoc)
             basedoc.subclasses.append(class_doc)
 
@@ -341,7 +341,7 @@ def inspect_class(cls):
             if child_name in UNDOCUMENTED_CLASS_VARS: continue
             #try: child = getattr(cls, child_name)
             #except: continue
-            val_doc = inspect_docs(child, context=class_doc)
+            val_doc = introspect_docs(child, context=class_doc)
             var_doc = VariableDoc(name=child_name, value=val_doc,
                                   container=class_doc)
             class_doc.variables[child_name] = var_doc
@@ -349,10 +349,10 @@ def inspect_class(cls):
     return class_doc
 
 #////////////////////////////////////////////////////////////
-# Routine Inspection
+# Routine Introspection
 #////////////////////////////////////////////////////////////
 
-def inspect_routine(routine):
+def introspect_routine(routine):
     """Add API documentation information about the function
     C{routine} to C{routine_doc} (specializing it to C{Routine_doc})."""
     # Create the RoutineDoc.
@@ -386,7 +386,7 @@ def inspect_routine(routine):
         if defaults is not None:
             offset = len(args)-len(defaults)
             for i in range(len(defaults)):
-                default_val = inspect_docs(defaults[i])
+                default_val = introspect_docs(defaults[i])
                 routine_doc.posarg_defaults[i+offset] = default_val
 
         # If it's a bound method, then strip off the first argument.
@@ -410,10 +410,10 @@ def inspect_routine(routine):
     return routine_doc
 
 #////////////////////////////////////////////////////////////
-# Property Inspection
+# Property Introspection
 #////////////////////////////////////////////////////////////
 
-def inspect_property(prop):
+def introspect_property(prop):
     """Add API documentation information about the property
     C{prop} to C{prop_doc} (specializing it to C{PropertyDoc})."""
     # Create the PropertyDoc
@@ -424,17 +424,17 @@ def inspect_property(prop):
     prop_doc.docstring = get_docstring(prop)
 
     # Record the property's access functions.
-    prop_doc.fget = inspect_docs(prop.fget)
-    prop_doc.fset = inspect_docs(prop.fset)
-    prop_doc.fdel = inspect_docs(prop.fdel)
+    prop_doc.fget = introspect_docs(prop.fget)
+    prop_doc.fset = introspect_docs(prop.fset)
+    prop_doc.fdel = introspect_docs(prop.fdel)
 
     return prop_doc
 
 #////////////////////////////////////////////////////////////
-# Generic Value Inspection
+# Generic Value Introspection
 #////////////////////////////////////////////////////////////
 
-def inspect_other(val):
+def introspect_other(val):
     """
     Create and return a C{ValueDoc} for the given value.
     """
@@ -489,7 +489,7 @@ def get_canonical_name(value):
     """
     if not hasattr(value, '__name__'): return UNKNOWN
 
-    # Get the name via inspection.
+    # Get the name via introspection.
     if isinstance(value, ModuleType):
         dotted_name = DottedName(value.__name__)
         
@@ -592,38 +592,38 @@ def _find_function_module(func):
     return None
 
 #////////////////////////////////////////////////////////////
-# Inspection Dispatch Table
+# Introspection Dispatch Table
 #////////////////////////////////////////////////////////////
 
-_inspector_registry = []
-def register_inspector(applicability_test, inspector, priority=10):
+_introspecter_registry = []
+def register_introspecter(applicability_test, introspecter, priority=10):
     """
-    Register an inspector function.
+    Register an introspecter function.
     
-    @param priority: The priority of this inspector, which determines
-    the order in which inspectors are tried -- inspectors with lower
-    numbers are tried first.  The standard inspectors have priorities
+    @param priority: The priority of this introspecter, which determines
+    the order in which introspecters are tried -- introspecters with lower
+    numbers are tried first.  The standard introspecters have priorities
     ranging from 20 to 30.  The default priority (10) will place new
-    inspectors before standard inspectors.
+    introspecters before standard introspecters.
     """
-    _inspector_registry.append( (priority, applicability_test, inspector) )
-    _inspector_registry.sort()
+    _introspecter_registry.append( (priority, applicability_test, introspecter) )
+    _introspecter_registry.sort()
     
-def _get_inspector(value):
-    for (priority, applicability_test, inspector) in _inspector_registry:
+def _get_introspecter(value):
+    for (priority, applicability_test, introspecter) in _introspecter_registry:
         if applicability_test(value):
-            return inspector
+            return introspecter
     else:
-        return inspect_other
+        return introspect_other
 
-# Register the standard inspector functions.
+# Register the standard introspecter functions.
 def is_classmethod(v): return isinstance(v, classmethod)
 def is_staticmethod(v): return isinstance(v, staticmethod)
 def is_property(v): return isinstance(v, property)
-register_inspector(inspect.ismodule, inspect_module, priority=20)
-register_inspector(inspect.isclass, inspect_class, priority=24)
-register_inspector(inspect.isroutine, inspect_routine, priority=28)
-register_inspector(is_property, inspect_property, priority=30)
+register_introspecter(inspect.ismodule, introspect_module, priority=20)
+register_introspecter(inspect.isclass, introspect_class, priority=24)
+register_introspecter(inspect.isroutine, introspect_routine, priority=28)
+register_introspecter(is_property, introspect_property, priority=30)
 
 #////////////////////////////////////////////////////////////
 # Import support
@@ -772,7 +772,7 @@ def _import(name, filename=None):
         sys.__dict__.update(old_sys)
         sys.path = old_sys_path
         
-def inspect_docstring_lineno(api_doc):
+def introspect_docstring_lineno(api_doc):
     """
     Try to determine the line number on which the given item's
     docstring begins.  Return the line number, or C{None} if the line
@@ -829,8 +829,8 @@ _dev_null = _DevNull()
 ######################################################################
 ## Zope Extension...
 ######################################################################
-class ZopeInspector(Inspector):
-    VALUEDOC_CLASSES = Inspector.VALUEDOC_CLASSES.copy()
+class ZopeIntrospecter(Introspecter):
+    VALUEDOC_CLASSES = Introspecter.VALUEDOC_CLASSES.copy()
     VALUEDOC_CLASSES.update({
         'module': ZopeModuleDoc,
         'class': ZopeClassDoc,
@@ -842,14 +842,14 @@ class ZopeInspector(Inspector):
         if isinstance(child, zope.interfaces.Interface):
             module_doc.add_zope_interface(child_name)
         else:
-            Inspector.add_module_child(self, child, child_name, module_doc)
+            Introspecter.add_module_child(self, child, child_name, module_doc)
 
     def add_class_child(self, child, child_name, class_doc):
         if isinstance(child, zope.interfaces.Interface):
             class_doc.add_zope_interface(child_name)
         else:
-            Inspector.add_class_child(self, child, child_name, class_doc)
+            Introspecter.add_class_child(self, child, child_name, class_doc)
 
-    def inspect_zope_interface(self, interface, interfacename):
+    def introspect_zope_interface(self, interface, interfacename):
         pass # etc...
 """        

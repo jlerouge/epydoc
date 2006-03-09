@@ -171,11 +171,11 @@ def parse_arguments():
         "--debug", action="store_true", dest="debug",
         help="Show full tracebacks for internal errors.")
     options_group.add_option(                                # --parse-only
-        "--parse-only", action="store_false", dest="inspect",
-        help="Get all information from parsing (don't inspect)")
-    options_group.add_option(                                # --inspect-only
-        "--inspect-only", action="store_false", dest="parse",
-        help="Get all information from inspecting (don't parse)")
+        "--parse-only", action="store_false", dest="introspect",
+        help="Get all information from parsing (don't introspect)")
+    options_group.add_option(                                # --introspect-only
+        "--introspect-only", action="store_false", dest="parse",
+        help="Get all information from introspecting (don't parse)")
     options_group.add_option(
         "--profile", action="store_true", dest="profile",
         help="Run the profiler.  Output will be written to profile.out")
@@ -190,7 +190,7 @@ def parse_arguments():
                            show_private=True, show_imports=False,
                            inheritance="grouped",
                            verbose=0, quiet=0,
-                           parse=True, inspect=True,
+                           parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False)
 
     # Parse the arguments.
@@ -202,9 +202,9 @@ def parse_arguments():
     if options.inheritance not in ('grouped', 'listed', 'included'):
         optparser.error("Bad inheritance style.  Valid options are "
                         "grouped, listed, and included.")
-    if not options.parse and not options.inspect:
+    if not options.parse and not options.introspect:
         optparser.error("Invalid option combination: --parse-only "
-                        "and --inspect-only.")
+                        "and --introspect-only.")
     if options.action == 'text' and len(names) > 1:
         optparser.error("--text option takes only one name.")
 
@@ -224,7 +224,7 @@ def parse_arguments():
 
 def main(options, names):
     if options.action == 'text':
-        if options.parse and options.inspect:
+        if options.parse and options.introspect:
             options.parse = False
     
     # Set up the logger
@@ -237,16 +237,16 @@ def main(options, names):
         # Each number is a rough approximation of how long we spend on
         # that task, used to divide up the unified progress bar.
         stages = [40,  # Building documentation
-                  7,   # Merging parsed & inspected information
+                  7,   # Merging parsed & introspected information
                   1,   # Linking imported variables
                   3,   # Indexing documentation
                   30,  # Parsing Docstrings
                   1,   # Inheriting documentation
                   2,   # Sorting & Grouping
                   100] # Generating output
-        if options.parse and not options.inspect:
+        if options.parse and not options.introspect:
             del stages[1] # no merging
-        if options.inspect and not options.parse:
+        if options.introspect and not options.parse:
             del stages[1:3] # no merging or linking
         logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
         log.register_logger(logger)
@@ -265,7 +265,7 @@ def main(options, names):
     docstringparser.DEFAULT_DOCFORMAT = options.docformat
 
     # Build docs for the named values.
-    docindex = build_doc_index(names, options.inspect, options.parse,
+    docindex = build_doc_index(names, options.introspect, options.parse,
                                add_submodules=(options.action!='text'))
 
     # Perform the specified action.

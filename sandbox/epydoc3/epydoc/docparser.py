@@ -38,7 +38,7 @@ import codecs
 from epydoc.apidoc import *
 # For looking up the docs of builtins:
 import __builtin__
-from epydoc.docinspector import inspect_docs
+from epydoc.docintrospecter import introspect_docs
 # Misc utility functions:
 from epydoc.util import *
 
@@ -151,7 +151,7 @@ should it determine the list of identifiers expored by C{M{m}}?
   - C{'parse'}: parse it to find a list of the identifiers that it
     exports.  (This will fall back to the 'ignore' behavior if the
     imported file can't be parsed, e.g., if it's a builtin.)
-  - C{'inspect'}: import the module and inspect it (using C{dir})
+  - C{'introspect'}: import the module and introspect it (using C{dir})
     to find a list of the identifiers that it exports.  (This will
     fall back to the 'ignore' behavior if the imported file can't
     be parsed, e.g., if it's a builtin.)
@@ -747,8 +747,8 @@ def _process_fromstar_import(src, parent_docs):
     attributes pointing to the imported objects).  If
     L{IMPORT_STAR_HANDLING} is C{'parse'}, then the list of
     exports if found by parsing C{M{<src>}}; if it is
-    C{'inspect'}, then the list of exports is found by importing
-    and inspecting C{M{<src>}}.
+    C{'introspect'}, then the list of exports is found by importing
+    and introspecting C{M{<src>}}.
     """
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
@@ -780,7 +780,7 @@ def _process_fromstar_import(src, parent_docs):
 
     # If we got here, then either IMPORT_HANDLING='link' or we
     # failed to parse the `src` module.
-    if IMPORT_STAR_HANDLING == 'inspect':
+    if IMPORT_STAR_HANDLING == 'introspect':
         try: module = __import__(str(src), {}, {}, [0])
         except: return # We couldn't import it.
         if module is None: return # We couldn't import it.
@@ -1592,7 +1592,7 @@ def lookup_name(identifier, parent_docs):
             return parent_docs[0].variables[identifier]
 
     # Builtins
-    builtins = inspect_docs(__builtin__)
+    builtins = introspect_docs(__builtin__)
     if isinstance(builtins, NamespaceDoc):
         if builtins.variables.has_key(identifier):
             return builtins.variables[identifier]

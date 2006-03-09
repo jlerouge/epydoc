@@ -16,18 +16,18 @@ to document, and produce API documentation using the following steps:
 
   1. Extract basic information about the specified objects, and objects
      that are related to them (such as the values defined by a module).
-     This can be done via inspection, parsing, or both:
+     This can be done via introspection, parsing, or both:
   
-       1.1. Use inspection to examine the objects directly.
+       1.1. Use introspection to examine the objects directly.
    
        1.2. Parse the Python source files that define the objects,
             and extract information from those files.
 
   2. Combine and process that information.
 
-       2.1. Merge the information obtained from inspection & parsing
+       2.1. Merge the information obtained from introspection & parsing
             each object into a single structure.  (This step is
-            skipped if information was extracted from only inspection
+            skipped if information was extracted from only introspection
             or only parsing.)
 
        2.2. Replace any 'pointers' that were created for imported
@@ -52,13 +52,13 @@ to document, and produce API documentation using the following steps:
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
 @requires: Python 2.1+, or Python 2.0 with
-    U{C{inspect.py}<http://lfw.org/python/inspect.html>}.
+    U{C{introspect.py}<http://lfw.org/python/introspect.html>}.
 @version: 2.1
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo: s/inspection/introspection/ ???
+@todo: s/introspection/introspection/ ???
 @todo: Create a better default top_page than trees.html.
 @todo: Fix trees.html to work when documenting non-top-level
        modules/packages
@@ -66,7 +66,7 @@ to document, and produce API documentation using the following steps:
 @todo: Implement @include
 @todo: Optimize epytext
 @todo: More doctests
-@todo: When inspecting, limit how much inspection you do (eg,
+@todo: When introspecting, limit how much introspection you do (eg,
        don't construct docs for imported modules' vars if it's
        not necessary)
 
