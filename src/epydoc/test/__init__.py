@@ -1,0 +1,28 @@
+# epydoc -- Regression testing
+#
+# Copyright (C) 2005 Edward Loper
+# Author: Edward Loper <edloper@loper.org>
+# URL: <http://epydoc.sf.net>
+#
+# $Id: apidoc.py 946 2006-03-10 00:40:50Z edloper $
+
+import unittest, doctest, epydoc, os, os.path
+
+def main():
+    # Options for doctest:
+    options = doctest.ELLIPSIS
+    doctest.set_unittest_reportflags(doctest.REPORT_UDIFF)
+
+    # Find all test cases.
+    tests = []
+    testdir = os.path.join(os.path.split(__file__)[0])
+    if testdir == '': testdir = '.'
+    for filename in os.listdir(testdir):
+        if filename.endswith('.doctest'):
+            tests.append(doctest.DocFileSuite(filename, optionflags=options))
+            
+    # Run all test cases.
+    unittest.TextTestRunner(verbosity=2).run(unittest.TestSuite(tests))
+
+if __name__=='__main__':
+    main()
