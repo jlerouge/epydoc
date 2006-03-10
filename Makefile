@@ -8,7 +8,7 @@
 ## Configuration variables
 ##//////////////////////////////////////////////////////////////////////
 
-# Python source files (don't include src/epydoc/test)
+# Python source files (don't include src/epydoc/test?)
 PY_SRC = src/epydoc/
 PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
@@ -102,7 +102,8 @@ checkdocs:
 	cp -r $(DOCS) $(WEBDIR)
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
-	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
+	@echo "Skipping pdf generation (not implemented yet)"
+#	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
 	touch .webpage.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
@@ -113,43 +114,43 @@ api-html: .api-html.up2date
 .api-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_API)
 	mkdir -p $(HTML_API)
-	$(EPYDOC) \
-	       -o $(HTML_API) --name epydoc \
+	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
 	       --url http://epydoc.sourceforge.net \
-	       --inheritance=listed --navlink "epydoc 2.1"\
-	       --css white --docformat plaintext $(PY_SRC)
+	       --inheritance=listed --navlink "epydoc $(VERSION)"\
+	       --docformat plaintext $(PY_SRC)
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
 .api-pdf.up2date: $(PY_SRCFILES)
-	rm -rf $(LATEX_API)
-	mkdir -p $(LATEX_API)
-	$(EPYDOC) --pdf -o $(LATEX_API) \
-	       -n "Epydoc $(VERSION)" $(PY_SRC)
+	@echo "Skipping pdf generation (not implemented yet)"
+#	rm -rf $(LATEX_API)
+#	mkdir -p $(LATEX_API)
+#	$(EPYDOC) --pdf -o $(LATEX_API) \
+#	       -n "Epydoc $(VERSION)" $(PY_SRC)
 	touch .api-pdf.up2date
 
 examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)
 	rm -rf $(HTML_EXAMPLES)
 	mkdir -p $(HTML_EXAMPLES)
-	$(EPYDOC) \
-	       -o $(HTML_EXAMPLES) -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue -t example --docformat=plaintext \
+	$(EPYDOC) -o $(HTML_EXAMPLES) --name epydoc \
+	       --url http://epydoc.sourceforge.net \
+	       --css blue --top example --docformat=plaintext \
 	       --navlink 'epydoc examples' doc/epytext_example.py sre
 	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped \
 	       --inheritance=grouped \
-	       -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue --debug \
+	       --name epydoc --url http://epydoc.sourceforge.net \
+	       --css blue --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	$(EPYDOC) -o $(HTML_EXAMPLES)/listed \
 	       --inheritance=listed \
-	       -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue --debug \
+	       --name epydoc --url http://epydoc.sourceforge.net \
+	       --css blue --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	$(EPYDOC) -o $(HTML_EXAMPLES)/included \
 	       --inheritance=included \
-	       -n epydoc -u http://epydoc.sourceforge.net \
-	       --no-private --css blue --debug \
+	       --name epydoc --url http://epydoc.sourceforge.net \
+	       --css blue --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	touch .examples.up2date
 
