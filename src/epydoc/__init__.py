@@ -51,18 +51,15 @@ to document, and produce API documentation using the following steps:
         3.2. other formats (under construction)
 
 @author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
-@requires: Python 2.1+, or Python 2.0 with
-    U{C{introspect.py}<http://lfw.org/python/introspect.html>}.
-@version: 2.1
+@requires: Python 2.3+
+@version: 3.0 alpha
 @see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
 @see: U{The epytext markup language
     manual<http://epydoc.sourceforge.net/epytext.html>}
 
-@todo: s/introspection/introspection/ ???
 @todo: Create a better default top_page than trees.html.
 @todo: Fix trees.html to work when documenting non-top-level
        modules/packages
-@todo: Implement lots more of _inherit_info()
 @todo: Implement @include
 @todo: Optimize epytext
 @todo: More doctests
@@ -80,17 +77,20 @@ to document, and produce API documentation using the following steps:
 @contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
 @contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
 @contributor: U{Christian Reis <mailto:kiko@async.com.br>}
-
-@var __license__: The license governing the use and distribution of
-    epydoc.
 """
 __docformat__ = 'epytext en'
 
-# General info
-__version__ = '2.1'
+__version__ = '3.0 alpha'
+"""The version of epydoc"""
+
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
+"""The primary author of eypdoc"""
+
 __url__ = 'http://epydoc.sourceforge.net'
+"""The URL for epydoc's homepage"""
+
 __license__ = 'IBM Open Source License'
+"""The license governing the use and distribution of epydoc"""
 
 # [xx] this should probably be a private variable:
 DEBUG = True
