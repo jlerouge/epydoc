@@ -14,7 +14,7 @@ epydoc \- generate API documentation from Python docstrings
 .IR dir ]
 .RB [ \-\-docformat
 .IR format ]
-.RB [ \-n
+.RB [ \-\-name
 .IR name ]
 .RB [ \-u
 .IR url ]
@@ -28,12 +28,11 @@ epydoc \- generate API documentation from Python docstrings
 .IR html ]
 .RB [ \-\-help\-file
 .IR file ]
-.RB [ \-\-private ]
+.RB [ \-\-show\-private ]
 .RB [ \-\-no\-private ]
 .RB [ \-\-inheritance
 .IR style ]
 .RB [ \-\-show\-imports ]
-.RB [ \-\-builtins ]
 .RB [ \-\-ignore\-param\-mismatch ]
 .RB [ \-\-separate-classes ]
 .RB [ \-q ]
@@ -44,8 +43,7 @@ epydoc \- generate API documentation from Python docstrings
 .B \-\-check
 .RB [ \-\-tests
 .BR tests ]
-.RB [ \-\-private ]
-.RB [ \-\-builtins ]
+.RB [ \-\-show\-private ]
 .RB [ \-\-ignore\-param\-mismatch ]
 .RB [ \-q ]
 .RB [ \-v ]
@@ -57,6 +55,10 @@ epydoc \- generate API documentation from Python docstrings
 .B epydoc \-V
 .\" ================== DESCRIPTION ====================
 .SH DESCRIPTION
+.B This man page is somewhat outdated while epydoc is in alpha; run
+"epydoc --help"
+.B for a complete option list.
+.PP
 .B epydoc
 generates API documentation for Python modules and packages, based on
 their docstrings.  A lightweight markup language called
@@ -95,12 +97,16 @@ documents, then use the
 .B \-\-separate\-classes
 option to produce a separate LaTeX file for each class.
 .PP
+.B LaTeX API output is not yet implemented in this alpha release.
+.PP
 .B epydoc
 can also be used to check the completeness of the API documentation.
 By default, it checks that every public package, module, class,
 method, and function has a docstring description.  The
 .B \-\-tests
 option can be used to specify additional tests to perform.
+.PP
+.B Completeness checking is not yet implemented in this alpha release.
 .\" ================== OPTIONS ====================
 .SH OPTIONS
 Options are divided into five categories: action selection options;
@@ -116,6 +122,7 @@ Generate HTML output. (default)
 .TP
 .B \-\-latex
 Generate LaTeX output.
+.B (Not yet implemented in this alpha release)
 .TP
 .B \-\-dvi
 Generate dvi output.  This option first creates LaTeX output, and then
@@ -126,6 +133,7 @@ and
 to convert the LaTeX files into a single
 .B dvi
 file.
+.B (Not yet implemented in this alpha release)
 .TP
 .B \-\-ps
 Generate postscript output.  This option first creates LaTeX output,
@@ -135,6 +143,7 @@ and then uses
 and
 .BR dvips
 to convert the LaTeX files into a single postscript file.
+.B (Not yet implemented in this alpha release)
 .TP
 .B \-\-pdf
 Generate Adobe Acrobat
@@ -148,9 +157,11 @@ and
 to convert the LaTeX files into a single
 .B pdf
 file.
+.B (Not yet implemented in this alpha release)
 .TP
 .B \-\-check
 Perform completeness checks on the documentation.
+.B (Not yet implemented in this alpha release)
 .RE
 .PP
 .B HTML DOCUMENTATION GENERATION OPTIONS 
@@ -166,10 +177,6 @@ or directory names (such as
 .BR epydoc/ ).
 Directory names specify packages, and are expanded to include
 all sub-modules and sub-packages.
-.TP
-.B \-\-builtins
-Add the builtin modules (as defined by sys.builtin_module_names) to
-the list of modules to document.
 .TP
 .BI "\-c " sheet ", \-\-css " sheet
 CSS stylesheet for HTML files containing public API documentation.  If
@@ -219,7 +226,7 @@ end of the summary table.  If
 is "included," then inherited objects are mixed in with non-inherited
 objects.  The default format for HTML output is "grouped."
 .TP
-.BI "\-n " name ", \-\-name " name
+.BI "\-\-name " name
 The name of the project whose documentation is being generated.  This
 is used in the index page's title, and in the help page.  It is also
 used to create the homepage link on the navigation bar, if the
@@ -245,13 +252,13 @@ the frames-based table of contents by clicking on
 .B frames
 in the navigation bar.
 .TP
-.BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
+.BI "\-o " dir ", \-\-output " dir
 The output directory for HTML files.  By default, HTML files are
 written to the
 .B html
 directory.
 .TP
-.B \-\-private, \-\-no\-private
+.B \-\-show\-private, \-\-no\-private
 These options control whether documentation is generated for private
 objects.  By default, HTML documentation includes private objects, and
 users can choose whether to view private objects or not, by clicking
@@ -360,11 +367,11 @@ end of their section.  If
 is "included," then inherited objects are mixed in with non-inherited
 objects.  The default format for LaTeX output is "listed."
 .TP
-.BI "\-n " name ", \-\-name " name
+.BI "\-\-name " name
 The name of the project whose documentation is being generated.  This
 is used on the title page, in the page header, and in the pdf metadata.
 .TP
-.BI "\-o " dir ", \-\-output " dir ", \-\-target " dir
+.BI "\-o " dir ", \-\-output " dir
 The output directory.  By default, HTML files are
 written to the
 .B html
@@ -372,7 +379,7 @@ directory, and LaTeX files are written to the
 .B latex
 directory.
 .TP
-.B \-\-private, \-\-no\-private
+.B \-\-show\-private, \-\-no\-private
 These options control whether documentation is generated for private
 objects.  By default, LaTeX output only includes documentation for
 public objects.
