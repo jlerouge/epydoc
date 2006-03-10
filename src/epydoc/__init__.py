@@ -80,7 +80,7 @@ to document, and produce API documentation using the following steps:
 """
 __docformat__ = 'epytext en'
 
-__version__ = '3.0 alpha'
+__version__ = '3.0alpha'
 """The version of epydoc"""
 
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
