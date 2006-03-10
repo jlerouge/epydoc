@@ -693,7 +693,7 @@ class HTMLWriter:
 
         # Footer material.
         self.write_navbar(out, 'trees')
-        self.write_footer(out, 'Trees')
+        self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
     # 2.4. Indices page
@@ -733,7 +733,7 @@ class HTMLWriter:
 
         # Footer material.
         self.write_navbar(out, 'indices')
-        self.write_footer(out, 'Index')
+        self.write_footer(out)
 
     write_identifier_index_header = compile_template(
         """
@@ -853,7 +853,7 @@ class HTMLWriter:
         self.write_breadcrumbs(out, 'help')
         out(help)
         self.write_navbar(out, 'help')
-        self.write_footer(out, 'Help')
+        self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
     # 2.6. Frames-based Table of Contents
