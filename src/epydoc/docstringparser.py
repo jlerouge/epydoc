@@ -9,6 +9,7 @@
 """
 Parse the docstrings of APIDoc objects.
 """
+__docformat__ = 'epytext en'
 
 
 ######################################################################

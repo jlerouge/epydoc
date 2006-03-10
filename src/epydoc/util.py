@@ -14,6 +14,7 @@ Miscellaneous utility functions that are used by multiple modules.
 @group Text processing: wordwrap, decode_with_backslashreplace,
     plaintext_to_html
 """
+__docformat__ = 'epytext en'
 
 import os, os.path, re
 

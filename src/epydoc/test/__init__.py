@@ -6,6 +6,11 @@
 #
 # $Id: apidoc.py 946 2006-03-10 00:40:50Z edloper $
 
+"""
+Regression testing.
+"""
+__docformat__ = 'epytext en'
+
 import unittest, doctest, epydoc, os, os.path
 
 def main():

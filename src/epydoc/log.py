@@ -21,7 +21,7 @@ to progress displays; but also with respect to message blocks).
 
 @group Message Severity Levels: DEBUG, INFO, WARNING, ERROR, FATAL
 """
-__docformat__ = 'plaintext en'
+__docformat__ = 'epytext en'
 
 import sys, os
 from sets import Set

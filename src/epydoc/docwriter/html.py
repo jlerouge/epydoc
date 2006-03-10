@@ -10,6 +10,7 @@
 The HTML output generator for epydoc.  The main interface provided by
 this module is the L{HTMLWriter} class.
 """
+__docformat__ = 'epytext en'
 
 import re, os, sys, codecs, sre_constants
 import urllib

@@ -52,6 +52,7 @@ perform individual steps in the creation of the documentation.
     _var_shadows_self, _fix_self_shadowing_var, _unreachable_name_for
 @group Inheritance: inherit_docs, _inherit_info
 """
+__docformat__ = 'epytext en'
 
 ######################################################################
 ## Contents

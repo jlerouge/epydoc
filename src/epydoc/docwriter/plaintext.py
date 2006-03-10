@@ -1,6 +1,15 @@
+# epydoc -- Plaintext output generation
+#
+# Copyright (C) 2005 Edward Loper
+# Author: Edward Loper <edloper@loper.org>
+# URL: <http://epydoc.sf.net>
+#
+# $Id$
+
 """
-Plaintext output generation
+Plaintext output generation.
 """
+__docformat__ = 'epytext en'
 
 from epydoc.apidoc import *
 import re

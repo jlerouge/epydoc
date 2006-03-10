@@ -46,6 +46,7 @@ Verbosity levels::
   1               bar             yes            yes       yes
   2               list            yes            yes       yes
 """
+__docformat__ = 'epytext en'
 
 import sys, os, time
 from optparse import OptionParser, OptionGroup
