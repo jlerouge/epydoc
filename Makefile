@@ -15,7 +15,7 @@ EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*)
 
 # What version of python to use?
-PYTHON = python2.3
+PYTHON = python2.4
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -182,15 +182,14 @@ doc/epydocgui-man.html: man/epydocgui.1
 ## Standard Library docs
 ##//////////////////////////////////////////////////////////////////////
 
-SLNAME = 'Python 2.3 Standard Library'
-SLURL = "http://www.python.org/doc/2.3/lib/lib.html"
-SLFILES = $(shell find /usr/lib/python2.3/ -name '*.py' -o -name '*.so' \
-	      |grep -v '/python2.3/config/' \
-	      |grep -v '/python2.3/lib-old/' \
-	      |grep -v '/python2.3/site-packages/' \
-              |grep -v '/__' \
-              |grep -v 'python2.3/encodings/idna.py')
-export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die?
+SLNAME = 'Python Standard Library'
+SLURL = "http://www.python.org/doc/lib/lib.html"
+SLFILES = $(shell find /usr/lib/$(PYTHON)/ -name '*.py' -o -name '*.so' \
+	      |grep -v "/$(PYTHON)/config/" \
+	      |grep -v "/$(PYTHON)/lib-old/" \
+	      |grep -v "/$(PYTHON)/site-packages/" \
+              |grep -v "/$(PYTHON)/__phello__\.foo\.py" )
+export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die.
 stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_STDLIB)
@@ -214,7 +213,7 @@ stdlib-pdf: .stdlib-pdf.up2date
 
 tests: test
 test:
-	python src/epydoc/test/__init__.py
+	$(PYTHON) src/epydoc/test/__init__.py
 
 ##//////////////////////////////////////////////////////////////////////
 ## Other test targets
