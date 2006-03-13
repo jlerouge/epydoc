@@ -284,7 +284,8 @@ class HTMLWriter:
               source code files for each python module.
         """
         self.docindex = docindex
-
+        self.contained_valdocs = self.docindex.contained_valdocs()
+        
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
         """The project's name (for the project link in the navbar)"""
@@ -353,6 +354,19 @@ class HTMLWriter:
             self._prj_link = ('<a class="navbar" target="_top" href="'+
                               self._prj_url+'">'+self._prj_link+'</a>')
 
+        # Figure out how many output files there will be (for progress
+        # reporting).
+        self.modules_with_sourcecode = [d for d in self.contained_valdocs
+                                        if (isinstance(d, ModuleDoc) and
+                                            d.filename not in (None, UNKNOWN))]
+        self._num_files = (len([d for d in self.contained_valdocs
+                                if isinstance(d, ClassDoc)]) +
+                           2*len([d for d in self.contained_valdocs
+                                if isinstance(d, ModuleDoc)]) +
+                           9)
+        if self._incl_sourcecode:
+            self._num_files += len(self.modules_with_sourcecode)
+            
     def _find_top_page(self, pagename):
         # [XXX]
         return 'trees.html'
@@ -374,19 +388,7 @@ class HTMLWriter:
         @raise OSError: If C{directory} cannot be created.
         @raise OSError: If any file cannot be created or written to.
         """
-        self.contained_valdocs = self.docindex.contained_valdocs()
-        
-        # Keep track of total number of files..
-        modules_with_sourcecode = [d for d in self.contained_valdocs
-                                   if (isinstance(d, ModuleDoc) and
-                                       d.filename not in (None, UNKNOWN))]
-        self._num_files = (len([d for d in self.contained_valdocs
-                                if isinstance(d, ClassDoc)]) +
-                           2*len([d for d in self.contained_valdocs
-                                if isinstance(d, ModuleDoc)]) +
-                           9)
-        if self._incl_sourcecode:
-            self._num_files += len(modules_with_sourcecode)
+        # For progress reporting:
         self._files_written = 0.
         
         # Keep track of failed xrefs, and report them at the end.
@@ -435,7 +437,7 @@ class HTMLWriter:
 
         # Write source code files.
         if self._incl_sourcecode:
-            for doc in modules_with_sourcecode:
+            for doc in self.modules_with_sourcecode:
                 filename = urllib.unquote(self.pysrc_url(doc))
                 self._write(self.write_sourcecode, directory, filename, doc)
 
