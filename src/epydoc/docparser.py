@@ -1166,12 +1166,13 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
                 set_variable(parent_docs[i], prev_line_doc, True)
                 break
 
-    if prev_line_doc.docstring in (None, UNKNOWN):
-        prev_line_doc.docstring = docstring
-        prev_line_doc.docstring_lineno = lineno
-    else:
-        # [XX] normalize whitespace between them?
-        prev_line_doc.docstring += docstring
+    if prev_line_doc.docstring not in (None, UNKNOWN):
+        log.warning("%s has both a comment-docstring and a normal "
+                    "(string) docstring; ignoring the comment-"
+                    "docstring." % prev_line_doc.canonical_name)
+        
+    prev_line_doc.docstring = docstring
+    prev_line_doc.docstring_lineno = lineno
 
     
 #/////////////////////////////////////////////////////////////////
