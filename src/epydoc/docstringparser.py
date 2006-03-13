@@ -405,6 +405,7 @@ def process_undocumented_field(api_doc, tag, arg, descr):
 def process_group_field(api_doc, tag, arg, descr):
     _check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=True)
     api_doc.group_specs.append( (arg, _descr_to_identifiers(descr)) )
+    # [xx] should this also set sort order?
 
 def process_deffield_field(api_doc, tag, arg, descr):
     _check(api_doc, tag, arg, expect_arg=True)
@@ -427,7 +428,7 @@ def process_todo_field(api_doc, tag, arg, descr):
 
 def process_sort_field(api_doc, tag, arg, descr):
     _check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=False)
-    api_doc.sort_spec += _descr_to_identifiers(descr)
+    api_doc.sort_spec = _descr_to_identifiers(descr) + api_doc.sort_spec
 
 # [xx] should I notice when they give a type for an unknown var?
 def process_type_field(api_doc, tag, arg, descr):
