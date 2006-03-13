@@ -1469,7 +1469,10 @@ class HTMLWriter:
             for base in doc.mro():
                 if base in grouped_inh_vars:
                     hdr = 'Inherited from %s' % self.href(base)
-                    self.write_group_header(out, hdr)
+                    tr_class = ''
+                    if len([v for v in grouped_inh_vars if v.is_public]) == 0:
+                        tr_class = ' class="private"'
+                    self.write_group_header(out, hdr, tr_class)
                     for var_doc in grouped_inh_vars[base]:
                         self.write_summary_line(out, var_doc, doc)
 
@@ -1485,22 +1488,25 @@ class HTMLWriter:
         #   - normal_vars -- for all other variables.
         listed_inh_vars = {}
         normal_vars = []
-        for i in range(len(var_docs)-1, -1, -1):
-            var_doc = var_docs[i]
+        for var_doc in var_docs:
             if var_doc.container != doc:
                 base = var_doc.container
                 if (base not in self.contained_valdocs
                     or self._inheritance == 'listed'):
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
-                    continue
                 elif self._inheritance == 'grouped':
                     grouped_inh_vars.setdefault(base,[]).append(var_doc)
-                    continue
-            normal_vars.append(var_doc)
+                else:
+                    normal_vars.append(var_doc)
+            else:
+                normal_vars.append(var_doc)
             
         # Write a header for the group.
         if name != '':
-            self.write_group_header(out, name)
+            tr_class = ''
+            if len([v for v in var_docs if v.is_public]) == 0:
+                tr_class = ' class="private"'
+            self.write_group_header(out, name, tr_class)
 
         # Write a line for each normal var:
         for var_doc in normal_vars:
@@ -2455,12 +2461,12 @@ class HTMLWriter:
 
     write_group_header = compile_template(
         '''
-        write_group_header(self, out, group, css_class="group")
+        write_group_header(self, out, group, tr_class)
         ''',
         # /------------------------- Template -------------------------\
         '''
-        <tr bgcolor="#e8f0f8" class="$css_class$">
-          <th colspan="2" class="$css_class$"
+        <tr bgcolor="#e8f0f8" $tr_class$>
+          <th colspan="2" class="group"
             >&nbsp;&nbsp;&nbsp;&nbsp;$group$</th></tr>
         ''')
         # \------------------------------------------------------------/
