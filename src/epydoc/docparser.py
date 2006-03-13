@@ -17,8 +17,6 @@ in those modules.
 
 C{DocParser} can be subclassed to extend the set of source code
 constructions that it supports.
-
-@bug: Instance vars are not created if they just have a docstring..
 """
 __docformat__ = 'epytext en'
 
@@ -103,16 +101,10 @@ several different ways:
 
   - [XX] fill this in!
 
-@group Entry Points: find, parse
-
-@group Line Processors: process_*
-@group Variable Manipulation: set_variable, del_variable
-@group Name Lookup: lookup_*
-
 """
 
 #////////////////////////////////////////////////////////////
-# Configuration Constants
+#{ Configuration Constants
 #////////////////////////////////////////////////////////////
 
 PARSE_TRY_BLOCKS = True
@@ -170,8 +162,11 @@ COMMENT_DOCSTRING_MARKER = '#: '
 """The prefix used to mark comments that contain attribute
 docstrings for variables."""
 
+COMMENT_START_GROUP_MARKER = '#{'
+COMMENT_END_GROUP_MARKER = '#}'
+
 #/////////////////////////////////////////////////////////////////
-# Top level: Module parsing
+#{ Module parser
 #/////////////////////////////////////////////////////////////////
 
 def parse_docs(filename=None, name=None, context=None, is_script=False):
@@ -286,7 +281,6 @@ def _parse_package(package_dir):
     package_file = os.path.join(package_dir, '__init__')
     return parse_docs(filename=package_file, context=parent_doc)
         
-
 # Special vars:
 # C{__docformat__}, C{__all__}, and C{__path__}.
 def handle_special_module_vars(module_doc):
@@ -295,6 +289,7 @@ def handle_special_module_vars(module_doc):
     if toktree is not None:
         try: module_doc.docformat = parse_string(toktree)
         except: pass
+        del module_doc.variables['__docformat__']
             
     # If __all__ is defined, parse its value.
     toktree = _module_var_toktree(module_doc, '__all__')
@@ -310,6 +305,7 @@ def handle_special_module_vars(module_doc):
                     var_doc.is_public = False
         except ParseError:
             pass # [xx]
+        del module_doc.variables['__all__']
 
     # If __path__ is defined, then extract its value (pkgs only)
     if module_doc.is_package:
@@ -319,6 +315,7 @@ def handle_special_module_vars(module_doc):
                 module_doc.path = parse_string_list(toktree)
             except ParseError:
                 pass # [xx]
+            del module_doc.variables['__path__']
 
 def _module_var_toktree(module_doc, name):
     var_doc = module_doc.variables.get(name)
@@ -329,7 +326,7 @@ def _module_var_toktree(module_doc, name):
         return var_doc.value.toktree
 
 #////////////////////////////////////////////////////////////
-# Module Lookup
+#{ Module Lookup
 #////////////////////////////////////////////////////////////
 
 def _find(name, package_doc=None):
@@ -446,7 +443,7 @@ def _get_filename(identifier, path=None):
         raise ImportError, 'No Python source file found.'
 
 #/////////////////////////////////////////////////////////////////
-# File tokenization loop
+#{ File tokenization loop
 #/////////////////////////////////////////////////////////////////
 
 def process_file(module_doc):
@@ -485,6 +482,20 @@ def process_file(module_doc):
     # declaration line and its decorators all at once.
     decorators = []
 
+    # A list of group names, one for each indentation level.  This is
+    # used to keep track groups that are defined by comment markers
+    # COMMENT_START_GROUP_MARKER and COMMENT_END_GROUP_MARKER.
+    groups = [None]
+
+    # When we encounter a comment start group marker, set this to the
+    # name of the group; but wait until we're ready to process the
+    # next line before we actually set groups[-1] to this value.  This
+    # is necessary because at the top of a block, the tokenizer gives
+    # us comments before the INDENT token; but if we encounter a group
+    # start marker at the top of a block, then we want it to apply
+    # inside that block, not outside it.
+    start_group = None
+
     # Check if the source file declares an encoding.
     encoding = _get_encoding(module_doc.filename)
 
@@ -504,24 +515,46 @@ def process_file(module_doc):
                 parent_docs.append(parent_docs[-1])
             else:
                 parent_docs.append(prev_line_doc)
+            groups.append(None)
                 
         # Dedent token: update the parent_doc stack.
         elif toktype == token.DEDENT:
             if line_toks == []:
                 parent_docs.pop()
+                groups.pop()
             else:
                 # This *should* only happen if the file ends on an
                 # indented line, with no final newline.
                 # (otherwise, this is the wrong thing to do.)
                 pass
             
-        # Line-internal newline token: ignore it.
+        # Line-internal newline token: if we're still at the start of
+        # the logical line, and we've seen one or more comment lines,
+        # then discard them: blank lines are not allowed between a
+        # comment block and the thing it describes.
         elif toktype == tokenize.NL:
-            pass
-        
+            if comments and not line_toks:
+                log.warning('Ignoring docstring comment block followed by '
+                            'a blank line in %r on line %r' %
+                            (module_doc.filename, srow-1))
+                comments = []
+                
         # Comment token: add to comments if appropriate.
         elif toktype == tokenize.COMMENT:
-            comments.append( [toktext, srow])
+            if toktext.startswith(COMMENT_DOCSTRING_MARKER):
+                comment_line = toktext[len(COMMENT_DOCSTRING_MARKER):].rstrip()
+                comments.append( [comment_line, srow])
+            elif toktext.startswith(COMMENT_START_GROUP_MARKER):
+                start_group = toktext[len(COMMENT_START_GROUP_MARKER):].strip()
+            elif toktext.startswith(COMMENT_END_GROUP_MARKER):
+                for i in range(len(groups)-1, -1, -1):
+                    if groups[i]:
+                        groups[i] = None
+                        break
+                else:
+                    log.warning("Got group end marker without a corresponding "
+                                "start marker in %r on line %r" % 
+                                (module_doc.filename, srow))
             
         # Normal token: Add it to line_toks.  (If it's a non-unicode
         # string literal, then we need to re-encode using the file's
@@ -544,6 +577,10 @@ def process_file(module_doc):
             
         # End of line token: parse the logical line & process it.
         else:
+            if start_group:
+                groups[-1] = start_group
+                start_group = None
+
             if parent_docs[-1] != 'skip_block':
                 try:
                     prev_line_doc = process_line(
@@ -553,6 +590,18 @@ def process_file(module_doc):
                     raise ParseError('Error during parsing: invalid '
                                      'syntax (%s, line %d)' %
                                      (module_doc.filename, lineno))
+
+                # grouping...
+                if groups[-1] and prev_line_doc:
+                    if isinstance(prev_line_doc, VariableDoc):
+                        add_to_group(prev_line_doc.container,
+                                     prev_line_doc, groups[-1])
+                    elif isinstance(parent_docs[-1], NamespaceDoc):
+                        add_to_group(parent_docs[-1], prev_line_doc,
+                                     groups[-1])
+                    else:
+                        log.warning("Not in a namespace!")
+                        
             else:
                 prev_line_doc = None
 
@@ -560,9 +609,25 @@ def process_file(module_doc):
             line_toks = []
             lineno = None
             comments = []
+            
+def add_to_group(container, api_doc, group_name):
+    if container.group_specs == UNKNOWN:
+        container.group_specs = []
+
+    if isinstance(api_doc, VariableDoc):
+        var_name = api_doc.name
+    else:
+        var_name = api_doc.canonical_name[-1]
+
+    for (name, group_vars) in container.group_specs:
+        if name == group_name:
+            group_vars.append(var_name)
+            return
+    else:
+        container.group_specs.append( (group_name, [var_name]) )
 
 #/////////////////////////////////////////////////////////////////
-# Shallow parser -- Convert a list of tokens to a token tree.
+#{ Shallow parser
 #/////////////////////////////////////////////////////////////////
 
 def shallow_parse(line_toks):
@@ -599,7 +664,7 @@ def shallow_parse(line_toks):
     return stack[0]
 
 #/////////////////////////////////////////////////////////////////
-# Line processing Methods
+#{ Line processing
 #/////////////////////////////////////////////////////////////////
 # The methods process_*() are used to handle lines.
 
@@ -639,12 +704,25 @@ def process_line(line, parent_docs, prev_line_doc, lineno,
         return None
         # [xx] do something with control structures like for/if?
 
+
+def process_special_comment(comments, parent_docs, lineno):
+    comment = '\n'.join([line for (line, lineno) in comments]).strip()
+    if comment.startswith('@group:'):
+        log.debug('start a group! %r' % comment[7:].strip())
+    elif comment == '@endgroup':
+        log.debug('end a group!')
+    else:
+        module_doc = parent_docs[0]
+
 #/////////////////////////////////////////////////////////////////
 # Line handler: control flow
 #/////////////////////////////////////////////////////////////////
 
-CONTROL_FLOW_KEYWORDS = ['if', 'elif', 'else', 'while',
-                         'for', 'try', 'except', 'finally']
+CONTROL_FLOW_KEYWORDS = [
+    #: A list of the control flow keywords.  If a line begins with
+    #: one of these keywords, then it should be handled by
+    #: C{process_control_flow_line}.
+    'if', 'elif', 'else', 'while', 'for', 'try', 'except', 'finally']
 
 def process_control_flow_line(line, parent_docs, prev_line_doc,
                               lineno, comments, decorators):
@@ -965,7 +1043,7 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
             # unfortunately is necessary because we won't know if
             # this assignment line is followed by a docstring
             # until later.)
-            if not is_instvar or comments_include_docstring(comments):
+            if (not is_instvar) or comments:
                 set_variable(lhs_parent, var_doc, True)
 
             # If it's the only var, then return the VarDoc for use
@@ -1080,7 +1158,7 @@ def process_one_line_block(line, parent_docs, prev_line_doc, lineno,
                              lineno, comments, decorators)
     doc2 = process_line(line[i+1:], parent_docs+[doc1],
                              doc1, lineno, None, [])
-    return None # hm.. doc1?
+    return doc1
 
 #/////////////////////////////////////////////////////////////////
 # Line handler: semicolon-separated statements
@@ -1354,9 +1432,8 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
 
     return class_doc
 
-
 #/////////////////////////////////////////////////////////////////
-# Parsing methods
+#{ Parsing
 #/////////////////////////////////////////////////////////////////
 
 def dotted_names_in(elt_list):
@@ -1529,7 +1606,7 @@ def parse_string_list(elt_list):
     return string_list
 
 #/////////////////////////////////////////////////////////////////
-# Variable Manipulation
+#{ Variable Manipulation
 #/////////////////////////////////////////////////////////////////
 
 def set_variable(namespace, var_doc, preserve_docstring=False):
@@ -1577,7 +1654,7 @@ def del_variable(namespace, name):
                               DottedName(*name[1:]))
             
 #/////////////////////////////////////////////////////////////////
-# Name Lookup
+#{ Name Lookup
 #/////////////////////////////////////////////////////////////////
 
 def lookup_name(identifier, parent_docs):
@@ -1642,40 +1719,16 @@ def lookup_value(dotted_name, parent_docs):
     return var_doc.value
 
 #/////////////////////////////////////////////////////////////////
-# Docstring Comments
+#{ Docstring Comments
 #/////////////////////////////////////////////////////////////////
-
-def comments_include_docstring(comments):
-    return (len(comments) > 0 and
-            comments[-1][0].startswith(COMMENT_DOCSTRING_MARKER))
 
 def add_docstring_from_comments(api_doc, comments):
-    if api_doc is None or not comments: return        
-
-    # The length of the marker (to strip it off each line)
-    marker_len = len(COMMENT_DOCSTRING_MARKER)
-
-    # Extract a docstring from the comments.  To be considered a
-    # docstring, the comments must begin with the comment
-    # docstring marker.  The docstring comments must also be
-    # contiguous (i.e., no intervening non-marked comments).
-    docstring = ''
-    docstring_lineno = None
-    for comment, comment_lineno in comments:
-        if comment.startswith(COMMENT_DOCSTRING_MARKER):
-            docstring += comment[marker_len:].rstrip()+'\n'
-            if docstring_lineno is None:
-                docstring_lineno = comment_lineno
-        else:
-            docstring = ''
-            docstring_lineno = None
-
-    if docstring:
-        api_doc.docstring = docstring
-        api_doc.docstring_lineno = docstring_lineno
+    if api_doc is None or not comments: return
+    api_doc.docstring = '\n'.join([line for (line, lineno) in comments])
+    api_doc.docstring_lineno = comments[0][1]
 
 #/////////////////////////////////////////////////////////////////
-# Tree tokens
+#{ Tree tokens
 #/////////////////////////////////////////////////////////////////
 
 def pp_toktree(elts, spacing='normal', indent=0):
@@ -1715,9 +1768,9 @@ def pp_toktree(elts, spacing='normal', indent=0):
                 s = '%s %s' % (s, elt_s)
     return s
         
-######################################################################
-## Helper Functions
-######################################################################
+#/////////////////////////////////////////////////////////////////
+#{ Helper Functions
+#/////////////////////////////////////////////////////////////////
 
 def _get_encoding(filename):
     """
