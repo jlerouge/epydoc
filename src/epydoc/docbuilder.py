@@ -780,8 +780,7 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
 
     return baselist1
 
-def merge_posarg_defaults(defaults1, defaults2, precedence,
-                          cyclecheck, path):
+def merge_posarg_defaults(defaults1, defaults2, precedence, cyclecheck, path):
     if len(defaults1) != len(defaults2):
         if precedence == 'introspect': return defaults1
         else: return defaults2
@@ -796,6 +795,12 @@ def merge_posarg_defaults(defaults1, defaults2, precedence,
             defaults.append(d2)
     return defaults
 
+def merge_docstring(docstring1, docstring2, precedence, cyclecheck, path):
+    if docstring1 in (None, UNKNOWN) or precedence=='parse':
+        return docstring2
+    else:
+        return docstring1
+
 register_attribute_mergefunc('variables', merge_variables)
 register_attribute_mergefunc('value', merge_value)
 # [xx] are these useful/necessary?
@@ -808,6 +813,7 @@ register_attribute_mergefunc('fdel', merge_fdel)
 register_attribute_mergefunc('imported_from', merge_imported_from)
 register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
+register_attribute_mergefunc('docstring', merge_docstring)
 
 ######################################################################
 ## Import Linking
