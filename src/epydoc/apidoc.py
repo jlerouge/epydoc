@@ -681,7 +681,12 @@ class NamespaceDoc(ValueDoc):
                     self.groups[group_name].append(elt)
                     del ungrouped[i]
     
-        # [xx] check for empty groups???
+        # Delete any empty groups
+        for i, group in enumerate(self.group_names[:]):
+            if not self.groups[group] and group != '':
+                log.warning('Empty group %r in %s' %
+                            (group, self.canonical_name))
+                del self.group_names[i], self.groups[group]
         
         
         
