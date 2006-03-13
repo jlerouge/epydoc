@@ -146,7 +146,7 @@ table.summary, table.details, table.index
                    { background: #e8f0f8; color: #000000; } 
 tr.summary, tr.details, tr.index
                    { background: #70b0f0; color: #000000; } 
-tr.group           { background: #c0e0f8; color: #000000; } 
+th.group           { background: #c0e0f8; color: #000000; } 
 
 /* Details Sections */
 table.func-details { background: #e8f0f8; color: #000000;
@@ -229,7 +229,7 @@ table.summary, table.details, table.index
 tr.summary         { background: #c0e0e0; color: #000000; }
 tr.details, tr.index
                    { background: #c0e0e0; color: #000000; }
-tr.group           { background: #bad8e0; color: #000000; }
+th.group           { background: #bad8e0; color: #000000; }
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
@@ -321,7 +321,7 @@ table.summary, table.details, table.index
 tr.summary         { background: #dcf4fc; color: #000000; }
 tr.details, tr.index
                    { background: #dcf4fc; color: #000000; }
-tr.group           { background: #bad8e0; color: #000000; }
+th.group           { background: #bad8e0; color: #000000; }
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
