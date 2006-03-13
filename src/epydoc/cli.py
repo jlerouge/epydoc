@@ -277,10 +277,9 @@ def main(options, names):
             log.start_progress('Writing HTML docs to %r' % options.target)
         else:
             log.start_progress('Writing HTML docs')
-            html_writer.write(options.target)
-            log.end_progress()
+        html_writer.write(options.target)
+        log.end_progress()
     elif options.action == 'text':
-        # hmm
         log.start_progress('Writing output')
         plaintext_writer = PlaintextWriter()
         s = ''
@@ -293,10 +292,13 @@ def main(options, names):
 
     # If we supressed docstring warnings, then let the user know.
     if logger is not None and logger.supressed_docstring_warning:
-        log.warning("%d markup error(s) were found while processing "
-                    "docstrings.  Use the verbose switch (-v) to "
-                    "display markup errors." %
-                    logger.supressed_docstring_warning)
+        if logger.supressed_docstring_warning == 1:
+            prefix = '1 markup error was found'
+        else:
+            prefix = ('%d markup errors were found' %
+                      logger.supressed_docstring_warning)
+        log.warning("%s while processing docstrings.  Use the verbose "
+                    "switch (-v) to display markup errors." % prefix)
 
     # Basic timing breakdown:
     if options.verbosity >= 2 and logger is not None:
