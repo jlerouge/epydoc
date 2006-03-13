@@ -104,9 +104,10 @@ several different ways:
 """
 
 #////////////////////////////////////////////////////////////
-#{ Configuration Constants
+# Configuration Constants
 #////////////////////////////////////////////////////////////
 
+#{ Configuration Constants: Control Flow 
 PARSE_TRY_BLOCKS = True
 """Should the contents of C{try} blocks be examined?"""
 PARSE_EXCEPT_BLOCKS = True
@@ -122,6 +123,7 @@ PARSE_WHILE_BLOCKS = False
 PARSE_FOR_BLOCKS = False
 """Should the contents of C{for} blocks be examined?"""
 
+#{ Configuration Constants: Imports
 IMPORT_HANDLING = 'link'
 """What should the C{DocParser} do when it encounters an import
 statement?
@@ -158,12 +160,24 @@ it do to the documentation of the decorated function?
     knowledge about what value the decorator returns.
 """
 
+#{ Configuration Constants: Comment docstrings
 COMMENT_DOCSTRING_MARKER = '#: '
 """The prefix used to mark comments that contain attribute
 docstrings for variables."""
 
-COMMENT_START_GROUP_MARKER = '#{'
-COMMENT_END_GROUP_MARKER = '#}'
+#{ Configuration Constants: Grouping
+START_GROUP_MARKER = '#{'
+"""The prefix used to mark a comment that starts a group.  This marker
+should be followed (on the same line) by the name of the group.
+Following a start-group comment, all variables defined at the same
+indentation level will be assigned to this group name, until the
+parser reaches the end of the file, a matching end-group comment, or
+another start-group comment at the same indentation level.
+"""
+
+END_GROUP_MARKER = '#}'
+"""The prefix used to mark a comment that ends a group.  See
+L{START_GROUP_MARKER}."""
 
 #/////////////////////////////////////////////////////////////////
 #{ Module parser
@@ -484,7 +498,7 @@ def process_file(module_doc):
 
     # A list of group names, one for each indentation level.  This is
     # used to keep track groups that are defined by comment markers
-    # COMMENT_START_GROUP_MARKER and COMMENT_END_GROUP_MARKER.
+    # START_GROUP_MARKER and END_GROUP_MARKER.
     groups = [None]
 
     # When we encounter a comment start group marker, set this to the
@@ -544,9 +558,9 @@ def process_file(module_doc):
             if toktext.startswith(COMMENT_DOCSTRING_MARKER):
                 comment_line = toktext[len(COMMENT_DOCSTRING_MARKER):].rstrip()
                 comments.append( [comment_line, srow])
-            elif toktext.startswith(COMMENT_START_GROUP_MARKER):
-                start_group = toktext[len(COMMENT_START_GROUP_MARKER):].strip()
-            elif toktext.startswith(COMMENT_END_GROUP_MARKER):
+            elif toktext.startswith(START_GROUP_MARKER):
+                start_group = toktext[len(START_GROUP_MARKER):].strip()
+            elif toktext.startswith(END_GROUP_MARKER):
                 for i in range(len(groups)-1, -1, -1):
                     if groups[i]:
                         groups[i] = None
@@ -633,7 +647,7 @@ def add_to_group(container, api_doc, group_name):
 def shallow_parse(line_toks):
     """
     Given a flat list of tokens, return a nested tree structure
-    (called a C{token tree}), whose leaves are identical to the
+    (called a X{token tree}), whose leaves are identical to the
     original list, but whose structure reflects the structure
     implied by the grouping tokens (i.e., parenthases, braces, and
     brackets).  If the parenthases, braces, and brackets do not
