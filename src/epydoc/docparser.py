@@ -931,7 +931,10 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
         return None
     
     # Evaluate the right hand side.
-    rhs_val, is_alias = rhs_to_valuedoc(rhs, parent_docs)
+    if not is_instvar:
+        rhs_val, is_alias = rhs_to_valuedoc(rhs, parent_docs)
+    else:
+        rhs_val, is_alias = UNKNOWN, False
 
     # Assign the right hand side value to each left hand side.
     # (Do the rightmost assignment first)
@@ -963,7 +966,7 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
             # this assignment line is followed by a docstring
             # until later.)
             if not is_instvar or comments_include_docstring(comments):
-                set_variable(lhs_parent, var_doc)
+                set_variable(lhs_parent, var_doc, True)
 
             # If it's the only var, then return the VarDoc for use
             # as the new `prev_line_doc`.
@@ -982,7 +985,7 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
                                       is_imported=False,
                                       is_alias=is_alias,
                                       is_instvar=is_instvar)
-                set_variable(lhs_parent, var_doc)
+                set_variable(lhs_parent, var_doc, True)
 
         # If we have multiple left-hand-sides, then all but the
         # rightmost one are considered aliases.
@@ -1160,7 +1163,7 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
         prev_line_doc.docstring in (None, UNKNOWN)):
         for i in range(len(parent_docs)-1, -1, -1):
             if isinstance(parent_docs[i], ClassDoc):
-                set_variable(parent_docs[i], prev_line_doc)
+                set_variable(parent_docs[i], prev_line_doc, True)
                 break
 
     if prev_line_doc.docstring in (None, UNKNOWN):
@@ -1528,7 +1531,13 @@ def parse_string_list(elt_list):
 # Variable Manipulation
 #/////////////////////////////////////////////////////////////////
 
-def set_variable(namespace, var_doc):
+def set_variable(namespace, var_doc, preserve_docstring=False):
+    """
+    Add var_doc to namespace.  If namespace already contains a
+    variable with the same name, then discard the old variable.  If
+    C{preserve_docstring} is true, then keep the old variable's
+    docstring when overwriting a variable.
+    """
     # Choose which dictionary we'll be storing the variable in.
     if not isinstance(namespace, NamespaceDoc):
         return
@@ -1541,6 +1550,10 @@ def set_variable(namespace, var_doc):
         if (old_var_doc.is_alias == False and
             old_var_doc.value != UNKNOWN):
             old_var_doc.value.canonical_name = UNKNOWN
+        if (preserve_docstring and var_doc.docstring in (None, UNKNOWN) and
+            old_var_doc.docstring not in (None, UNKNOWN)):
+            var_doc.docstring = old_var_doc.docstring
+            var_doc.docstring_lineno = old_var_doc.docstring_lineno
     # Add the variable to the namespace.
     namespace.variables[var_doc.name] = var_doc
     namespace.sort_spec.append(var_doc.name)
