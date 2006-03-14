@@ -28,5 +28,5 @@ setup(name="epydoc",
       license=LICENSE,
       url=URL,
       scripts=SCRIPTS,
-      packages=['epydoc', 'epydoc.markup', 'epydoc.test'])
+      packages=['epydoc', 'epydoc.markup', 'epydoc.test', 'epydoc.docwriter'])
 
