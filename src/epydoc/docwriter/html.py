@@ -372,7 +372,7 @@ class HTMLWriter:
         return 'trees.html'
     
     #////////////////////////////////////////////////////////////
-    # 1. Interface Methods
+    #{ 1. Interface Methods
     #////////////////////////////////////////////////////////////
 
     def write(self, directory=None):
@@ -461,6 +461,12 @@ class HTMLWriter:
                     estr += '      (from %s)\n' % name
             log.docstring_warning(estr)
 
+#         # [XX] This is still under construction
+#         for v in self.docindex.root:
+#             if isinstance(v, ModuleDoc):
+#                 filename = urllib.unquote(self.url(v))[:-5]+'.gif'
+#                 self.write_import_graph(v, directory, filename)
+
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
         self._files_written += 1
@@ -482,7 +488,7 @@ class HTMLWriter:
             os.mkdir(directory)
         
     #////////////////////////////////////////////////////////////
-    # 2.1. Module Pages
+    #{ 2.1. Module Pages
     #////////////////////////////////////////////////////////////
 
     def write_module(self, out, doc):
@@ -548,7 +554,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.??. Source Code Pages
+    #{ 2.??. Source Code Pages
     #////////////////////////////////////////////////////////////
 
     def write_sourcecode(self, out, doc):
@@ -573,7 +579,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.2. Class Pages
+    #{ 2.2. Class Pages
     #////////////////////////////////////////////////////////////
 
     def write_class(self, out, doc):
@@ -660,7 +666,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.3. Trees page
+    #{ 2.3. Trees page
     #////////////////////////////////////////////////////////////
 
     def write_trees(self, out):
@@ -698,7 +704,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.4. Indices page
+    #{ 2.4. Indices page
     #////////////////////////////////////////////////////////////
 
     def write_indices(self, out):
@@ -821,7 +827,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 2.5. Help Page
+    #{ 2.5. Help Page
     #////////////////////////////////////////////////////////////
 
     def write_help(self, out):
@@ -858,7 +864,7 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    # 2.6. Frames-based Table of Contents
+    #{ 2.6. Frames-based Table of Contents
     #////////////////////////////////////////////////////////////
     
     write_frames_index = compile_template(
@@ -1006,7 +1012,7 @@ class HTMLWriter:
         self.write_footer(out, short=True)
 
     #////////////////////////////////////////////////////////////
-    # 2.7. Project homepage (index.html)
+    #{ 2.7. Project homepage (index.html)
     #////////////////////////////////////////////////////////////
 
     def write_homepage(self, directory):
@@ -1069,7 +1075,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 2.8. Stylesheet (epydoc.css)
+    #{ 2.8. Stylesheet (epydoc.css)
     #////////////////////////////////////////////////////////////
 
     def write_css(self, directory, cssname):
@@ -1101,7 +1107,7 @@ class HTMLWriter:
         cssfile.close()
 
     #////////////////////////////////////////////////////////////
-    # 2.9. Javascript (epydoc.js)
+    #{ 2.9. Javascript (epydoc.js)
     #////////////////////////////////////////////////////////////
 
     def write_javascript(self, directory):
@@ -1191,7 +1197,69 @@ class HTMLWriter:
     '''.strip()
 
     #////////////////////////////////////////////////////////////
-    # 3.1. Page Header
+    #{ 2.10. Graphs
+    #////////////////////////////////////////////////////////////
+
+    # [xx] Requires dot!
+    def write_import_graph(self, doc, directory, filename):
+        log.progress(self._files_written/self._num_files, filename)
+        
+        # What do we import?
+        imports = {}
+        for name in doc.imports:
+            for i in range(len(name), 0, -1):
+                val_doc = self.docindex.get_valdoc(DottedName(*name[:i]))
+                if isinstance(val_doc, ModuleDoc):
+                    src = val_doc
+                    var_name = '.'.join(name[i:])
+                    imports.setdefault(src,[]).append(var_name)
+                    break
+
+        # Who imports us?
+        exports = {}
+        for other in self.contained_valdocs:
+            if isinstance(other, ModuleDoc):
+                for name in other.imports:
+                    if doc.canonical_name.dominates(name):
+                        dst = other
+                        var_name ='.'.join(name[len(other.canonical_name):])
+                        exports.setdefault(dst,[]).append(var_name)
+
+        # Now make a graph.
+        graph = ['digraph %s-imports {' % doc.canonical_name,
+                 'rankdir="LR"',
+                 'node [shape="box",height=0,width="1"]',
+                 'edge [weight="10000",sametail,len="1"]',
+                 'self [label="%s",style="filled"]' % doc.canonical_name,
+                 ]
+        for i, (src, names) in enumerate(imports.items()):
+            graph.append('i%d [label="%s",href="%s"]' %
+                         (i, src.canonical_name, self.url(src)))
+            graph.append('self -> i%d [href="%s",tooltip="%s"]' %
+                         (i, self.url(src), ', '.join(names)))
+        for i, (dst, names) in enumerate(exports.items()):
+            graph.append('o%d [label="%s",href="%s"]' % 
+                         (i, dst.canonical_name, self.url(dst)))
+            graph.append('o%d -> self [href="%s",tooltip="%s"]' %
+                         (i, self.url(dst), ', '.join(names)))
+        graph.append('}')
+
+        # Write it!
+        from os import popen
+        path = os.path.join(directory, filename)
+        pipe = os.popen('dot -Tgif -o %s' % path, 'w')
+        pipe.write('\n'.join(graph))
+        pipe.close()
+
+        # coordinate map for client-side image map.
+        # <img src="..." usemap="#name">
+        path = os.path.join(directory, filename[:-3]+'cmapx')
+        pipe = os.popen('dot -Tcmapx -o %s' % path, 'w')
+        pipe.write('\n'.join(graph))
+        pipe.close()
+
+    #////////////////////////////////////////////////////////////
+    #{ 3.1. Page Header
     #////////////////////////////////////////////////////////////
 
     write_header = compile_template(
@@ -1220,7 +1288,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 3.2. Page Footer
+    #{ 3.2. Page Footer
     #////////////////////////////////////////////////////////////
 
     write_footer = compile_template(
@@ -1260,7 +1328,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 3.3. Navigation Bar
+    #{ 3.3. Navigation Bar
     #////////////////////////////////////////////////////////////
 
     write_navbar = compile_template(
@@ -1341,7 +1409,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 3.4. Breadcrumbs
+    #{ 3.4. Breadcrumbs
     #////////////////////////////////////////////////////////////
 
     write_breadcrumbs = compile_template(
@@ -1419,7 +1487,7 @@ class HTMLWriter:
         return '%s&nbsp;%s' % (self.doc_kind(doc), doc.canonical_name[-1])
 
     #////////////////////////////////////////////////////////////
-    # 3.5. Summary Tables
+    #{ 3.5. Summary Tables
     #////////////////////////////////////////////////////////////
 
     def write_summary_table(self, out, heading, doc, value_type):
@@ -1470,7 +1538,8 @@ class HTMLWriter:
                 if base in grouped_inh_vars:
                     hdr = 'Inherited from %s' % self.href(base)
                     tr_class = ''
-                    if len([v for v in grouped_inh_vars if v.is_public]) == 0:
+                    if len([v for v in grouped_inh_vars[base]
+                            if v.is_public]) == 0:
                         tr_class = ' class="private"'
                     self.write_group_header(out, hdr, tr_class)
                     for var_doc in grouped_inh_vars[base]:
@@ -1617,7 +1686,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # 3.6. Details Lists
+    #{ 3.6. Details Lists
     #////////////////////////////////////////////////////////////
 
     def write_details_list(self, out, heading, doc, value_type):
@@ -2039,7 +2108,7 @@ class HTMLWriter:
 
 
     #////////////////////////////////////////////////////////////
-    # Base Tree
+    #{ Base Tree
     #////////////////////////////////////////////////////////////
 
     def base_tree(self, doc, width=None, postfix=''):
@@ -2096,7 +2165,7 @@ class HTMLWriter:
             return str(base.canonical_name)
     
     #////////////////////////////////////////////////////////////
-    # Function Signatures
+    #{ Function Signatures
     #////////////////////////////////////////////////////////////
 
     def function_signature(self, api_doc, css_class='sig',
@@ -2148,7 +2217,7 @@ class HTMLWriter:
     
 
     #////////////////////////////////////////////////////////////
-    # Import Lists
+    #{ Import Lists
     #////////////////////////////////////////////////////////////
         
     def write_imports(self, out, doc):
@@ -2163,11 +2232,11 @@ class HTMLWriter:
         out('\n</p>\n')
 
     #////////////////////////////////////////////////////////////
-    # Function Attributes
+    #{ Function Attributes
     #////////////////////////////////////////////////////////////
         
     #////////////////////////////////////////////////////////////
-    # Module Trees
+    #{ Module Trees
     #////////////////////////////////////////////////////////////
 
     def write_module_tree(self, out):
@@ -2227,7 +2296,7 @@ class HTMLWriter:
 
 
     #////////////////////////////////////////////////////////////
-    # Class trees
+    #{ Class trees
     #////////////////////////////////////////////////////////////
 
 
@@ -2294,7 +2363,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
     
     #////////////////////////////////////////////////////////////
-    # Standard Fields
+    #{ Standard Fields
     #////////////////////////////////////////////////////////////
 
     write_standard_fields = compile_template(
@@ -2342,7 +2411,7 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    # Term index generation
+    #{ Term index generation
     #////////////////////////////////////////////////////////////
     
     def _get_index_terms(self, parsed_docstring, link, terms, links):
@@ -2415,7 +2484,7 @@ class HTMLWriter:
         return [(k, terms[k], links[k]) for k in keys]
                     
     #////////////////////////////////////////////////////////////
-    # Helper functions
+    #{ Helper functions
     #////////////////////////////////////////////////////////////
 
     # [XX] Is it worth-while to pull the anchor tricks that I do here?

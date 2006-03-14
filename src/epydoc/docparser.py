@@ -257,7 +257,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
 
         # Create a new ModuleDoc for the module, & add it to the cache.
         module_doc = ModuleDoc(canonical_name=module_name, variables={},
-                               sort_spec=[],
+                               sort_spec=[], imports=[],
                                filename=filename, package=context,
                                is_package=is_pkg, submodules=[])
         _moduledoc_cache[filename] = module_doc
@@ -842,6 +842,9 @@ def _process_fromstar_import(src, parent_docs):
     C{'introspect'}, then the list of exports is found by importing
     and introspecting C{M{<src>}}.
     """
+    # Record the import
+    parent_docs[0].imports.append(src) # mark that it's .*??
+    
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If src is package-local, then convert it to a global name.
@@ -899,11 +902,14 @@ def _import_var(name, parent_docs):
     C{'a'} in parentdoc containing a proxy module; and a variable
     C{'b'} in the proxy module containing a proxy value.
     """
+    # Record the import
+    parent_docs[0].imports.append(name)
+    
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If name is package-local, then convert it to a global name.
     name = _global_name(name, parent_docs)
-    
+
     # [xx] add check for if we already have the source docs in our
     # cache??
 
@@ -953,6 +959,9 @@ def _import_var_as(src, name, parent_docs):
     value with C{imported_from} attributes pointing to the
     imported object).
     """
+    # Record the import
+    parent_docs[0].imports.append(src)
+    
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If src is package-local, then convert it to a global name.

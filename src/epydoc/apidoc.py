@@ -704,6 +704,8 @@ class ModuleDoc(NamespaceDoc):
         submodule that is shadowed by a variable with the same name.)
     @ivar filename: The name of the file that defines the module.
     @type filename: C{string}
+
+    @ivar imports: list of names..?
     """
     package = UNKNOWN
     docformat = UNKNOWN
@@ -711,6 +713,8 @@ class ModuleDoc(NamespaceDoc):
     is_package = UNKNOWN
     filename = UNKNOWN
     path = UNKNOWN
+
+    imports = UNKNOWN
 
     def valdoc_links(self):
         val_docs = []
