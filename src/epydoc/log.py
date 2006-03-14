@@ -140,29 +140,35 @@ def remove_logger(logger):
 # The following methods all just delegate to the corresponding 
 # methods in the Logger class (above) for each registered logger.
 
-def fatal(message):
+def fatal(*messages):
     """Display the given fatal message."""
-    for logger in _loggers: logger.log(FATAL, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(FATAL, message)
     
-def error(message):
+def error(*messages):
     """Display the given error message."""
-    for logger in _loggers: logger.log(ERROR, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(ERROR, message)
     
-def warning(message):
+def warning(*messages):
     """Display the given warning message."""
-    for logger in _loggers: logger.log(WARNING, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(WARNING, message)
     
-def docstring_warning(message):
+def docstring_warning(*messages):
     """Display the given docstring warning message."""
-    for logger in _loggers: logger.log(DOCSTRING_WARNING, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(DOCSTRING_WARNING, message)
     
-def info(message):
+def info(*messages):
     """Display the given informational message."""
-    for logger in _loggers: logger.log(INFO, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(INFO, message)
     
-def debug(message):
+def debug(*messages):
     """Display the given debugging message."""
-    for logger in _loggers: logger.log(DEBUG, '%s' % message)
+    message = ' '.join(['%s' % (m,) for m in messages])
+    for logger in _loggers: logger.log(DEBUG, message)
     
 def start_block(header):
     for logger in _loggers: logger.start_block(header)
