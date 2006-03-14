@@ -62,6 +62,7 @@ assignments, is_imported and is_instvar will always be False.)
     ModuleDoc for test [0]
      +- canonical_name = DottedName('test')
      +- filename = ...
+     +- imports = []
      +- is_package = False
      +- package = None
      +- sort_spec = [u'x', u'y', u'z']
@@ -350,7 +351,7 @@ it.
      +- docstring = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
-           +- docstring = u'comment docstring for x\n'
+           +- docstring = u'comment docstring for x'
            +- name = u'x'
 
     >>> runparser(s="""
@@ -365,7 +366,8 @@ it.
            +- docstring = u'comment docstring for x.\n(can be m...
            +- name = u'x'
 
-If comments and a string constant are both used, they will be combined:
+If comments and a string constant are both used, then the string
+constant takes precedence:
 
     >>> runparser(s="""
     ...     #: comment1
@@ -376,7 +378,7 @@ If comments and a string constant are both used, they will be combined:
      +- docstring = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
-           +- docstring = u'comment1\ncomment2\nstring'
+           +- docstring = 'string'
            +- name = u'x'
 
 Functions
@@ -711,17 +713,13 @@ Instance Variables
                     |     +- RoutineDoc for test.A.__init__ [4]
                     |        +- docstring = <UNKNOWN>
                     +- y => VariableDoc for test.A.y [5]
-                    |  +- docstring = u'docstring for y\n'
+                    |  +- docstring = u'docstring for y'
                     |  +- is_instvar = True
-                    |  +- value
-                    |     +- ValueDoc [6]
-                    |        +- docstring = <UNKNOWN>
-                    +- z => VariableDoc for test.A.z [7]
+                    |  +- value = <UNKNOWN>
+                    +- z => VariableDoc for test.A.z [6]
                        +- docstring = 'docstring for z'
                        +- is_instvar = True
-                       +- value
-                          +- ValueDoc [8]
-                             +- docstring = <UNKNOWN>
+                       +- value = <UNKNOWN>
 
 Assignments Into Namespaces
 ===========================
