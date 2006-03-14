@@ -575,7 +575,8 @@ def get_docformat(api_doc, docindex):
     except: return DEFAULT_DOCFORMAT
 
 def unindent_docstring(docstring):
-    # [xx] copied from introspect.
+    # [xx] copied from inspect.getdoc(); we can't use inspect.getdoc()
+    # itself, since it expects an object, not a string.
     
     if docstring == '': return ''
     lines = docstring.expandtabs().split('\n')
@@ -583,7 +584,7 @@ def unindent_docstring(docstring):
     # Find minimum indentation of any non-blank lines after first line.
     margin = sys.maxint
     for line in lines[1:]:
-        content = len(line.strip())
+        content = len(line.lstrip())
         if content:
             indent = len(line) - content
             margin = min(margin, indent)
