@@ -347,8 +347,6 @@ def _profile():
 ## Logging
 ######################################################################
 
-import curses
-
 class ConsoleLogger(log.Logger):
     TERM_WIDTH = 75
     """The width of the console terminal."""
@@ -377,6 +375,7 @@ class ConsoleLogger(log.Logger):
         # Examine the capabilities of our terminal.
         if sys.stdout.isatty():
             try:
+                import curses
                 curses.setupterm()
                 self._TERM_CR = curses.tigetstr('cr') or ''
                 self.TERM_WIDTH = curses.tigetnum('cols')-1
