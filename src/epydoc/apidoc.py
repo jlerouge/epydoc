@@ -682,7 +682,8 @@ class NamespaceDoc(ValueDoc):
                     del ungrouped[i]
     
         # Delete any empty groups
-        for i, group in enumerate(self.group_names[:]):
+        for i in range(len(self.group_names)-1, -1, -1):
+            group = self.group_names[i]
             if not self.groups[group] and group != '':
                 log.warning('Empty group %r in %s' %
                             (group, self.canonical_name))
@@ -830,35 +831,45 @@ class ClassDoc(NamespaceDoc):
                 return True
         return False
 
-    def mro(self):
+    def mro(self, warn_about_bad_bases=False):
         if self.is_newstyle_class():
-            return self._c3_mro()
+            return self._c3_mro(warn_about_bad_bases)
         else:
-            return self._dfs_bases([], Set())
-        
-    def _dfs_bases(self, mro, seen):
+            return self._dfs_bases([], Set(), warn_about_bad_bases)
+                
+    def _dfs_bases(self, mro, seen, warn_about_bad_bases):
         if self in seen: return mro
         mro.append(self)
         seen.add(self)
         if self.bases is not UNKNOWN:
             for base in self.bases:
                 if isinstance(base, ClassDoc):
-                    base._dfs_bases(mro, seen)
-                elif base.imported_from is not UNKNOWN:
-                    log.info("No information available for base %r" % base)
-                else:
-                   log.warning("While calculating the MRO for %r, encountered "
-                               "a base that's not a class: %r" % (self, base))
+                    base._dfs_bases(mro, seen, warn_about_bad_bases)
+                elif warn_about_bad_bases:
+                    self._report_bad_base(base)
         return mro
 
-    def _c3_mro(self):
+    def _c3_mro(self, warn_about_bad_bases):
         """
         Compute the class precedence list (mro) according to C3.
         @seealso: U{http://www.python.org/2.3/mro.html}
         """
-        return self._c3_merge([[self]] +
-                              map(ClassDoc._c3_mro, self.bases) +
-                              [list(self.bases)])
+        bases = [base for base in self.bases if isinstance(base, ClassDoc)]
+        if len(bases) != len(self.bases) and warn_about_bad_bases:
+            for base in self.bases:
+                if not isinstance(base, ClassDoc):
+                    self._report_bad_base(base)
+        w = [warn_about_bad_bases]*len(bases)
+        return self._c3_merge([[self]] + map(ClassDoc._c3_mro, bases, w) +
+                              [list(bases)])
+
+    def _report_bad_base(self, base):
+        if base.__class__ == ValueDoc and base.repr == UNKNOWN:
+            log.info("No information available for %s's base %s" %
+                     (self.canonical_name, base.canonical_name))
+        else:
+            log.warning("%s's base %s is not a class" %
+                        (self.canonical_name, base.canonical_name))
 
     def _c3_merge(self, seqs):
         """
