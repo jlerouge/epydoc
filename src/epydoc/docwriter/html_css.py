@@ -110,10 +110,11 @@ a.navbar:link      { text-decoration: none; }
 a.navbar:visited   { text-decoration: none; }  
 
 /* Source Code Listings */
-div.py-src         { border: 2px solid; }
-div.highlight-hdr  { border-top: 2px solid; border-bottom: 1px solid; }
-div.highlight      { border-bottom: 2px solid; }
-.lineno            { border-right: 2px solid;
+div.py-src         { border: 2px solid black; }
+div.highlight-hdr  { border-top: 2px solid black;
+                     border-bottom: 1px solid black; }
+div.highlight      { border-bottom: 2px solid black; }
+.lineno            { border-right: 2px solid black;
                      padding-right: .2em;
                      font-style: italic; }
 
