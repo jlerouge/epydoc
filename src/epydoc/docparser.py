@@ -271,7 +271,13 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
             context.submodules.append(module_doc)
 
         # Tokenize & process the contents of the module's source file.
-        process_file(module_doc)
+        try:
+            process_file(module_doc)
+        except tokenize.TokenError, e:
+            msg, (srow, scol) = e.args
+            raise ParseError('Error during parsing: %s '
+                             '(%s, line %d, char %d)' %
+                             (msg, module_doc.filename, srow, scol))
 
         # Handle any special variables (__path__, __docformat__, etc.)
         handle_special_module_vars(module_doc)
@@ -514,14 +520,14 @@ def process_file(module_doc):
     encoding = _get_encoding(module_doc.filename)
 
     # The token-eating loop:
-    module_file = codecs.open(module_doc.filename, 'r', encoding)
+    module_file = codecs.open(module_doc.filename, 'rU', encoding)
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
         # Error token: abort
         if toktype == token.ERRORTOKEN:
-            raise ParseError('Error during parsing: invalid '
-                             'syntax (%s, line %d)' %
-                             (module_doc.filename, lineno))
+            raise ParseError('Error during parsing: invalid syntax '
+                             '(%s, line %d, char %d: %r)' %
+                             (module_doc.filename, srow, scol, toktext))
         
         # Indent token: update the parent_doc stack.
         elif toktype == token.INDENT:
@@ -600,10 +606,10 @@ def process_file(module_doc):
                     prev_line_doc = process_line(
                         shallow_parse(line_toks), parent_docs,
                         prev_line_doc, lineno, comments, decorators)
-                except ParseError:
+                except ParseError, e:
                     raise ParseError('Error during parsing: invalid '
-                                     'syntax (%s, line %d)' %
-                                     (module_doc.filename, lineno))
+                                     'syntax (%s, line %d) -- %s' %
+                                     (module_doc.filename, lineno, e))
 
                 # grouping...
                 if groups[-1] and prev_line_doc:
@@ -784,12 +790,13 @@ def process_import(line, parent_docs, prev_line_doc, lineno,
             src_name = parse_dotted_name(name_pieces[0])
             _import_var(src_name, parent_docs)
         elif len(name_pieces) == 2:
-            if len(name_pieces[1]) != 1: raise ParseError()
+            if len(name_pieces[1]) != 1:
+                raise ParseError('Expected identifier after "as"')
             src_name = parse_dotted_name(name_pieces[0])
             var_name = parse_name(name_pieces[1][0])
             _import_var_as(src_name, var_name, parent_docs)
         else:
-            raise ParseError()
+            raise ParseError('Multiple "as" tokens in import')
 
 def process_from_import(line, parent_docs, prev_line_doc, lineno,
                         comments, decorators):
@@ -797,7 +804,7 @@ def process_from_import(line, parent_docs, prev_line_doc, lineno,
     
     pieces = split_on(line[1:], (token.NAME, 'import'))
     if len(pieces) != 2 or not pieces[0] or not pieces[1]:
-        raise ParseError()
+        raise ParseError("Bad from-import")
     lhs, rhs = pieces
 
     # The RHS might be parenthasized, as specified by PEP 328:
@@ -1293,7 +1300,7 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     """
     # Check syntax.
     if len(line) != 4 or line[3] != (token.OP, ':'):
-        raise ParseError()
+        raise ParseError("Bad function definition line")
     
     # If we're not in a namespace, then ignore it.
     parent_doc = parent_docs[-1]
@@ -1353,7 +1360,7 @@ def apply_decorator(decorator_name, func_doc):
 
 def init_arglist(func_doc, arglist):
     if not isinstance(arglist, list) or arglist[0] != (token.OP, '('):
-        raise ParseError()
+        raise ParseError("Bad argument list")
 
     # Initialize to defaults.
     func_doc.posargs = []
@@ -1367,14 +1374,14 @@ def init_arglist(func_doc, arglist):
     # Keyword argument.
     if args and args[-1][0] == (token.OP, '**'):
         if len(args[-1]) != 2 or args[-1][1][0] != token.NAME:
-            raise ParseError()
+            raise ParseError("Expected name after ** in argument list")
         func_doc.kwarg = args[-1][1][1]
         args.pop()
 
     # Vararg argument.
     if args and args[-1][0] == (token.OP, '*'):
         if len(args[-1]) != 2 or args[-1][1][0] != token.NAME:
-            raise ParseError()
+            raise ParseError("Expected name after * in argument list")
         func_doc.vararg = args[-1][1][1]
         args.pop()
 
@@ -1383,9 +1390,9 @@ def init_arglist(func_doc, arglist):
         func_doc.posargs.append(parse_funcdef_arg(arg[0]))
         if len(arg) == 1:
             func_doc.posarg_defaults.append(None)
+        elif arg[1] != (token.OP, '=') or len(arg) == 2:
+            raise ParseError("Bad argument list")
         else:
-            if arg[1] != (token.OP, '=') or len(arg) == 2:
-                raise ParseError()
             default_val = ValueDoc(repr=pp_toktree(arg[2:]))
             func_doc.posarg_defaults.append(default_val)
 
@@ -1406,7 +1413,7 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     """
     # Check syntax
     if len(line)<3 or len(line)>4 or line[-1] != (token.OP, ':'):
-        raise ParseError()
+        raise ParseError("Bad class definition line")
 
     # If we're not in a namespace, then ignore it.
     parent_doc = parent_docs[-1]
@@ -1427,7 +1434,7 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     if len(line) == 4:
         if (not isinstance(line[2], list) or
             line[2][0] != (token.OP, '(')):
-            raise ParseError()
+            raise ParseError("Expected base list")
         try:
             for base in parse_classdef_bases(line[2]):
                 base_doc = lookup_value(base, parent_docs)
@@ -1490,14 +1497,14 @@ def parse_name(elt, strip_parens=False):
                elt[-1] == (token.OP, ')')):
             elt = elt[1]
     if isinstance(elt, list) or elt[0] != token.NAME:
-        raise ParseError()
+        raise ParseError("Bad name")
     return elt[1]
 
 def parse_dotted_name(elt_list, strip_parens=True):
     """
     @bug: does not handle 'x.(y).z'
     """
-    if len(elt_list) == 0: raise ParseError()
+    if len(elt_list) == 0: raise ParseError("Bad dotted name")
     
     # Handle ((x.y).z).  (If the contents of the parens include
     # anything other than dotted names, such as (x,y), then we'll
@@ -1508,12 +1515,12 @@ def parse_dotted_name(elt_list, strip_parens=True):
            elt_list[0][-1] == (token.OP, ')')):
         elt_list[:1] = elt_list[0][1:-1]
 
-    if len(elt_list) % 2 != 1: raise ParseError()
+    if len(elt_list) % 2 != 1: raise ParseError("Bad dotted name")
     name = DottedName(parse_name(elt_list[0], True))
     for i in range(2, len(elt_list), 2):
         dot, identifier = elt_list[i-1], elt_list[i]
         if  dot != (token.OP, '.'):
-            raise ParseError()
+            raise ParseError("Bad dotted name")
         name = DottedName(name, parse_name(identifier, True))
     return name
         
@@ -1522,7 +1529,7 @@ def split_on(elt_list, split_tok):
     result = [[]]
     for elt in elt_list:
         if elt == split_tok:
-            if result[-1] == []: raise ParseError()
+            if result[-1] == []: raise ParseError("Empty element from split")
             result.append([])
         else:
             result[-1].append(elt)
@@ -1546,11 +1553,11 @@ def parse_funcdef_arg(elt):
                         for e in elt[1:-1]
                         if e != (token.OP, ',')]
         else:
-            raise ParseError()
+            raise ParseError("Bad argument -- expected name or tuple")
     elif elt[0] == token.NAME:
         return elt[1]
     else:
-        raise ParseError()
+        raise ParseError("Bad argument -- expected name or tuple")
     
 def parse_classdef_bases(elt):
     """
@@ -1564,7 +1571,7 @@ def parse_classdef_bases(elt):
     """
     if (not isinstance(elt, list) or
         elt[0] != (token.OP, '(')):
-        raise ParseError()
+        raise ParseError("Bad base list")
 
     return [parse_dotted_name(n)
             for n in split_on(elt[1:-1], (token.OP, ','))]
@@ -1588,7 +1595,7 @@ def parse_dotted_name_list(elt_list):
                 names.append(DottedName(elt[1]))
                 state = 1
             else:
-                raise ParseError()
+                raise ParseError("Expected a name")
         # State 1 -- Expecting comma, period, or end of arglist
         elif state == 1:
             if elt == (token.OP, '.'):
@@ -1596,16 +1603,16 @@ def parse_dotted_name_list(elt_list):
             elif elt == (token.OP, ','):
                 state = 0
             else:
-                raise ParseError()
+                raise ParseError("Expected '.' or ',' or end of list")
         # State 2 -- Continuation of dotted name.
         elif state == 2:
             if isinstance(elt, tuple) and elt[0] == token.NAME:
                 names[-1] = DottedName(names[-1], elt[1])
                 state = 1
             else:
-                raise ParseError()
+                raise ParseError("Expected a name")
     if state == 2:
-        raise ParseError()
+        raise ParseError("Expected a name")
     return names
 
 def parse_string(elt_list):
@@ -1614,7 +1621,7 @@ def parse_string(elt_list):
         # any string type (eg r"foo\bar" etc).
         return eval(elt_list[0][1])
     else:
-        raise ParseError()
+        raise ParseError("Expected a string")
 
 # ['1', 'b', 'c']
 def parse_string_list(elt_list):
