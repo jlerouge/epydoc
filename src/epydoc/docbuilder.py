@@ -990,7 +990,7 @@ def _unreachable_name_for(val_doc, docindex):
 ######################################################################
 
 def inherit_docs(class_doc):
-    for base_class in list(class_doc.mro()):
+    for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
         if base_class == class_doc: continue
         if base_class.variables is UNKNOWN: continue
 
