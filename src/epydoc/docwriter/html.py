@@ -1740,6 +1740,17 @@ class HTMLWriter:
         else:
             self.write_variable_details_entry(out, var_doc, descr, div_class)
 
+    def labelled_list_item(self, lhs, rhs):
+        # If the RHS starts with a paragraph, then move the
+        # paragraph-start tag to the beginning of the lhs instead (so
+        # there won't be a line break after the '-').
+        m = re.match(r'^<p( [^>]+)?>', rhs)
+        if m:
+            lhs = m.group() + lhs
+            rhs = rhs[m.end():]
+
+        return '<li>%s - %s</li>' % (lhs, rhs)
+
     def property_accessor_to_html(self, val_doc):
         if val_doc not in (None, UNKNOWN):
             if isinstance(val_doc, RoutineDoc):
@@ -1791,11 +1802,11 @@ class HTMLWriter:
           $descr$
           <dl><dt></dt><dd>
         >>> # === parameters ===
-        >>> if func_doc.arg_descrs not in (None, UNKNOWN, [], ()):
+        >>> if arg_descrs:
             <dl><dt>Parameters:</dt></dl>
             <ul>
-        >>>   for (lhs, rhs) in arg_descrs:
-                <li>$lhs$ - $rhs$</li>
+        >>>   for lhs, rhs in arg_descrs:
+                $self.labelled_list_item(lhs, rhs)$
         >>>   #endfor
             </ul>
         >>> #endif
@@ -1811,13 +1822,15 @@ class HTMLWriter:
         >>> #endif
         >>> # === exceptions ===
         >>> if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
-            <dl><dt>Raises:</dt>
+            <dl><dt>Raises:</dt></dl>
+            <ul>
         >>>   for name, descr in func_doc.exception_descrs:
-              <dd>
-                <code><strong class="fraise">$self.href(name)$</strong></code>
-              </dd> - $self.docstring_to_html(descr, func_doc, 8)$
+                $self.labelled_list_item(
+                    "<code><strong class=\'fraise\'>" +
+                    self.href(name) + "</strong></code>",
+                    self.docstring_to_html(descr, func_doc, 8))$
         >>>   #endfor
-            </dl>
+            </ul>
         >>> #endif
         >>> # === overrides ===
         >>> if var_doc.overrides not in (None, UNKNOWN):
@@ -2403,7 +2416,7 @@ class HTMLWriter:
                 <li>
                 $self.description(val, doc, 8)$
                 </li>
-              # end for
+        >>>   # end for
               </ul>
         >>>   # end else
         >>> # end for
