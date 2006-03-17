@@ -290,7 +290,10 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
         message_items = messages.items()
         message_items.sort(lambda a,b:cmp(min(a[1]), min(b[1])))
         for message, linenums in message_items:
-            if len(linenums) == 1:
+            linenums = [n for n in linenums if n is not None]
+            if len(linenums) == 0:
+                log.docstring_warning(message)
+            elif len(linenums) == 1:
                 log.docstring_warning("Line %s: %s" % (linenums[0], message))
             else:
                 linenums = ', '.join(['%s' % l for l in linenums])
