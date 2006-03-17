@@ -26,6 +26,10 @@ from epydoc import log
 from epydoc.util import plaintext_to_html
 import __builtin__
 
+# Backwards compatibility imports:
+try: sorted
+except NameError: from epydoc.util import py_sorted as sorted
+
 ######################################################################
 ## Template Compiler
 ######################################################################
@@ -284,7 +288,7 @@ class HTMLWriter:
               source code files for each python module.
         """
         self.docindex = docindex
-        self.contained_valdocs = self.docindex.contained_valdocs()
+        self.contained_valdocs = self.docindex.contained_valdocs(True)
         
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
@@ -1514,10 +1518,11 @@ class HTMLWriter:
         grouped_inh_vars = {}
 
         # Divide all public variables of the given type into groups.
-        groups = [(plaintext_to_html(g),
-                   doc.select_variables(group=g, value_type=value_type,
-                                        imported=False))
-                  for g in doc.group_names]
+        group_names = [''] + [n for n,_ in doc.group_specs]
+        groups = [(plaintext_to_html(group_name),
+                   doc.select_variables(group=group_name, imported=False,
+                                        value_type=value_type))
+                  for group_name in group_names]
                 
         # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
@@ -2262,51 +2267,37 @@ class HTMLWriter:
         # Write entries for all top-level modules/packages.
         out('<ul>\n')
         for doc in modules:
-            if doc.package in (None, UNKNOWN):
+            if (doc.package in (None, UNKNOWN) or
+                doc.package not in self.contained_valdocs):
                 self.write_module_tree_item(out, doc)
         out('</ul>\n')
     
-    write_module_list = compile_template(
-        '''
-        write_module_list(self, out, doc)
-        ''',
-        # /------------------------- Template -------------------------\
-        '''
-        >>> if len(doc.submodules) == 0: return
-        >>> self.write_table_header(out, "details", "Submodules")
-        >>> for submodule in doc.submodules:
-          <tr><td><ul>
-        >>>   self.write_module_tree_item(out, submodule)
-          </ul></td></tr>
-        >>> #endif
-        $self.TABLE_FOOTER$
-        <br />
-        ''')
-        # \------------------------------------------------------------/
+    def write_module_list(self, out, doc):
+        if len(doc.submodules) == 0: return
+        self.write_table_header(out, "details", "Submodules")
 
-    write_module_tree_item = compile_template(
-        '''
-        write_module_tree_item(self, out, doc)
-        ''',
-        # /------------------------- Template -------------------------\
-        '''
-        >>> if doc.summary in (None, UNKNOWN):
-            <li> <strong class="uidlink">$self.href(doc)$</strong>
-        >>> else:
-            <li> <strong class="uidlink">$self.href(doc)$</strong>:
-              <em class="summary">$self.description(doc.summary, doc, 8)$</em>
-        >>> # endif
-        >>> if doc.submodules:
-            <ul>
-        >>>   for submodule in doc.submodules:
-        >>>     self.write_module_tree_item(out, submodule)
-        >>>   #endfor
-            </ul>
-        >>> #endif
-            </li>
-        ''')
-        # \------------------------------------------------------------/
+        group_names = [''] + [n for n,_ in doc.group_specs]
+        for group_name in group_names:
+            if group_name:
+                self.write_group_header(out, group_name)
+            out('  <tr><td><ul>\n')
+            for submodule in doc.submodule_groups[group_name]:
+                self.write_module_tree_item(out, submodule)
+            out('  </ul></td></tr>\n')
+                
+        out(self.TABLE_FOOTER+'\n<br />\n')
 
+    def write_module_tree_item(self, out, doc):
+        out('    <li> <strong class="uidlink">'+self.href(doc)+'</strong>')
+        if doc.summary not in (None, UNKNOWN):
+            out(': <em class="summary">'+
+                self.description(doc.summary, doc, 8)+'</em>')
+        out('</li>\n')
+        if doc.submodules:
+            out('    <ul>\n')
+            for submodule in doc.submodules:
+                self.write_module_tree_item(out, submodule)
+            out('    </ul>\n    </li>\n')
 
     #////////////////////////////////////////////////////////////
     #{ Class trees
@@ -2543,7 +2534,7 @@ class HTMLWriter:
 
     write_group_header = compile_template(
         '''
-        write_group_header(self, out, group, tr_class)
+        write_group_header(self, out, group, tr_class='')
         ''',
         # /------------------------- Template -------------------------\
         '''
