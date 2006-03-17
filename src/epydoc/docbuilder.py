@@ -200,7 +200,9 @@ def build_doc_index(items, introspect=True, parse=True,
             percent = float(i)/len(reachable_valdocs)
             log.progress(percent, val_doc.canonical_name)
             val_doc.init_sorted_variables()
-            val_doc.init_groups()
+            val_doc.init_variable_groups()
+            if isinstance(val_doc, ModuleDoc):
+                val_doc.init_submodule_groups()
     log.end_progress()
 
     return docindex

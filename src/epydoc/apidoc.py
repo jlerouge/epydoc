@@ -573,24 +573,31 @@ class NamespaceDoc(ValueDoc):
             alphabetical order.
             
     @type sorted_variables: C{list} of L{VariableDoc}
-    @ivar group_names: A list of the names of the group, in the order
-        in which they should be listed.  The first element of this
-        list is always the special group name C{''}, which is used for
-        variables that do not belong to any group.
-    @type group_names: C{list} of C{string}
-    @ivar groups: The groups defined by the namespace's docstring,
-        encoded as a dictionary mapping from group names to lists of
-        C{VariableDoc}s.  The lists of C{VariableDoc}s are pre-sorted.
-        The key C{''} is used for variables that do not belong to any
-        other group.
-    @type groups: C{dict} from C{string} to (C{list} of L{VariableDoc})
+    @ivar group_specs: The groups that are defined by this namespace's
+        docstrings.  C{group_specs} is encoded as an ordered list of
+        tuples C{(group_name, elt_names)}, where C{group_name} is the
+        
+        name of a group and C{elt_names} is a list of element names in
+        that group.  (An element can be a variable or a submodule.)  A
+        '*' in an element name will match any string of characters.
+    @type group_specs: C{list} of C{(str,list)}
+    @ivar variable_groups: A dictionary specifying what group each
+        variable belongs to.  The keys of the dictionary are group
+        names, and the values are lists of C{VariableDoc}s.  The order
+        that groups should be listed in should be taken from
+        L{group_specs}.
+    @type variable_groups: C{dict} from C{str} to C{list} of L{APIDoc}
+    @ivar sort_spec: The order in which variables should be listed,
+        encoded as a list of names.  Any variables whose names are not
+        included in this list should be listed alphabetically,
+        following the variables that are included.
+    @type sort_spec: C{list} of C{str}
     """
     variables = UNKNOWN
     sorted_variables = UNKNOWN
-    group_names = UNKNOWN
-    groups = UNKNOWN
-    group_specs = UNKNOWN #: list of (groupname, (identnames))
-    sort_spec = UNKNOWN #: list of names
+    variable_groups = UNKNOWN
+    group_specs = UNKNOWN
+    sort_spec = UNKNOWN
 
     def __init__(self, **kwargs):
         kwargs.setdefault('variables', {})
@@ -632,65 +639,57 @@ class NamespaceDoc(ValueDoc):
         for name, var_doc in var_docs:
             self.sorted_variables.append(var_doc)
 
-    def init_groups(self):
+    def init_variable_groups(self):
         """
-        Initialize the L{groups} attribute, based on the
+        Initialize the L{variable_groups} attribute, based on the
         L{sorted_variables} and L{group_specs} attributes.
         """
         if self.sorted_variables == UNKNOWN:
             self.init_sorted_variables
         assert len(self.sorted_variables) == len(self.variables)
+
+        elts = [(v.name, v) for v in self.sorted_variables]
+        self.variable_groups = self._init_grouping(elts)
+
+    def _init_grouping(self, elts):
+        """
+        Divide a given a list of APIDoc objects into groups, as
+        specified by L{self.group_specs}.
+
+        @param elts: A list of tuples C{(name, apidoc)}.
         
-        self.group_names = [''] + [n for (n,vs) in self.group_specs]
-        self.groups = {}
-        
-        # Make the common case fast:
-        if len(self.group_names) == 1:
-            self.groups[''] = self.sorted_variables
-            return
-    
-        for group in self.group_names:
-            self.groups[group] = []
-    
-        # Create a mapping from elt -> group name.
-        varname2groupname = {}
-        regexp_groups = []
-    
-        for group_name, var_names in self.group_specs:
-            for var_name in var_names:
-                if '*' not in var_name:
-                    varname2groupname[var_name] = group_name
-                else:
-                    var_name_re = '^%s$' % var_name.replace('*', '(.*)')
-                    var_name_re = re.compile(var_name_re)
-                    regexp_groups.append( (group_name, var_name_re) )
-    
-        # Use the elt -> group name mapping to put each elt in the
-        # right group.
-        for var_doc in self.sorted_variables:
-            group_name = varname2groupname.get(var_doc.name, '')
-            self.groups[group_name].append(var_doc)
-    
-        # Handle any regexp groups, by moving elements from the
-        # ungrouped list to the appropriate group.
-        ungrouped = self.groups['']
-        for (group_name, regexp) in regexp_groups:
-            for i in range(len(ungrouped)-1, -1, -1):
-                elt = ungrouped[i]
-                if regexp.match(elt.name):
-                    self.groups[group_name].append(elt)
-                    del ungrouped[i]
-    
-        # Delete any empty groups
-        for i in range(len(self.group_names)-1, -1, -1):
-            group = self.group_names[i]
-            if not self.groups[group] and group != '':
-                log.warning('Empty group %r in %s' %
-                            (group, self.canonical_name))
-                del self.group_names[i], self.groups[group]
-        
-        
-        
+        @return: A list of tuples C{(groupname, elts)}, where
+        C{groupname} is the name of a group and C{elts} is a list of
+        C{APIDoc}s in that group.  The first tuple has name C{''}, and
+        is used for ungrouped elements.  The remaining tuples are
+        listed in the order that they appear in C{self.group_specs}.
+        Within each tuple, the elements are listed in the order that
+        they appear in C{api_docs}.
+        """
+        # Make the common case fast.
+        if len(self.group_specs) == 1:
+            return [('', elts)]
+
+        ungrouped = Set([elt_doc for (elt_name, elt_doc) in elts])
+        groups = {}
+        for (group_name, elt_names) in self.group_specs:
+            group_re = re.compile('|'.join([n.replace('*','.*')+'$'
+                                            for n in elt_names]))
+            group = []
+            for elt_name, elt_doc in list(elts):
+                if group_re.match(elt_name):
+                    group.append(elt_doc)
+                    if elt_doc in ungrouped:
+                        ungrouped.remove(elt_doc)
+                    else:
+                        log.warning("%s.%s is in multiple groups" %
+                                    (self.canonical_name, elt_name))
+            groups[group_name] = group
+
+        # Convert ungrouped from an unordered set to an ordered list.
+        groups[''] = [elt_doc for (elt_name, elt_doc) in elts
+                      if elt_doc in ungrouped]
+        return groups
     
 class ModuleDoc(NamespaceDoc):
     """
@@ -705,6 +704,12 @@ class ModuleDoc(NamespaceDoc):
         submodule that is shadowed by a variable with the same name.)
     @ivar filename: The name of the file that defines the module.
     @type filename: C{string}
+    @ivar variable_groups: A dictionary specifying what group each
+        submodule belongs to.  The keys of the dictionary are group
+        names, and the values are lists of C{ModuleDoc}s.  The order
+        that groups should be listed in should be taken from
+        L{group_specs}.
+    @type submodule_groups: C{dict} from C{str} to C{list} of L{APIDoc}
 
     @ivar imports: list of names..?
     """
@@ -714,6 +719,7 @@ class ModuleDoc(NamespaceDoc):
     is_package = UNKNOWN
     filename = UNKNOWN
     path = UNKNOWN
+    submodule_groups = UNKNOWN
 
     imports = UNKNOWN
 
@@ -724,6 +730,16 @@ class ModuleDoc(NamespaceDoc):
         return val_docs
     def vardoc_links(self):
         return self.variables.values()
+
+    def init_submodule_groups(self):
+        """
+        Initialize the L{submodule_groups} attribute, based on the
+        L{submodules} and L{group_specs} attributes.
+        """
+        self.submodules = sorted(self.submodules,
+                                 key=lambda m:m.canonical_name)
+        elts = [(m.canonical_name[-1], m) for m in self.submodules]
+        self.submodule_groups = self._init_grouping(elts)
 
     def select_variables(self, group=None, value_type=None, public=None,
                          imported=None):
@@ -753,12 +769,13 @@ class ModuleDoc(NamespaceDoc):
             variables that do not belong to any group.
         @type group: C{string}
         """
-        if self.sorted_variables == UNKNOWN or self.groups == UNKNOWN:
-            raise ValueError('sorted_variables and groups must be '
-                             'initialized first.')
+        if (self.sorted_variables == UNKNOWN or 
+            self.variable_groups == UNKNOWN):
+            raise ValueError('sorted_variables and variable_groups '
+                             'must be initialized first.')
         
         if group is None: var_list = self.sorted_variables
-        else: var_list = self.groups[group]
+        else: var_list = self.variable_groups[group]
 
         # Public/private filter (Count UNKNOWN as public)
         if public is True:
@@ -935,12 +952,13 @@ class ClassDoc(NamespaceDoc):
             local variables; if C{True}, then return only inherited
             variables; if C{False}, then return only local variables.
         """
-        if self.sorted_variables == UNKNOWN or self.groups == UNKNOWN:
-            raise ValueError('sorted_variables and groups must be '
-                             'initialized first.')
+        if (self.sorted_variables == UNKNOWN or 
+            self.variable_groups == UNKNOWN):
+            raise ValueError('sorted_variables and variable_groups '
+                             'must be initialized first.')
         
         if group is None: var_list = self.sorted_variables
-        else: var_list = self.groups[group]
+        else: var_list = self.variable_groups[group]
 
         # Public/private filter (Count UNKNOWN as public)
         if public is True:
