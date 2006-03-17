@@ -279,7 +279,7 @@ class _SplitFieldsTranslator(NodeVisitor):
         else: arg = None
 
         # Handle special fields:
-        fbody = node[1].get_children()
+        fbody = node[1]
         if arg is None:
             for (list_tag, entry_tag) in CONSOLIDATED_FIELDS.items():
                 if tagname.lower() == list_tag:
@@ -308,7 +308,7 @@ class _SplitFieldsTranslator(NodeVisitor):
             
     def visit_field_list(self, node):
         # Remove the field list from the tree.  The visitor will still walk
-        # over the node's variables.
+        # over the node's children.
         node.parent.remove(node)
 
     def handle_consolidated_field(self, body, tagname):
@@ -414,7 +414,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
     def visit_document(self, node): pass
     def depart_document(self, node): pass
         
-    def starttag(self, node, tagname, suffix='\n', infix='', **attributes):
+    def starttag(self, node, tagname, suffix='\n', **attributes):
         """
         This modified version of starttag makes a few changes to HTML
         tags, to prevent them from conflicting with epydoc.  In particular:
@@ -440,4 +440,4 @@ class _EpydocHTMLTranslator(HTMLTranslator):
             attributes['class'] = 'heading'
         
         return HTMLTranslator.starttag(self, node, tagname, suffix,
-                                       infix, **attributes)
+                                       **attributes)
