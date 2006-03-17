@@ -109,7 +109,10 @@ def parse_docstring(docstring, errors, **options):
     """
     writer = _DocumentPseudoWriter()
     reader = _EpydocReader(errors) # Outputs errors to the list.
-    publish_string(docstring, writer=writer, reader=reader)
+    publish_string(docstring, writer=writer, reader=reader,
+                   settings_overrides={'report_level':10000,
+                                       'halt_level':10000,
+                                       'warning_stream':None})
     return ParsedRstDocstring(writer.document)
 
 class ParsedRstDocstring(ParsedDocstring):
@@ -178,10 +181,12 @@ class _EpydocReader(StandaloneReader):
         
     def new_document(self):
         document = new_document(self.source.source_path, self.settings)
+        # Capture all warning messages.
         document.reporter.attach_observer(self.report)
-        document.reporter.set_conditions('', 10000, 10000, None)
+        # These are used so we know how to encode warning messages:
         self._encoding = document.reporter.encoding
         self._error_handler = document.reporter.error_handler
+        # Return the new document.
         return document
 
     def report(self, error):
@@ -399,6 +404,12 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         xref = self._linker.translate_identifier_xref(target, target)
         self.body.append(xref)
         raise SkipNode
+
+    def should_be_compact_paragraph(self, node):
+        if self.document.children == [node]:
+            return True
+        else:
+            return HTMLTranslator.should_be_compact_paragraph(self, node)
 
     def visit_document(self, node): pass
     def depart_document(self, node): pass
