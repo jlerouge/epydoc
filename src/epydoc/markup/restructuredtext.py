@@ -81,6 +81,9 @@ import docutils.nodes
 
 from epydoc.markup import *
 
+#: A dictionary whose keys are the "consolidated fields" that are
+#: recognized by epydoc; and whose values are the corresponding epydoc
+#: field names that should be used for the individual fields.
 CONSOLIDATED_FIELDS = {
     'parameters': 'param',
     'arguments': 'arg',
@@ -92,6 +95,12 @@ CONSOLIDATED_FIELDS = {
     'types': 'type',
     'keywords': 'keyword',
     }
+
+#: A list of consolidated fields whose bodies may be specified using a
+#: definition list, rather than a bulleted list.  For these fields, the
+#: 'classifier' for each term in the definition list is translated into
+#: a @type field.
+CONSOLIDATED_DEFLIST_FIELDS = ['param', 'arg', 'var', 'ivar', 'cvar']
 
 def parse_docstring(docstring, errors, **options):
     """
@@ -289,7 +298,8 @@ class _SplitFieldsTranslator(NodeVisitor):
                     except ValueError, e:
                         estr = 'Unable to split consolidated field '
                         estr += '"%s" - %s' % (tagname, e)
-                        self._errors.append(ParseError(estr, is_fatal=0))
+                        self._errors.append(ParseError(estr, node.line,
+                                                       is_fatal=0))
                         
                         # Use a @newfield to let it be displayed as-is.
                         if not self._newfields.has_key(tagname.lower()):
@@ -315,18 +325,28 @@ class _SplitFieldsTranslator(NodeVisitor):
         """
         Attempt to handle a consolidated section.
         """
-        # Check that it contains a bulleted list.
-        if len(body) != 1 or body[0].tagname != 'bullet_list':
-            raise ValueError('field does not contain a single bulleted list.')
+        if len(body) != 1:
+            raise ValueError('does not contain a single list.')
+        elif body[0].tagname == 'bullet_list':
+            self.handle_consolidated_bullet_list(body[0], tagname)
+        elif (body[0].tagname == 'definition_list' and
+              tagname in CONSOLIDATED_DEFLIST_FIELDS):
+            self.handle_consolidated_definition_list(body[0], tagname)
+        elif tagname in CONSOLIDATED_DEFLIST_FIELDS:
+            raise ValueError('does not contain a bulleted list or '
+                             'definition list.')
+        else:
+            raise ValueError('does not contain a bulleted list.')
 
-        # Check that each list item begins with interpreted text
+    def handle_consolidated_bullet_list(self, items, tagname):
+        # Check the contents of the list.  In particular, each list
+        # item should have the form:
+        #   - `arg`: description...
         n = 0
-        for item in body[0]:
+        for item in items:
             n += 1
-            if item.tagname != 'list_item':
-                raise ValueError('bad bulleted list (bad child).')
-            if len(item) == 0: 
-                raise ValueError('bad bulleted list (empty).')
+            if item.tagname != 'list_item' or len(item) == 0: 
+                raise ValueError('bad bulleted list (bad child %d).' % n)
             if item[0].tagname != 'paragraph':
                 if item[0].tagname == 'definition_list':
                     raise ValueError(('list item %d contains a definition '+
@@ -343,7 +363,7 @@ class _SplitFieldsTranslator(NodeVisitor):
                                   'an identifier.') % n)
 
         # Everything looks good; convert to multiple fields.
-        for item in body[0]:
+        for item in items:
             # Extract the arg
             arg = item[0][0].astext()
 
@@ -364,6 +384,36 @@ class _SplitFieldsTranslator(NodeVisitor):
             # Wrap the field body, and add a new field
             self._add_field(tagname, arg, fbody)
         
+    def handle_consolidated_definition_list(self, items, tagname):
+        # Check the list contents.
+        n = 0
+        for item in items:
+            n += 1
+            if (item.tagname != 'definition_list_item' or len(item) < 2 or
+                item[0].tagname != 'term' or
+                item[-1].tagname != 'definition'):
+                raise ValueError('bad definition list (bad child).')
+            if len(item) > 3:
+                raise ValueError('list item %d has multiple classifiers' % n)
+            if item[0][0].tagname != 'title_reference':
+                raise ValueError('list item %d does not begin with an '
+                                 'identifier' % n)
+            for child in item[0][1:]:
+                if child.astext() != '':
+                    raise ValueError('list item %d does not begin with an '
+                                     'identifier' % n)
+
+        # Extract it.
+        for item in items:
+            # The basic field.
+            arg = item[0][0].astext()
+            fbody = item[-1]
+            self._add_field(tagname, arg, fbody)
+            # If there's a classifier, treat it as a type.
+            if len(item) == 3:
+                type_descr = item[1]
+                self._add_field('type', arg, type_descr)
+
     def unknown_visit(self, node):
         'Ignore all unknown nodes'
 
