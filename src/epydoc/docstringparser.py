@@ -146,6 +146,9 @@ STANDARD_FIELDS = [
 
     # Future Work
     DocstringField(['todo'], 'To Do', takes_arg=True),
+
+    # Permissions (used by zope-based projects)
+    DocstringField(['permission', 'permissions'], 'Permission', 'Permissions')
     ]
 
 # [xx] keep track of which ones we've already done, in case we're
