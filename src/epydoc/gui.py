@@ -257,6 +257,7 @@ class EpydocGUI:
         self._progress = [None]
         self._cancel = [0]
         self._filename = None
+        self._init_dir = None
 
         # Store a copy of sys.modules, so that we can restore it
         # later.  This is useful for making sure that we reload
@@ -272,6 +273,7 @@ class EpydocGUI:
         self._root.bind('<Control-q>', self.destroy)
         self._root.bind('<Alt-q>', self.destroy)
         self._root.bind('<Alt-x>', self.destroy)
+        self._root.bind('<Control-x>', self.destroy)
         #self._root.bind('<Control-d>', self.destroy)
         self._root.title('Epydoc')
         self._rootframe = Frame(self._root, background=BG_COLOR,
@@ -727,8 +729,10 @@ class EpydocGUI:
                   ('Python extension', '.so'),
                   ('All files', '*')]
         filename = askopenfilename(filetypes=ftypes, title=title,
-                                   defaultextension='.py')
+                                   defaultextension='.py',
+                                   initialdir=self._init_dir)
         if not filename: return
+        self._init_dir = os.path.dirname(filename)
         self.add_module(filename, check=1)
         
     def _browse_css(self, *e):
@@ -952,6 +956,7 @@ class EpydocGUI:
         self._private_css_var.set('default')
         self._help_var.set('default')
         self._filename = None
+        self._init_dir = None
 
     def _open(self, *e):
         title = 'Open project'
