@@ -288,7 +288,9 @@ class HTMLWriter:
               source code files for each python module.
         """
         self.docindex = docindex
-        self.contained_valdocs = self.docindex.contained_valdocs(True)
+        self.valdocs = docindex.reachable_valdocs(
+            sort_by_name=True, imports=False, packages=False,
+            submodules=False, bases=False, subclasses=False)
         
         # Process keyword arguments.
         self._prj_name = kwargs.get('prj_name', None)
@@ -360,12 +362,12 @@ class HTMLWriter:
 
         # Figure out how many output files there will be (for progress
         # reporting).
-        self.modules_with_sourcecode = [d for d in self.contained_valdocs
+        self.modules_with_sourcecode = [d for d in self.valdocs
                                         if (isinstance(d, ModuleDoc) and
                                             d.filename not in (None, UNKNOWN))]
-        self._num_files = (len([d for d in self.contained_valdocs
+        self._num_files = (len([d for d in self.valdocs
                                 if isinstance(d, ClassDoc)]) +
-                           2*len([d for d in self.contained_valdocs
+                           2*len([d for d in self.valdocs
                                 if isinstance(d, ModuleDoc)]) +
                            9)
         if self._incl_sourcecode:
@@ -425,13 +427,13 @@ class HTMLWriter:
         self._write(self.write_frames_index, directory, 'frames.html')
         self._write(self.write_toc, directory, 'toc.html')
         self._write(self.write_project_toc, directory, 'toc-everything.html')
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             if isinstance(doc, ModuleDoc):
                 filename = 'toc-%s' % urllib.unquote(self.url(doc))
                 self._write(self.write_module_toc, directory, filename, doc)
 
         # Write the object documentation.
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
             filename = urllib.unquote(self.url(doc))
             if isinstance(doc, ModuleDoc):
@@ -693,7 +695,7 @@ class HTMLWriter:
 
         # Does the project define any classes?
         defines_classes = False
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             if isinstance(doc, ClassDoc): defines_classes = True; break
 
         # Write the class hierarchy
@@ -732,7 +734,7 @@ class HTMLWriter:
             self.write_term_index(out, terms)
 
         identifiers = []
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             name = doc.canonical_name
             if self.url(doc) is None: continue
             key = name[-1].lower()
@@ -912,7 +914,7 @@ class HTMLWriter:
         <p class="toc">
           <a target="moduleFrame" href="toc-everything.html">Everything</a>
         </p>
-        >>> modules = [d for d in self.contained_valdocs if
+        >>> modules = [d for d in self.valdocs if
         >>>            isinstance(d, ModuleDoc)]
         >>> self.write_toc_section(out, "Modules", modules)
         <hr />
@@ -955,19 +957,19 @@ class HTMLWriter:
         out('<hr />\n')
 
         # List the classes.
-        classes = [d for d in self.contained_valdocs
+        classes = [d for d in self.valdocs
                    if isinstance(d, ClassDoc)]
         self.write_toc_section(out, "All Classes", classes)
 
         # List the functions.
-        funcs = [d for d in self.contained_valdocs
+        funcs = [d for d in self.valdocs
                  if (isinstance(d, RoutineDoc) and
                      not isinstance(self.docindex.container(d), ClassDoc))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
         vars = []
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             if isinstance(doc, ModuleDoc):
                 vars += doc.select_variables(value_type='other',
                                              imported=False)
@@ -1221,7 +1223,7 @@ class HTMLWriter:
 
         # Who imports us?
         exports = {}
-        for other in self.contained_valdocs:
+        for other in self.valdocs:
             if isinstance(other, ModuleDoc):
                 for name in other.imports:
                     if doc.canonical_name.dominates(name):
@@ -1565,7 +1567,7 @@ class HTMLWriter:
         for var_doc in var_docs:
             if var_doc.container != doc:
                 base = var_doc.container
-                if (base not in self.contained_valdocs
+                if (base not in self.valdocs
                     or self._inheritance == 'listed'):
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
@@ -2259,7 +2261,7 @@ class HTMLWriter:
 
     def write_module_tree(self, out):
         # Get all modules.
-        modules = [doc for doc in self.contained_valdocs
+        modules = [doc for doc in self.valdocs
                    if isinstance(doc, ModuleDoc)]
         if not modules: return
         # [XX] sort?
@@ -2268,7 +2270,7 @@ class HTMLWriter:
         out('<ul>\n')
         for doc in modules:
             if (doc.package in (None, UNKNOWN) or
-                doc.package not in self.contained_valdocs):
+                doc.package not in self.valdocs):
                 self.write_module_tree_item(out, doc)
         out('</ul>\n')
     
@@ -2319,15 +2321,15 @@ class HTMLWriter:
             first mention.
         """
         # [XX] sort? and backref for multiple inheritance?
-        classes = Set([doc for doc in self.contained_valdocs
+        classes = Set([doc for doc in self.valdocs
                        if isinstance(doc, ClassDoc)])
         if not classes: return
 
         # Add external classes.
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             if isinstance(doc, ClassDoc):
                 for base in doc.bases:
-                    if base not in self.contained_valdocs:
+                    if base not in self.valdocs:
                         if isinstance(base, ClassDoc):
                             classes.union_update(base.mro())
                         else:
@@ -2457,7 +2459,7 @@ class HTMLWriter:
         """
         terms = {}
         links = {}
-        for doc in self.contained_valdocs:
+        for doc in self.valdocs:
             self._get_index_terms(doc.descr, doc, terms, links)
             if doc.metadata not in (None, UNKNOWN):
                 for descrlist in doc.metadata.values():
@@ -2551,11 +2553,11 @@ class HTMLWriter:
         """
         # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
-            if obj not in self.contained_valdocs: return None
+            if obj not in self.valdocs: return None
             return urllib.quote('%s'%obj.canonical_name) + '-module.html'
         # Class: <canonical_name>-class.html
         elif isinstance(obj, ClassDoc):
-            if obj not in self.contained_valdocs: return None
+            if obj not in self.valdocs: return None
             return urllib.quote('%s'%obj.canonical_name) + '-class.html'
         # Variable
         elif isinstance(obj, VariableDoc):
@@ -2745,7 +2747,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     def __init__(self, htmlwriter, container):
         self.htmlwriter = htmlwriter
         self.docindex = htmlwriter.docindex
-        self.contained_valdocs = htmlwriter.contained_valdocs
+        self.valdocs = htmlwriter.valdocs
         self.container = container
         
     def translate_indexterm(self, indexterm):
@@ -2829,7 +2831,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
                     var_name = DottedName(*(container_name[:i]+name[:j]))
                     var_doc = self.docindex.get_vardoc(var_name)
                     if (var_doc is not None and var_doc.is_imported==True and
-                        var_doc.value not in self.contained_valdocs):
+                        var_doc.value not in self.valdocs):
                         return None
 
         # We couldn't find it.  Add it to the list of failed xrefs.
