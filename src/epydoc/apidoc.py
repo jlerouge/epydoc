@@ -1034,8 +1034,8 @@ class ClassDoc(NamespaceDoc):
         elif value_type == 'classvariable':
             return [var_doc for var_doc in var_list
                     if (var_doc.is_instvar in (False, UNKNOWN) and
-                        not isinstance(var_doc.value, RoutineDoc) and
-                        not isinstance(var_doc.value, ClassDoc))]
+                        not isinstance(var_doc.value,
+                                       (RoutineDoc, ClassDoc, PropertyDoc)))]
         else:
             raise ValueError('Bad value type %r' % value_type)
 
