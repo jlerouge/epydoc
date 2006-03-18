@@ -374,8 +374,57 @@ class HTMLWriter:
             self._num_files += len(self.modules_with_sourcecode)
             
     def _find_top_page(self, pagename):
-        # [XXX]
-        return 'trees.html'
+        """
+        Find the top page for the API documentation.  This page is
+        used as the default page shown in the main frame, when frames
+        are used.  When frames are not used, this page is copied to 
+        C{index.html}.
+
+        @param pagename: The name of the page, as specified by the
+            keyword argument C{top} to the constructor.
+        @type pagename: C{string}
+        @return: The URL of the top page.
+        @rtype: C{string}
+        """
+        # If a page name was specified, then we need to figure out
+        # what it points to.
+        if pagename:
+            # If it's a URL, then use it directly.
+            if pagename.lower().startswith('http:'):
+                return pagename
+
+            # If it's an object, then use that object's page.
+            try:
+                doc = self.docindex.get_valdoc(pagename)
+                return self.url(doc)
+            except:
+                pass
+
+            # Otherwise, give up.
+            log.warning('Could not find top page %r; using trees.html '
+                        'instead' % pagename)
+
+        # If no page name was specified, then try to choose one
+        # automatically.
+        else:
+            root = [val_doc for val_doc in self.docindex.root
+                    if isinstance(val_doc, (ClassDoc, ModuleDoc))]
+            if len(root) == 0:
+                # No docs??  Try the trees page.
+                return 'trees.html' 
+            elif len(root) == 1:
+                # One item in the root; use that.
+                return self.url(root[0]) 
+            else:
+                # Multiple root items; if they're all in one package,
+                # then use that.  Otherwise, use trees.html
+                root = sorted(root, key=lambda v:len(v.canonical_name))
+                top = root[0]
+                for doc in root[1:]:
+                    if not top.canonical_name.dominates(doc.canonical_name):
+                        return 'trees.html'
+                else:
+                    return self.url(top)
     
     #////////////////////////////////////////////////////////////
     #{ 1. Interface Methods
@@ -1363,7 +1412,7 @@ class HTMLWriter:
         >>> if self._top_page not in ("trees.html", "indices.html", "help.html"):
           <!-- Home link -->
         >>>   if (isinstance(context, ValueDoc) and
-        >>>       self._top_page == self.url(context.dotted_name)):
+        >>>       self._top_page == self.url(context.canonical_name)):
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Home&nbsp;&nbsp;&nbsp;</th>
         >>>   else:
