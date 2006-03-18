@@ -644,12 +644,13 @@ def parse_function_signature(func_doc):
     m = _SIGNATURE_RE.match(func_doc.docstring)
     if m is None: return False
 
-    if not (m.group('func') == func_doc.canonical_name[-1] or
-            '_'+m.group('func') == func_doc.canonical_name[-1]):
-        log.warning("Not extracting function signature from %s's "
-                    "docstring, since the name doesn't match." %
-                    func_doc.canonical_name)
-        return False
+    # Do I want to be this strict?
+#     if not (m.group('func') == func_doc.canonical_name[-1] or
+#             '_'+m.group('func') == func_doc.canonical_name[-1]):
+#         log.warning("Not extracting function signature from %s's "
+#                     "docstring, since the name doesn't match." %
+#                     func_doc.canonical_name)
+#         return False
     
     params = m.group('params')
     rtype = m.group('return')
