@@ -352,6 +352,56 @@ class APIDoc(object):
         # Return self.
         return self
 
+    def apidoc_links(self, **filters):
+        """
+        Return a list of all C{APIDoc}s that are directly linked from
+        this C{APIDoc} (i.e., are contained or pointed to by one or
+        more of this C{APIDoc}'s attributes.)
+
+        Keyword argument C{filters} can be used to selectively exclude
+        certain categories of attribute value.  For example, using
+        C{includes=False} will exclude variables that were imported
+        from other modules; and C{subclasses=False} will exclude
+        subclasses.  The filter categories currently supported by
+        epydoc are:
+          - C{imports}: Imported variables.
+          - C{packages}: Containing packages for modules.
+          - C{submodules}: Contained submodules for packages.
+          - C{bases}: Bases for classes.
+          - C{subclasses}: Subclasses for classes.
+          - C{variables}: All variables.
+        """
+        return []
+
+def reachable_valdocs(root, sorted_by_name=False, **filters):
+    """
+    Return a list of all C{ValueDoc}s that can be reached, directly or
+    indirectly from the given root list of C{ValueDoc}s.
+
+    @param sorted_by_name: If true, then sort the list of reachable
+        C{ValueDoc}s by name before returning it.
+    @param filters: A set of filters that can be used to prevent
+        C{reachable_valdocs} from following specific link types when
+        looking for C{ValueDoc}s that can be reached from the root
+        set.  See C{APIDoc.apidoc_links} for a more complete
+        description.
+    """
+    apidoc_queue = list(root)
+    val_set = Set()
+    var_set = Set()
+    while apidoc_queue:
+        api_doc = apidoc_queue.pop()
+        if isinstance(api_doc, ValueDoc):
+            val_set.add(api_doc)
+        else:
+            var_set.add(api_doc)
+        apidoc_queue.extend([v for v in api_doc.apidoc_links(**filters)
+                             if v not in val_set and v not in var_set])
+    if sorted_by_name:
+        return sorted(val_set, key=lambda d:d.canonical_name)
+    else:
+        return val_set
+
 ######################################################################
 # Variable Documentation Objects
 ######################################################################
@@ -434,6 +484,12 @@ class VariableDoc(APIDoc):
     container's cannonical name, and adding the variable's name
     to it.""")
 
+    def apidoc_links(self, **filters):
+        if self.value in (None, UNKNOWN):
+            return []
+        else:
+            return [self.value]
+
 ######################################################################
 # Value Documentation Objects
 ######################################################################
@@ -500,53 +556,9 @@ class ValueDoc(APIDoc):
         else:                     
             return '<%s>' % self.__class__.__name__
 
-    def valdoc_links(self):
-        return []
-    def vardoc_links(self):
+    def apidoc_links(self, **filters):
         return []
 
-def reachable_valdocs(*root):
-    """
-    @return: The set of all C{ValueDoc}s that are directly or
-    indirectly reachable from the root set.  In particular, this set
-    contains all C{ValueDoc}s that can be reached from the root set by
-    following I{any} sequence of pointers to C{ValueDoc}s or
-    C{VariableDoc}s.
-    """
-    val_queue = list(root)
-    val_set = Set()
-    while val_queue:
-        val_doc = val_queue.pop()
-        val_set.add(val_doc)
-        val_queue.extend([v for v in val_doc.valdoc_links()
-                          if v not in val_set])
-        val_queue.extend([v.value for v in val_doc.vardoc_links()
-                          if (v.value not in (None, UNKNOWN) and
-                              v.value not in val_set)])
-    return val_set
-
-def contained_valdocs(*root):
-    """
-    @return: The set of all C{ValueDoc}s that are directly or
-    indirectly contained in the root set.  In particular, this set
-    contains all C{ValueDoc}s that can be reached from the root set by
-    following only the C{ValueDoc} pointers defined by non-imported
-    C{VariableDoc}s.  This will always be a subset of
-    L{reachable_valdocs}.
-    """
-    val_queue = list(root)
-    val_set = Set()
-    while val_queue:
-        val_doc = val_queue.pop()
-        val_set.add(val_doc)
-        val_queue.extend([v.value for v in val_doc.vardoc_links()
-                          if (v.value not in (None, UNKNOWN) and 
-                              v.value not in val_set and
-                              v.is_imported != True)])
-    return val_set
-
-        
-    
 class NamespaceDoc(ValueDoc):
     """
     API documentation information about a singe Python namespace
@@ -604,10 +616,14 @@ class NamespaceDoc(ValueDoc):
         APIDoc.__init__(self, **kwargs)
         assert self.variables != UNKNOWN
 
-    def valdoc_links(self):
-        return []
-    def vardoc_links(self):
-        return self.variables.values()
+    def apidoc_links(self, **filters):
+        if not filters.get('variables', True):
+            return []
+        elif not filters.get('imports', True):
+            return [v for v in self.variables.values() if
+                    v.is_imported != True]
+        else:
+            return self.variables.values()
 
     def init_sorted_variables(self):
         """
@@ -667,8 +683,8 @@ class NamespaceDoc(ValueDoc):
         they appear in C{api_docs}.
         """
         # Make the common case fast.
-        if len(self.group_specs) == 1:
-            return [('', elts)]
+        if len(self.group_specs) == 0:
+            return {'': [elt[1] for elt in elts]}
 
         ungrouped = Set([elt_doc for (elt_name, elt_doc) in elts])
         groups = {}
@@ -723,13 +739,15 @@ class ModuleDoc(NamespaceDoc):
 
     imports = UNKNOWN
 
-    def valdoc_links(self):
-        val_docs = []
-        if self.package not in (None, UNKNOWN): val_docs.append(self.package)
-        if self.submodules not in (None, UNKNOWN): val_docs += self.submodules
+    def apidoc_links(self, **filters):
+        val_docs = NamespaceDoc.apidoc_links(self, **filters)
+        if (filters.get('packages', True) and
+            self.package not in (None, UNKNOWN)):
+            val_docs.append(self.package)
+        if (filters.get('submodules', True) and
+            self.submodules not in (None, UNKNOWN)):
+            val_docs += self.submodules
         return val_docs
-    def vardoc_links(self):
-        return self.variables.values()
 
     def init_submodule_groups(self):
         """
@@ -775,7 +793,8 @@ class ModuleDoc(NamespaceDoc):
                              'must be initialized first.')
         
         if group is None: var_list = self.sorted_variables
-        else: var_list = self.variable_groups[group]
+        else:
+            var_list = self.variable_groups[group]
 
         # Public/private filter (Count UNKNOWN as public)
         if public is True:
@@ -816,13 +835,15 @@ class ClassDoc(NamespaceDoc):
     bases = UNKNOWN
     subclasses = UNKNOWN
 
-    def valdoc_links(self):
-        val_docs = []
-        if self.bases not in (None, UNKNOWN): val_docs += self.bases
-        if self.subclasses not in (None, UNKNOWN): val_docs += self.subclasses
+    def apidoc_links(self, **filters):
+        val_docs = NamespaceDoc.apidoc_links(self, **filters)
+        if (filters.get('bases', True) and 
+            self.bases not in (None, UNKNOWN)):
+            val_docs += self.bases
+        if (filters.get('subclasses', True) and
+            self.subclasses not in (None, UNKNOWN)):
+            val_docs += self.subclasses
         return val_docs
-    def vardoc_links(self):
-        return self.variables.values()
     
     def is_type(self):
         if self.canonical_name == DottedName('type'): return True
@@ -1081,11 +1102,6 @@ class RoutineDoc(ValueDoc):
     return_type = UNKNOWN
     exception_descrs = UNKNOWN
 
-    def valdoc_links(self):
-        return []
-    def vardoc_links(self):
-        return []
-    
     def all_args(self):
         """
         @return: A list of the names of all arguments (positional,
@@ -1131,14 +1147,12 @@ class PropertyDoc(ValueDoc):
     fdel = UNKNOWN
     type_descr = UNKNOWN # [XX]?? type of value that should be stored in the prop
 
-    def valdoc_links(self):
+    def apidoc_links(self, **filters):
         val_docs = []
         if self.fget not in (None, UNKNOWN): val_docs.append(self.fget)
         if self.fset not in (None, UNKNOWN): val_docs.append(self.fset)
         if self.fdel not in (None, UNKNOWN): val_docs.append(self.fdel)
         return val_docs
-    def vardoc_links(self):
-        return []
 
 ######################################################################
 ## Index
@@ -1269,12 +1283,13 @@ class DocIndex:
                 return None, None
             
             # First, check for variables in namespaces.
-            for child_var in val_doc.vardoc_links():
-                if child_var.name == identifier:
-                    var_doc = child_var
-                    val_doc = var_doc.value
-                    if val_doc is UNKNOWN: val_doc = None
-                    break
+            if isinstance(val_doc, NamespaceDoc):
+                for child_name, child_var in val_doc.variables.items():
+                    if child_name == identifier:
+                        var_doc = child_var
+                        val_doc = var_doc.value
+                        if val_doc is UNKNOWN: val_doc = None
+                        break
 
             # If that fails, then see if it's a submodule.
             else:
@@ -1298,19 +1313,20 @@ class DocIndex:
     # etc
     #////////////////////////////////////////////////////////////
 
-    def contained_valdocs(self, sorted_by_name=False):
-        if sorted_by_name:
-            return sorted(contained_valdocs(*self.root),
-                          key=lambda doc:doc.canonical_name)
-        else:
-            return contained_valdocs(*self.root)
+    def reachable_valdocs(self, sorted_by_name=False, **filters):
+        """
+        Return a list of all C{ValueDoc}s that can be reached,
+        directly or indirectly from this C{DocIndex}'s root set.
         
-    def reachable_valdocs(self, sorted_by_name=False):
-        if sorted_by_name:
-            return sorted(reachable_valdocs(*self.root),
-                          key=lambda doc:doc.canonical_name)
-        else:
-            return reachable_valdocs(*self.root)
+        @param sorted_by_name: If true, then sort the list of
+            reachable C{ValueDoc}s by name before returning it.
+        @param filters: A set of filters that can be used to prevent
+            C{reachable_valdocs} from following specific link types
+            when looking for C{ValueDoc}s that can be reached from the
+            root set.  See C{APIDoc.apidoc_links} for a more complete
+            description.
+        """
+        return reachable_valdocs(self.root, sorted_by_name, **filters)
 
     def container(self, api_doc):
         """
