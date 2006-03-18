@@ -471,6 +471,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
           - existing class attributes are prefixed with C{'rst-'}
           - existing names are prefixed with C{'rst-'}
           - hrefs starting with C{'#'} are prefixed with C{'rst-'}
+          - hrefs not starting with C{'#'} are given target='_top'
           - all headings (C{<hM{n}>}) are given the css class C{'heading'}
         """
         # Prefix all CSS classes with "rst-"
@@ -482,8 +483,11 @@ class _EpydocHTMLTranslator(HTMLTranslator):
             attributes['id'] = 'rst-%s' % attributes['id']
         if attributes.has_key('name'):
             attributes['name'] = 'rst-%s' % attributes['name']
-        if attributes.has_key('href') and attributes['href'][:1]=='#':
-            attributes['href'] = '#rst-%s' % attributes['href'][1:]
+        if attributes.has_key('href'):
+            if attributes['href'][:1]=='#':
+                attributes['href'] = '#rst-%s' % attributes['href'][1:]
+            else:
+                attributes['target'] = '_top'
 
         # For headings, use class="heading"
         if re.match(r'^h\d+$', tagname):
