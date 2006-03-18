@@ -682,7 +682,11 @@ class PythonSourceColorizer:
         # Decode the html string into unicode, and then encode it back
         # into ascii, replacing any non-ascii characters with xml
         # character references.
-        html = html.decode(coding).encode('ascii', 'xmlcharrefreplace')
+        try:
+            html = html.decode(coding).encode('ascii', 'xmlcharrefreplace')
+        except LookupError:
+            coding = 'iso-8859-1'
+            html = html.decode(coding).encode('ascii', 'xmlcharrefreplace')
 
         # Add on the javascripts.
         html += PYSRC_JAVASCRIPTS
