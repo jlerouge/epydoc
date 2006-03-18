@@ -48,7 +48,7 @@ Verbosity levels::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time
+import sys, os, time, re
 from optparse import OptionParser, OptionGroup
 import epydoc
 from epydoc.docbuilder import build_doc_index
@@ -346,17 +346,73 @@ def _profile():
 ######################################################################
 ## Logging
 ######################################################################
+    
+class TerminalController:
+    """
+    A class that can be used to portably generate formatted output to
+    a terminal.  See
+    U{http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/475116}
+    for documentation.
+    """
+    BOL = ''             #: Move the cursor to the beginning of the line
+    UP = ''              #: Move the cursor up one line
+    DOWN = ''            #: Move the cursor down one line
+    LEFT = ''            #: Move the cursor left one char
+    RIGHT = ''           #: Move the cursor right one char
+    CLEAR_EOL = ''       #: Clear to the end of the line.
+    CLEAR_LINE = ''      #: Clear the current line; cursor to BOL.
+    BOLD = ''            #: Turn on bold mode
+    NORMAL = ''          #: Turn off all modes
+    COLS = 75            #: Width of the terminal (default to 75)
+    BLACK = BLUE = GREEN = CYAN = RED = MAGENTA = YELLOW = WHITE = ''
+    
+    _STRING_CAPABILITIES = """
+    BOL=cr UP=cuu1 DOWN=cud1 LEFT=cub1 RIGHT=cuf1
+    CLEAR_EOL=el BOLD=bold UNDERLINE=smul NORMAL=sgr0""".split()
+    _COLORS = """BLACK BLUE GREEN CYAN RED MAGENTA YELLOW WHITE""".split()
+
+    def __init__(self, term_stream=sys.stdout):
+        # If the stream isn't a tty, then assume it has no capabilities.
+        if not term_stream.isatty(): return
+
+        # Curses isn't available on all platforms
+        try: import curses
+        except:
+            # If it's not available, then try faking enough to get a
+            # simple progress bar.
+            self.BOL = '\r'
+            self.CLEAR_LINE = '\r' + ' '*self.COLS + '\r'
+            
+        # Check the terminal type.  If we fail, then assume that the
+        # terminal has no capabilities.
+        try: curses.setupterm()
+        except: return
+
+        # Look up numeric capabilities.
+        self.COLS = curses.tigetnum('cols')
+        
+        # Look up string capabilities.
+        for capability in self._STRING_CAPABILITIES:
+            (attrib, cap_name) = capability.split('=')
+            setattr(self, attrib, self._tigetstr(cap_name) or '')
+        if self.BOL and self.CLEAR_EOL:
+            self.CLEAR_LINE = self.BOL+self.CLEAR_EOL
+
+        # Colors
+        set_fg = self._tigetstr('setf')
+        if set_fg:
+            for i,color in zip(range(len(self._COLORS)), self._COLORS):
+                setattr(self, color, curses.tparm(set_fg, i) or '')
+
+    def _tigetstr(self, cap_name):
+        # String capabilities can include "delays" of the form "$<2>".
+        # For any modern terminal, we should be able to just ignore
+        # these, so strip them out.
+        import curses
+        cap = curses.tigetstr(cap_name) or ''
+        return re.sub(r'\$<\d+>[/*]?', '', cap)
 
 class ConsoleLogger(log.Logger):
-    TERM_WIDTH = 75
-    """The width of the console terminal."""
-    # Terminal control strings:
-    _TERM_CR = _TERM_CLR_EOL = _TERM_UP = ''
-    _TERM_HIDE_CURSOR = _TERM_HIDE_CURSOR = ''
-    _TERM_NORM = _TERM_BOLD = ''
-    _TERM_RED = _TERM_YELLOW = _TERM_GREEN = _TERM_CYAN = _TERM_BLUE = ''
-    _DISABLE_COLOR = False
-    
     def __init__(self, verbosity):
         self._verbosity = verbosity
         self._progress = None
@@ -371,39 +427,17 @@ class ConsoleLogger(log.Logger):
         """This variable will be incremented once every time a
         docstring warning is reported tothe logger, but the verbosity
         level is too low for it to be displayed."""
-        
-        # Examine the capabilities of our terminal.
-        if sys.stdout.isatty():
-            try:
-                import curses
-                curses.setupterm()
-                self._TERM_CR = curses.tigetstr('cr') or ''
-                self.TERM_WIDTH = curses.tigetnum('cols')-1
-                self._TERM_CLR_EOL = curses.tigetstr('el') or ''
-                self._TERM_NORM =  curses.tigetstr('sgr0') or ''
-                self._TERM_HIDE_CURSOR = curses.tigetstr('civis') or ''
-                self._TERM_SHOW_CURSOR = curses.tigetstr('cnorm') or ''
-                self._TERM_UP = curses.tigetstr('cuu1') or ''
-                if self._TERM_NORM:
-                    self._TERM_BOLD = curses.tigetstr('bold') or ''
-                    term_setf = curses.tigetstr('setf')
-                    if term_setf or self._DISABLE_COLOR:
-                        self._TERM_RED = curses.tparm(term_setf, 4) or ''
-                        self._TERM_YELLOW = curses.tparm(term_setf, 6) or ''
-                        self._TERM_GREEN = curses.tparm(term_setf, 2) or ''
-                        self._TERM_CYAN = curses.tparm(term_setf, 3) or ''
-                        self._TERM_BLUE = curses.tparm(term_setf, 1) or ''
-            except:
-                pass
+
+        self.term = TerminalController()
 
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
         elif verbosity >= 0:
-            if self.TERM_WIDTH < 15:
+            if self.term.COLS < 15:
                 self._progress_mode = 'simple-bar'
-            if self._TERM_CR and self._TERM_CLR_EOL and self._TERM_UP:
+            if self.term.BOL and self.term.CLEAR_EOL and self.term.UP:
                 self._progress_mode = 'multiline-bar'
-            elif self._TERM_CR and self._TERM_CLR_EOL:
+            elif self.term.BOL and self.term.CLEAR_LINE:
                 self._progress_mode = 'bar'
             else:
                 self._progress_mode = 'simple-bar'
@@ -415,12 +449,13 @@ class ConsoleLogger(log.Logger):
     def end_block(self):
         header, messages = self._message_blocks.pop()
         if messages:
-            width = self.TERM_WIDTH - 5 - 2*len(self._message_blocks)
-            prefix = self._TERM_CYAN+self._TERM_BOLD+"| "+self._TERM_NORM
-            divider = self._TERM_CYAN + self._TERM_BOLD + '+' + '-'*(width-1)
+            width = self.term.COLS - 5 - 2*len(self._message_blocks)
+            prefix = self.term.CYAN+self.term.BOLD+'| '+self.term.NORMAL
+            divider = (self.term.CYAN+self.term.BOLD+'+'+'-'*(width-1)+
+                       self.term.NORMAL)
             # Mark up the header:
             header = wordwrap(header, right=width-2).rstrip()
-            header = '\n'.join([prefix+self._TERM_CYAN+l+self._TERM_NORM
+            header = '\n'.join([prefix+self.term.CYAN+l+self.term.NORMAL
                                 for l in header.split('\n')])
             # Indent the body:
             body = '\n'.join(messages)
@@ -440,22 +475,22 @@ class ConsoleLogger(log.Logger):
             if lines[i].startswith(' '):
                 lines[i] = ' '*(indent-startindex) + lines[i] + '\n'
             else:
-                width = self.TERM_WIDTH - 5 - 4*len(self._message_blocks)
+                width = self.term.COLS - 5 - 4*len(self._message_blocks)
                 lines[i] = wordwrap(lines[i], indent, width, startindex)
             startindex = 0
-        return color+prefix+self._TERM_NORM+''.join(lines)
+        return color+prefix+self.term.NORMAL+''.join(lines)
 
     def log(self, level, message):
         if self._verbosity >= -2 and level >= log.ERROR:
-            message = self._format('  Error: ', message, self._TERM_RED)
+            message = self._format('  Error: ', message, self.term.RED)
         elif self._verbosity >= -1 and level >= log.WARNING:
-            message = self._format('Warning: ', message, self._TERM_YELLOW)
+            message = self._format('Warning: ', message, self.term.YELLOW)
         elif self._verbosity >= 1 and level >= log.DOCSTRING_WARNING:
-            message = self._format('Warning: ', message, self._TERM_YELLOW)
+            message = self._format('Warning: ', message, self.term.YELLOW)
         elif self._verbosity >= 3 and level >= log.INFO:
-            message = self._format('   Info: ', message, self._TERM_NORM)
+            message = self._format('   Info: ', message, self.term.NORMAL)
         elif epydoc.DEBUG and level == log.DEBUG:
-            message = self._format('  Debug: ', message, self._TERM_CYAN)
+            message = self._format('  Debug: ', message, self.term.CYAN)
         else:
             if level >= log.DOCSTRING_WARNING:
                 self.supressed_docstring_warning += 1
@@ -476,10 +511,10 @@ class ConsoleLogger(log.Logger):
                     print
                     self._progress = None
             if self._progress_mode == 'bar':
-                sys.stdout.write(self._TERM_CR+self._TERM_CLR_EOL)
+                sys.stdout.write(self.term.CLEAR_LINE)
             if self._progress_mode == 'multiline-bar':
-                sys.stdout.write((self._TERM_CLR_EOL + '\n')*2 +
-                                 self._TERM_CLR_EOL + self._TERM_UP*2)
+                sys.stdout.write((self.term.CLEAR_EOL + '\n')*2 +
+                                 self.term.CLEAR_EOL + self.term.UP*2)
 
             # Display the message message.
             print message
@@ -495,26 +530,25 @@ class ConsoleLogger(log.Logger):
                 sys.stdout.flush()
                 
         elif self._progress_mode == 'bar':
-            dots = int((self.TERM_WIDTH/2-5)*percent)
-            background = '-'*(self.TERM_WIDTH/2-5)
-            
-            if len(message) > self.TERM_WIDTH/2:
-                message = message[:self.TERM_WIDTH/2-3]+'...'
-
-            sys.stdout.write(self._TERM_CR + '  ' + self._TERM_GREEN + '[' +
-                             self._TERM_BOLD + '='*dots + background[dots:] +
-                             self._TERM_NORM + self._TERM_GREEN + '] ' +
-                             self._TERM_NORM + message + self._TERM_CLR_EOL)
+            dots = int((self.term.COLS/2-8)*percent)
+            background = '-'*(self.term.COLS/2-8)
+            if len(message) > self.term.COLS/2:
+                message = message[:self.term.COLS/2-3]+'...'
+            sys.stdout.write(self.term.CLEAR_LINE + '%3d%% '%(100*percent) +
+                             self.term.GREEN + '[' + self.term.BOLD +
+                             '='*dots + background[dots:] + self.term.NORMAL +
+                             self.term.GREEN + '] ' + self.term.NORMAL +
+                             message + self.term.BOL)
             sys.stdout.flush()
             self._progress = percent
         elif self._progress_mode == 'multiline-bar':
-            dots = int((self.TERM_WIDTH-10)*percent)
-            background = '-'*(self.TERM_WIDTH-10)
+            dots = int((self.term.COLS-10)*percent)
+            background = '-'*(self.term.COLS-10)
             
-            if len(message) > self.TERM_WIDTH-10:
-                message = message[:self.TERM_WIDTH-10-3]+'...'
+            if len(message) > self.term.COLS-10:
+                message = message[:self.term.COLS-10-3]+'...'
             else:
-                message = message.center(self.TERM_WIDTH-10)
+                message = message.center(self.term.COLS-10)
 
             time_elapsed = time.time()-self._progress_start_time
             if percent > 0:
@@ -524,18 +558,18 @@ class ConsoleLogger(log.Logger):
 
             sys.stdout.write(
                 # Line 1:
-                self._TERM_CLR_EOL + '      ' +
+                self.term.CLEAR_EOL + '      ' +
                 '%-8s' % self._timestr(time_elapsed) +
-                self._TERM_BOLD + 'Progress:'.center(self.TERM_WIDTH-26) +
-                self._TERM_NORM + '%8s' % self._timestr(time_remain) + '\n' +
+                self.term.BOLD + 'Progress:'.center(self.term.COLS-26) +
+                self.term.NORMAL + '%8s' % self._timestr(time_remain) + '\n' +
                 # Line 2:
-                self._TERM_CLR_EOL + ('%3d%% ' % (100*percent)) +
-                self._TERM_GREEN + '[' +  self._TERM_BOLD + '='*dots +
-                background[dots:] + self._TERM_NORM + self._TERM_GREEN +
-                ']' + self._TERM_NORM + '\n' +
+                self.term.CLEAR_EOL + ('%3d%% ' % (100*percent)) +
+                self.term.GREEN + '[' +  self.term.BOLD + '='*dots +
+                background[dots:] + self.term.NORMAL + self.term.GREEN +
+                ']' + self.term.NORMAL + '\n' +
                 # Line 3:
-                self._TERM_CLR_EOL + '      ' + message + self._TERM_CR +
-                self._TERM_UP + self._TERM_UP)
+                self.term.CLEAR_EOL + '      ' + message + self.term.BOL +
+                self.term.UP + self.term.UP)
             
             sys.stdout.flush()
             self._progress = percent
@@ -543,8 +577,8 @@ class ConsoleLogger(log.Logger):
             if self._progress is None:
                 sys.stdout.write('  [')
                 self._progress = 0.0
-            dots = int((self.TERM_WIDTH-2)*percent)
-            progress_dots = int((self.TERM_WIDTH-2)*self._progress)
+            dots = int((self.term.COLS-2)*percent)
+            progress_dots = int((self.term.COLS-2)*self._progress)
             if dots > progress_dots:
                 sys.stdout.write('.'*(dots-progress_dots))
                 sys.stdout.flush()
@@ -564,15 +598,15 @@ class ConsoleLogger(log.Logger):
         self._progress_start_time = time.time()
         self._progress_header = header
         if self._progress_mode != 'hide' and header:
-            print self._TERM_BOLD + header + self._TERM_NORM
+            print self.term.BOLD + header + self.term.NORMAL
 
     def end_progress(self):
         self.progress(1.)
         if self._progress_mode == 'bar':
-            sys.stdout.write(self._TERM_CR+self._TERM_CLR_EOL)
+            sys.stdout.write(self.term.CLEAR_LINE)
         if self._progress_mode == 'multiline-bar':
-                sys.stdout.write((self._TERM_CLR_EOL + '\n')*2 +
-                                 self._TERM_CLR_EOL + self._TERM_UP*2)
+                sys.stdout.write((self.term.CLEAR_EOL + '\n')*2 +
+                                 self.term.CLEAR_EOL + self.term.UP*2)
         if self._progress_mode == 'simple-bar':
             print ']'
         self._progress = None
@@ -587,8 +621,8 @@ class ConsoleLogger(log.Logger):
         for (time, task) in self._task_times:
             task = task[:31]
             print '  %s%s %7.1fs' % (task, '.'*(35-len(task)), time),
-            if self.TERM_WIDTH > 55:
-                print '|'+'=' * int((self.TERM_WIDTH-53) * time / max_t)
+            if self.term.COLS > 55:
+                print '|'+'=' * int((self.term.COLS-53) * time / max_t)
             else:
                 print
         print
