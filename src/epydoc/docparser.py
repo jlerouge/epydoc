@@ -249,11 +249,11 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
             context = _parse_package(basedir)
 
         # Figure out the canonical name of the module we're parsing.
-        module_name, is_pkg = _get_module_name(filename, context)
-
-        # Mark scripts
-        if is_script:
-            module_name = DottedName(munge_script_name(str(module_name)))
+        if not is_script:
+            module_name, is_pkg = _get_module_name(filename, context)
+        else:
+            module_name = DottedName(munge_script_name(filename))
+            is_pkg = False
 
         # Create a new ModuleDoc for the module, & add it to the cache.
         module_doc = ModuleDoc(canonical_name=module_name, variables={},
@@ -520,11 +520,22 @@ def process_file(module_doc):
     encoding = _get_encoding(module_doc.filename)
 
     # The token-eating loop:
-    module_file = codecs.open(module_doc.filename, 'rU', encoding)
+    try:
+        module_file = codecs.open(module_doc.filename, 'rU', encoding)
+    except LookupError:
+        log.warning("Unknown encoding %r for %s; using the default"
+                    "encoding instead (iso-8859-1)" %
+                    (encoding, module_doc.filename))
+        encoding = 'iso-8859-1'
+        module_file = codecs.open(module_doc.filename, 'rU', encoding)
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
+        # BOM encoding marker: ignore.
+        if toktype == token.ERRORTOKEN and toktext == u'\ufeff':
+            pass
+            
         # Error token: abort
-        if toktype == token.ERRORTOKEN:
+        elif toktype == token.ERRORTOKEN:
             raise ParseError('Error during parsing: invalid syntax '
                              '(%s, line %d, char %d: %r)' %
                              (module_doc.filename, srow, scol, toktext))
