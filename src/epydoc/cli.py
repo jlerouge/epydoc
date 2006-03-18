@@ -252,16 +252,11 @@ def main(options, names):
         logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
         log.register_logger(logger)
 
-    # create the output directory.
+    # check the output directory.
     if options.action != 'text':
         if os.path.exists(options.target):
             if not os.path.isdir(options.target):
                 return log.error("%s is not a directory" % options.target)
-        else:
-            try:
-                os.mkdir(options.target)
-            except Exception, e:
-                return log.error(e)
 
     # Set the default docformat
     docstringparser.DEFAULT_DOCFORMAT = options.docformat
