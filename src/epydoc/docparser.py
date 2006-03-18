@@ -1197,9 +1197,9 @@ def process_one_line_block(line, parent_docs, prev_line_doc, lineno,
     """
     i = line.index((token.OP, ':'))
     doc1 = process_line(line[:i+1], parent_docs, prev_line_doc,
-                             lineno, comments, decorators)
+                             lineno, comments, decorators, encoding)
     doc2 = process_line(line[i+1:], parent_docs+[doc1],
-                             doc1, lineno, None, [])
+                             doc1, lineno, None, [], encoding)
     return doc1
 
 #/////////////////////////////////////////////////////////////////
@@ -1222,8 +1222,8 @@ def process_multi_stmt(line, parent_docs, prev_line_doc, lineno,
     while start < len(line):
         try: end = line.index((token.OP, ';'), start)
         except ValueError: end = len(line)
-        doc = process_line(line[start:end], parent_docs,
-                                prev_line_doc, lineno, None, decorators)
+        doc = process_line(line[start:end], parent_docs, prev_line_doc, 
+                           lineno, None, decorators, encoding)
         start = end+1
         prev_line_doc = doc
         decorators = []
