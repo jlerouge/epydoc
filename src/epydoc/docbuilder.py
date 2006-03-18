@@ -150,6 +150,10 @@ def build_doc_index(items, introspect=True, parse=True,
     else:
         docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[1]]
 
+    if len(docs) == 0:
+        log.error('Nothing left to document!')
+        return
+
     # Collect the docs into a single index.
     docindex = DocIndex(docs)
 
@@ -157,9 +161,11 @@ def build_doc_index(items, introspect=True, parse=True,
     # their targets.
     if parse:
         log.start_progress('Linking imported variables')
-        reachable_valdocs = docindex.reachable_valdocs(True)
-        for i, val_doc in enumerate(reachable_valdocs):
-            _report_valdoc_progress(i, val_doc, reachable_valdocs)
+        valdocs = docindex.reachable_valdocs(sort_by_name=True, imports=False,
+                                             submodules=False, packages=False,
+                                             subclasses=False)
+        for i, val_doc in enumerate(valdocs):
+            _report_valdoc_progress(i, val_doc, valdocs)
             link_imports(val_doc, docindex)
         log.end_progress()
 
@@ -172,9 +178,11 @@ def build_doc_index(items, introspect=True, parse=True,
 
     # Parse the docstrings for each object.
     log.start_progress('Parsing docstrings')
-    reachable_valdocs = docindex.reachable_valdocs(True)
-    for i, val_doc in enumerate(reachable_valdocs):
-        _report_valdoc_progress(i, val_doc, reachable_valdocs)
+    valdocs = docindex.reachable_valdocs(sort_by_name=True, imports=False,
+                                         submodules=False, packages=False,
+                                         subclasses=False)
+    for i, val_doc in enumerate(valdocs):
+        _report_valdoc_progress(i, val_doc, valdocs)
         # the value's docstring
         parse_docstring(val_doc, docindex)
         # the value's variables' docstrings
@@ -186,18 +194,18 @@ def build_doc_index(items, introspect=True, parse=True,
 
     # Take care of inheritance.
     log.start_progress('Inheriting documentation')
-    for i, val_doc in enumerate(reachable_valdocs):
+    for i, val_doc in enumerate(valdocs):
         if isinstance(val_doc, ClassDoc):
-            percent = float(i)/len(reachable_valdocs)
+            percent = float(i)/len(valdocs)
             log.progress(percent, val_doc.canonical_name)
             inherit_docs(val_doc)
     log.end_progress()
 
     # Initialize the groups & sortedvars attributes.
     log.start_progress('Sorting & Grouping')
-    for i, val_doc in enumerate(reachable_valdocs):
+    for i, val_doc in enumerate(valdocs):
         if isinstance(val_doc, NamespaceDoc):
-            percent = float(i)/len(reachable_valdocs)
+            percent = float(i)/len(valdocs)
             log.progress(percent, val_doc.canonical_name)
             val_doc.init_sorted_variables()
             val_doc.init_variable_groups()
@@ -270,39 +278,47 @@ def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
                   "introspecting them.")
             
     introspect_doc = parse_doc = None
-    if introspect:
-        try:
-            introspect_doc = introspect_docs(value=obj)
-        except ImportError, e:
-            log.error(e)
+    introspect_error = parse_error = None
+    try:
+        introspect_doc = introspect_docs(value=obj)
+    except ImportError, e:
+        log.error(e)
+        return (None, None)
     if parse:
         if introspect_doc.canonical_name is not None:
             _, parse_docs = _get_docs_from_pyname(
                 str(introspect_doc.canonical_name), False, True,
-                progress_estimator)
+                progress_estimator, supress_warnings=True)
     return (introspect_doc, parse_doc)
 
-def _get_docs_from_pyname(name, introspect, parse, progress_estimator):
+def _get_docs_from_pyname(name, introspect, parse, progress_estimator,
+                          supress_warnings=False):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), name)
     
     introspect_doc = parse_doc = None
+    introspect_error = parse_error = None
     if introspect:
         try:
             introspect_doc = introspect_docs(name=name)
         except ImportError, e:
-            log.error(e)
+            introspect_error = str(e)
     if parse:
         try:
             parse_doc = parse_docs(name=name)
         except ParseError, e:
-            log.error(e)
+            parse_error = str(e)
         except ImportError, e:
-            if introspect_doc is None:
-                log.error('Could not parse %s: %s' % (name, e))
-            else:
-                log.warning('Could not parse %s: %s\n' % (name, e) +
-                            'Using introspected documentation only.')
+            # If we get here, then there' probably no python source
+            # available; don't bother to generate a warnining.
+            pass
+        
+    # Report any errors we encountered.
+    if not supress_warnings:
+        _report_errors(name, introspect_doc, parse_doc,
+                       introspect_error, parse_error)
+
+    # Return the docs we found.
     return (introspect_doc, parse_doc)
 
 def _get_docs_from_pyscript(filename, introspect, parse, progress_estimator):
@@ -310,22 +326,25 @@ def _get_docs_from_pyscript(filename, introspect, parse, progress_estimator):
     # and maybe do some munging to prevent problems.
 
     introspect_doc = parse_doc = None
+    introspect_error = parse_error = None
     if introspect:
         try:
             introspect_doc = introspect_docs(filename=filename, is_script=True)
         except ImportError, e:
-            log.error(e)
+            introspect_error = str(e)
     if parse:
         try:
             parse_doc = parse_docs(filename=filename, is_script=True)
         except ParseError, e:
-            log.error(e)
+            parse_error = str(e)
         except ImportError, e:
-            if introspect_doc is None:
-                log.error('Could not parse %s: %s' % (filename, e))
-            else:
-                log.warning('Could not parse %s: %s\n' % (filename, e) +
-                            'Using introspected documentation only.')
+            parse_error = str(e)
+                
+    # Report any errors we encountered.
+    _report_errors(filename, introspect_doc, parse_doc,
+                   introspect_error, parse_error)
+
+    # Return the docs we found.
     return (introspect_doc, parse_doc)
     
 def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
@@ -356,29 +375,35 @@ def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
     filename = os.path.normpath(os.path.abspath(filename))
 
     # When possible, use the source version of the file.
-    try: filename = py_src_filename(filename)
-    except ValueError: pass
+    try:
+        filename = py_src_filename(filename)
+        src_file_available = True
+    except ValueError:
+        src_file_available = False
 
     # Get the introspected & parsed docs (as appropriate)
     introspect_doc = parse_doc = None
+    introspect_error = parse_error = None
     if introspect:
         try:
             introspect_doc = introspect_docs(
                 filename=filename, context=parent_docs[0])
         except ImportError, e:
-            log.error(e)
-    if parse:
+            introspect_error = str(e)
+    if parse and src_file_available:
         try:
             parse_doc = parse_docs(
                 filename=filename, context=parent_docs[1])
         except ParseError, e:
-            log.error(e)
+            parse_error = str(e)
         except ImportError, e:
-            if introspect_doc is None:
-                log.error('Could not parse %s: %s' % (filename, e))
-            else:
-                log.warning('Could not parse %s: %s\n' % (filename, e) +
-                            'Using introspected documentation only.')
+            parse_error = str(e)
+
+    # Report any errors we encountered.
+    _report_errors(filename, introspect_doc, parse_doc,
+                   introspect_error, parse_error)
+
+    # Return the docs we found.
     return (introspect_doc, parse_doc)
 
 def _get_docs_from_package_dir(package_dir, introspect, parse,
@@ -425,6 +450,26 @@ def _get_docs_from_package_dir(package_dir, introspect, parse,
         docs += _get_docs_from_package_dir(
             subpackage_dir, introspect, parse, progress_estimator, pkg_docs)
     return docs
+
+def _report_errors(name, introspect_doc, parse_doc,
+                   introspect_error, parse_error):
+    if introspect_doc == parse_doc == None:
+        if introspect_error:
+            log.warning('Introspection failed for %s:\n%s' %
+                        (name, introspect_error))
+        if parse_error:
+            log.warning('Source code parsing failed for %s:\n%s' %
+                        (name, parse_error))
+        log.error('No documentation available for %s!' % name)
+    else:
+        if introspect_error:
+            log.warning('Introspection failed for %s; using parse '
+                        'information only:\n%s' % (name, introspect_error))
+        if parse_error:
+            log.warning('Source code parsing failed for %s; using '
+                        'introspection information only:\n%s' %
+                        (name, parse_error))
+    
 
 #/////////////////////////////////////////////////////////////////
 # Progress Estimation (for Documentation Generation)
@@ -744,7 +789,9 @@ def merge_fdel(v1, v2, precedence, cyclecheck, path):
 def merge_imported_from(v1, v2, precedence, cyclecheck, path):
     # Anything we got from introspection shouldn't have an imported_from
     # attribute -- it should be the actual object's documentation.
-    assert v1 is None
+    if v1 is not None:
+        log.warning("Ouch, inspected thing with imported_from attribute?",
+                    `v1`, `v2`)
     return None
 
 def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
@@ -905,26 +952,28 @@ def assign_canonical_names(val_doc, name, docindex, score=0):
             _name_scores[val_doc] = score
 
     # Recurse to any contained values.
-    for var_doc in val_doc.vardoc_links():
-        if var_doc.value is UNKNOWN: continue
-        varname = DottedName(name, var_doc.name)
-
-        # This check is for cases like curses.wrapper, where an
-        # imported variable shadows its value's "real" location.
-        if _var_shadows_self(var_doc, varname):
-            _fix_self_shadowing_var(var_doc, varname, docindex)
-
-        # Find the score for this new name.            
-        vardoc_score = score-1
-        if var_doc.is_imported is UNKNOWN: vardoc_score -= 10
-        elif var_doc.is_imported: vardoc_score -= 100
-        if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
-        elif var_doc.is_alias: vardoc_score -= 1000
-        
-        assign_canonical_names(var_doc.value, varname, docindex, vardoc_score)
+    if isinstance(val_doc, NamespaceDoc):
+        for var_doc in val_doc.variables.values():
+            if var_doc.value is UNKNOWN: continue
+            varname = DottedName(name, var_doc.name)
+    
+            # This check is for cases like curses.wrapper, where an
+            # imported variable shadows its value's "real" location.
+            if _var_shadows_self(var_doc, varname):
+                _fix_self_shadowing_var(var_doc, varname, docindex)
+    
+            # Find the score for this new name.            
+            vardoc_score = score-1
+            if var_doc.is_imported is UNKNOWN: vardoc_score -= 10
+            elif var_doc.is_imported: vardoc_score -= 100
+            if var_doc.is_alias is UNKNOWN: vardoc_score -= 10
+            elif var_doc.is_alias: vardoc_score -= 1000
+            
+            assign_canonical_names(var_doc.value, varname,
+                                   docindex, vardoc_score)
 
     # Recurse to any directly reachable values.
-    for val_doc_2 in val_doc.valdoc_links():
+    for val_doc_2 in val_doc.apidoc_links(variables=False):
         val_name, val_score = _unreachable_name_for(val_doc_2, docindex)
         assign_canonical_names(val_doc_2, val_name, docindex, val_score)
 
