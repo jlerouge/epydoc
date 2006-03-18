@@ -1276,7 +1276,7 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
     # right thing to do; but it will almost always be what the
     # module's author intended.
     if isinstance(docstring, str):
-        str.encode(encoding)
+        docstring = docstring.decode(encoding)
 
     # If the modified APIDoc is an instance variable, and it has
     # not yet been added to its class's C{variables} list,
