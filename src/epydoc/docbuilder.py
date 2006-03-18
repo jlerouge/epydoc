@@ -152,7 +152,7 @@ def build_doc_index(items, introspect=True, parse=True,
 
     if len(docs) == 0:
         log.error('Nothing left to document!')
-        return
+        return None
 
     # Collect the docs into a single index.
     docindex = DocIndex(docs)
@@ -527,9 +527,10 @@ MERGE_PRECEDENCE = {
     'is_alias': 'parse',
     'docformat': 'parse',
     'is_package': 'parse',
-    'sort_spec': 'parse',
+    'sort_spec': 'parse', # sort according to the order in the file.
     'subpackages': 'introspect',
-    'filename': 'parse',
+    'filename': 'parse', # use src filename when possible
+    'docstring': 'parse', # more likely to get encoding right.
     }
 """Indicates whether information from introspection or parsing should be
 given precedence, for specific attributes.  This dictionary maps from

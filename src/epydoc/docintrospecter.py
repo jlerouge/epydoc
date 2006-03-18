@@ -34,6 +34,8 @@ from sets import Set
 from epydoc import log
 # Helper functions:
 from epydoc.util import *
+# For extracting encoding for docstrings:
+import epydoc.docparser
 # Builtin values
 import __builtin__
 
@@ -459,12 +461,20 @@ def get_docstring(value):
     elif isinstance(docstring, str):
         try: return unicode(docstring, 'ascii')
         except UnicodeDecodeError:
+            module_name = get_containing_module(value)
+            if module_name is not None:
+                try:
+                    module = get_value_from_name(module_name)
+                    filename = py_src_filename(module.__file__)
+                    encoding = epydoc.docparser.get_module_encoding(filename)
+                    return unicode(docstring, encoding)
+                except KeyboardInterrupt: raise
+                except: raise #pass
             if hasattr(value, '__name__'): name = value.__name__
             else: name = `value`
-            log.warning("%s's docstring is not a unicode string, but it "
-                        "contains non-ascii data -- treating it as "
-                        "latin-1." % name)
-            # Assume it's latin-1.
+            log.info("%s's docstring is not a unicode string, but it "
+                     "contains non-ascii data -- treating it as "
+                     "latin-1." % name)
             return unicode(docstring, 'latin-1')
         return None
     elif value is BuiltinMethodType:

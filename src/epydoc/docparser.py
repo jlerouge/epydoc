@@ -36,7 +36,7 @@ import codecs
 from epydoc.apidoc import *
 # For looking up the docs of builtins:
 import __builtin__
-from epydoc.docintrospecter import introspect_docs
+import epydoc.docintrospecter 
 # Misc utility functions:
 from epydoc.util import *
 
@@ -517,7 +517,7 @@ def process_file(module_doc):
     start_group = None
 
     # Check if the source file declares an encoding.
-    encoding = _get_encoding(module_doc.filename)
+    encoding = get_module_encoding(module_doc.filename)
 
     # The token-eating loop:
     try:
@@ -615,8 +615,8 @@ def process_file(module_doc):
             if parent_docs[-1] != 'skip_block':
                 try:
                     prev_line_doc = process_line(
-                        shallow_parse(line_toks), parent_docs,
-                        prev_line_doc, lineno, comments, decorators)
+                        shallow_parse(line_toks), parent_docs, prev_line_doc, 
+                        lineno, comments, decorators, encoding)
                 except ParseError, e:
                     raise ParseError('Error during parsing: invalid '
                                      'syntax (%s, line %d) -- %s' %
@@ -700,11 +700,12 @@ def shallow_parse(line_toks):
 # The methods process_*() are used to handle lines.
 
 def process_line(line, parent_docs, prev_line_doc, lineno,
-                 comments, decorators):
+                 comments, decorators, encoding):
     """
     @return: C{new-doc}, C{decorator}..?
     """
-    args = (line, parent_docs, prev_line_doc, lineno, comments, decorators)
+    args = (line, parent_docs, prev_line_doc, lineno,
+            comments, decorators, encoding)
 
     if not line: # blank line.
         return None
@@ -756,7 +757,7 @@ CONTROL_FLOW_KEYWORDS = [
     'if', 'elif', 'else', 'while', 'for', 'try', 'except', 'finally']
 
 def process_control_flow_line(line, parent_docs, prev_line_doc,
-                              lineno, comments, decorators):
+                              lineno, comments, decorators, encoding):
     keyword = line[0][1]
 
     # If it's a 'for' block: create the loop variable.
@@ -790,7 +791,7 @@ def process_control_flow_line(line, parent_docs, prev_line_doc,
 #/////////////////////////////////////////////////////////////////
 
 def process_import(line, parent_docs, prev_line_doc, lineno,
-                   comments, decorators):
+                   comments, decorators, encoding):
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     names = split_on(line[1:], (token.OP, ','))
@@ -810,7 +811,7 @@ def process_import(line, parent_docs, prev_line_doc, lineno,
             raise ParseError('Multiple "as" tokens in import')
 
 def process_from_import(line, parent_docs, prev_line_doc, lineno,
-                        comments, decorators):
+                        comments, decorators, encoding):
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     pieces = split_on(line[1:], (token.NAME, 'import'))
@@ -1031,7 +1032,7 @@ def _global_name(name, parent_docs):
 #/////////////////////////////////////////////////////////////////
 
 def process_assignment(line, parent_docs, prev_line_doc, lineno,
-                       comments, decorators):
+                       comments, decorators, encoding):
     # Divide the assignment statement into its pieces.
     pieces = split_on(line, (token.OP, '='))
 
@@ -1182,7 +1183,7 @@ def get_lhs_parent(lhs_name, parent_docs):
 #/////////////////////////////////////////////////////////////////
 
 def process_one_line_block(line, parent_docs, prev_line_doc, lineno,
-                           comments, decorators):
+                           comments, decorators, encoding):
     """
     The line handler for single-line blocks, such as:
 
@@ -1206,7 +1207,7 @@ def process_one_line_block(line, parent_docs, prev_line_doc, lineno,
 #/////////////////////////////////////////////////////////////////
 
 def process_multi_stmt(line, parent_docs, prev_line_doc, lineno,
-                       comments, decorators):
+                       comments, decorators, encoding):
     """
     The line handler for semicolon-separated statements, such as:
 
@@ -1233,7 +1234,7 @@ def process_multi_stmt(line, parent_docs, prev_line_doc, lineno,
 #/////////////////////////////////////////////////////////////////
 
 def process_del(line, parent_docs, prev_line_doc, lineno,
-                comments, decorators):
+                comments, decorators, encoding):
     """
     The line handler for delete statements, such as:
 
@@ -1259,7 +1260,7 @@ def process_del(line, parent_docs, prev_line_doc, lineno,
 #/////////////////////////////////////////////////////////////////
 
 def process_docstring(line, parent_docs, prev_line_doc, lineno,
-                      comments, decorators):
+                      comments, decorators, encoding):
     """
     The line handler for bare string literals.  If
     C{prev_line_doc} is not C{None}, then the string literal is
@@ -1269,6 +1270,13 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
     """
     if prev_line_doc is None: return
     docstring = parse_string(line)
+
+    # If the docstring is a str, then convert it to unicode.
+    # According to a strict reading of PEP 263, this might not be the
+    # right thing to do; but it will almost always be what the
+    # module's author intended.
+    if isinstance(docstring, str):
+        str.encode(encoding)
 
     # If the modified APIDoc is an instance variable, and it has
     # not yet been added to its class's C{variables} list,
@@ -1299,7 +1307,7 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
 #/////////////////////////////////////////////////////////////////
 
 def process_funcdef(line, parent_docs, prev_line_doc, lineno,
-                    comments, decorators):
+                    comments, decorators, encoding):
     """
     The line handler for function declaration lines, such as:
 
@@ -1412,7 +1420,7 @@ def init_arglist(func_doc, arglist):
 #/////////////////////////////////////////////////////////////////
 
 def process_classdef(line, parent_docs, prev_line_doc, lineno,
-                     comments, decorators):
+                     comments, decorators, encoding):
     """
     The line handler for class declaration lines, such as:
     
@@ -1724,7 +1732,7 @@ def lookup_name(identifier, parent_docs):
             return parent_docs[0].variables[identifier]
 
     # Builtins
-    builtins = introspect_docs(__builtin__)
+    builtins = epydoc.docintrospecter.introspect_docs(__builtin__)
     if isinstance(builtins, NamespaceDoc):
         if builtins.variables.has_key(identifier):
             return builtins.variables[identifier]
@@ -1813,11 +1821,11 @@ def pp_toktree(elts, spacing='normal', indent=0):
 #{ Helper Functions
 #/////////////////////////////////////////////////////////////////
 
-def _get_encoding(filename):
+def get_module_encoding(filename):
     """
     @see: U{PEP 263<http://www.python.org/peps/pep-0263.html>}
     """
-    module_file = open(filename)
+    module_file = open(filename, 'rU')
     try:
         lines = [module_file.readline() for i in range(2)]
         if lines[0].startswith('\xef\xbb\xbf'):

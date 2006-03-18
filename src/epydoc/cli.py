@@ -265,6 +265,9 @@ def main(options, names):
     docindex = build_doc_index(names, options.introspect, options.parse,
                                add_submodules=(options.action!='text'))
 
+    if docindex is None:
+        return # docbuilder already logged an error.
+
     # Perform the specified action.
     if options.action == 'html':
         html_writer = HTMLWriter(docindex, **options.__dict__)
