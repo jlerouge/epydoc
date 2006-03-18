@@ -1728,7 +1728,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif tree.tagName == 'code':
             return '<code>%s</code>' % childstr
         elif tree.tagName == 'uri':
-            return '<a href="%s">%s</a>' % (variables[1], variables[0])
+            return ('<a href="%s" target="_top">%s</a>' %
+                    (variables[1], variables[0]))
         elif tree.tagName == 'link':
             return linker.translate_identifier_xref(variables[1], variables[0])
         elif tree.tagName == 'italic':
