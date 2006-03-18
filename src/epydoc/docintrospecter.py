@@ -95,7 +95,7 @@ several different ways:
 """
 
 def introspect_docs(value=None, name=None, filename=None, context=None,
-                 is_script=False):
+                    is_script=False):
     """
     Generate the API documentation for a specified object by
     introspecting Python values, and return it as a L{ValueDoc}.  The
@@ -563,7 +563,9 @@ def get_containing_module(value):
     elif inspect.ismethod(value):
         return DottedName(value.im_class.__module__)
     elif inspect.isroutine(value):
-        return DottedName(_find_function_module(value))
+        module = _find_function_module(value)
+        if module is None: return None
+        return DottedName(module)
     else:
         return None
 
@@ -719,8 +721,8 @@ def _lookup(module, name):
     for i, identifier in enumerate(name):
         try: val = getattr(val, identifier)
         except AttributeError:
-            exc_msg = ('Could not import %s:\nNo variable named %s in %s' %
-                       (name, identifier, '.'.join(name[:1+i])))
+            exc_msg = ('no variable named %s in %s' %
+                       (identifier, '.'.join(name[:1+i])))
             raise ImportError(exc_msg)
     return val
             
@@ -754,16 +756,15 @@ def _import(name, filename=None):
                 return imp.load_source(name, filename)
         except KeyboardInterrupt:
             raise # don't capture keyboard interrupts!
-        except Exception, e:
-            estr = e.__class__.__name__
-            if ('%s'%e): estr += ' -- %s' % e
-            raise ImportError('Could not import %s:\n%s' % (name, estr))
-        except SystemExit, e:
-            estr = e.__class__.__name__
-            if ('%s'%e): estr += ' (%s)' % e
-            raise ImportError('Could not import %s:\n%s' % (name, estr))
         except:
-            raise ImportError('Could not import %s' % name)
+            exc_typ, exc_val, exc_tb = sys.exc_info()
+            if exc_val is None:
+                estr = '%s' % (exc_typ,)
+            else:
+                estr = '%s: %s' % (exc_typ.__name__, exc_val)
+            if exc_tb.tb_next is not None:
+                estr += ' (line %d)' % (exc_tb.tb_next.tb_lineno,)
+            raise ImportError(estr)
     finally:
         # Restore the important values that we saved.
         __builtin__.__dict__.clear()
