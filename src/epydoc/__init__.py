@@ -77,6 +77,7 @@ to document, and produce API documentation using the following steps:
 @contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
 @contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
 @contributor: U{Christian Reis <mailto:kiko@async.com.br>}
+@contributor: U{Daniele Varrazzo <mailto:daniele.varrazzo@gmail.com>}
 """
 __docformat__ = 'epytext en'
 
