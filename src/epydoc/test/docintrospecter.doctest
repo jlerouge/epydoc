@@ -553,7 +553,7 @@ Recursive objects
     ...         pass
     ...
     ...     A.b = B
-    ...     """, introspect="A")
+    ...     """, introspect="A") # doctest: +ELLIPSIS
     ClassDoc for epydoc_test.A [0]
      +- bases = []
      +- canonical_name = DottedName('epydoc_test', 'A')
