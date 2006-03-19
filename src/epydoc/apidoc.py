@@ -1292,21 +1292,20 @@ class DocIndex:
                         break
 
             # If that fails, then see if it's a submodule.
-            else:
-                if (isinstance(val_doc, ModuleDoc) and
-                    val_doc.submodules is not UNKNOWN):
-                    for submodule in val_doc.submodules:
-                        if (submodule.canonical_name ==
-                            DottedName(val_doc.canonical_name, identifier)):
-                            var_doc = None
-                            val_doc = submodule
-                            if val_doc is UNKNOWN: val_doc = None
-                            break
-                    else:
-                        return None, None
+            if (isinstance(val_doc, ModuleDoc) and
+                val_doc.submodules is not UNKNOWN):
+                for submodule in val_doc.submodules:
+                    if (submodule.canonical_name ==
+                        DottedName(val_doc.canonical_name, identifier)):
+                        var_doc = None
+                        val_doc = submodule
+                        if val_doc is UNKNOWN: val_doc = None
+                        break
                 else:
                     return None, None
-            
+            else:
+                return None, None
+
         return (var_doc, val_doc)
 
     #////////////////////////////////////////////////////////////
