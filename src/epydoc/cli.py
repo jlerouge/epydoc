@@ -112,7 +112,7 @@ def parse_arguments():
     options_group.add_option(                                # --show-imports
         "--inheritance", dest="inheritance", metavar="STYLE",
         help="The format for showing inheritance objects.  STYLE "
-        "should be \"grouped\", \"listed\", or \"inherited\".")
+        "should be \"grouped\", \"listed\", or \"included\".")
     options_group.add_option(                                # --output
         "--docformat", dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
