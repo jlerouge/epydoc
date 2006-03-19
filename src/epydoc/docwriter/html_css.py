@@ -80,6 +80,9 @@ h3.func-detail     { margin: 0 0 1em 0; }
 table.var-details  { border-width: 2px; border-style: groove;
                      padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
 h3.var-details     { margin: 0 0 1em 0; }
+table.prop-details  { border-width: 2px; border-style: groove;
+                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
+h3.prop-details     { margin: 0 0 1em 0; }
 
 /* Function signatures */
 .sig               { font-weight: bold; }  
@@ -156,6 +159,9 @@ h3.func-detail     { background: transparent; color: #000000; }
 table.var-details  { background: #e8f0f8; color: #000000;
                      border-color: #c0d0d0; }
 h3.var-details     { background: transparent; color: #000000; }
+table.prop-details  { background: #e8f0f8; color: #000000;
+                     border-color: #c0d0d0; }
+h3.prop-details     { background: transparent; color: #000000; }
 
 /* Function signatures */
 .sig               { background: transparent; color: #000000; }
@@ -245,10 +251,12 @@ h3.heading         { background: transparent; color: #002040; }
 table.func-details { background: #a8c0c8; color: #000000;
                      border-color: #c0d0d0; }
 h3.func-detail     { background: transparent; color: #000000; }
-
 table.var-details  { background: #a8c0c8; color: #000000;
                      border-color: #c0d0d0; }
 h3.var-details     { background: transparent; color: #000000; }
+table.prop-details  { background: #a8c0c8; color: #000000;
+                     border-color: #c0d0d0; }
+h3.prop-details     { background: transparent; color: #000000; }
 
 /* Function signatures */
 .sig               { background: transparent; color: #000000; }
@@ -337,10 +345,12 @@ h3.heading         { background: transparent; color: #002060; }
 table.func-details { background: #c8e0e8; color: #000000;
                      border-color: #c0d0d0; }
 h3.func-detail     { background: transparent; color: #000000; }
-
 table.var-details  { background: #c8e0e8; color: #000000;
                      border-color: #ffffff; }
 h3.var-details     { background: transparent; color: #000000; }
+table.prop-details  { background: #c8e0e8; color: #000000;
+                     border-color: #ffffff; }
+h3.prop-details     { background: transparent; color: #000000; }
 
 /* Function signatures */
 .sig               { background: transparent; color: #000000; }
