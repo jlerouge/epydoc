@@ -346,7 +346,8 @@ def user_docfields(api_doc, docindex):
     # Get any docfields from `api_doc`'s ancestors
     for i in range(len(api_doc.canonical_name)-1, 0, -1):
         ancestor = docindex.get_valdoc(api_doc.canonical_name.container())
-        if ancestor.extra_docstring_fields not in (None, UNKNOWN):
+        if ancestor is not None \
+        and ancestor.extra_docstring_fields not in (None, UNKNOWN):
             docfields += ancestor.extra_docstring_fields
     return docfields
 
