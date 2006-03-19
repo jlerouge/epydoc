@@ -100,7 +100,7 @@ CONSOLIDATED_FIELDS = {
 #: definition list, rather than a bulleted list.  For these fields, the
 #: 'classifier' for each term in the definition list is translated into
 #: a @type field.
-CONSOLIDATED_DEFLIST_FIELDS = ['param', 'arg', 'var', 'ivar', 'cvar']
+CONSOLIDATED_DEFLIST_FIELDS = ['param', 'arg', 'var', 'ivar', 'cvar', 'keyword']
 
 def parse_docstring(docstring, errors, **options):
     """
