@@ -341,7 +341,7 @@ it.
      +- docstring = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
-           +- docstring = 'docstring for x.\n(can be multiline)'
+           +- docstring = u'docstring for x.\n(can be multiline)'
            +- name = u'x'
 
     >>> runparser(s="""
@@ -378,7 +378,7 @@ constant takes precedence:
      +- docstring = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
-           +- docstring = 'string'
+           +- docstring = u'string'
            +- name = u'x'
 
 Functions
@@ -394,7 +394,7 @@ VariableDoc object in the module's children list).
     ...     """, show="f")
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
-     +- docstring = 'docstring for f'
+     +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = None
      +- posarg_defaults = [None]
@@ -416,7 +416,7 @@ of the variable argument and keyword argument, respectively:
     ...     """, show="f")
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
-     +- docstring = 'docstring for f'
+     +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = u'kw'
      +- posarg_defaults = [None, <ValueDoc 22>, <ValueDoc (1,)>]
@@ -448,7 +448,7 @@ Decorators & Wrapper Assignments
            +- docstring = <UNKNOWN>
            +- value
               +- ClassMethodDoc [2]
-                 +- docstring = 'docstring for f'
+                 +- docstring = u'docstring for f'
                  +- posargs = [u'cls', u'x']
 
 Classes
@@ -474,14 +474,14 @@ Classes
         |  +- value
         |     +- ClassDoc for test.A [2]
         |        +- bases = []
-        |        +- docstring = 'no bases'
+        |        +- docstring = u'no bases'
         |        +- variables
         |           +- Nested => VariableDoc for test.A.Nested [3]
         |              +- docstring = <UNKNOWN>
         |              +- value
         |                 +- ClassDoc for test.A.Nested [4]
         |                    +- bases = []
-        |                    +- docstring = 'nested class'
+        |                    +- docstring = u'nested class'
         |                    +- variables = {}
         +- B => VariableDoc for test.B [5]
         |  +- docstring = <UNKNOWN>
@@ -489,7 +489,7 @@ Classes
         |     +- ClassDoc for test.B [6]
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
-        |        +- docstring = 'single base'
+        |        +- docstring = u'single base'
         |        +- variables = {}
         +- C => VariableDoc for test.C [7]
         |  +- docstring = <UNKNOWN>
@@ -498,7 +498,7 @@ Classes
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
         |        |  +- ClassDoc for test.B [6] (defined above)
-        |        +- docstring = 'multiple bases'
+        |        +- docstring = u'multiple bases'
         |        +- variables = {}
         +- D => VariableDoc for test.D [9]
         |  +- docstring = <UNKNOWN>
@@ -506,7 +506,7 @@ Classes
         |     +- ClassDoc for test.D [10]
         |        +- bases
         |        |  +- ClassDoc for test.A [2] (defined above)
-        |        +- docstring = 'extra parens around base'
+        |        +- docstring = u'extra parens around base'
         |        +- variables = {}
         +- E => VariableDoc for test.E [11]
         |  +- docstring = <UNKNOWN>
@@ -514,7 +514,7 @@ Classes
         |     +- ClassDoc for test.E [12]
         |        +- bases
         |        |  +- ClassDoc for test.A.Nested [4] (defined above)
-        |        +- docstring = 'dotted name'
+        |        +- docstring = u'dotted name'
         |        +- variables = {}
         +- F => VariableDoc for test.F [13]
         |  +- docstring = <UNKNOWN>
@@ -522,14 +522,14 @@ Classes
         |     +- ClassDoc for test.F [14]
         |        +- bases
         |        |  +- ClassDoc for test.A.Nested [4] (defined above)
-        |        +- docstring = 'parens with dotted name'
+        |        +- docstring = u'parens with dotted name'
         |        +- variables = {}
         +- Z => VariableDoc for test.Z [15]
            +- docstring = <UNKNOWN>
            +- value
               +- ClassDoc for test.Z [16]
                  +- bases = <UNKNOWN>
-                 +- docstring = 'calculated base'
+                 +- docstring = u'calculated base'
                  +- variables = {}
 
 
@@ -641,7 +641,7 @@ Single-Line Blocks
            +- docstring = <UNKNOWN>
            +- value
               +- ClassDoc for test.A [2]
-                 +- docstring = 'docstring for A'
+                 +- docstring = u'docstring for A'
                  +- variables = {}
 
 Imports
@@ -717,7 +717,7 @@ Instance Variables
                     |  +- is_instvar = True
                     |  +- value = <UNKNOWN>
                     +- z => VariableDoc for test.A.z [6]
-                       +- docstring = 'docstring for z'
+                       +- docstring = u'docstring for z'
                        +- is_instvar = True
                        +- value = <UNKNOWN>
 
