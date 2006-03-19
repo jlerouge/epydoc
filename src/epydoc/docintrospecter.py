@@ -57,13 +57,6 @@ _introspected_values = {}
 """A record which values we've introspected, encoded as a dictionary from
 pyid to C{bool}."""
 
-_introspecting = {}
-"""A temporary container for values being introspected. Mapping from the
-value's pyid to its L{ValueDoc}. As soon as an object is put in
-C{_valuedoc_cache}, it is removed from C{_introspecting}. This mapping is used
-to avoid being stuck in a loop while introspecting mutually recursive 
-objects."""
-
 ######################################################################
 ## Introspection
 ######################################################################
@@ -148,6 +141,7 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
         return _valuedoc_cache[pyid]
 
     # Introspect the value.
+    _introspected_values[pyid] = True
     introspecter = _get_introspecter(value)
     val_doc = introspecter(value)
 
@@ -157,9 +151,6 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
         val_doc.merge_and_overwrite(_valuedoc_cache[pyid])
     else:
         _valuedoc_cache[pyid] = val_doc
-
-    _introspected_values[pyid] = True
-    _introspecting.pop(pyid, None)
 
     # Set canonical name, if it was given
     if val_doc.canonical_name == UNKNOWN and name is not None:
@@ -196,16 +187,10 @@ def introspect_module(module):
     Add API documentation information about the module C{module}
     to C{module_doc}.
     """
-    oid = id(module)
-    if oid in _introspecting:
-        return _introspecting[oid]
-
     # Create the ModuleDoc
     module_doc = ModuleDoc(pyval=module, repr=value_repr(module),
                            canonical_name = get_canonical_name(module))
     
-    _introspecting[oid] = module_doc
-
     # Record the module's docstring & docformat.
     if hasattr(module, '__doc__'):
         module_doc.docstring = get_docstring(module)
@@ -322,16 +307,10 @@ def introspect_class(cls):
     Add API documentation information about the class C{cls}
     to C{class_doc}.
     """
-    oid = id(cls)
-    if oid in _introspecting:
-        return _introspecting[oid]
-        
     # Create the ClassDoc.
     class_doc = ClassDoc(pyval=cls, repr=value_repr(cls),
                          canonical_name = get_canonical_name(cls))
     
-    _introspecting[oid] = class_doc
-
     # Record the class's docstring.
     class_doc.docstring = get_docstring(cls)
 
@@ -378,16 +357,9 @@ def introspect_class(cls):
 def introspect_routine(routine):
     """Add API documentation information about the function
     C{routine} to C{routine_doc} (specializing it to C{Routine_doc})."""
-    
-    oid = id(routine)
-    if oid in _introspecting:
-        return _introspecting[oid]
-    
     # Create the RoutineDoc.
     routine_doc = RoutineDoc(pyval=routine, repr=value_repr(routine),
                              canonical_name = get_canonical_name(routine))
-
-    _introspecting[oid] = routine_doc
 
     # Extract the underying function
     if isinstance(routine, MethodType):
@@ -447,16 +419,9 @@ def introspect_property(prop):
     """Add API documentation information about the property
     C{prop} to C{prop_doc} (specializing it to C{PropertyDoc})."""
     # Create the PropertyDoc
-    
-    oid = id(prop)
-    if oid in _introspecting:
-        return _introspecting[oid]
-
     prop_doc = PropertyDoc(pyval=prop, repr=value_repr(prop),
                            canonical_name = get_canonical_name(prop))
-
-    _introspecting[oid] = prop_doc
-
+    
     # Record the property's docstring.
     prop_doc.docstring = get_docstring(prop)
 
