@@ -472,9 +472,9 @@ def get_docstring(value):
                 except: raise #pass
             if hasattr(value, '__name__'): name = value.__name__
             else: name = `value`
-            log.info("%s's docstring is not a unicode string, but it "
-                     "contains non-ascii data -- treating it as "
-                     "latin-1." % name)
+            log.warning("%s's docstring is not a unicode string, but it "
+                        "contains non-ascii data -- treating it as "
+                        "latin-1." % name)
             return unicode(docstring, 'latin-1')
         return None
     elif value is BuiltinMethodType:
