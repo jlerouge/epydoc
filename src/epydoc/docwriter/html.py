@@ -344,6 +344,9 @@ class HTMLWriter:
         self._incl_sourcecode = kwargs.get('include_soucre_code', True)
         """Should pages be generated for source code of modules?"""
 
+        self._mark_docstrings = kwargs.get('mark_docstrings', False)
+        """Wrap <span class='docstring'>...</span> around docstrings?"""
+
         # Make sure inheritance has a sane value.
         if self._inheritance not in ('listed', 'included', 'grouped'):
             raise ValueError, 'Bad value for inheritance'
@@ -1947,7 +1950,7 @@ class HTMLWriter:
         >>> prop_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
+        <table width="100%" class="prop-details" bgcolor="#e0e0e0"><tr><td>
           <h3>$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
@@ -2755,10 +2758,10 @@ class HTMLWriter:
     def docstring_to_html(self, parsed_docstring, where=None, indent=0):
         if parsed_docstring in (None, UNKNOWN): return ''
         linker = _HTMLDocstringLinker(self, where)
-        return parsed_docstring.to_html(linker, indent=indent).strip()
-
-
-
+        s = parsed_docstring.to_html(linker, indent=indent).strip()
+        if self._mark_docstrings:
+            s = '<span class="docstring">%s</span><!--end docstring-->' % s
+        return s
     
     def description(self, parsed_docstring, where=None, indent=0):
         assert isinstance(where, (APIDoc, type(None)))
