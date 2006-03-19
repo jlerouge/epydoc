@@ -540,6 +540,41 @@ Assignments Into Namespaces
            +- value
               +- ValueDoc [2]
 
+Recursive objects
+=================
 
-
-
+    >>> x = runintrospecter(s="""
+    ...     class A:
+    ...         "A base referring to a child"
+    ...         b = None
+    ...
+    ...     class B(A):
+    ...         "Its child."
+    ...         pass
+    ...
+    ...     A.b = B
+    ...     """, introspect="A")
+    ClassDoc for epydoc_test.A [0]
+     +- bases = []
+     +- canonical_name = DottedName('epydoc_test', 'A')
+     +- docstring = u'A base referring to a child'
+     +- pyval = <class epydoc_test.A at ...>
+     +- repr = u'<class epydoc_test.A at ...>'
+     +- subclasses
+     |  +- ClassDoc for epydoc_test.B [1]
+     |     +- bases
+     |     |  +- ClassDoc for epydoc_test.A [0] (defined above)
+     |     +- canonical_name = DottedName('epydoc_test', 'B')
+     |     +- docstring = u'Its child.'
+     |     +- pyval = <class epydoc_test.B at ...>
+     |     +- repr = u'<class epydoc_test.B at ...>'
+     |     +- subclasses = []
+     |     +- variables = {}
+     +- variables
+        +- b => VariableDoc for epydoc_test.A.b [2]
+           +- container
+           |  +- ClassDoc for epydoc_test.A [0] (defined above)
+           +- is_public = True
+           +- name = 'b'
+           +- value
+              +- ClassDoc for epydoc_test.B [1] (defined above)
