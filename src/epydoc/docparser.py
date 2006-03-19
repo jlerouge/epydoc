@@ -531,7 +531,8 @@ def process_file(module_doc):
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
         # BOM encoding marker: ignore.
-        if toktype == token.ERRORTOKEN and toktext == u'\ufeff':
+        if (toktype == token.ERRORTOKEN and
+            (toktext == u'\ufeff' or toktext == '\xef\xbb\xbf')):
             pass
             
         # Error token: abort
@@ -605,6 +606,10 @@ def process_file(module_doc):
         elif line_toks and line_toks[0] == (token.OP, '@'):
             decorators.append(shallow_parse(line_toks))
             line_toks = []
+
+        # End of line token, but nothing to do.
+        elif line_toks == []:
+            pass
             
         # End of line token: parse the logical line & process it.
         else:
