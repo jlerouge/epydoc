@@ -27,7 +27,6 @@ Usage::
      -c SHEET, --css SHEET     CSS stylesheet for HTML files.
      --private-css SHEET       CSS stylesheet for private objects.
      --inheritance STYLE       The format for showing inherited objects.
-     --encoding ENCODING       Output encoding for HTML files (default: utf-8).
      -V, --version             Print the version of epydoc.
      -h, -?, --help, --usage   Display a usage message.
      -h TOPIC, --help TOPIC    Display information about TOPIC (docformat,
@@ -136,10 +135,6 @@ def parse_arguments():
         help="The \"top\" page for the HTML documentation.  PAGE can "
         "be a URL, the name of a module or class, or one of the "
         "special names \"trees.html\", \"indices.html\", or \"help.html\"")
-    # [XX] output encoding isnt' implemented yet!!
-    options_group.add_option(                                # --encoding
-        "--encoding", dest="encoding", metavar="NAME",
-        help="The output encoding for generated HTML files.")
     options_group.add_option(                                # --help-file
         "--help-file", dest="help_file", metavar="FILE",
         help="An alternate help file.  FILE should contain the body "
