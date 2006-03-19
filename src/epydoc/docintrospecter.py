@@ -140,17 +140,13 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     if pyid in _introspected_values:
         return _valuedoc_cache[pyid]
 
+    # Create an initial value doc for this value & add it to the cache.
+    val_doc = _get_valuedoc(value)
+
     # Introspect the value.
     _introspected_values[pyid] = True
-    introspecter = _get_introspecter(value)
-    val_doc = introspecter(value)
-
-    # Add it to the cache (or merge it if we've seen this value but
-    # not introspected it before).
-    if pyid in _valuedoc_cache:
-        val_doc.merge_and_overwrite(_valuedoc_cache[pyid])
-    else:
-        _valuedoc_cache[pyid] = val_doc
+    introspect_func = _get_introspecter(value)
+    introspect_func(value, val_doc)
 
     # Set canonical name, if it was given
     if val_doc.canonical_name == UNKNOWN and name is not None:
@@ -172,6 +168,22 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
 
     return val_doc
 
+def _get_valuedoc(value):
+    """
+    If a C{ValueDoc} for the given value exists in the valuedoc
+    cache, then return it; otherwise, create a new C{ValueDoc},
+    add it to the cache, and return it.  When possible, the new
+    C{ValueDoc}'s C{pyval}, C{repr}, and C{canonical_name}
+    attributes will be set appropriately.
+    """
+    pyid = id(value)
+    val_doc = _valuedoc_cache.get(pyid)
+    if val_doc is None:
+        val_doc = ValueDoc(pyval=value, repr=value_repr(value),
+                           canonical_name = get_canonical_name(value))
+        _valuedoc_cache[pyid] = val_doc
+    return val_doc
+
 #////////////////////////////////////////////////////////////
 # Module Introspection
 #////////////////////////////////////////////////////////////
@@ -182,15 +194,13 @@ UNDOCUMENTED_MODULE_VARS = (
     '__builtins__', '__doc__', '__all__', '__file__', '__path__',
     '__name__', '__extra_epydoc_fields__', '__docformat__')
 
-def introspect_module(module):
+def introspect_module(module, module_doc):
     """
     Add API documentation information about the module C{module}
     to C{module_doc}.
     """
-    # Create the ModuleDoc
-    module_doc = ModuleDoc(pyval=module, repr=value_repr(module),
-                           canonical_name = get_canonical_name(module))
-    
+    module_doc.specialize_to(ModuleDoc)
+
     # Record the module's docstring & docformat.
     if hasattr(module, '__doc__'):
         module_doc.docstring = get_docstring(module)
@@ -279,20 +289,6 @@ def introspect_module(module):
 
     return module_doc
 
-def _get_valuedoc(value):
-    """
-    If a C{ValueDoc} for the given value exists in the valuedoc
-    cache, then return it; otherwise, create a new C{ValueDoc},
-    add it to the cache, and return it.  When possible, the new
-    C{ValueDoc}'s C{pyval}, C{repr}, and C{canonical_name}
-    attributes will be set appropriately.
-    """
-    pyid = id(value)
-    val_doc = _valuedoc_cache.get(pyid)
-    if val_doc is None:
-        val_doc = _valuedoc_cache[pyid] = introspect_other(value)
-    return val_doc
-
 #////////////////////////////////////////////////////////////
 # Class Introspection
 #////////////////////////////////////////////////////////////
@@ -302,15 +298,13 @@ def _get_valuedoc(value):
 UNDOCUMENTED_CLASS_VARS = (
     '__doc__', '__module__', '__dict__', '__weakref__')
 
-def introspect_class(cls):
+def introspect_class(cls, class_doc):
     """
     Add API documentation information about the class C{cls}
     to C{class_doc}.
     """
-    # Create the ClassDoc.
-    class_doc = ClassDoc(pyval=cls, repr=value_repr(cls),
-                         canonical_name = get_canonical_name(cls))
-    
+    class_doc.specialize_to(ClassDoc)
+
     # Record the class's docstring.
     class_doc.docstring = get_docstring(cls)
 
@@ -354,13 +348,11 @@ def introspect_class(cls):
 # Routine Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_routine(routine):
+def introspect_routine(routine, routine_doc):
     """Add API documentation information about the function
     C{routine} to C{routine_doc} (specializing it to C{Routine_doc})."""
-    # Create the RoutineDoc.
-    routine_doc = RoutineDoc(pyval=routine, repr=value_repr(routine),
-                             canonical_name = get_canonical_name(routine))
-
+    routine_doc.specialize_to(RoutineDoc)
+    
     # Extract the underying function
     if isinstance(routine, MethodType):
         func = routine.im_func
@@ -415,13 +407,11 @@ def introspect_routine(routine):
 # Property Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_property(prop):
+def introspect_property(prop, prop_doc):
     """Add API documentation information about the property
     C{prop} to C{prop_doc} (specializing it to C{PropertyDoc})."""
-    # Create the PropertyDoc
-    prop_doc = PropertyDoc(pyval=prop, repr=value_repr(prop),
-                           canonical_name = get_canonical_name(prop))
-    
+    prop_doc.specialize_to(PropertyDoc)
+
     # Record the property's docstring.
     prop_doc.docstring = get_docstring(prop)
 
@@ -436,12 +426,11 @@ def introspect_property(prop):
 # Generic Value Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_other(val):
+def introspect_other(val, val_doc):
     """
     Create and return a C{ValueDoc} for the given value.
     """
-    return ValueDoc(pyval=val, repr=value_repr(val),
-                    canonical_name = get_canonical_name(val))
+    return val_doc
 
 #////////////////////////////////////////////////////////////
 # Helper functions
@@ -610,15 +599,24 @@ def _find_function_module(func):
 _introspecter_registry = []
 def register_introspecter(applicability_test, introspecter, priority=10):
     """
-    Register an introspecter function.
-    
+    Register an introspecter function.  Introspecter functions take
+    two arguments, a python value and a C{ValueDoc} object, and should
+    add information about the given value to the the C{ValueDoc}.
+    Usually, the first line of an inspecter function will specialize
+    it to a sublass of C{ValueDoc}, using L{ValueDoc.specialize_to()}:
+
+        >>> def typical_introspecter(value, value_doc):
+        ...     value_doc.specialize_to(SomeSubclassOfValueDoc)
+        ...     <add info to value_doc>
+
     @param priority: The priority of this introspecter, which determines
     the order in which introspecters are tried -- introspecters with lower
     numbers are tried first.  The standard introspecters have priorities
     ranging from 20 to 30.  The default priority (10) will place new
     introspecters before standard introspecters.
     """
-    _introspecter_registry.append( (priority, applicability_test, introspecter) )
+    _introspecter_registry.append( (priority, applicability_test,
+                                    introspecter) )
     _introspecter_registry.sort()
     
 def _get_introspecter(value):
