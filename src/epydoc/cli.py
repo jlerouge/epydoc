@@ -284,6 +284,8 @@ def main(options, names):
         for apidoc in docindex.root:
             s += plaintext_writer.write(apidoc)
         log.end_progress()
+        if isinstance(s, unicode):
+            s = s.encode('ascii', 'backslashreplace')
         print s
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
