@@ -53,6 +53,7 @@ import epydoc
 from epydoc import log
 from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
+import ConfigParser
 
 ######################################################################
 #{ Argument & Config File Parsing
@@ -175,9 +176,9 @@ def parse_arguments():
         "--dotpath", dest="dotpath", metavar='PATH',
         help="The path to the Graphviz 'dot' executable.")
     options_group.add_option(
-        '--config', action='append', dest="configfiles", metavar='FILE'
-        help="A configuration file, specifying additional OPTIONS "
-        "and/or NAMES.  This option may be repeated.")
+        '--config', action='append', dest="configfiles", metavar='FILE',
+        help=("A configuration file, specifying additional OPTIONS "
+              "and/or NAMES.  This option may be repeated."))
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -218,7 +219,6 @@ def parse_arguments():
     return options, names
 
 def parse_configfiles(configfiles, options, names):
-    import ConfigParser
     configparser = ConfigParser.ConfigParser()
     configparser.read(configfiles)
     for optname in configparser.options('epydoc'):
@@ -286,7 +286,15 @@ def main(options, names):
 
     # Process any config files.
     if options.configfiles:
-        parse_configfiles(options.configfiles, options, names)
+        try:
+            parse_configfiles(options.configfiles, options, names)
+        except KeyboardInterrupt,SystemExit: raise
+        except ValueError, e:
+            print 'Error reading config file: %s' % e
+            return
+        except ConfigParser.ParsingError, e:
+            print 'Error reading config file: %s' % e
+            return
     
     # Set up the logger
     if options.action == 'text':
