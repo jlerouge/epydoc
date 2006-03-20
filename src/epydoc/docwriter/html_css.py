@@ -30,6 +30,16 @@ import re
 ## Basic stylesheets
 ############################################################
 
+# [xx] Should I do something like:
+#
+#    @import url(html4css1.css);
+#
+# But then where do I get that css file from?  Hm.
+# Also, in principle I'm mangling classes, but it looks like I'm
+# failing.
+#
+# Should all epydoc css classes start with epydoc-?
+#
 
 # Base stylesheet -- just the layout details
 _LAYOUT = """
@@ -48,7 +58,7 @@ h2.type            { margin-top: 0.2em; }
 h2.py-src          { margin-top: 0.2em; }
 
 /* Headings */
-hq.help            { text-align: center; }
+h1.help            { text-align: center; }
 h1.heading         { font-size: +140%; font-style: italic;
                      font-weight: bold; }
 h2.heading         { font-size: +125%; font-style: italic;
