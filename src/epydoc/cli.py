@@ -55,6 +55,9 @@ from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
 import ConfigParser
 
+INHERITANCE_STYLES = ('grouped', 'listed', 'included')
+GRAPH_TYPES = ('classtree',)
+
 ######################################################################
 #{ Argument & Config File Parsing
 ######################################################################
@@ -108,7 +111,7 @@ def parse_arguments():
     options_group.add_option(                               # --show-imports
         "--inheritance", dest="inheritance", metavar="STYLE",
         help="The format for showing inheritance objects.  STYLE "
-        "should be \"grouped\", \"listed\", or \"included\".")
+        "should be one of: %s." % ', '.join(INHERITANCE_STYLES))
     options_group.add_option(                               # --output
         "--docformat", dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
@@ -179,6 +182,14 @@ def parse_arguments():
         '--config', action='append', dest="configfiles", metavar='FILE',
         help=("A configuration file, specifying additional OPTIONS "
               "and/or NAMES.  This option may be repeated."))
+    options_group.add_option(
+        '--graph', action='append', dest='graphs', metavar='GRAPHTYPE',
+        help=("Include graphs of type GRAPHTYPE in the generated output.  "
+              "Graphs are generated using the Graphviz dot executable.  "
+              "If this executable is not on the path, then use --dotpath "
+              "to specify its location.  This option may be repeated to "
+              "include multiple graph types in the output.  GRAPHTYPE"
+              "should be one of: %s." % ', '.join(GRAPH_TYPES)))
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -199,9 +210,9 @@ def parse_arguments():
     # Check to make sure all options are valid.
     if len(names) == 0:
         optparser.error("No names specified.")
-    if options.inheritance not in ('grouped', 'listed', 'included'):
-        optparser.error("Bad inheritance style.  Valid options are "
-                        "grouped, listed, and included.")
+    if options.inheritance not in INHERITANCE_STYLES:
+        optparser.error("Bad inheritance style.  Valid options are " +
+                        ",".join(INHERITANCE_STYLES))
     if not options.parse and not options.introspect:
         optparser.error("Invalid option combination: --parse-only "
                         "and --introspect-only.")
@@ -229,9 +240,9 @@ def parse_configfiles(configfiles, options, names):
         elif optname in ('output', 'target'):
             options.target = val
         elif optname == 'inheritance':
-            if val.lower() not in ('grouped', 'listed', 'included'):
-                raise ValueError('"inheritance" expected "grouped", '
-                                 '"listed", or "included"')
+            if val.lower() not in INHERITANCE_STYLES:
+                raise ValueError('"inheritance" expected one of: %s.' %
+                                 ', '.join(INHERITANCE_STYLES))
             options.inerhitance = val.lower()
         elif optname == 'docformat':
             options.docformat = val
