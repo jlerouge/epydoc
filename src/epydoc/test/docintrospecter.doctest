@@ -17,7 +17,7 @@ instead of introspecting the whole module.
 
     >>> import tempfile, re, os, os.path, textwrap, sys
     >>> from epydoc.docintrospecter import introspect_docs
-    >>> def runintrospecter(s, attribs='', introspect=None):
+    >>> def runintrospecter(s, attribs='', introspect=None, exclude=''):
     ...     # Write it to a temp file.
     ...     tmp_dir = tempfile.mkdtemp()
     ...     out = open(os.path.join(tmp_dir, 'epydoc_test.py'), 'w')
@@ -33,7 +33,7 @@ instead of introspecting the whole module.
     ...     # Introspect it.
     ...     val_doc = introspect_docs(val)
     ...     # Display it.
-    ...     s = val_doc.pp(include=attribs.split())
+    ...     s = val_doc.pp(include=attribs.split(),exclude=exclude.split())
     ...     s = re.sub(r"(filename = ).*", r"\1...", s)
     ...     s = re.sub(r"(<module 'epydoc_test' from ).*", r'\1...', s)
     ...     s = re.sub(r"(<function \w+ at )0x\w+>", r"\1...>", s)
@@ -202,7 +202,7 @@ Introspected functions are represented by `RoutineDoc` objects:
     ...     def f(x):
     ...         'docstring for f'
     ...         print 'inside f'
-    ...     """, introspect="f")
+    ...     """, introspect="f", exclude='defining_module')
     RoutineDoc for epydoc_test.f [0]
      +- canonical_name = DottedName('epydoc_test', 'f')
      +- docstring = u'docstring for f'
@@ -225,7 +225,7 @@ of the variable argument and keyword argument, respectively:
     ...     def f(x, y=22, z=(1,), *v, **kw):
     ...         'docstring for f'
     ...         print 'inside f'
-    ...     """, introspect="f")
+    ...     """, introspect="f", exclude='defining_module')
     RoutineDoc for epydoc_test.f [0]
      +- canonical_name = DottedName('epydoc_test', 'f')
      +- docstring = u'docstring for f'
@@ -262,7 +262,7 @@ instance method:
     ...     class A:
     ...         def f(self, x): 'docstring'
     ...     g=A().f
-    ...     """, introspect="g")
+    ...     """, introspect="g", exclude='defining_module')
     RoutineDoc [0]
      +- docstring = u'docstring'
      +- kwarg = None
@@ -494,7 +494,8 @@ Imports
         +- re => VariableDoc for epydoc_test.re [3]
            +- is_imported = True
            +- value
-              +- ValueDoc for re [4]
+              +- ModuleDoc for re [4]
+                 +- variables = {}
 
 
 Unicode
@@ -553,7 +554,8 @@ Recursive objects
     ...         pass
     ...
     ...     A.b = B
-    ...     """, introspect="A") # doctest: +ELLIPSIS
+    ...     """, introspect="A", exclude='defining_module')
+    ...     # doctest: +ELLIPSIS
     ClassDoc for epydoc_test.A [0]
      +- bases = []
      +- canonical_name = DottedName('epydoc_test', 'A')
