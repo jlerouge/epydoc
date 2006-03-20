@@ -368,17 +368,25 @@ def introspect_class(cls, class_doc):
             basedoc = introspect_docs(base)
             class_doc.bases.append(basedoc)
             basedoc.subclasses.append(class_doc)
-            try: base_children.update(base.__dict__)
-            except KeyboardInterrupt, SystemExit: raise
-            except: pass
+            
+        # Look for superclasses methods, respecting the resolution order.
+        if issubclass(cls, object):
+            bases = cls.mro()[1:]
+        else:
+            bases = list(cls.__bases__)
+        
+        bases.reverse()
+        for base in bases:
+            if hasattr(base, '__dict__'):
+                base_children.update(base.__dict__)
 
     # Record the class's local variables.
     class_doc.variables = {}
     private_prefix = '_%s__' % cls.__name__
     if hasattr(cls, '__dict__'):
         for child_name, child in cls.__dict__.items():
-            if child_name in base_children \
-            and base_children[child_name] == child:
+            if (child_name in base_children
+                and base_children[child_name] == child):
                 continue
 
             if child_name.startswith(private_prefix):
