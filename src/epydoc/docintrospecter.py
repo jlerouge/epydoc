@@ -224,6 +224,7 @@ def introspect_module(module, module_doc, preliminary=False):
     # Record the module's filename
     if hasattr(module, '__file__'):
         try: module_doc.filename = unicode(module.__file__)
+        except KeyboardInterrupt, SystemExit: raise
         except: pass
 
     # If this is just a preliminary introspection, then don't do
@@ -241,6 +242,7 @@ def introspect_module(module, module_doc, preliminary=False):
     if hasattr(module, '__path__'):
         module_doc.is_package = True
         try: module_doc.path = [unicode(p) for p in module.__path__]
+        except KeyboardInterrupt, SystemExit: raise
         except: pass
     else:
         module_doc.is_package = False
@@ -256,6 +258,7 @@ def introspect_module(module, module_doc, preliminary=False):
                         var_doc.is_imported = False
                 else:
                     var_doc.is_public = False
+        except KeyboardInterrupt, SystemExit: raise
         except: pass
 
     # Make sure we have a name for the package.
@@ -337,17 +340,24 @@ def introspect_class(cls, class_doc):
         try:
             public_names = [str(name) for name in cls.__all__]
             class_doc.public_names = public_names
+        except KeyboardInterrupt, SystemExit: raise
         except: pass
 
     # Start a list of subclasses.
     class_doc.subclasses = []
 
-    # 
-    # If the class' __dict__ attribute is a dictproxy, methods appear as they
-    # were locally defined. Collect the superclasses methods to manually check
-    # if they are imported or new/overridden.
-    # (Qt is such a system: QWidget subclasses receive abut 300 methods without
-    # any docstring!).
+    # Sometimes users will define a __metaclass__ that copies all
+    # class attributes from bases directly into the derived class's
+    # __dict__ when the class is created.  (This saves the lookup time
+    # needed to search the base tree for an attribute.)  But for the
+    # docs, we only want to list these copied attributes in the
+    # parent.  So only add an attribute if it is not identical to an
+    # attribute of a base class.  (Unfortunately, this can sometimes
+    # cause an attribute to look like it was inherited, even though it
+    # wasn't, if it happens to have the exact same value as the
+    # corresponding base's attribute.)  An example of a case where
+    # this helps is PyQt -- subclasses of QWidget get about 300
+    # methods injected into them.
     base_children = {}
     
     # Record the class's base classes; and add the class to its
@@ -358,9 +368,9 @@ def introspect_class(cls, class_doc):
             basedoc = introspect_docs(base)
             class_doc.bases.append(basedoc)
             basedoc.subclasses.append(class_doc)
-            if isinstance(getattr(cls, '__dict__', None), types.DictProxyType) \
-            and hasattr(base, '__dict__'):
-                base_children.update(base.__dict__)
+            try: base_children.update(base.__dict__)
+            except KeyboardInterrupt, SystemExit: raise
+            except: pass
 
     # Record the class's local variables.
     class_doc.variables = {}
@@ -619,6 +629,7 @@ def _find_function_module(func):
     try:
         module = inspect.getmodule(func)
         if module: return module.__name__
+    except KeyboardInterrupt, SystemExit: raise
     except: pass
 
     # This fallback shouldn't usually be needed.  But it is needed in
