@@ -123,13 +123,17 @@ a.navbar:link      { text-decoration: none; }
 a.navbar:visited   { text-decoration: none; }  
 
 /* Source Code Listings */
-div.py-src         { border: 2px solid black; }
+pre.py-src         { border: 2px solid black; }
 div.highlight-hdr  { border-top: 2px solid black;
                      border-bottom: 1px solid black; }
 div.highlight      { border-bottom: 2px solid black; }
-.lineno            { border-right: 2px solid black;
-                     padding-right: .2em;
-                     font-style: italic; }
+a.pysrc-toggle     { text-decoration: none; }
+span.pysrc-toggle  { font-size: 80%; font-style: normal;
+                     padding-left: .4em; }
+.py-line           { border-left: 2px solid black; margin-left: .2em;
+                     padding-left: .4em; }
+.lineno            { font-style: italic; font-size: 90%;
+                     padding-left: .5em; }
 
 /* Lists */
 ul { margin-top: 0; }
