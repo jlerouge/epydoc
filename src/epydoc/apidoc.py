@@ -40,6 +40,7 @@ import types, re
 from sets import Set
 from epydoc import log
 import epydoc
+import __builtin__
 
 # Backwards compatibility imports:
 try: sorted
@@ -1264,49 +1265,95 @@ class DocIndex:
         # of `name`.  If we can't find one, then return None.
         for root_valdoc in self.root:
             if root_valdoc.canonical_name.dominates(name):
-                var_doc, val_doc = self._get_from(
-                    root_valdoc, name[len(root_valdoc.canonical_name):])
+                # Starting at the root valdoc, walk down the variable/
+                # submodule chain until we find the requested item.
+                var_doc = None
+                val_doc = root_valdoc
+                for identifier in name[len(root_valdoc.canonical_name):]:
+                    if val_doc is None: break
+                    var_doc, val_doc = self._get_from(val_doc, identifier)
+                # If we found it, then return.
                 if var_doc is not None or val_doc is not None:
                     return var_doc, val_doc
 
         # We didn't find it.
         return None, None
+
+    def _get_from(self, val_doc, identifier):
+        if isinstance(val_doc, NamespaceDoc):
+            for child_name, child_var in val_doc.variables.items():
+                if child_name == identifier:
+                    var_doc = child_var
+                    val_doc = var_doc.value
+                    if val_doc is UNKNOWN: val_doc = None
+                    return var_doc, val_doc
+
+        # If that fails, then see if it's a submodule.
+        if (isinstance(val_doc, ModuleDoc) and
+            val_doc.submodules is not UNKNOWN):
+            for submodule in val_doc.submodules:
+                if (submodule.canonical_name ==
+                    DottedName(val_doc.canonical_name, identifier)):
+                    var_doc = None
+                    val_doc = submodule
+                    if val_doc is UNKNOWN: val_doc = None
+                    return var_doc, val_doc
+
+        return None, None
+
+    def find(self, name, context):
+        """
+        Look for a C{ValueDoc} named C{name}, relative to C{context}.
+        Return the C{ValueDoc} if one is found; otherwise, return
+        C{None}.  C{find} looks in the following places, in order:
+          - Function parameters (if one matches, return C{None})
+          - All enclosing namespaces, from closest to furthest.
+          - If C{name} starts with C{'self'}, then strip it off and
+            look for the remaining part of the name using C{find}
+          - Builtins
+          - Parameter attributes
         
-    def _get_from(self, root_valdoc, name):
-        # Starting at the selected root val_doc, walk down the variable
-        # chain until we find the requested value/variable.
-        var_doc = None
-        val_doc = root_valdoc
-    
-        for identifier in name:
-            if val_doc == None:
-                return None, None
-            
-            # First, check for variables in namespaces.
-            if isinstance(val_doc, NamespaceDoc):
-                for child_name, child_var in val_doc.variables.items():
-                    if child_name == identifier:
-                        var_doc = child_var
-                        val_doc = var_doc.value
-                        if val_doc is UNKNOWN: val_doc = None
-                        break
+        @type name: C{str} or L{DottedName}
+        @type context: L{ValueDoc}
+        """
+        try: name = DottedName(name)
+        except: return None
+        
+        if context is None or context.canonical_name is None:
+            container_name = []
+        else:
+            container_name = context.canonical_name
 
-            # If that fails, then see if it's a submodule.
-            if (isinstance(val_doc, ModuleDoc) and
-                val_doc.submodules is not UNKNOWN):
-                for submodule in val_doc.submodules:
-                    if (submodule.canonical_name ==
-                        DottedName(val_doc.canonical_name, identifier)):
-                        var_doc = None
-                        val_doc = submodule
-                        if val_doc is UNKNOWN: val_doc = None
-                        break
-                else:
-                    return None, None
-            else:
-                return None, None
+        # Is it a parameter's name?
+        if (isinstance(context, RoutineDoc) and
+            len(name) == 1 and name[0] in context.all_args()):
+            return None
 
-        return (var_doc, val_doc)
+        # Check for the name in all containing namespaces, starting
+        # with the closest one.
+        for i in range(len(container_name), -1, -1):
+            relative_name = DottedName(*(container_name[:i]+(name,)))
+            # Is `name` the absolute name of a documented value?
+            val_doc = self.get_valdoc(relative_name)
+            if val_doc is not None: return val_doc
+            # Is `name` the absolute name of a documented variable?
+            var_doc = self.get_vardoc(relative_name)
+            if var_doc is not None: return var_doc
+
+        # If the name begins with 'self', then try stripping that off
+        # and see if we can find the variable.
+        if name[0] == 'self':
+            doc = self.find('.'.join(name[1:]), context)
+            if doc is not None: return doc
+
+        # Is it the name of a builtin?
+        if len(name)==1 and hasattr(__builtin__, name[0]):
+            return None
+        
+        # Is it an attribute of a parameter?
+        if (isinstance(context, RoutineDoc) and
+            len(name) > 1 and name[0] in context.all_args()):
+            return None
 
     #////////////////////////////////////////////////////////////
     # etc
