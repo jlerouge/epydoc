@@ -104,7 +104,7 @@ __docformat__ = 'epytext en'
 #   4. helpers
 #   5. testing
 
-import re, string, types, sys
+import re, string, types, sys, os.path
 from xml.dom.minidom import Document, Text
 import xml.dom.minidom
 from epydoc.markup import *
@@ -173,6 +173,7 @@ _COLORIZING_TAGS = {
     'L': 'link',       # A Python identifier that should be linked to 
     'E': 'escape',     # escapes characters or creates symbols
     'S': 'symbol',
+    'G': 'graph',
     }
 
 # Which tags can use "link syntax" (e.g., U{Python<www.python.org>})?
@@ -1035,16 +1036,20 @@ def _colorize(doc, token, errors, tagName='para'):
 
             # Special handling for literal braces elements:
             if stack[-1].tagName == 'litbrace':
-                children = stack[-1].childNodes
+                variables = stack[-1].childNodes
                 stack[-2].removeChild(stack[-1])
                 stack[-2].appendChild(doc.createTextNode('{'))
-                for child in children:
+                for child in variables:
                     stack[-2].appendChild(child)
                 stack[-2].appendChild(doc.createTextNode('}'))
 
+            # Special handling for graphs:
+            if stack[-1].tagName == 'graph':
+                _colorize_graph(doc, stack[-1], token, end, errors)
+
             # Special handling for link-type elements:
             if stack[-1].tagName in _LINK_COLORIZING_TAGS:
-                link = _colorize_link(doc, stack[-1], token, end, errors)
+                _colorize_link(doc, stack[-1], token, end, errors)
 
             # Pop the completed element.
             openbrace_stack.pop()
@@ -1062,23 +1067,65 @@ def _colorize(doc, token, errors, tagName='para'):
 
     return stack[0]
 
+GRAPH_TYPES = ['classtree', 'packagetree', 'importgraph']
+
+def _colorize_graph(doc, graph, token, end, errors):
+    """
+    Eg::
+      G{classtree}
+      G{classtree x, y, z}
+      G{importgraph}
+    """
+    bad_graph_spec = False
+    
+    children = graph.childNodes[:]
+    for child in children: graph.removeChild(child)
+
+    if len(children) != 1 or not isinstance(children[0], Text):
+        print len(children), children[0]
+        bad_graph_spec = "Bad graph specification"
+    else:
+        pieces = children[0].data.split(None, 1)
+        graphtype = pieces[0].replace(':','').strip().lower()
+        if graphtype in GRAPH_TYPES:
+            if pieces[1]:
+                if re.match(r'\s*:?\s*([\w\.]+\s*,?\s*)*', pieces[1]):
+                    args = pieces[1].replace(',', ' ').replace(':','').split()
+                else:
+                    bad_graph_spec = "Bad graph arg list"
+            else:
+                args = []
+        else:
+            bad_graph_spec = ("Bad graph type %s -- use one of %s" %
+                              (pieces[0], ', '.join(GRAPH_TYPES)))
+
+    if bad_graph_spec:
+        errors.append(ColorizingError(bad_graph_spec, token, end))
+        graph.appendChild(doc.createTextNode('none'))
+        graph.appendChild(doc.createTextNode(''))
+        return
+
+    graph.appendChild(doc.createTextNode(graphtype))
+    for arg in args:
+        graph.appendChild(doc.createTextNode(arg))
+
 def _colorize_link(doc, link, token, end, errors):
-    children = link.childNodes[:]
+    variables = link.childNodes[:]
 
     # If the last child isn't text, we know it's bad.
-    if len(children)==0 or not isinstance(children[-1], Text):
+    if len(variables)==0 or not isinstance(variables[-1], Text):
         estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
     
     # Did they provide an explicit target?
-    match2 = _TARGET_RE.match(children[-1].data)
+    match2 = _TARGET_RE.match(variables[-1].data)
     if match2:
         (text, target) = match2.groups()
-        children[-1].data = text
+        variables[-1].data = text
     # Can we extract an implicit target?
-    elif len(children) == 1:
-        target = children[0].data
+    elif len(variables) == 1:
+        target = variables[0].data
     else:
         estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
@@ -1086,7 +1133,7 @@ def _colorize_link(doc, link, token, end, errors):
 
     # Construct the name element.
     name_elt = doc.createElement('name')
-    for child in children:
+    for child in variables:
         name_elt.appendChild(link.removeChild(child))
 
     # Clean up the target.  For URIs, assume http or mailto if they
@@ -1150,8 +1197,8 @@ def to_epytext(tree, indent=0, seclevel=0):
 
     if tree.tagName == 'epytext': indent -= 2
     if tree.tagName == 'section': seclevel += 1
-    children = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
-    childstr = ''.join(children)
+    variables = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
+    childstr = ''.join(variables)
 
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':(\s*)\2', '::\\1', childstr)
@@ -1188,10 +1235,10 @@ def to_epytext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = children[0]
-        args = children[1:1+numargs]
-        body = children[1+numargs:]
-        str = (indent)*' '+'@'+children[0]
+        tag = variables[0]
+        args = variables[1:1+numargs]
+        body = variables[1+numargs:]
+        str = (indent)*' '+'@'+variables[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
@@ -1201,6 +1248,8 @@ def to_epytext(tree, indent=0, seclevel=0):
         return childstr
     elif tree.tagName == 'symbol':
         return 'E{%s}' % childstr
+    elif tree.tagName == 'graph':
+        return 'G{%s}' % ' '.join(variables)
     else:
         for (tag, name) in _COLORIZING_TAGS.items():
             if name == tree.tagName:
@@ -1238,8 +1287,8 @@ def to_plaintext(tree, indent=0, seclevel=0):
         cindent = indent + 1 + len(tree.getAttributeNode('bullet').value)
     else:
         cindent = indent + 2
-    children = [to_plaintext(c, cindent, seclevel) for c in tree.childNodes]
-    childstr = ''.join(children)
+    variables = [to_plaintext(c, cindent, seclevel) for c in tree.childNodes]
+    childstr = ''.join(variables)
 
     if tree.tagName == 'para':
         return wordwrap(childstr, indent)+'\n'
@@ -1265,27 +1314,29 @@ def to_plaintext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = children[0]
-        args = children[1:1+numargs]
-        body = children[1+numargs:]
-        str = (indent)*' '+'@'+children[0]
+        tag = variables[0]
+        args = variables[1:1+numargs]
+        body = variables[1+numargs:]
+        str = (indent)*' '+'@'+variables[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'uri':
-        if len(children) != 2: raise ValueError('Bad URI ')
-        elif children[0] == children[1]: return '<%s>' % children[1]
-        else: return '%r<%s>' % (children[0], children[1])
+        if len(variables) != 2: raise ValueError('Bad URI ')
+        elif variables[0] == variables[1]: return '<%s>' % variables[1]
+        else: return '%r<%s>' % (variables[0], variables[1])
     elif tree.tagName == 'link':
-        if len(children) != 2: raise ValueError('Bad Link')
-        return '%s' % children[1]
+        if len(variables) != 2: raise ValueError('Bad Link')
+        return '%s' % variables[1]
     elif tree.tagName in ('olist', 'ulist'):
         # [xx] always use condensed lists.
         ## Use a condensed list if each list item is 1 line long.
-        #for child in children:
+        #for child in variables:
         #    if child.count('\n') > 2: return childstr
         return childstr.replace('\n\n', '\n')+'\n'
     elif tree.tagName == 'symbol':
         return '%s' % childstr
+    elif tree.tagName == 'graph':
+        return '<<%s graph: %s>>' % (variables[0], ', '.join(variables[1:]))
     else:
         # Assume that anything else can be passed through.
         return childstr
@@ -1317,8 +1368,8 @@ def to_debug(tree, indent=4, seclevel=0):
         return str
 
     if tree.tagName == 'section': seclevel += 1
-    children = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
-    childstr = ''.join(children)
+    variables = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
+    childstr = ''.join(variables)
 
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':( *\n     \|\n)\2', '::\\1', childstr)
@@ -1363,10 +1414,10 @@ def to_debug(tree, indent=4, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = children[0]
-        args = children[1:1+numargs]
-        body = children[1+numargs:]
-        str = ' FLD>|'+(indent-6)*' '+'@'+children[0]
+        tag = variables[0]
+        args = variables[1:1+numargs]
+        body = variables[1+numargs:]
+        str = ' FLD>|'+(indent-6)*' '+'@'+variables[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
@@ -1376,6 +1427,8 @@ def to_debug(tree, indent=4, seclevel=0):
         return childstr
     elif tree.tagName == 'symbol':
         return 'E{%s}' % childstr
+    elif tree.tagName == 'graph':
+        return 'G{%s}' % ' '.join(variables)
     else:
         for (tag, name) in _COLORIZING_TAGS.items():
             if name == tree.tagName:
@@ -1539,6 +1592,7 @@ def parse_as_para(str):
 #################################################################
 ##                    SUPPORT FOR EPYDOC
 #################################################################
+from epydoc.docwriter.dotgraph import *
 
 def parse_docstring(docstring, errors, **options):
     """
@@ -1664,11 +1718,13 @@ class ParsedEpytextDocstring(ParsedDocstring):
         self._html = self._latex = self._plaintext = None
         self._terms = None
         
-    def to_html(self, docstring_linker, **options):
+    def to_html(self, docstring_linker, directory=None, docindex=None,
+                context=None, **options):
         if self._html is not None: return self._html
         if self._tree is None: return ''
         indent = options.get('indent', 0)
-        self._html = self._to_html(self._tree, docstring_linker, indent)
+        self._html = self._to_html(self._tree, docstring_linker, directory, 
+                                   docindex, context, indent)
         return self._html
 
     def to_latex(self, docstring_linker, **options):
@@ -1695,32 +1751,34 @@ class ParsedEpytextDocstring(ParsedDocstring):
         str = re.sub(r'\s\s+', '-', str)
         return "index-"+re.sub("[^a-zA-Z0-9]", "_", str)
 
-    def _to_html(self, tree, linker, indent=0, seclevel=0):
+    def _to_html(self, tree, linker, directory, docindex, context,
+                 indent=0, seclevel=0):
         if isinstance(tree, Text):
             return plaintext_to_html(tree.data)
 
         if tree.tagName == 'epytext': indent -= 2
         if tree.tagName == 'section': seclevel += 1
 
-        # Process the children first.
-        children = [self._to_html(c, linker, indent+2, seclevel)
+        # Process the variables first.
+        variables = [self._to_html(c, linker, directory, docindex, context,
+                                   indent+2, seclevel)
                     for c in tree.childNodes]
     
         # Get rid of unnecessary <P>...</P> tags; they introduce extra
         # space on most browsers that we don't want.
-        for i in range(len(children)-1):
+        for i in range(len(variables)-1):
             if (not isinstance(tree.childNodes[i], Text) and
                 tree.childNodes[i].tagName == 'para' and
                 (isinstance(tree.childNodes[i+1], Text) or
                  tree.childNodes[i+1].tagName != 'para')):
-                children[i] = ' '*(indent+2)+children[i][5+indent:-5]+'\n'
+                variables[i] = ' '*(indent+2)+variables[i][5+indent:-5]+'\n'
         if (tree.hasChildNodes() and
             not isinstance(tree.childNodes[-1], Text) and
             tree.childNodes[-1].tagName == 'para'):
-            children[-1] = ' '*(indent+2)+children[-1][5+indent:-5]+'\n'
+            variables[-1] = ' '*(indent+2)+variables[-1][5+indent:-5]+'\n'
     
-        # Construct the HTML string for the children.
-        childstr = ''.join(children)
+        # Construct the HTML string for the variables.
+        childstr = ''.join(variables)
     
         # Perform the approriate action for the DOM tree type.
         if tree.tagName == 'para':
@@ -1729,9 +1787,9 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return '<code>%s</code>' % childstr
         elif tree.tagName == 'uri':
             return ('<a href="%s" target="_top">%s</a>' %
-                    (children[1], children[0]))
+                    (variables[1], variables[0]))
         elif tree.tagName == 'link':
-            return linker.translate_identifier_xref(children[1], children[0])
+            return linker.translate_identifier_xref(variables[1], variables[0])
         elif tree.tagName == 'italic':
             return '<i>%s</i>' % childstr
         elif tree.tagName == 'math':
@@ -1773,8 +1831,37 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 return '&%s;' % self.SYMBOL_TO_HTML[symbol]
             else:
                 return '[??]'
+        elif tree.tagName == 'graph':
+            graph = self._build_graph(variables[0], variables[1:], linker,
+                                      docindex, context)
+            # Write the graph's image to a file
+            path = os.path.join(directory, graph.uid)
+            if not graph.write('%s.gif' % path, 'gif'):
+                return
+            # Generate the image map.
+            cmapx = graph.render('cmapx') or ''
+            # Display the graph.
+            title = plaintext_to_html(graph.title) or '&nbsp;'
+            return (
+                '<table border="0" cellpadding="0" cellspacing="0">\n  '
+                '<tr><td>\n%s\n    <img src="%s.gif" alt="%s" usemap="#%s"'
+                'smap="ismap"/>\n  </td></tr>\n  <tr><th class="graph">'
+                '%s</th></tr>\n  </table><br />\n' % 
+                (cmapx, graph.uid, graph.uid, graph.uid, title))
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
+
+    #GRAPH_TYPES = ['classtree', 'packagetree', 'importgraph']
+    def _build_graph(self, graph_type, graph_args, linker, 
+                     docindex, context):
+        # Generate the graph
+        if graph_type == 'classtree':
+            if graph_args:
+                bases = [docindex.find(name, context)
+                         for name in graph_args]
+            else:
+                bases = [context]
+            return class_tree_graph(bases, linker, context)
     
     def _to_latex(self, tree, linker, indent=0, seclevel=0, breakany=0):
         if isinstance(tree, Text):
@@ -1785,34 +1872,34 @@ class ParsedEpytextDocstring(ParsedDocstring):
         # Figure out the child indent level.
         if tree.tagName == 'epytext': cindent = indent
         else: cindent = indent + 2
-        children = [self._to_latex(c, linker, cindent, seclevel, breakany)
+        variables = [self._to_latex(c, linker, cindent, seclevel, breakany)
                     for c in tree.childNodes]
-        childstr = ''.join(children)
+        childstr = ''.join(variables)
     
         if tree.tagName == 'para':
             return wordwrap(childstr, indent)+'\n'
         elif tree.tagName == 'code':
             return '\\texttt{%s}' % childstr
         elif tree.tagName == 'uri':
-            if len(children) != 2: raise ValueError('Bad URI ')
+            if len(variables) != 2: raise ValueError('Bad URI ')
             if self._hyperref:
                 # ~ and # should not be escaped in the URI.
                 uri = tree.childNodes[1].childNodes[0].data
                 uri = uri.replace('{\\textasciitilde}', '~')
                 uri = uri.replace('\\#', '#')
-                if children[0] == children[1]:
-                    return '\\href{%s}{\\textit{%s}}' % (uri, children[1])
+                if variables[0] == variables[1]:
+                    return '\\href{%s}{\\textit{%s}}' % (uri, variables[1])
                 else:
                     return ('%s\\footnote{\\href{%s}{%s}}' %
-                            (children[0], uri, children[1]))
+                            (variables[0], uri, variables[1]))
             else:
-                if children[0] == children[1]:
-                    return '\\textit{%s}' % children[1]
+                if variables[0] == variables[1]:
+                    return '\\textit{%s}' % variables[1]
                 else:
-                    return '%s\\footnote{%s}' % (children[0], children[1])
+                    return '%s\\footnote{%s}' % (variables[0], variables[1])
         elif tree.tagName == 'link':
-            if len(children) != 2: raise ValueError('Bad Link')
-            return linker.translate_identifier_xref(children[1], children[0])
+            if len(variables) != 2: raise ValueError('Bad Link')
+            return linker.translate_identifier_xref(variables[1], variables[0])
         elif tree.tagName == 'italic':
             return '\\textit{%s}' % childstr
         elif tree.tagName == 'math':
@@ -1849,6 +1936,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 return r'%s' % self.SYMBOL_TO_LATEX[symbol]
             else:
                 return '[??]'
+        elif tree.tagName == 'graph':
+            raise ValueError, 'graph not implemented yet for latex'
         else:
             # Assume that anything else can be passed through.
             return childstr
@@ -1865,27 +1954,27 @@ class ParsedEpytextDocstring(ParsedDocstring):
         doc.appendChild(epytext)
     
         # Find the first paragraph.
-        children = tree.childNodes
-        while (len(children) > 0) and (children[0].tagName != 'para'):
-            if children[0].tagName in ('section', 'ulist', 'olist', 'li'):
-                children = children[0].childNodes
+        variables = tree.childNodes
+        while (len(variables) > 0) and (variables[0].tagName != 'para'):
+            if variables[0].tagName in ('section', 'ulist', 'olist', 'li'):
+                variables = variables[0].childNodes
             else:
-                children = children[1:]
+                variables = variables[1:]
     
         # Special case: if the docstring contains a single literal block,
         # then try extracting the summary from it.
-        if (len(children) == 0 and len(tree.childNodes) == 1 and
+        if (len(variables) == 0 and len(tree.childNodes) == 1 and
             tree.childNodes[0].tagName == 'literalblock'):
             str = re.split(r'\n\s*(\n|$).*',
                            tree.childNodes[0].childNodes[0].data, 1)[0]
-            children = [doc.createElement('para')]
-            children[0].appendChild(doc.createTextNode(str))
+            variables = [doc.createElement('para')]
+            variables[0].appendChild(doc.createTextNode(str))
     
         # If we didn't find a paragraph, return an empty epytext.
-        if len(children) == 0: return ParsedEpytextDocstring(doc)
+        if len(variables) == 0: return ParsedEpytextDocstring(doc)
     
         # Extract the first sentence.
-        parachildren = children[0].childNodes
+        parachildren = variables[0].childNodes
         para = doc.createElement('para')
         epytext.appendChild(para)
         for parachild in parachildren:

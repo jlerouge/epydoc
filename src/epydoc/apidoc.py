@@ -21,6 +21,8 @@ define the different pieces of information that should be recorded
 about each value type (See the documentation for L{ValueDoc} for a
 complete list).
 
+G{classtree: APIDoc}
+
 The distinction between variables and values is intentionally kept
 explicit.  This allows us to distinguish information about a variable
 itself (such as whether it should be considered 'public' in its
