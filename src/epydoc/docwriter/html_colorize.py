@@ -399,37 +399,84 @@ Goals:
 """
 
 #: Javascript code for the PythonSourceColorizer
-PYSRC_JAVASCRIPTS = '''
+PYSRC_JAVASCRIPTS = '''\
 <script type="text/javascript">
 <!--
 function expand(id) {
-  var elt = document.getElementById(id+"-collapsed");
-  if (elt) elt.style.display = "none";
   var elt = document.getElementById(id+"-expanded");
   if (elt) elt.style.display = "block";
+  var elt = document.getElementById(id+"-expanded-linenums");
+  if (elt) elt.style.display = "block";
+  var elt = document.getElementById(id+"-collapsed");
+  if (elt) { elt.innerHTML = ""; elt.style.display = "none"; }
+  var elt = document.getElementById(id+"-collapsed-linenums");
+  if (elt) { elt.innerHTML = ""; elt.style.display = "none"; }
+  var elt = document.getElementById(id+"-toggle");
+  if (elt) { elt.innerHTML = "-"; }
 }
 
 function collapse(id) {
-  var elt = document.getElementById(id+"-collapsed");
-  if (elt) elt.style.display = "block";
   var elt = document.getElementById(id+"-expanded");
   if (elt) elt.style.display = "none";
+  var elt = document.getElementById(id+"-expanded-linenums");
+  if (elt) elt.style.display = "none";
+  var elt = document.getElementById(id+"-collapsed-linenums");
+  if (elt) { elt.innerHTML = "<br/>"; elt.style.display="block"; }
+  var elt = document.getElementById(id+"-toggle");
+  if (elt) { elt.innerHTML = "+"; }
+  var elt = document.getElementById(id+"-collapsed");
+  if (elt) {
+    elt.style.display = "block";
+    
+    var indent = elt.indent;
+    var linenumpadding = elt.linenumpadding;
+    var s = "";
+    if (linenumpadding != "")
+      s = "<span class=\'lineno\'>" + linenumpadding + "</span>"
+    s = s + "<span class=\'pysrc-toggle\'> </span>" +
+            "<span class=\'py-line\'>" + indent +
+            "<a href=\'#\' onclick=\'expand(\\"" + id +
+            "\\");return false\'>...</a></span><br />";
+    elt.innerHTML = s;
+  }
 }
 
+function toggle(id) {
+  elt = document.getElementById(id+"-toggle");
+  if (elt.innerHTML == "-")
+      collapse(id); 
+  else
+      expand(id);
+}
 function highlight(id) {
   var elt = document.getElementById(id+"-def");
   if (elt) elt.className = "highlight-hdr";
   var elt = document.getElementById(id+"-expanded");
   if (elt) elt.className = "highlight";
+  var elt = document.getElementById(id+"-collapsed");
+  if (elt) elt.className = "highlight";
 }
 
-function collapse_all() {
+function num_lines(s) {
+  var n = 1;
+  var pos = s.indexOf("\\n");
+  while ( pos > 0) {
+    n += 1;
+    pos = s.indexOf("\\n", pos+1);
+  }
+  return n;
+}
+
+// Collapse all blocks that mave more than `min_lines` lines.
+function collapse_all(min_lines) {
   var elts = document.getElementsByTagName("div");
   for (var i=0; i<elts.length; i++) {
-    if (elts[i].id.indexOf("-collapsed") > 0)
-    { elts[i].style.display = "block"; }
-    if (elts[i].id.indexOf("-expanded") > 0)
-    { elts[i].style.display = "none"; }
+    var elt = elts[i];
+    var split = elt.id.indexOf("-");
+    if (split > 0)
+      if (elt.id.substring(split, elt.id.length) == "-expanded")
+        if (num_lines(elt.innerHTML) > min_lines)
+          collapse(elt.id.substring(0, split));
   }
 }
 
@@ -437,7 +484,7 @@ function expandto(href) {
   var start = href.indexOf("#")+1;
   if (start != 0) {
     if (href.substring(start, href.length) != "-") {
-      collapse_all();
+      collapse_all(4);
       pos = href.indexOf(".", start);
       while (pos != -1) {
         var id = href.substring(start, pos);
@@ -450,10 +497,12 @@ function expandto(href) {
     }
   }
 }
+
 expandto(location.href);
 // -->
 </script>
 '''
+
 
 import tokenize, sys, token, cgi, keyword
 try: from cStringIO import StringIO
@@ -538,18 +587,14 @@ class PythonSourceColorizer:
     #: default, all definition blocks are expanded.
     #:
     #: This string should be interpolated with the following values::
-    #:   (name, indentation, name, name)
+    #:   (name, indentation, name)
     #: Where C{name} is the anchor name for the function or class; and
     #: indentation is a string of whitespace used to indent the
     #: ellipsis marker in the collapsed version.
-    START_DEF_BLOCK = ('<div id="%s-collapsed" style="display:none;">'
-                       '<span class="lineno">   .</span> '
-                       '%s'
-                       '<a href="#" onclick="expand(\'%s\');return false;"'
-                       'title="Expand body.">...</a>\n'
-                       '<span class="lineno">   .</span> \n'
-                       '</div>'
-                       '<div id="%s-expanded">')
+    START_DEF_BLOCK = (
+        '<div id="%s-collapsed" style="display:none;" '
+        'linenumpadding="%s" indent="%s"></div>'
+        '<div id="%s-expanded">')
 
     #: HTML code for the end of a collapsable function or class
     #: definition block.
@@ -619,10 +664,6 @@ class PythonSourceColorizer:
         #: The line number of the line we're currently processing.
         self.lineno = 0
 
-        #: A template string used to write HTML code for line numbers.
-        #:This
-        self.lineno_template = '<span class="lineno">%4d</span> '
-
         #: The name of the class or function whose definition started
         #: on the previous logical line, or C{None} if the previous
         #: logical line was not a class or function definition.
@@ -642,6 +683,11 @@ class PythonSourceColorizer:
             pos = self.text.find('\n', pos+1)
         # Add a final entry, marking the end of the string.
         self.line_offsets.append(len(self.text))
+
+    def lineno_to_html(self):
+        template = '%%%ds' % self.linenum_size
+        n = template % self.lineno
+        return '<span class="lineno">%s</span>' % n
 
     def colorize(self):
         """
@@ -663,6 +709,9 @@ class PythonSourceColorizer:
         # Construct the line_offsets table.
         self.find_line_offsets()
 
+        num_lines = self.text.count('\n')+1
+        self.linenum_size = len(`num_lines+1`)
+        
         # Call the tokenizer, and send tokens to our `tokeneater()`
         # method.  If anything goes wrong, then fall-back to using
         # the input text as-is (with no colorization).
@@ -736,11 +785,6 @@ class PythonSourceColorizer:
             C{(toktype,tokttext)} pairs corresponding to the tokens in
             the line.
         """
-        # Add a line number marker.
-        if self.ADD_LINE_NUMBERS:
-            s='<span class="lineno">%4d</span> ' % self.lineno
-        self.lineno += 1
-
         # def_name is the name of the function or class defined by
         # this line; or None if no funciton or class is defined.
         def_name = None
@@ -748,9 +792,16 @@ class PythonSourceColorizer:
         in_base_list = False
         in_param_list = False
         in_param_default = 0
-        at_module_top = (self.lineno == 2)
+        at_module_top = (self.lineno == 1)
 
         ended_def_blocks = 0
+
+        # The html output.
+        s = '<span class="pysrc-toggle"> </span>'
+        if self.ADD_LINE_NUMBERS:
+            s = self.lineno_to_html() + s
+            self.lineno += 1
+        s += '<span class="py-line">'
 
         # Loop through each token, and colorize it appropriately.
         for i, (toktype, toktext) in enumerate(line):
@@ -768,10 +819,8 @@ class PythonSourceColorizer:
                 if None not in self.context:
                     cls_name = '.'.join(self.context+[def_name])
                     href = self.name2href(cls_name)
-                    s = re.sub('(.*)\Z',
-                               r'<a name="%s"></a><div id="%s-def">\1' %
-                               (cls_name, cls_name), s)
-                    
+                    s = self.mark_def(s, cls_name)
+
             # Is this token the function name in a function def?  If
             # so, then make it a link back into the API docs.
             elif i>=2 and line[i-2][1] == 'def':
@@ -782,9 +831,7 @@ class PythonSourceColorizer:
                     cls_name = '.'.join(self.context)
                     func_name = '.'.join(self.context+[def_name])
                     href = self.name2href(cls_name, def_name)
-                    s = re.sub('(.*)\Z',
-                               r'<a name="%s"></a><div id="%s-def">\1' %
-                               (func_name, func_name), s)
+                    s = self.mark_def(s, func_name)
 
             # For each indent, update the indents list (which we use
             # to keep track of indentation strings) and the context
@@ -864,9 +911,11 @@ class PythonSourceColorizer:
             if href: s += '<a href="%s" class="%s">' % (href, css_class)
             elif css_class: s += '<span class="%s">' % css_class
             if i == len(line)-1:
+                s += ' </span>' # Closes <span class="py-line">
                 s += cgi.escape(toktext)
             else:
                 s += self.add_line_numbers(cgi.escape(toktext), css_class)
+                
             if href: s += '</a>'
             elif css_class: s += '</span>'
 
@@ -874,20 +923,31 @@ class PythonSourceColorizer:
             for i in range(ended_def_blocks):
                 self.out(self.END_DEF_BLOCK)
 
+        # Write the line.
         self.out(s)
+
         if def_name and None not in self.context:
             self.out('</div>')
 
         # Add divs if we're starting a def block.
         if (self.ADD_DEF_BLOCKS and def_name and
             (line[-2][1] == ':') and None not in self.context):
-                indentation = ''.join(self.indents)+'    '
-                name='.'.join(self.context+[def_name])
-                self.out(self.START_DEF_BLOCK % (name, indentation,
-                                                 name, name))
+            indentation = (''.join(self.indents)+'    ').replace(' ', '&nbsp;')
+            linenum_padding = '&nbsp;'*self.linenum_size
+            name='.'.join(self.context+[def_name])
+            self.out(self.START_DEF_BLOCK % (name, linenum_padding,
+                                             indentation, name))
             
         self.def_name = def_name
 
+    def mark_def(self, s, name):
+        replacement = ('<a name="%s"></a><div id="%s-def">\\1'
+                       '<a class="pysrc-toggle" href="#" id="%s-toggle" '
+                       'onclick="toggle(\'%s\'); return false;">-</a>\\2' %
+                       (name, name, name, name))
+        return re.sub('(.*<span class="pysrc-toggle">) (</span>.*)\Z',
+                      replacement, s)
+                    
     def is_docstring(self, line, i):
         if line[i][0] != token.STRING: return False
         for toktype, toktext in line[i:]:
@@ -903,9 +963,12 @@ class PythonSourceColorizer:
         while end:
             result += s[start:end-1]
             if css_class: result += '</span>'
+            result += ' </span>' # py-line
             result += '\n'
             if self.ADD_LINE_NUMBERS:
-                result += '<span class="lineno">%4d</span> ' % self.lineno
+                result += self.lineno_to_html()
+            result += '<span class="pysrc-toggle"> </span>'
+            result += '<span class="py-line">'
             if css_class: result += '<span class="%s">' % css_class
             start = end
             end = s.find('\n', end)+1
@@ -923,9 +986,33 @@ class PythonSourceColorizer:
         else:
             return '%s-module.html#%s' % (self.module_name, func_name)
 
+# if __name__=='__main__':
+#     s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
+#     import codecs
+#     f = codecs.open('/home/edloper/public_html/color.html', 'w', 'ascii', 'xmlcharrefreplace')
+#     f.write(s)
+#     f.close()
+
+HDR = '''\
+<?xml version="1.0" encoding="ascii"?>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                  "DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head>
+          <title>$title$</title>
+          <link rel="stylesheet" href="epydoc.css" type="text/css" />
+          <script type="text/javascript" src="epydoc.js"></script>
+        </head>
+        
+        <body bgcolor="white" text="black" link="blue" vlink="#204080"
+              alink="#204080">
+'''
+FOOT = '</body></html>'
 if __name__=='__main__':
-    s = PythonSourceColorizer('../api_doc.py', 'epydoc.apidoc').colorize()
+    #s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
+    s = PythonSourceColorizer('/tmp/fo.py', 'epydoc.apidoc').colorize()
+    #print s
     import codecs
-    f = codecs.open('/home/edloper/public_html/color.html', 'w', 'ascii', 'xmlcharrefreplace')
-    f.write(s)
+    f = codecs.open('/home/edloper/public_html/color3.html', 'w', 'ascii', 'xmlcharrefreplace')
+    f.write(HDR+'<pre id="py-src-top" class="py-src">'+s+'</pre>'+FOOT)
     f.close()
