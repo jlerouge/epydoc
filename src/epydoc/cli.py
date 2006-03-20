@@ -50,13 +50,9 @@ __docformat__ = 'epytext en'
 import sys, os, time, re
 from optparse import OptionParser, OptionGroup
 import epydoc
-from epydoc.docbuilder import build_doc_index
-from epydoc.docwriter.html import HTMLWriter
-from epydoc.docwriter.plaintext import PlaintextWriter
 from epydoc import log
 from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
-from epydoc import docstringparser
 
 ######################################################################
 ## Argument Parsing
@@ -175,6 +171,9 @@ def parse_arguments():
     options_group.add_option(
         "--profile", action="store_true", dest="profile",
         help="Run the profiler.  Output will be written to profile.out")
+    options_group.add_option(
+        "--dotpath", dest="dotpath", metavar='PATH',
+        help="The path to the Graphviz 'dot' executable.")
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -254,9 +253,16 @@ def main(options, names):
                 return log.error("%s is not a directory" % options.target)
 
     # Set the default docformat
+    from epydoc import docstringparser
     docstringparser.DEFAULT_DOCFORMAT = options.docformat
 
+    # Set the dot path
+    if options.dotpath:
+        from epydoc import dotgraph
+        dotgraph.DOT_PATH = options.dotpath
+
     # Build docs for the named values.
+    from epydoc.docbuilder import build_doc_index
     docindex = build_doc_index(names, options.introspect, options.parse,
                                add_submodules=(options.action!='text'))
 
@@ -265,6 +271,7 @@ def main(options, names):
 
     # Perform the specified action.
     if options.action == 'html':
+        from epydoc.docwriter.html import HTMLWriter
         html_writer = HTMLWriter(docindex, **options.__dict__)
         if options.verbose > 0:
             log.start_progress('Writing HTML docs to %r' % options.target)
@@ -274,6 +281,7 @@ def main(options, names):
         log.end_progress()
     elif options.action == 'text':
         log.start_progress('Writing output')
+        from epydoc.docwriter.plaintext import PlaintextWriter
         plaintext_writer = PlaintextWriter()
         s = ''
         for apidoc in docindex.root:

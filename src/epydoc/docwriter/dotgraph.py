@@ -24,6 +24,9 @@ except NameError: from epydoc.util import py_sorted as sorted
 #{ Dot Graphs
 ######################################################################
 
+DOT_COMMAND = 'dot'
+"""The command that should be used to spawn dot"""
+
 class DotGraph:
     """
     A C{dot} directed graph.  The contents of the graph are
@@ -54,9 +57,6 @@ class DotGraph:
     """A set of all uids that that have been generated, used to ensure
     that each new graph has a unique uid."""
 
-    DOT_COMMAND = 'dot'
-    """The command that should be used to spawn dot"""
-    
     def __init__(self, title, body='', node_defaults=None, edge_defaults=None):
         """
         Create a new C{DotGraph}.
@@ -150,13 +150,13 @@ class DotGraph:
         """
         try:
             from subprocess import Popen, PIPE
-            cmd = [self.DOT_COMMAND, '-T%s' % language]
+            cmd = [DOT_COMMAND, '-T%s' % language]
             pipe = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE,
                          close_fds=True)
             (to_child, from_child) = (pipe.stdin, pipe.stdout)
         except ImportError:
             from popen2 import Popen4
-            cmd = '%s -T%s' % (self.DOT_COMMAND, language)
+            cmd = '%s -T%s' % (DOT_COMMAND, language)
             pipe = Popen4(cmd)
             (to_child, from_child) = (pipe.tochild, pipe.fromchild)
 
