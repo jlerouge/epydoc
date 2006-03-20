@@ -22,6 +22,7 @@ from epydoc.docwriter.html_colorize import PythonSourceColorizer
 from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
+from epydoc.docwriter.dotgraph import *
 from epydoc import log
 from epydoc.util import plaintext_to_html
 
@@ -346,6 +347,9 @@ class HTMLWriter:
         self._mark_docstrings = kwargs.get('mark_docstrings', False)
         """Wrap <span class='docstring'>...</span> around docstrings?"""
 
+        self._graph_types = kwargs.get('graphs', ()) or ()
+        """Graphs that we should include in our output."""
+
         # Make sure inheritance has a sane value.
         if self._inheritance not in ('listed', 'included', 'grouped'):
             raise ValueError, 'Bad value for inheritance'
@@ -662,20 +666,29 @@ class HTMLWriter:
         if src_link: out('\n<br/>' + src_link)
         out('</h2>\n')
 
-        # Write the base class tree.
-        if doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0:
-            out('<pre class="base-tree">\n%s</pre>\n\n' %
-                self.base_tree(doc))
-
-        # Write the known subclasses
-        if doc.subclasses not in (UNKNOWN, None) and len(doc.subclasses) > 0:
-            out('<dl><dt>Known Subclasses:</dt>\n<dd>\n    ')
-            out(',\n    '.join([self.href(c, c.canonical_name[-1])
-                                for c in doc.subclasses]))
-            out('\n</dd></dl>\n\n')
-
         if ((doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0) or
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
+            # Display bases graphically, if requested.
+            if 'classtree' in self._graph_types:
+                linker = _HTMLDocstringLinker(self, doc)
+                graph = class_tree_graph([doc], linker, doc)
+                self.write_graph(out, graph)
+
+            # Otherwise, use ascii-art.
+            else:
+                # Write the base class tree.
+                if doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0:
+                    out('<pre class="base-tree">\n%s</pre>\n\n' %
+                        self.base_tree(doc))
+
+                # Write the known subclasses
+                if (doc.subclasses not in (UNKNOWN, None) and
+                    len(doc.subclasses) > 0):
+                    out('<dl><dt>Known Subclasses:</dt>\n<dd>\n    ')
+                    out(',\n    '.join([self.href(c, c.canonical_name[-1])
+                                        for c in doc.subclasses]))
+                    out('\n</dd></dl>\n\n')
+
             out('<hr />\n')
         
         # If the class has a description, then list it.
@@ -1251,6 +1264,18 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     #{ 2.10. Graphs
     #////////////////////////////////////////////////////////////
+
+    def write_graph(self, out, graph):
+        # Write the graph's image to a file
+        path = os.path.join(self._directory, graph.uid)
+        if not graph.write('%s.gif' % path, 'gif'):
+            return
+        # Generate the image map.
+        cmapx = graph.render('cmapx') or ''
+        # Display the graph.
+        out('%s\n<center>\n<img src="%s.gif" alt="%s" usemap="#%s" '
+            'ismap="ismap" class="graph-without-title"/>\n</center>' % 
+            (cmapx, graph.uid, graph.uid, graph.uid))
 
     #////////////////////////////////////////////////////////////
     #{ 3.1. Page Header
@@ -2105,15 +2130,6 @@ class HTMLWriter:
         lines[-1] += ' '*(linelen-cnum+1)
 
         return ('\n').join(lines)
-            
-        
-
-
-
-
-
-
-
 
     #////////////////////////////////////////////////////////////
     #{ Base Tree
