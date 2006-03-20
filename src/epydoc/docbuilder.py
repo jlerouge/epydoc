@@ -530,7 +530,11 @@ MERGE_PRECEDENCE = {
     'sort_spec': 'parse', # sort according to the order in the file.
     'subpackages': 'introspect',
     'filename': 'parse', # use src filename when possible
-    'docstring': 'parse', # more likely to get encoding right.
+
+    # parse is more likely to get the encoding right, but introspect
+    # will handle programatically generated docstrings.  Which is
+    # better?
+    'docstring': 'introspect',
     }
 """Indicates whether information from introspection or parsing should be
 given precedence, for specific attributes.  This dictionary maps from
