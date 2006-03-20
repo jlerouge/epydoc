@@ -369,12 +369,7 @@ def introspect_class(cls, class_doc):
             class_doc.bases.append(basedoc)
             basedoc.subclasses.append(class_doc)
             
-        # Look for superclasses methods, respecting the resolution order.
-        if issubclass(cls, object):
-            bases = cls.mro()[1:]
-        else:
-            bases = list(cls.__bases__)
-        
+        bases = list(cls.__bases__)
         bases.reverse()
         for base in bases:
             if hasattr(base, '__dict__'):
