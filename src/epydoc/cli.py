@@ -202,7 +202,8 @@ def parse_arguments():
                            inheritance="grouped",
                            verbose=0, quiet=0,
                            parse=True, introspect=True,
-                           debug=epydoc.DEBUG, profile=False)
+                           debug=epydoc.DEBUG, profile=False,
+                           graphs=[])
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -277,6 +278,13 @@ def parse_configfiles(configfiles, options, names):
             options.profile = _str_to_bool(val, optname)
         elif optname == 'dotpath':
             options.dotpath = val
+        elif optname == 'graph':
+            graphtypes = val.replace(',', '').split()
+            for graphtype in graphtypes:
+                if graphtype not in GRAPH_TYPES:
+                    raise ValueError('"graph" expected one of: %s.' %
+                                     ', '.join(GRAPH_TYPES))
+            options.graphs.extend(graphtypes)
 
 def _str_to_bool(val, optname):
     if val.lower() in ('0', 'no', 'false', 'n', 'f', 'hide'):
