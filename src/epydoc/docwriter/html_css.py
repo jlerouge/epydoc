@@ -135,6 +135,10 @@ span.pysrc-toggle  { font-size: 80%; font-style: normal;
 .lineno            { font-style: italic; font-size: 90%;
                      padding-left: .5em; }
 
+/* For Graphs */
+.graph-without-title { border: none; }
+.graph-with-title    { border: 1px solid black; }
+
 /* Lists */
 ul { margin-top: 0; }
 
