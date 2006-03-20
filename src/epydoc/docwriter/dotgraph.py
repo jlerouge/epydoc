@@ -23,7 +23,7 @@ __docformat__ = 'restructuredtext'
 from sets import Set
 import re
 from epydoc import log
-from epydoc.apidoc import DottedName, ModuleDoc
+from epydoc.apidoc import *
 
 # Backwards compatibility imports:
 try: sorted
@@ -94,7 +94,7 @@ class DotGraph:
 
         self.uid = re.sub(r'\W', '_', title).lower()
         """A unique identifier for this graph.  This can be used as a
-        filename when rendering the graph.  No two `DotGraph`s will
+        filename when rendering the graph.  No two `DotGraph`\s will
         have the same uid."""
 
         # Make sure the UID is unique
@@ -256,7 +256,7 @@ def package_tree_graph(packages, linker, context=None, **options):
                      edge_defaults={'sametail':True})
     
     # Options
-    if options.get('dir', 'LR') != 'TB':
+    if options.get('dir', 'LR') != 'TB': # default: left-to-right
         graph.body += 'rankdir=%s\n' % options.get('dir', 'LR')
 
     # Get a list of all modules in the package.
@@ -282,27 +282,39 @@ def class_tree_graph(bases, linker, context=None, **options):
     hierarchies for the given packages.
     """
     graph = DotGraph('Class Hierarchy',
+                     body='ranksep=0.3\n',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
-                     edge_defaults={'sametail':True})
+                     edge_defaults={'sametail':True, 'dir':'none'})
 
     # Options
-    if options.get('dir', 'LR') != 'TB':
-        graph.body += 'rankdir=%s\n' % options.get('dir', 'LR')
+    if options.get('dir', 'TB') != 'TB': # default: top-down
+        graph.body += 'rankdir=%s\n' % options.get('dir', 'TB')
 
-    # Get a list of all classes derived from the given base(s).
-    queue = list(bases)
+    # Find all superclasses & subclasses of the given classes.
     classes = Set(bases)
+    queue = list(bases)
     for cls in queue:
-        queue.extend(cls.subclasses)
-        classes.update(cls.subclasses)
+        if cls.subclasses not in (None, UNKNOWN):
+            queue.extend(cls.subclasses)
+            classes.update(cls.subclasses)
+    queue = list(bases)
+    for cls in queue:
+        if cls.bases not in (None, UNKNOWN):
+            queue.extend(cls.bases)
+            classes.update(cls.bases)
 
     # Add a node for each cls.
+    classes = [d for d in classes if isinstance(d, ClassDoc)
+               if d.pyval is not object]
     nodes = add_valdoc_nodes(graph, classes, linker, context)
 
     # Add an edge for each package/subclass relationship.
+    edges = Set()
     for cls in classes:
         for subcls in cls.subclasses:
-            graph.edges.append(DotGraphEdge(nodes[cls], nodes[subcls]))
+            if cls in nodes and subcls in nodes:
+                edges.add((nodes[cls], nodes[subcls]))
+    graph.edges = [DotGraphEdge(src,dst) for (src,dst) in edges]
 
     return graph
 
@@ -321,25 +333,28 @@ def import_graph(modules, docindex, linker, context=None, **options):
     # Edges.
     edges = Set()
     for dst in modules:
+        if dst.imports in (None, UNKNOWN): continue
         for var_name in dst.imports:
             for i in range(len(var_name), 0, -1):
                 val_doc = docindex.get_valdoc(DottedName(*var_name[:i]))
                 if isinstance(val_doc, ModuleDoc):
-                    edges.add( (val_doc, dst) )
+                    if val_doc in nodes and dst in nodes:
+                        edges.add((nodes[val_doc], nodes[dst]))
                     break
-
-    for (src, dst) in edges:
-        if src in nodes and dst in nodes:
-            graph.edges.append(DotGraphEdge(nodes[src], nodes[dst]))
+    graph.edges = [DotGraphEdge(src,dst) for (src,dst) in edges]
 
     return graph
     
-# [xx] Use short names when possible, but long names when needed?
 def add_valdoc_nodes(graph, val_docs, linker, context):
     nodes = {}
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
     for i, val_doc in enumerate(val_docs):
-        node = nodes[val_doc] = DotGraphNode(val_doc.canonical_name)
+        if (val_doc.canonical_name[:-1] == context.canonical_name[:-1] or
+            val_doc.canonical_name[:-1] == context.canonical_name[:]):
+            label = val_doc.canonical_name[-1]
+        else:
+            label = val_doc.canonical_name
+        node = nodes[val_doc] = DotGraphNode(label)
         graph.nodes.append(node)
         if val_doc == context:
             node.attribs.update({'fillcolor':'black', 'fontcolor':'white',
