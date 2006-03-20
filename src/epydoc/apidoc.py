@@ -18,8 +18,7 @@ Python variable or value.  C{APIDoc} has two direct subclasses:
 L{VariableDoc}, for documenting variables; and L{ValueDoc}, for
 documenting values.  The C{ValueDoc} class is subclassed further, to
 define the different pieces of information that should be recorded
-about each value type (See the documentation for L{ValueDoc} for a
-complete list).
+about each value type:
 
 G{classtree: APIDoc}
 
