@@ -18,39 +18,38 @@ to document, and produce API documentation using the following steps:
    that are related to them (such as the values defined by a module).
    This can be done via introspection, parsing, or both:
 
-   1.1. Use introspection to examine the objects directly.
- 
-   1.2. Parse the Python source files that define the objects,
-   and extract information from those files.
+   * Use introspection to examine the objects directly.
+  
+   * Parse the Python source files that define the objects,
+     and extract information from those files.
 
 2. Combine and process that information.
 
-   2.1. Merge the information obtained from introspection & parsing
-   each object into a single structure.  (This step is skipped if
-   information was extracted from only introspection or only parsing.)
-
-   2.2. Replace any 'pointers' that were created for imported
-   variables with the documentation that they point to (if it's
-   available).
-
-   2.3. Assign unique 'canonical names' to each of the specified
-   objects, and any related objects.
-
-   2.4. Parse the docstrings of each of the specified objects, and any
-   related objects.
-
-   2.5. Add variables to classes for any values that they inherit from
-   their base classes.
+   * Merge the information obtained from introspection & parsing
+     each object into a single structure.  (This step is skipped if
+     information was extracted from only introspection or only
+     parsing.)
+     
+   * Replace any 'pointers' that were created for imported
+     variables with the documentation that they point to (if it's
+     available).
+     
+   * Assign unique 'canonical names' to each of the specified
+     objects, and any related objects.
+     
+   * Parse the docstrings of each of the specified objects, and any
+     related objects.
+     
+   * Add variables to classes for any values that they inherit from
+     their base classes.
 
 3. Generate output.  Output can be generated in a variety of formats:
 
-    3.1. An HTML webpage
+   * An HTML webpage
+  
+   * other formats (under construction)
 
-    3.2. other formats (under construction)
-
-Architecture Graph
-~~~~~~~~~~~~~~~~~~
-.. digraph:: architecture
+.. digraph:: Overview of epydoc's architecture
 
    ranksep = 0.1;
    node [shape="box", height="0", width="0"]
@@ -62,7 +61,7 @@ Architecture Graph
      parse       [label="Parse source code:\\nparse_docs()",
                   href="<docparser.parse_docs>"]
      merge       [label="Merge introspected & parsed docs:\\nmerge_docs()",
-                  href="<docmerger.merge_docs>", width="2.5"]
+                  href="<docbuilder.merge_docs>", width="2.5"]
      link        [label="Link imports:\\nlink_imports()",
                   href="<docbuilder.link_imports>", width="2.5"]
      name        [label="Assign names:\\nassign_canonical_names()",
@@ -86,7 +85,7 @@ Architecture Graph
    }
 
    { /* Graph edges */
-     edge [dir="none", fontcolor=\"#602000\"]
+     edge [fontcolor=\"#602000\"]
      input -> introspect
      introspect -> merge [label="APIDoc", href="<apidoc.APIDoc>"]
      input -> parse
@@ -112,12 +111,20 @@ Architecture Graph
    { rank=same; l2 write_html }
    { rank=same; l4 output }
 
-:author: `Edward Loper <edloper@gradient.cis.upenn.edu>`
+:group User Interface: gui, cli
+:group Basic Data Types: apidoc
+:group Documentation Generation: docbuilder, docintrospecter, docparser
+:group Docstring Processing: docstringparser, markup
+:group Output Generation: docwriter
+:group Completeness Checking: checker
+:group Miscellaneous: log, util, test
+
+:author: `Edward Loper <edloper@gradient.cis.upenn.edu>`__
 :requires: Python 2.3+
 :version: 3.0 alpha
-:see: `The epydoc webpage <http://epydoc.sourceforge.net>`
+:see: `The epydoc webpage <http://epydoc.sourceforge.net>`__
 :see: `The epytext markup language
-    manual <http://epydoc.sourceforge.net/epytext.html>`
+    manual <http://epydoc.sourceforge.net/epytext.html>`__
 
 :todo: Create a better default top_page than trees.html.
 :todo: Fix trees.html to work when documenting non-top-level
@@ -133,13 +140,13 @@ Architecture Graph
 :copyright: |copy| 2006 Edward Loper
 
 :newfield contributor: Contributor, Contributors (Alphabetical Order)
-:contributor: `Glyph Lefkowitz  <mailto:glyph@twistedmatrix.com>`
-:contributor: `Edward Loper  <mailto:edloper@gradient.cis.upenn.edu>`
-:contributor: `Bruce Mitchener  <mailto:bruce@cubik.org>`
-:contributor: `Jeff O'Halloran  <mailto:jeff@ohalloran.ca>`
-:contributor: `Simon Pamies  <mailto:spamies@bipbap.de>`
-:contributor: `Christian Reis  <mailto:kiko@async.com.br>`
-:contributor: `Daniele Varrazzo  <mailto:daniele.varrazzo@gmail.com>`
+:contributor: `Glyph Lefkowitz  <mailto:glyph@twistedmatrix.com>`__
+:contributor: `Edward Loper  <mailto:edloper@gradient.cis.upenn.edu>`__
+:contributor: `Bruce Mitchener  <mailto:bruce@cubik.org>`__
+:contributor: `Jeff O'Halloran  <mailto:jeff@ohalloran.ca>`__
+:contributor: `Simon Pamies  <mailto:spamies@bipbap.de>`__
+:contributor: `Christian Reis  <mailto:kiko@async.com.br>`__
+:contributor: `Daniele Varrazzo  <mailto:daniele.varrazzo@gmail.com>`__
 
 .. |copy| unicode:: 0xA9 .. copyright sign
 """
