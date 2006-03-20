@@ -55,7 +55,7 @@ from epydoc.util import wordwrap
 from epydoc.apidoc import UNKNOWN
 
 ######################################################################
-## Argument Parsing
+#{ Argument & Config File Parsing
 ######################################################################
 
 def parse_arguments():
@@ -67,25 +67,25 @@ def parse_arguments():
     options_group = OptionGroup(optparser, 'Options')
 
     # Add options -- Actions
-    action_group.add_option(                                # --html
+    action_group.add_option(                               # --html
         "--html", action="store_const", dest="action", const="html",
         help="Write HTML output.")
-    action_group.add_option(                                # --latex
+    action_group.add_option(                               # --latex
         "--text", action="store_const", dest="action", const="text",
         help="Write plaintext output. (not implemented yet)")
-    action_group.add_option(                                # --latex
+    action_group.add_option(                               # --latex
         "--latex", action="store_const", dest="action", const="latex",
         help="Write LaTeX output. (not implemented yet)")
-    action_group.add_option(                                # --dvi
+    action_group.add_option(                               # --dvi
         "--dvi", action="store_const", dest="action", const="dvi",
         help="Write DVI output. (not implemented yet)")
-    action_group.add_option(                                # --ps
+    action_group.add_option(                               # --ps
         "--ps", action="store_const", dest="action", const="ps",
         help="Write Postscript output. (not implemented yet)")
-    action_group.add_option(                                # --pdf
+    action_group.add_option(                               # --pdf
         "--pdf", action="store_const", dest="action", const="pdf",
         help="Write PDF output. (not implemented yet)")
-    action_group.add_option(                                # --check
+    action_group.add_option(                               # --check
         "--check", action="store_const", dest="action", const="check",
         help="Check completeness of docs. (not implemented yet)")
 
@@ -100,72 +100,72 @@ def parse_arguments():
     
 
     # Add options -- Options
-    options_group.add_option(                                # --output
+    options_group.add_option(                               # --output
         "--output", "-o", dest="target", metavar="PATH",
         help="The output directory.  If PATH does not exist, then "
         "it will be created.")
-    options_group.add_option(                                # --show-imports
+    options_group.add_option(                               # --show-imports
         "--inheritance", dest="inheritance", metavar="STYLE",
         help="The format for showing inheritance objects.  STYLE "
         "should be \"grouped\", \"listed\", or \"included\".")
-    options_group.add_option(                                # --output
+    options_group.add_option(                               # --output
         "--docformat", dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
         "to \"%default\".")
-    options_group.add_option(                                # --css
+    options_group.add_option(                               # --css
         "--css", dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
-    options_group.add_option(                                # --name
+    options_group.add_option(                               # --name
         "--name", dest="prj_name", metavar="NAME",
         help="The documented project's name (for the navigation bar).")
-    options_group.add_option(                                # --url
+    options_group.add_option(                               # --url
         "--url", dest="prj_url", metavar="URL",
         help="The documented project's URL (for the navigation bar).")
-    options_group.add_option(                                # --navlink
+    options_group.add_option(                               # --navlink
         "--navlink", dest="prj_link", metavar="HTML",
         help="HTML code for a navigation link to place in the "
         "navigation bar.")
-    options_group.add_option(                                # --top
+    options_group.add_option(                               # --top
         "--top", dest="top_page", metavar="PAGE",
         help="The \"top\" page for the HTML documentation.  PAGE can "
         "be a URL, the name of a module or class, or one of the "
         "special names \"trees.html\", \"indices.html\", or \"help.html\"")
-    options_group.add_option(                                # --help-file
+    options_group.add_option(                               # --help-file
         "--help-file", dest="help_file", metavar="FILE",
         help="An alternate help file.  FILE should contain the body "
         "of an HTML file -- navigation bars will be added to it.")
-    options_group.add_option(                                # --frames
+    options_group.add_option(                               # --frames
         "--show-frames", action="store_true", dest="show_frames",
         help="Include frames in the output.")
-    options_group.add_option(                                # --no-frames
+    options_group.add_option(                               # --no-frames
         "--no-frames", action="store_false", dest="show_frames",
         help="Do not include frames in the output.")
-    options_group.add_option(                                # --private
+    options_group.add_option(                               # --private
         "--show-private", action="store_true", dest="show_private",
         help="Include private variables in the output.")
-    options_group.add_option(                                # --no-private
+    options_group.add_option(                               # --no-private
         "--no-private", action="store_false", dest="show_private",
         help="Do not include private variables in the output.")
-    options_group.add_option(                                # --show-imports
+    options_group.add_option(                               # --show-imports
         "--show-imports", action="store_true", dest="show_imports",
         help="List each module's imports.")
-    options_group.add_option(                                # --show-imports
+    options_group.add_option(                               # --show-imports
         "--no-imports", action="store_false", dest="show_imports",
         help="Do not list each module's imports.")
-    options_group.add_option(                                # --quiet
+    options_group.add_option(                               # --quiet
         "--quiet", "-q", action="count", dest="quiet",
         help="Decrease the verbosity.")
-    options_group.add_option(                                # --verbose
+    options_group.add_option(                               # --verbose
         "--verbose", "-v", action="count", dest="verbose",
         help="Increase the verbosity.")
-    options_group.add_option(                                # --debug
+    options_group.add_option(                               # --debug
         "--debug", action="store_true", dest="debug",
         help="Show full tracebacks for internal errors.")
-    options_group.add_option(                                # --parse-only
+    options_group.add_option(                               # --parse-only
         "--parse-only", action="store_false", dest="introspect",
         help="Get all information from parsing (don't introspect)")
-    options_group.add_option(                                # --introspect-only
+    options_group.add_option(                               # --introspect-only
         "--introspect-only", action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
     options_group.add_option(
@@ -174,6 +174,10 @@ def parse_arguments():
     options_group.add_option(
         "--dotpath", dest="dotpath", metavar='PATH',
         help="The path to the Graphviz 'dot' executable.")
+    options_group.add_option(
+        '--config', action='append', dest="configfiles", metavar='FILE'
+        help="A configuration file, specifying additional OPTIONS "
+        "and/or NAMES.  This option may be repeated.")
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -213,14 +217,76 @@ def parse_arguments():
     # Return parsed args.
     return options, names
 
+def parse_configfiles(configfiles, options, names):
+    import ConfigParser
+    configparser = ConfigParser.ConfigParser()
+    configparser.read(configfiles)
+    for optname in configparser.options('epydoc'):
+        val = configparser.get('epydoc', optname).strip()
+        if optname in ('modules', 'objects', 'values',
+                       'module', 'object', 'value'):
+            names.extend(val.split())
+        elif optname in ('output', 'target'):
+            options.target = val
+        elif optname == 'inheritance':
+            if val.lower() not in ('grouped', 'listed', 'included'):
+                raise ValueError('"inheritance" expected "grouped", '
+                                 '"listed", or "included"')
+            options.inerhitance = val.lower()
+        elif optname == 'docformat':
+            options.docformat = val
+        elif optname == 'css':
+            options.css = val
+        elif optname == 'name':
+            options.prj_name = val
+        elif optname == 'url':
+            options.prj_url = val
+        elif optname == 'link':
+            options.prj_link = val
+        elif optname == 'top':
+            options.top_page = val
+        elif optname == 'help':
+            options.help_file = val
+        elif optname =='frames':
+            options.frames = _str_to_bool(val, optname)
+        elif optname =='private':
+            options.private = _str_to_bool(val, optname)
+        elif optname =='imports':
+            options.imports = _str_to_bool(val, optname)
+        elif optname == 'verbosity':
+            try:
+                options.verbosity = int(val)
+            except ValueError:
+                raise ValueError('"verbosity" expected an int')
+        elif optname == 'parse':
+            options.parse = _str_to_bool(val, optname)
+        elif optname == 'introspect':
+            options.introspect = _str_to_bool(val, optname)
+        elif optname == 'profile':
+            options.profile = _str_to_bool(val, optname)
+        elif optname == 'dotpath':
+            options.dotpath = val
+
+def _str_to_bool(val, optname):
+    if val.lower() in ('0', 'no', 'false', 'n', 'f', 'hide'):
+        return False
+    elif val.lower() in ('1', 'yes', 'true', 'y', 't', 'show'):
+        return True
+    else:
+        raise ValueError('"%s" expected a boolean' % optname)
+        
 ######################################################################
-## Interface
+#{ Interface
 ######################################################################
 
 def main(options, names):
     if options.action == 'text':
         if options.parse and options.introspect:
             options.parse = False
+
+    # Process any config files.
+    if options.configfiles:
+        parse_configfiles(options.configfiles, options, names)
     
     # Set up the logger
     if options.action == 'text':
@@ -347,7 +413,7 @@ def _profile():
     print 'Profiling output is in "profile.out"'
         
 ######################################################################
-## Logging
+#{ Logging
 ######################################################################
     
 class TerminalController:
