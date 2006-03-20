@@ -58,6 +58,7 @@ __docformat__ = 'epytext en'
 import re, types, sys
 from epydoc import log
 from epydoc.util import plaintext_to_html, plaintext_to_latex
+import epydoc
 
 ##################################################
 ## Contents
@@ -124,7 +125,9 @@ def parse(docstring, markup='plaintext', errors=None, **options):
     try: parsed_docstring = parse_docstring(docstring, errors, **options)
     except KeyboardInterrupt: raise
     except Exception, e:
-        errors.append(ParseError('Internal error: %s' % e))
+        if epydoc.DEBUG: raise
+        log.error('Internal error while parsing a docstring: %s; '
+                  'treating docstring as plaintext' % e)
         return plaintext.parse_docstring(docstring, errors, **options)
 
     # Check for fatal errors.
