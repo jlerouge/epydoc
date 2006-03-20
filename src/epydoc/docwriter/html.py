@@ -1,5 +1,5 @@
 #
-# epydoc.py: epydoc HTML output generator
+# epydoc -- HTML output generator
 # Edward Loper
 #
 # Created [01/30/01 05:18 PM]
@@ -24,7 +24,6 @@ from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc import log
 from epydoc.util import plaintext_to_html
-import __builtin__
 
 # Backwards compatibility imports:
 try: sorted
@@ -455,6 +454,7 @@ class HTMLWriter:
         # Create destination directories, if necessary
         if not directory: directory = os.curdir
         self._mkdir(directory)
+        self._directory = directory
 
         # Write the CSS file.
         self._files_written += 1
@@ -518,12 +518,6 @@ class HTMLWriter:
                 for name in names:
                     estr += '      (from %s)\n' % name
             log.docstring_warning(estr)
-
-#         # [XX] This is still under construction
-#         for v in self.docindex.root:
-#             if isinstance(v, ModuleDoc):
-#                 filename = urllib.unquote(self.url(v))[:-5]+'.gif'
-#                 self.write_import_graph(v, directory, filename)
 
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
@@ -1257,64 +1251,6 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     #{ 2.10. Graphs
     #////////////////////////////////////////////////////////////
-
-    # [xx] Requires dot!
-    def write_import_graph(self, doc, directory, filename):
-        log.progress(self._files_written/self._num_files, filename)
-        
-        # What do we import?
-        imports = {}
-        for name in doc.imports:
-            for i in range(len(name), 0, -1):
-                val_doc = self.docindex.get_valdoc(DottedName(*name[:i]))
-                if isinstance(val_doc, ModuleDoc):
-                    src = val_doc
-                    var_name = '.'.join(name[i:])
-                    imports.setdefault(src,[]).append(var_name)
-                    break
-
-        # Who imports us?
-        exports = {}
-        for other in self.valdocs:
-            if isinstance(other, ModuleDoc):
-                for name in other.imports:
-                    if doc.canonical_name.dominates(name):
-                        dst = other
-                        var_name ='.'.join(name[len(other.canonical_name):])
-                        exports.setdefault(dst,[]).append(var_name)
-
-        # Now make a graph.
-        graph = ['digraph %s-imports {' % doc.canonical_name,
-                 'rankdir="LR"',
-                 'node [shape="box",height=0,width="1"]',
-                 'edge [weight="10000",sametail,len="1"]',
-                 'self [label="%s",style="filled"]' % doc.canonical_name,
-                 ]
-        for i, (src, names) in enumerate(imports.items()):
-            graph.append('i%d [label="%s",href="%s"]' %
-                         (i, src.canonical_name, self.url(src)))
-            graph.append('self -> i%d [href="%s",tooltip="%s"]' %
-                         (i, self.url(src), ', '.join(names)))
-        for i, (dst, names) in enumerate(exports.items()):
-            graph.append('o%d [label="%s",href="%s"]' % 
-                         (i, dst.canonical_name, self.url(dst)))
-            graph.append('o%d -> self [href="%s",tooltip="%s"]' %
-                         (i, self.url(dst), ', '.join(names)))
-        graph.append('}')
-
-        # Write it!
-        from os import popen
-        path = os.path.join(directory, filename)
-        pipe = os.popen('dot -Tgif -o %s' % path, 'w')
-        pipe.write('\n'.join(graph))
-        pipe.close()
-
-        # coordinate map for client-side image map.
-        # <img src="..." usemap="#name">
-        path = os.path.join(directory, filename[:-3]+'cmapx')
-        pipe = os.popen('dot -Tcmapx -o %s' % path, 'w')
-        pipe.write('\n'.join(graph))
-        pipe.close()
 
     #////////////////////////////////////////////////////////////
     #{ 3.1. Page Header
@@ -2758,17 +2694,23 @@ class HTMLWriter:
     def docstring_to_html(self, parsed_docstring, where=None, indent=0):
         if parsed_docstring in (None, UNKNOWN): return ''
         linker = _HTMLDocstringLinker(self, where)
-        s = parsed_docstring.to_html(linker, indent=indent).strip()
+        s = parsed_docstring.to_html(linker, indent=indent,
+                                     directory=self._directory,
+                                     docindex=self.docindex,
+                                     context=where).strip()
         if self._mark_docstrings:
             s = '<span class="docstring">%s</span><!--end docstring-->' % s
         return s
-    
+
+    # [XX] Just use docstring_to_html???
     def description(self, parsed_docstring, where=None, indent=0):
         assert isinstance(where, (APIDoc, type(None)))
         if parsed_docstring in (None, UNKNOWN): return ''
-        #if parsed_docstring in (None, UNKNOWN): return '&nbsp;'
         linker = _HTMLDocstringLinker(self, where)
-        descr = parsed_docstring.to_html(linker, indent=indent).strip()
+        descr = parsed_docstring.to_html(linker, indent=indent,
+                                         directory=self._directory,
+                                         docindex=self.docindex,
+                                         context=where).strip()
         if descr == '': return '&nbsp;'
         return descr
     
@@ -2813,7 +2755,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
 
         # Find the APIDoc for it (if it's available).
         try:
-            doc = self._find(identifier)
+            doc = self.docindex.find(identifier, self.container)
         except ValueError:
             doc = None # e.g., if identifier == '[1,2]'
 
@@ -2823,73 +2765,144 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         else:
             return self.htmlwriter.href(doc, label, 'link')
 
-    def _find(self, name):
-        """
-        @type name: C{str}
-        @return: An C{APIDoc}, or the string C{'imported'}, or
-        C{None}
-        """
-        assert isinstance(name, basestring)
-        # Convert `name` to a dotted name.  If it's not a valid python
-        # dotted name, then give up.
-        if re.match('\w+(\.\w+)*', name):
-            name = DottedName(name)
+    # [xx] Should this be added to the DocstringLinker interface???
+    def url_for(self, identifier):
+        if isinstance(identifier, (basestring, DottedName)):
+            doc = self.docindex.find(identifier, self.container)
+            if doc:
+                return self.htmlwriter.url(doc)
+            else:
+                # [xx] ignore if it's inside an import??
+                # Record that we failed to find it.
+                failed_xrefs = self.htmlwriter._failed_xrefs
+                context = self.container.canonical_name
+                failed_xrefs.setdefault(identifier,{})[context] = 1
+            
+        elif isinstance(identifier, APIDoc):
+            return self.htmlwriter.url(identifier)
+            doc = identifier
+            
         else:
-            return None
+            raise TypeError('Expected string or APIDoc')
+
+#     def _find(self, name):
+#         """
+#         @type name: C{str}
+#         @return: An C{APIDoc}, or the string C{'imported'}, or
+#         C{None}
+#         """
+#         assert isinstance(name, basestring)
+#         # Convert `name` to a dotted name.  If it's not a valid python
+#         # dotted name, then give up.
+#         if re.match('\w+(\.\w+)*', name):
+#             name = DottedName(name)
+#         else:
+#             return None
         
-        if self.container is None or self.container.canonical_name is None:
-            container_name = []
-        else:
-            container_name = self.container.canonical_name
+#         if self.container is None or self.container.canonical_name is None:
+#             container_name = []
+#         else:
+#             container_name = self.container.canonical_name
 
-        # Is it a parameter's name?
-        if (isinstance(self.container, RoutineDoc) and
-            len(name) == 1 and name[0] in self.container.all_args()):
-            return None
+#         # Is it a parameter's name?
+#         if (isinstance(self.container, RoutineDoc) and
+#             len(name) == 1 and name[0] in self.container.all_args()):
+#             return None
 
-        # Check for the name in all containing namespaces, starting
-        # with the closest one.
-        for i in range(len(container_name), -1, -1):
-            relative_name = DottedName(*(container_name[:i]+(name,)))
-            # Is `name` the absolute name of a documented value?
-            val_doc = self.docindex.get_valdoc(relative_name)
-            if val_doc is not None: return val_doc
-            # Is `name` the absolute name of a documented variable?
-            var_doc = self.docindex.get_vardoc(relative_name)
-            if var_doc is not None: return var_doc
+#         # Check for the name in all containing namespaces, starting
+#         # with the closest one.
+#         for i in range(len(container_name), -1, -1):
+#             relative_name = DottedName(*(container_name[:i]+(name,)))
+#             # Is `name` the absolute name of a documented value?
+#             val_doc = self.docindex.get_valdoc(relative_name)
+#             if val_doc is not None: return val_doc
+#             # Is `name` the absolute name of a documented variable?
+#             var_doc = self.docindex.get_vardoc(relative_name)
+#             if var_doc is not None: return var_doc
 
-        # If the name begins with 'self', then try stripping that off
-        # and see if we can find the variable.
-        if name[0] == 'self':
-            doc = self._find('.'.join(name[1:]))
-            if doc is not None: return doc
+#         # If the name begins with 'self', then try stripping that off
+#         # and see if we can find the variable.
+#         if name[0] == 'self':
+#             doc = self._find('.'.join(name[1:]))
+#             if doc is not None: return doc
 
-        # Is it the name of a builtin?
-        if len(name)==1 and hasattr(__builtin__, name[0]):
-            return None
+#         # Is it the name of a builtin?
+#         if len(name)==1 and hasattr(__builtin__, name[0]):
+#             return None
         
-        # Is it an attribute of a parameter?
-        if (isinstance(self.container, RoutineDoc) and
-            len(name) > 1 and name[0] in self.container.all_args()):
-            return None
+#         # Is it an attribute of a parameter?
+#         if (isinstance(self.container, RoutineDoc) and
+#             len(name) > 1 and name[0] in self.container.all_args()):
+#             return None
 
-        # Check if `name` is contained inside of an imported variable
-        # whose value is not known.  (We check this case to avoid
-        # reporting xref failures when the cause is simply that the
-        # docs for the target's containing module were not processed.)
-        else:
-            for i in range(len(container_name), -1, -1):
-                for j in range(len(name), 0, -1):
-                    var_name = DottedName(*(container_name[:i]+name[:j]))
-                    var_doc = self.docindex.get_vardoc(var_name)
-                    if (var_doc is not None and var_doc.is_imported==True and
-                        var_doc.value not in self.valdocs):
-                        return None
+#         # Check if `name` is contained inside of an imported variable
+#         # whose value is not known.  (We check this case to avoid
+#         # reporting xref failures when the cause is simply that the
+#         # docs for the target's containing module were not processed.)
+#         else:
+#             for i in range(len(container_name), -1, -1):
+#                 for j in range(len(name), 0, -1):
+#                     var_name = DottedName(*(container_name[:i]+name[:j]))
+#                     var_doc = self.docindex.get_vardoc(var_name)
+#                     if (var_doc is not None and var_doc.is_imported==True and
+#                         var_doc.value not in self.valdocs):
+#                         return None
 
-        # We couldn't find it.  Add it to the list of failed xrefs.
-        failed_xrefs = self.htmlwriter._failed_xrefs
-        if not failed_xrefs.has_key(name):
-            failed_xrefs[name] = {}
-        failed_xrefs[name][self.container.canonical_name] = 1
-        return None
+#         # We couldn't find it.  Add it to the list of failed xrefs.
+#         failed_xrefs = self.htmlwriter._failed_xrefs
+#         if not failed_xrefs.has_key(name):
+#             failed_xrefs[name] = {}
+#         failed_xrefs[name][self.container.canonical_name] = 1
+#         return None
+
+# def url_for(obj, docindex):
+#     """
+#     Return the URL for the given object, which can be a
+#     C{VariableDoc}, a C{ValueDoc}, or a C{DottedName}.
+#     """
+#     # Module: <canonical_name>-module.html
+#     if isinstance(obj, ModuleDoc):
+#         if obj not in docindex.root: return None
+#         return urllib.quote('%s'%obj.canonical_name) + '-module.html'
+#     # Class: <canonical_name>-class.html
+#     elif isinstance(obj, ClassDoc):
+#         if obj not in docindex.reachable_valdocs(imports=False,
+#             packages=False, submodules=False, bases=False, subclasses=False):
+#             return None
+#         return urllib.quote('%s'%obj.canonical_name) + '-class.html'
+#     # Variable
+#     elif isinstance(obj, VariableDoc):
+#         val_doc = obj.value
+#         if isinstance(val_doc, (ModuleDoc, ClassDoc)):
+#             return url_for(val_doc, docindex)
+#         elif obj.container in (None, UNKNOWN):
+#             return url_for(val_doc, docindex)
+#         else:
+#             container_url = url_for(obj.container, docindex)
+#             if container_url is None: return None
+#             return '%s#%s' % (container_url, urllib.quote('%s'%obj.name))
+#     # Value (other than module or class)
+#     elif isinstance(obj, ValueDoc):
+#         container = docindex.container(obj)
+#         if container is None:
+#             return None # We couldn't find it!
+#         else:
+#             container_url = url_for(container, docindex)
+#             if container_url is None: return None
+#             anchor = urllib.quote('%s'%obj.canonical_name[-1])
+#             return '%s#%s' % (container_url, anchor)
+#     # Dotted name: look up the corresponding APIDoc
+#     elif isinstance(obj, DottedName):
+#         val_doc = docindex.get_valdoc(obj)
+#         if val_doc is None: return None
+#         return url_for(val_doc, docindex)
+#     # Special pages:
+#     elif obj == 'indices':
+#         return 'indices.html'
+#     elif obj == 'help':
+#         return 'help.html'
+#     elif obj == 'trees':
+#         return 'trees.html'
+#     else:
+#         raise ValueError, "Don't know what to do with %r" % obj
 

@@ -65,7 +65,7 @@ the list.
 __docformat__ = 'epytext en'
 
 # Imports
-import re
+import re, os, os.path
 from xml.dom.minidom import *
 
 from docutils.core import publish_string
@@ -161,9 +161,11 @@ class ParsedRstDocstring(ParsedDocstring):
 #             result.append(visitor.get_tree_copy())
 #         return ParsedRstDocstring(result)
         
-    def to_html(self, docstring_linker, **options):
+    def to_html(self, docstring_linker, directory=None,
+                docindex=None, context=None, **options):
         # Inherit docs
-        visitor = _EpydocHTMLTranslator(self._document, docstring_linker)
+        visitor = _EpydocHTMLTranslator(self._document, docstring_linker,
+                                        directory, docindex, context)
         self._document.walkabout(visitor)
         return ''.join(visitor.body)
 
@@ -440,13 +442,19 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
     def depart_document(self, node): pass
         
 class _EpydocHTMLTranslator(HTMLTranslator):
-    def __init__(self, document, docstring_linker):
+    def __init__(self, document, docstring_linker, directory,
+                 docindex, context):
+        self._linker = docstring_linker
+        self._directory = directory
+        self._docindex = docindex
+        self._context = context
+        
         # Set the document's settings.
         settings = OptionParser([HTMLWriter()]).get_default_values()
         document.settings = settings
-    
+
+        # Call the parent constructor.
         HTMLTranslator.__init__(self, document)
-        self._linker = docstring_linker
 
     # Handle interpreted text (crossreferences)
     def visit_title_reference(self, node):
@@ -495,3 +503,165 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         
         return HTMLTranslator.starttag(self, node, tagname, suffix,
                                        **attributes)
+
+    def visit_dotgraph(self, node):
+        if self._directory is None: return # [xx] warning?
+        
+        # Generate the graph.
+        graph = node.graph(self._docindex, self._context, self._linker)
+        if graph is None: return
+        # Write the graph's image to a file
+        path = os.path.join(self._directory, graph.uid)
+        if not graph.write('%s.gif' % path, 'gif'):
+            return
+        # Generate the image map.
+        cmapx = graph.render('cmapx') or ''
+        # Display the graph.
+        self.body.append('%s<p><img src="%s.gif" alt="%s" '
+                         'usemap="#%s" smap="ismap"/></p>\n' %
+                         (cmapx, graph.uid, graph.uid, graph.uid))
+
+    def depart_dotgraph(self, node):
+        pass # Nothing to do.
+
+######################################################################
+#{ Graph Generation Directives
+######################################################################
+from epydoc.apidoc import ModuleDoc, DottedName, UNKNOWN, ClassDoc
+from sets import Set
+import urllib
+from docutils.parsers.rst import directives
+from epydoc.docwriter.dotgraph import *
+
+class dotgraph(docutils.nodes.image):
+    """
+    A custom docutils node that should be rendered using Graphviz dot.
+    This node does not directly store the graph; instead, it stores a
+    pointer to a function that can be used to generate the graph.
+    This allows the graph to be built based on information that might
+    not be available yet at parse time.  This graph generation
+    function has the following signature:
+
+        >>> def generate_graph(docindex, context, linker, *args):
+        ...     'generates and returns a new DotGraph'
+
+    Where C{docindex} is a docindex containing the documentation that
+    epydoc has built; C{context} is the C{APIDoc} whose docstring
+    contains this dotgraph node; C{linker} is a L{DocstringLinker}
+    that can be used to resolve crossreferences; and C{args} is any
+    extra arguments that are passed to the C{dotgraph} constructor.
+    """
+    def __init__(self, generate_graph_func, *generate_graph_args):
+        docutils.nodes.TextElement.__init__(self)
+        self.graph_func = generate_graph_func
+        self.args = generate_graph_args
+    def graph(self, docindex, context, linker):
+        return self.graph_func(docindex, context, linker, *self.args)
+
+def _dir_option(argument):
+    """A directive option spec for the orientation of a graph."""
+    argument = argument.lower().strip()
+    if argument == 'right': return 'LR'
+    if argument == 'left': return 'RL'
+    if argument == 'down': return 'TB'
+    if argument == 'up': return 'BT'
+    raise ValueError('%r unknown; choose from left, right, up, down' %
+                     argument)
+ 
+def digraph_directive(name, arguments, options, content, lineno,
+                      content_offset, block_text, state, state_machine):
+    """
+    A custom restructuredtext directive which can be used to display
+    Graphviz dot graphs.  This directive takes a single argument,
+    which is used as the graph's name.  The contents of the directive
+    are used as the body of the graph.  Any href attributes whose
+    value has the form <name> will be replaced by the URL of the object
+    with that name.  Here's a simple example::
+
+     .. digraph:: example_digraph
+       a -> b -> c
+       c -> a [dir=\"none\"]
+    """
+    return dotgraph(_construct_digraph, arguments[0], '\n'.join(content))
+digraph_directive.arguments = (1, 0, 0)
+digraph_directive.content = True
+directives.register_directive('digraph', digraph_directive)
+
+def _construct_digraph(docindex, context, linker, title, body):
+    """Graph generator for L{digraph_directive}"""
+    graph = DotGraph(title, body)
+    graph.link(linker)
+    return graph
+
+def classtree_directive(name, arguments, options, content, lineno,
+                        content_offset, block_text, state, state_machine):
+    """
+    A custom restructuredtext directive which can be used to
+    graphically display a class hierarchy.  If one or more arguments
+    are given, then those classes and all their descendants will be
+    displayed.  If no arguments are given, and the directive is in a
+    class's docstring, then that class and all its descendants will be
+    displayed.  It is an error to use this directive with no arguments
+    in a non-class docstring.
+
+    Options:
+      - C{:dir:} -- Specifies the orientation of the graph.  One of
+        C{down}, C{right} (default), C{left}, C{up}.
+    """
+    return dotgraph(_construct_classtree, arguments, options)
+classtree_directive.arguments = (0, 1, True)
+classtree_directive.options = {'dir': _dir_option}
+classtree_directive.content = False
+directives.register_directive('classtree', classtree_directive)
+
+def _construct_classtree(docindex, context, linker, arguments, options):
+    """Graph generator for L{classtree_directive}"""
+    if len(arguments) == 1:
+        bases = [docindex.find(name, context) for name in
+                 arguments[0].replace(',',' ').split()]
+        bases = [d for d in bases if isinstance(d, ClassDoc)]
+    elif isinstance(context, ClassDoc):
+        bases = [context]
+    else:
+        log.warning("Could not construct class tree: you must "
+                    "specify one or more base classes.")
+        return None
+        
+    return class_tree_graph(bases, linker, context, **options)
+
+def packagetree_directive(name, arguments, options, content, lineno,
+                        content_offset, block_text, state, state_machine):
+    """
+    A custom restructuredtext directive which can be used to
+    graphically display a package hierarchy.  If one or more arguments
+    are given, then those packages and all their submodules will be
+    displayed.  If no arguments are given, and the directive is in a
+    package's docstring, then that package and all its submodules will
+    be displayed.  It is an error to use this directive with no
+    arguments in a non-package docstring.
+
+    Options:
+      - C{:dir:} -- Specifies the orientation of the graph.  One of
+        C{down}, C{right} (default), C{left}, C{up}.
+    """
+    return dotgraph(_construct_packagetree, arguments, options)
+packagetree_directive.arguments = (0, 1, True)
+packagetree_directive.options = {'dir': _dir_option}
+packagetree_directive.content = False
+directives.register_directive('packagetree', packagetree_directive)
+
+def _construct_packagetree(docindex, context, linker, arguments, options):
+    """Graph generator for L{packagetree_directive}"""
+    if len(arguments) == 1:
+        packages = [docindex.find(name, context) for name in
+                    arguments[0].replace(',',' ').split()]
+        packages = [d for d in packages if isinstance(d, ModuleDoc)]
+    elif isinstance(context, ModuleDoc):
+        packages = [context]
+    else:
+        log.warning("Could not construct package tree: you must "
+                    "specify one or more root packages.")
+        return None
+
+    return package_tree_graph(packages, linker, context, **options)
+

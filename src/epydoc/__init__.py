@@ -10,76 +10,140 @@
 Automatic Python reference documentation generator.  Epydoc processes
 Python modules and docstrings to generate formatted API documentation,
 in the form of HTML pages.  Epydoc can be used via a command-line
-interface (L{epydoc.cli}) and a graphical interface (L{epydoc.gui}).
+interface (`epydoc.cli`) and a graphical interface (`epydoc.gui`).
 Both interfaces let the user specify a set of modules or other objects
 to document, and produce API documentation using the following steps:
 
-  1. Extract basic information about the specified objects, and objects
-     that are related to them (such as the values defined by a module).
-     This can be done via introspection, parsing, or both:
-  
-       1.1. Use introspection to examine the objects directly.
+1. Extract basic information about the specified objects, and objects
+   that are related to them (such as the values defined by a module).
+   This can be done via introspection, parsing, or both:
+
+   1.1. Use introspection to examine the objects directly.
+ 
+   1.2. Parse the Python source files that define the objects,
+   and extract information from those files.
+
+2. Combine and process that information.
+
+   2.1. Merge the information obtained from introspection & parsing
+   each object into a single structure.  (This step is skipped if
+   information was extracted from only introspection or only parsing.)
+
+   2.2. Replace any 'pointers' that were created for imported
+   variables with the documentation that they point to (if it's
+   available).
+
+   2.3. Assign unique 'canonical names' to each of the specified
+   objects, and any related objects.
+
+   2.4. Parse the docstrings of each of the specified objects, and any
+   related objects.
+
+   2.5. Add variables to classes for any values that they inherit from
+   their base classes.
+
+3. Generate output.  Output can be generated in a variety of formats:
+
+    3.1. An HTML webpage
+
+    3.2. other formats (under construction)
+
+Architecture Graph
+~~~~~~~~~~~~~~~~~~
+.. digraph:: architecture
+
+   ranksep = 0.1;
+   node [shape="box", height="0", width="0"]
    
-       1.2. Parse the Python source files that define the objects,
-            and extract information from those files.
+   { /* Task nodes */
+     node [fontcolor=\"#000060\"]
+     introspect  [label="Introspect value:\\nintrospect_docs()",
+                  href="<docintrospecter.introspect_docs>"]
+     parse       [label="Parse source code:\\nparse_docs()",
+                  href="<docparser.parse_docs>"]
+     merge       [label="Merge introspected & parsed docs:\\nmerge_docs()",
+                  href="<docmerger.merge_docs>", width="2.5"]
+     link        [label="Link imports:\\nlink_imports()",
+                  href="<docbuilder.link_imports>", width="2.5"]
+     name        [label="Assign names:\\nassign_canonical_names()",
+                  href="<docbuilder.assign_canonical_names>", width="2.5"]
+     docstrings  [label="Parse docstrings:\\nparse_docstring()",
+                  href="<docstringparser.parse_docstring>", width="2.5"]
+     inheritance [label="Inherit docs from bases:\\ninherit_docs()",
+                  href="<docbuilder.inherit_docs>", width="2.5"]
+     write_html  [label="Write HTML output:\\nHTMLWriter",
+                 href="<docwriter.html>"]
+     write_latex  [label="Write LaTeX output:\\nLaTeXWriter",
+                 href="<docwriter.latex>"]
+     write_text  [label="Write text output:\\nPlaintextWriter",
+                 href="<docwriter.plaintext>"]
+   }
 
-  2. Combine and process that information.
+   { /* Input & Output nodes */
+     node [fontcolor=\"#602000\", shape="plaintext"]
+     input [label="Python module or value"]
+     output [label="DocIndex", href="<apidoc.DocIndex>"]
+   }
 
-       2.1. Merge the information obtained from introspection & parsing
-            each object into a single structure.  (This step is
-            skipped if information was extracted from only introspection
-            or only parsing.)
+   { /* Graph edges */
+     edge [dir="none", fontcolor=\"#602000\"]
+     input -> introspect
+     introspect -> merge [label="APIDoc", href="<apidoc.APIDoc>"]
+     input -> parse
+     parse -> merge [label="APIDoc", href="<apidoc.APIDoc>"]
+     merge -> link [label=" DocIndex", href="<apidoc.DocIndex>"]
+     link -> name [label=" DocIndex", href="<apidoc.DocIndex>"]
+     name -> docstrings [label=" DocIndex", href="<apidoc.DocIndex>"]
+     docstrings -> inheritance [label=" DocIndex", href="<apidoc.DocIndex>"]
+     inheritance -> output
+     output -> write_html
+     output -> write_latex
+     output -> write_text
+   }
 
-       2.2. Replace any 'pointers' that were created for imported
-            variables with the documentation that they point to (if
-            it's available).
+   { /* Task collections */
+     node [shape="circle",label="",width=.1,height=.1]
+     edge [fontcolor="black", dir="none", fontcolor=\"#000060\"]
+     l3 -> l4 [label=" epydoc.\\l docbuilder.\\l build_doc_index()",
+               href="<docbuilder.build_doc_index>"]
+     l1 -> l2 [label=" epydoc.\\l cli()", href="<cli>"]
+   }
+   { rank=same; l1 l3 introspect }
+   { rank=same; l2 write_html }
+   { rank=same; l4 output }
 
-       2.3. Assign unique 'canonical names' to each of the specified
-            objects, and any related objects.
+:author: `Edward Loper <edloper@gradient.cis.upenn.edu>`
+:requires: Python 2.3+
+:version: 3.0 alpha
+:see: `The epydoc webpage <http://epydoc.sourceforge.net>`
+:see: `The epytext markup language
+    manual <http://epydoc.sourceforge.net/epytext.html>`
 
-       2.4. Parse the docstrings of each of the specified objects, and
-            any related objects.
-
-       2.5. Add variables to classes for any values that they inherit
-            from their base classes.
-
-  3. Generate output.  Output can be generated in a variety of
-     formats:
-
-        3.1. An HTML webpage
-
-        3.2. other formats (under construction)
-
-@author: U{Edward Loper<edloper@gradient.cis.upenn.edu>}
-@requires: Python 2.3+
-@version: 3.0 alpha
-@see: U{The epydoc webpage<http://epydoc.sourceforge.net>}
-@see: U{The epytext markup language
-    manual<http://epydoc.sourceforge.net/epytext.html>}
-
-@todo: Create a better default top_page than trees.html.
-@todo: Fix trees.html to work when documenting non-top-level
+:todo: Create a better default top_page than trees.html.
+:todo: Fix trees.html to work when documenting non-top-level
        modules/packages
-@todo: Implement @include
-@todo: Optimize epytext
-@todo: More doctests
-@todo: When introspecting, limit how much introspection you do (eg,
+:todo: Implement @include
+:todo: Optimize epytext
+:todo: More doctests
+:todo: When introspecting, limit how much introspection you do (eg,
        don't construct docs for imported modules' vars if it's
        not necessary)
 
-@license: IBM Open Source License
-@copyright: (C) 2003 Edward Loper
+:license: IBM Open Source License
+:copyright: |copy| 2006 Edward Loper
 
-@newfield contributor: Contributor, Contributors (Alphabetical Order)
-@contributor: U{Glyph Lefkowitz <mailto:glyph@twistedmatrix.com>}
-@contributor: U{Edward Loper <mailto:edloper@gradient.cis.upenn.edu>}
-@contributor: U{Bruce Mitchener <mailto:bruce@cubik.org>}
-@contributor: U{Jeff O'Halloran <mailto:jeff@ohalloran.ca>}
-@contributor: U{Simon Pamies <mailto:spamies@bipbap.de>}
-@contributor: U{Christian Reis <mailto:kiko@async.com.br>}
-@contributor: U{Daniele Varrazzo <mailto:daniele.varrazzo@gmail.com>}
+:newfield contributor: Contributor, Contributors (Alphabetical Order)
+:contributor: `Glyph Lefkowitz  <mailto:glyph@twistedmatrix.com>`
+:contributor: `Edward Loper  <mailto:edloper@gradient.cis.upenn.edu>`
+:contributor: `Bruce Mitchener  <mailto:bruce@cubik.org>`
+:contributor: `Jeff O'Halloran  <mailto:jeff@ohalloran.ca>`
+:contributor: `Simon Pamies  <mailto:spamies@bipbap.de>`
+:contributor: `Christian Reis  <mailto:kiko@async.com.br>`
+:contributor: `Daniele Varrazzo  <mailto:daniele.varrazzo@gmail.com>`
+
+.. |copy| unicode:: 0xA9 .. copyright sign
 """
-__docformat__ = 'epytext en'
+__docformat__ = 'restructuredtext en'
 
 __version__ = '3.0alpha'
 """The version of epydoc"""
