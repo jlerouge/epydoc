@@ -115,7 +115,7 @@ def parse(docstring, markup='plaintext', errors=None, **options):
 
     # Is the markup language supported?
     try: exec('from epydoc.markup.%s import parse_docstring' % markup)
-    except:
+    except ImportError:
         _parse_warn('Unsupported markup language %r.  Treating '
                     'docstrings as plaintext.' % markup)
         return plaintext.parse_docstring(docstring, errors, **options)
