@@ -539,6 +539,11 @@ class ValueDoc(APIDoc):
         to link imported values to their source values.  When
         possible, these alias C{ValueDoc}s are replaced by the
         imported value's C{ValueDoc} during indexing.
+    @ivar defining_module: The documentation for the module that
+        defines this value.  This is used, e.g., to lookup the
+        appropriate markup language for docstrings.  For a
+        C{ModuleDoc}, C{defining_module} should be C{self}.
+    @type defining_mdoule: L{ModuleDoc}
     """
     canonical_name = UNKNOWN
     pyval = UNKNOWN
@@ -546,8 +551,9 @@ class ValueDoc(APIDoc):
     repr = UNKNOWN
     type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
     imported_from = None
-
     toktree = UNKNOWN # from the tokenizing docparser.
+    defining_module = UNKNOWN
+    
     
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
@@ -1389,15 +1395,17 @@ class DocIndex:
             parent = api_doc.canonical_name.container()
             return self.get_valdoc(parent)
 
+    # [xx] this could be moved out of docindex and/or removed.
     def module_that_defines(self, api_doc):
         """
         Return the C{ModuleDoc} of the module that defines C{api_doc},
         or C{None} if that module is not in the index.  If C{api_doc}
         is itself a module, then C{api_doc} will be returned.
         """
-        while not (isinstance(api_doc, ModuleDoc) or api_doc is None):
-            api_doc = self.container(api_doc)
-        return api_doc
+        if isinstance(api_doc, VariableDoc):
+            api_doc = api_doc.container
+        if api_doc.defining_module == UNKNOWN: return None
+        return api_doc.defining_module
     
 ######################################################################
 ## Pretty Printing

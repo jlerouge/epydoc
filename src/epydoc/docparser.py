@@ -260,6 +260,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
                                sort_spec=[], imports=[],
                                filename=filename, package=context,
                                is_package=is_pkg, submodules=[])
+        module_doc.defining_module = module_doc
         _moduledoc_cache[filename] = module_doc
 
         # Set the module's __path__ to its default value.
@@ -1161,7 +1162,8 @@ def rhs_to_valuedoc(rhs, parent_docs):
 
     # Nothing else to do: make a val with the source as its repr.
     valdoc_repr = pp_toktree(rhs)
-    return ValueDoc(repr=valdoc_repr, toktree=rhs), False
+    return ValueDoc(repr=valdoc_repr, toktree=rhs,
+                    defining_module=parent_docs[0]), False
     
 
 def get_lhs_parent(lhs_name, parent_docs):
@@ -1335,7 +1337,8 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     canonical_name = DottedName(parent_doc.canonical_name, func_name)
 
     # Create the function's RoutineDoc.
-    func_doc = RoutineDoc(canonical_name=canonical_name)
+    func_doc = RoutineDoc(canonical_name=canonical_name,
+                          defining_module=parent_docs[0])
 
     # Process the signature.
     init_arglist(func_doc, line[2])
@@ -1449,8 +1452,9 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
 
     # Create the class's ClassDoc & VariableDoc.
     class_doc = ClassDoc(variables={}, sort_spec=[],
-                        bases=[], subclasses=[],
-                        canonical_name=canonical_name)
+                         bases=[], subclasses=[],
+                         canonical_name=canonical_name,
+                         defining_module=parent_docs[0])
     var_doc = VariableDoc(name=class_name, value=class_doc,
                           is_imported=False, is_alias=False)
 

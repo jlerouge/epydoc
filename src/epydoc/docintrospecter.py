@@ -182,6 +182,22 @@ def _get_valuedoc(value):
         val_doc = ValueDoc(pyval=value, repr=value_repr(value),
                            canonical_name = get_canonical_name(value))
         _valuedoc_cache[pyid] = val_doc
+        
+        # If it's a module, then do some preliminary introspection.
+        # Otherwise, check what the containing module is (used e.g.
+        # to decide what markup language should be used for docstrings)
+        if inspect.ismodule(value):
+            introspect_module(value, val_doc, preliminary=True)
+            val_doc.defining_module = val_doc
+        else:
+            module_name = get_containing_module(value)
+            if module_name:
+                try:
+                    module = get_value_from_name(module_name)
+                    val_doc.defining_module = _get_valuedoc(module)
+                except KeyboardInterrupt: raise
+                except Exception: pass
+            
     return val_doc
 
 #////////////////////////////////////////////////////////////
@@ -194,19 +210,41 @@ UNDOCUMENTED_MODULE_VARS = (
     '__builtins__', '__doc__', '__all__', '__file__', '__path__',
     '__name__', '__extra_epydoc_fields__', '__docformat__')
 
-def introspect_module(module, module_doc):
+def introspect_module(module, module_doc, preliminary=False):
     """
     Add API documentation information about the module C{module}
     to C{module_doc}.
     """
     module_doc.specialize_to(ModuleDoc)
 
-    # Record the module's docstring & docformat.
-    if hasattr(module, '__doc__'):
-        module_doc.docstring = get_docstring(module)
+    # Record the module's docformat
     if hasattr(module, '__docformat__'):
         module_doc.docformat = unicode(module.__docformat__)
                                   
+    # Record the module's filename
+    if hasattr(module, '__file__'):
+        try: module_doc.filename = unicode(module.__file__)
+        except: pass
+
+    # If this is just a preliminary introspection, then don't do
+    # anything else.  (Typically this is true if this module was
+    # imported, but is not included in the set of modules we're
+    # documenting.)
+    if preliminary: return
+
+    # Record the module's docstring
+    if hasattr(module, '__doc__'):
+        module_doc.docstring = get_docstring(module)
+
+    # If the module has a __path__, then it's (probably) a
+    # package; so set is_package=True and record its __path__.
+    if hasattr(module, '__path__'):
+        module_doc.is_package = True
+        try: module_doc.path = [unicode(p) for p in module.__path__]
+        except: pass
+    else:
+        module_doc.is_package = False
+
     # Record the module's __all__ attribute (public names).
     if hasattr(module, '__all__'):
         try:
@@ -219,20 +257,6 @@ def introspect_module(module, module_doc):
                 else:
                     var_doc.is_public = False
         except: pass
-
-    # Record the module's filename
-    if hasattr(module, '__file__'):
-        try: module_doc.filename = unicode(module.__file__)
-        except: pass
-
-    # If the module has a __path__, then it's (probably) a
-    # package; so set is_package=True and record its __path__.
-    if hasattr(module, '__path__'):
-        module_doc.is_package = True
-        try: module_doc.path = [unicode(p) for p in module.__path__]
-        except: pass
-    else:
-        module_doc.is_package = False
 
     # Make sure we have a name for the package.
     dotted_name = module_doc.canonical_name
@@ -318,6 +342,7 @@ def introspect_class(cls, class_doc):
     # Start a list of subclasses.
     class_doc.subclasses = []
 
+    # 
     # If the class' __dict__ attribute is a dictproxy, methods appear as they
     # were locally defined. Collect the superclasses methods to manually check
     # if they are imported or new/overridden.
@@ -472,7 +497,7 @@ def get_docstring(value):
                     encoding = epydoc.docparser.get_module_encoding(filename)
                     return unicode(docstring, encoding)
                 except KeyboardInterrupt: raise
-                except: raise #pass
+                except Exception: pass
             if hasattr(value, '__name__'): name = value.__name__
             else: name = `value`
             log.warning("%s's docstring is not a unicode string, but it "
@@ -601,7 +626,8 @@ def _find_function_module(func):
     # itself).  In particular, if a module gets loaded twice, using
     # two different names for the same file, then this helps.
     for module in sys.modules.values():
-        if (module.hasattr('__dict__') and
+        if (hasattr(module, '__dict__') and
+            hasattr(func, 'func_globals') and
             func.func_globals is module.__dict__):
             return module.__name__
     return None
@@ -722,11 +748,11 @@ def get_value_from_name(name, globs=None):
     # the requested name refers to a builtin.
     try:
         module = _import(name[0])
-    except ImportError:
+    except ImportError, e:
         if globs is None: globs = __builtin__.__dict__
         if name[0] in globs:
             try: return _lookup(globs[name[0]], name[1:])
-            except: raise
+            except: raise e
         else:
             raise
 
