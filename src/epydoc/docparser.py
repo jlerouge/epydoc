@@ -1096,7 +1096,8 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
 
             # If it's the only var, then return the VarDoc for use
             # as the new `prev_line_doc`.
-            if len(lhs_pieces) == 1 and len(lhs_name) == 1:
+            if (len(lhs_pieces) == 1 and
+                (len(lhs_name) == 1 or is_instvar)):
                 return var_doc
 
         # Otherwise, the LHS must be a complex expression; use
