@@ -1035,10 +1035,10 @@ def _colorize(doc, token, errors, tagName='para'):
 
             # Special handling for literal braces elements:
             if stack[-1].tagName == 'litbrace':
-                variables = stack[-1].childNodes
+                children = stack[-1].childNodes
                 stack[-2].removeChild(stack[-1])
                 stack[-2].appendChild(doc.createTextNode('{'))
-                for child in variables:
+                for child in children:
                     stack[-2].appendChild(child)
                 stack[-2].appendChild(doc.createTextNode('}'))
 
@@ -1063,22 +1063,22 @@ def _colorize(doc, token, errors, tagName='para'):
     return stack[0]
 
 def _colorize_link(doc, link, token, end, errors):
-    variables = link.childNodes[:]
+    children = link.childNodes[:]
 
     # If the last child isn't text, we know it's bad.
-    if len(variables)==0 or not isinstance(variables[-1], Text):
+    if len(children)==0 or not isinstance(children[-1], Text):
         estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
         return
     
     # Did they provide an explicit target?
-    match2 = _TARGET_RE.match(variables[-1].data)
+    match2 = _TARGET_RE.match(children[-1].data)
     if match2:
         (text, target) = match2.groups()
-        variables[-1].data = text
+        children[-1].data = text
     # Can we extract an implicit target?
-    elif len(variables) == 1:
-        target = variables[0].data
+    elif len(children) == 1:
+        target = children[0].data
     else:
         estr = "Bad %s target." % link.tagName
         errors.append(ColorizingError(estr, token, end))
@@ -1086,7 +1086,7 @@ def _colorize_link(doc, link, token, end, errors):
 
     # Construct the name element.
     name_elt = doc.createElement('name')
-    for child in variables:
+    for child in children:
         name_elt.appendChild(link.removeChild(child))
 
     # Clean up the target.  For URIs, assume http or mailto if they
@@ -1150,8 +1150,8 @@ def to_epytext(tree, indent=0, seclevel=0):
 
     if tree.tagName == 'epytext': indent -= 2
     if tree.tagName == 'section': seclevel += 1
-    variables = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
-    childstr = ''.join(variables)
+    children = [to_epytext(c, indent+2, seclevel) for c in tree.childNodes]
+    childstr = ''.join(children)
 
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':(\s*)\2', '::\\1', childstr)
@@ -1188,10 +1188,10 @@ def to_epytext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = variables[0]
-        args = variables[1:1+numargs]
-        body = variables[1+numargs:]
-        str = (indent)*' '+'@'+variables[0]
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = (indent)*' '+'@'+children[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
@@ -1238,8 +1238,8 @@ def to_plaintext(tree, indent=0, seclevel=0):
         cindent = indent + 1 + len(tree.getAttributeNode('bullet').value)
     else:
         cindent = indent + 2
-    variables = [to_plaintext(c, cindent, seclevel) for c in tree.childNodes]
-    childstr = ''.join(variables)
+    children = [to_plaintext(c, cindent, seclevel) for c in tree.childNodes]
+    childstr = ''.join(children)
 
     if tree.tagName == 'para':
         return wordwrap(childstr, indent)+'\n'
@@ -1265,23 +1265,23 @@ def to_plaintext(tree, indent=0, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = variables[0]
-        args = variables[1:1+numargs]
-        body = variables[1+numargs:]
-        str = (indent)*' '+'@'+variables[0]
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = (indent)*' '+'@'+children[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'uri':
-        if len(variables) != 2: raise ValueError('Bad URI ')
-        elif variables[0] == variables[1]: return '<%s>' % variables[1]
-        else: return '%r<%s>' % (variables[0], variables[1])
+        if len(children) != 2: raise ValueError('Bad URI ')
+        elif children[0] == children[1]: return '<%s>' % children[1]
+        else: return '%r<%s>' % (children[0], children[1])
     elif tree.tagName == 'link':
-        if len(variables) != 2: raise ValueError('Bad Link')
-        return '%s' % variables[1]
+        if len(children) != 2: raise ValueError('Bad Link')
+        return '%s' % children[1]
     elif tree.tagName in ('olist', 'ulist'):
         # [xx] always use condensed lists.
         ## Use a condensed list if each list item is 1 line long.
-        #for child in variables:
+        #for child in children:
         #    if child.count('\n') > 2: return childstr
         return childstr.replace('\n\n', '\n')+'\n'
     elif tree.tagName == 'symbol':
@@ -1317,8 +1317,8 @@ def to_debug(tree, indent=4, seclevel=0):
         return str
 
     if tree.tagName == 'section': seclevel += 1
-    variables = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
-    childstr = ''.join(variables)
+    children = [to_debug(c, indent+2, seclevel) for c in tree.childNodes]
+    childstr = ''.join(children)
 
     # Clean up for literal blocks (add the double "::" back)
     childstr = re.sub(':( *\n     \|\n)\2', '::\\1', childstr)
@@ -1363,10 +1363,10 @@ def to_debug(tree, indent=4, seclevel=0):
     elif tree.tagName == 'field':
         numargs = 0
         while tree.childNodes[numargs+1].tagName == 'arg': numargs += 1
-        tag = variables[0]
-        args = variables[1:1+numargs]
-        body = variables[1+numargs:]
-        str = ' FLD>|'+(indent-6)*' '+'@'+variables[0]
+        tag = children[0]
+        args = children[1:1+numargs]
+        body = children[1+numargs:]
+        str = ' FLD>|'+(indent-6)*' '+'@'+children[0]
         if args: str += '(' + ', '.join(args) + ')'
         return str + ':\n' + ''.join(body)
     elif tree.tagName == 'target':
@@ -1702,25 +1702,25 @@ class ParsedEpytextDocstring(ParsedDocstring):
         if tree.tagName == 'epytext': indent -= 2
         if tree.tagName == 'section': seclevel += 1
 
-        # Process the variables first.
-        variables = [self._to_html(c, linker, indent+2, seclevel)
+        # Process the children first.
+        children = [self._to_html(c, linker, indent+2, seclevel)
                     for c in tree.childNodes]
     
         # Get rid of unnecessary <P>...</P> tags; they introduce extra
         # space on most browsers that we don't want.
-        for i in range(len(variables)-1):
+        for i in range(len(children)-1):
             if (not isinstance(tree.childNodes[i], Text) and
                 tree.childNodes[i].tagName == 'para' and
                 (isinstance(tree.childNodes[i+1], Text) or
                  tree.childNodes[i+1].tagName != 'para')):
-                variables[i] = ' '*(indent+2)+variables[i][5+indent:-5]+'\n'
+                children[i] = ' '*(indent+2)+children[i][5+indent:-5]+'\n'
         if (tree.hasChildNodes() and
             not isinstance(tree.childNodes[-1], Text) and
             tree.childNodes[-1].tagName == 'para'):
-            variables[-1] = ' '*(indent+2)+variables[-1][5+indent:-5]+'\n'
+            children[-1] = ' '*(indent+2)+children[-1][5+indent:-5]+'\n'
     
-        # Construct the HTML string for the variables.
-        childstr = ''.join(variables)
+        # Construct the HTML string for the children.
+        childstr = ''.join(children)
     
         # Perform the approriate action for the DOM tree type.
         if tree.tagName == 'para':
@@ -1729,9 +1729,9 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return '<code>%s</code>' % childstr
         elif tree.tagName == 'uri':
             return ('<a href="%s" target="_top">%s</a>' %
-                    (variables[1], variables[0]))
+                    (children[1], children[0]))
         elif tree.tagName == 'link':
-            return linker.translate_identifier_xref(variables[1], variables[0])
+            return linker.translate_identifier_xref(children[1], children[0])
         elif tree.tagName == 'italic':
             return '<i>%s</i>' % childstr
         elif tree.tagName == 'math':
@@ -1785,34 +1785,34 @@ class ParsedEpytextDocstring(ParsedDocstring):
         # Figure out the child indent level.
         if tree.tagName == 'epytext': cindent = indent
         else: cindent = indent + 2
-        variables = [self._to_latex(c, linker, cindent, seclevel, breakany)
+        children = [self._to_latex(c, linker, cindent, seclevel, breakany)
                     for c in tree.childNodes]
-        childstr = ''.join(variables)
+        childstr = ''.join(children)
     
         if tree.tagName == 'para':
             return wordwrap(childstr, indent)+'\n'
         elif tree.tagName == 'code':
             return '\\texttt{%s}' % childstr
         elif tree.tagName == 'uri':
-            if len(variables) != 2: raise ValueError('Bad URI ')
+            if len(children) != 2: raise ValueError('Bad URI ')
             if self._hyperref:
                 # ~ and # should not be escaped in the URI.
                 uri = tree.childNodes[1].childNodes[0].data
                 uri = uri.replace('{\\textasciitilde}', '~')
                 uri = uri.replace('\\#', '#')
-                if variables[0] == variables[1]:
-                    return '\\href{%s}{\\textit{%s}}' % (uri, variables[1])
+                if children[0] == children[1]:
+                    return '\\href{%s}{\\textit{%s}}' % (uri, children[1])
                 else:
                     return ('%s\\footnote{\\href{%s}{%s}}' %
-                            (variables[0], uri, variables[1]))
+                            (children[0], uri, children[1]))
             else:
-                if variables[0] == variables[1]:
-                    return '\\textit{%s}' % variables[1]
+                if children[0] == children[1]:
+                    return '\\textit{%s}' % children[1]
                 else:
-                    return '%s\\footnote{%s}' % (variables[0], variables[1])
+                    return '%s\\footnote{%s}' % (children[0], children[1])
         elif tree.tagName == 'link':
-            if len(variables) != 2: raise ValueError('Bad Link')
-            return linker.translate_identifier_xref(variables[1], variables[0])
+            if len(children) != 2: raise ValueError('Bad Link')
+            return linker.translate_identifier_xref(children[1], children[0])
         elif tree.tagName == 'italic':
             return '\\textit{%s}' % childstr
         elif tree.tagName == 'math':
@@ -1865,27 +1865,27 @@ class ParsedEpytextDocstring(ParsedDocstring):
         doc.appendChild(epytext)
     
         # Find the first paragraph.
-        variables = tree.childNodes
-        while (len(variables) > 0) and (variables[0].tagName != 'para'):
-            if variables[0].tagName in ('section', 'ulist', 'olist', 'li'):
-                variables = variables[0].childNodes
+        children = tree.childNodes
+        while (len(children) > 0) and (children[0].tagName != 'para'):
+            if children[0].tagName in ('section', 'ulist', 'olist', 'li'):
+                children = children[0].childNodes
             else:
-                variables = variables[1:]
+                children = children[1:]
     
         # Special case: if the docstring contains a single literal block,
         # then try extracting the summary from it.
-        if (len(variables) == 0 and len(tree.childNodes) == 1 and
+        if (len(children) == 0 and len(tree.childNodes) == 1 and
             tree.childNodes[0].tagName == 'literalblock'):
             str = re.split(r'\n\s*(\n|$).*',
                            tree.childNodes[0].childNodes[0].data, 1)[0]
-            variables = [doc.createElement('para')]
-            variables[0].appendChild(doc.createTextNode(str))
+            children = [doc.createElement('para')]
+            children[0].appendChild(doc.createTextNode(str))
     
         # If we didn't find a paragraph, return an empty epytext.
-        if len(variables) == 0: return ParsedEpytextDocstring(doc)
+        if len(children) == 0: return ParsedEpytextDocstring(doc)
     
         # Extract the first sentence.
-        parachildren = variables[0].childNodes
+        parachildren = children[0].childNodes
         para = doc.createElement('para')
         epytext.appendChild(para)
         for parachild in parachildren:
