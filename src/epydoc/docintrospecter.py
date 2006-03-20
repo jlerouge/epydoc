@@ -318,6 +318,13 @@ def introspect_class(cls, class_doc):
     # Start a list of subclasses.
     class_doc.subclasses = []
 
+    # If the class' __dict__ attribute is a dictproxy, methods appear as they
+    # were locally defined. Collect the superclasses methods to manually check
+    # if they are imported or new/overridden.
+    # (Qt is such a system: QWidget subclasses receive abut 300 methods without
+    # any docstring!).
+    base_children = {}
+    
     # Record the class's base classes; and add the class to its
     # base class's subclass lists.
     if hasattr(cls, '__bases__'):
@@ -326,12 +333,19 @@ def introspect_class(cls, class_doc):
             basedoc = introspect_docs(base)
             class_doc.bases.append(basedoc)
             basedoc.subclasses.append(class_doc)
+            if isinstance(getattr(cls, '__dict__', None), types.DictProxyType) \
+            and hasattr(base, '__dict__'):
+                base_children.update(base.__dict__)
 
     # Record the class's local variables.
     class_doc.variables = {}
     private_prefix = '_%s__' % cls.__name__
     if hasattr(cls, '__dict__'):
         for child_name, child in cls.__dict__.items():
+            if child_name in base_children \
+            and base_children[child_name] == child:
+                continue
+
             if child_name.startswith(private_prefix):
                 child_name = child_name[len(private_prefix)-2:]
             if child_name in UNDOCUMENTED_CLASS_VARS: continue
