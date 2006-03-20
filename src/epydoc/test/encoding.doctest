@@ -42,10 +42,25 @@ HTML output, and displays them.
     ...             for m in re.finditer(r'<span class="docstring">([\s\S]*?)'
     ...                                  r'</span><!--end docstring-->',
     ...                                  s):
-    ...                 docstr = m.group(1).strip()
+    ...                 docstr = remove_surrogates(m.group(1).strip())
     ...                 if docstr: print '-'*75+'\n'+docstr
     ...         os.unlink(os.path.join(tmp_dir,file))
     ...     os.rmdir(tmp_dir)
+
+The following is a helper function, used to convert two-character
+surrogate sequences into single characters.  This is needed because
+some systems create surrogates but others don't.
+
+    >>> def remove_surrogates(s):
+    ...     pieces = re.split('(&#\d+;)', s)
+    ...     for i in range(3, len(pieces)-1, 2):
+    ...         if pieces[i-1] != '': continue
+    ...         high,low = int(pieces[i-2][2:-1]), int(pieces[i][2:-1])
+    ...         if 0xd800 <= high <= 0xdbff and 0xdc00 <= low <= 0xdfff:
+    ...             pieces[i-2] = '&#%d;' % (((high&0x3ff)<<10) +
+    ...                                      (low&0x3ff) + 0x10000)
+    ...             pieces[i] = ''
+    ...     return ''.join(pieces)
 
 Encoding Tests
 ==============
