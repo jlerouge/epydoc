@@ -7,14 +7,23 @@
 # $Id: docparser.py 1015 2006-03-19 03:27:50Z edloper $
 
 """
-Render Graphviz directed graphs as images.
+Render Graphviz directed graphs as images.  Below are some examples.
 
-@see: L{Graphviz Homepage<http://www.research.att.com/sw/tools/graphviz/>}
+.. importgraph::
+
+.. classtree:: epydoc.apidoc.APIDoc
+
+.. packagetree:: epydoc
+
+:see: `The Graphviz Homepage
+       <http://www.research.att.com/sw/tools/graphviz/>`__
 """
+__docformat__ = 'restructuredtext'
 
 from sets import Set
 import re
 from epydoc import log
+from epydoc.apidoc import DottedName, ModuleDoc
 
 # Backwards compatibility imports:
 try: sorted
@@ -29,29 +38,29 @@ DOT_COMMAND = 'dot'
 
 class DotGraph:
     """
-    A C{dot} directed graph.  The contents of the graph are
+    A `dot` directed graph.  The contents of the graph are
     constructed from the following instance variables:
 
-      - C{nodes}: A list of L{DotGraphNode}s, encoding the nodes
+      - `nodes`: A list of `DotGraphNode`\\s, encoding the nodes
         that are present in the graph.  Each node is characterized
         a set of attributes, including an optional label.
-      - C{edges}: A list of L{DotGraphEdge}s, encoding the edges
+      - `edges`: A list of `DotGraphEdge`\\s, encoding the edges
         that are present in the graph.  Each edge is characterized
         by a set of attributes, including an optional label.
-      - C{node_defaults}: Default attributes for nodes.
-      - C{edge_defaults}: Default attributes for edges.
-      - C{body}: A string that is appended as-is in the body of
+      - `node_defaults`: Default attributes for nodes.
+      - `edge_defaults`: Default attributes for edges.
+      - `body`: A string that is appended as-is in the body of
         the graph.  This can be used to build more complex dot
         graphs.
 
-    The C{link()} method can be used to resolve crossreference links
+    The `link()` method can be used to resolve crossreference links
     within the graph.  In particular, if the 'href' attribute of any
-    node or edge is assigned a value of the form C{<name>}, then it
+    node or edge is assigned a value of the form `<name>`, then it
     will be replaced by the URL of the object with that name.  This
-    applies to the C{body} as well as the C{nodes} and C{edges}.
+    applies to the `body` as well as the `nodes` and `edges`.
 
-    To render the graph, use the methods C{write()} and C{render()}.
-    Usually, you should call C{link()} before you render the graph.
+    To render the graph, use the methods `write()` and `render()`.
+    Usually, you should call `link()` before you render the graph.
     """
     _uids = Set()
     """A set of all uids that that have been generated, used to ensure
@@ -59,23 +68,23 @@ class DotGraph:
 
     def __init__(self, title, body='', node_defaults=None, edge_defaults=None):
         """
-        Create a new C{DotGraph}.
+        Create a new `DotGraph`.
         """
         self.title = title
         """The title of the graph."""
         
         self.nodes = []
         """A list of the nodes that are present in the graph.
-        @type: C{list} of L{DocGraphNode}"""
+        :type: `list` of `DocGraphNode`"""
         
         self.edges = []
         """A list of the edges that are present in the graph.
-        @type: C{list} of L{DocGraphEdge}"""
+        :type: `list` of `DocGraphEdge`"""
 
         self.body = body
         """A string that should be included as-is in the body of the
         graph.
-        @type: C{str}"""
+        :type: `str`"""
         
         self.node_defaults = node_defaults or {}
         """Default attribute values for nodes."""
@@ -83,9 +92,9 @@ class DotGraph:
         self.edge_defaults = edge_defaults or {}
         """Default attribute values for edges."""
 
-        self.uid = re.sub(r'\W', '_', title)
+        self.uid = re.sub(r'\W', '_', title).lower()
         """A unique identifier for this graph.  This can be used as a
-        filename when rendering the graph.  No two C{DotGraph}s will
+        filename when rendering the graph.  No two `DotGraph`s will
         have the same uid."""
 
         # Make sure the UID is unique
@@ -119,7 +128,7 @@ class DotGraph:
                            subfunc, self.body)
 
     def _link_href(self, attribs, docstring_linker):
-        """Helper for L{link()}"""
+        """Helper for `link()`"""
         if 'href' in attribs:
             m = re.match(r'^<([\w\.]+)>$', attribs['href'])
             if m:
@@ -129,9 +138,9 @@ class DotGraph:
                 
     def write(self, filename, language='gif'):
         """
-        Render the graph using the output format C{language}, and write
-        the result to C{filename}.
-        @return: True if rendering was successful.
+        Render the graph using the output format `language`, and write
+        the result to `filename`.
+        :return: True if rendering was successful.
         """
         s = self.render(language)
         if s is not None:
@@ -144,8 +153,8 @@ class DotGraph:
 
     def render(self, language='gif'):
         """
-        Use the C{dot} command to render this graph, using the output
-        format C{language}.  Return the result as a string, or C{None}
+        Use the `dot` command to render this graph, using the output
+        format `language`.  Return the result as a string, or `None`
         if the rendering failed.
         """
         try:
@@ -216,12 +225,12 @@ class DotGraphNode:
 class DotGraphEdge:
     def __init__(self, start, end, label=None, **attribs):
         """
-        @type start: L{DotGraphNode}
-        @type end: L{DotGraphNode}
+        :type start: `DotGraphNode`
+        :type end: `DotGraphNode`
         """
         if label is not None: attribs['label'] = label
-        self.start = start       #: @type: L{DotGraphNode}
-        self.end = end           #: @type: L{DotGraphNode}
+        self.start = start       #: :type: `DotGraphNode`
+        self.end = end           #: :type: `DotGraphNode`
         self.attribs = attribs
 
     def to_dotfile(self):
@@ -239,10 +248,10 @@ class DotGraphEdge:
 
 def package_tree_graph(packages, linker, context=None, **options):
     """
-    Return a L{DotGraph} that graphically displays the package
+    Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('package',
+    graph = DotGraph('Package Tree',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
     
@@ -258,17 +267,7 @@ def package_tree_graph(packages, linker, context=None, **options):
         modules.update(module.submodules)
 
     # Add a node for each module.
-    nodes = {}
-    modules = sorted(modules, key=lambda d:d.canonical_name)
-    for i, module in enumerate(modules):
-        url = linker.url_for(module)
-        nodes[module] = DotGraphNode(module.canonical_name, href=url)
-        graph.nodes.append(nodes[module])
-        if module == context:
-            attribs = nodes[module].attribs
-            attribs.update({'fillcolor':'black', 'fontcolor':'white',
-                            'style':'filled'})
-            del attribs['href']
+    nodes = add_valdoc_nodes(graph, modules, linker, context)
 
     # Add an edge for each package/submodule relationship.
     for module in modules:
@@ -277,13 +276,12 @@ def package_tree_graph(packages, linker, context=None, **options):
 
     return graph
 
-# [xx] Use short names when possible, but long names when needed?
 def class_tree_graph(bases, linker, context=None, **options):
     """
-    Return a L{DotGraph} that graphically displays the package
+    Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('class_hierarchy',
+    graph = DotGraph('Class Hierarchy',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
 
@@ -299,17 +297,55 @@ def class_tree_graph(bases, linker, context=None, **options):
         classes.update(cls.subclasses)
 
     # Add a node for each cls.
-    nodes = {}
-    classes = sorted(classes, key=lambda d:d.canonical_name)
-    for i, cls in enumerate(classes):
-        url = linker.url_for(cls)
-        nodes[cls] = DotGraphNode(cls.canonical_name[-1], href=url)
-        graph.nodes.append(nodes[cls])
+    nodes = add_valdoc_nodes(graph, classes, linker, context)
 
-    # Add an edge for each package/subcls relationship.
+    # Add an edge for each package/subclass relationship.
     for cls in classes:
         for subcls in cls.subclasses:
             graph.edges.append(DotGraphEdge(nodes[cls], nodes[subcls]))
 
     return graph
+
+def import_graph(modules, docindex, linker, context=None, **options):
+    graph = DotGraph('Import Graph',
+                     node_defaults={'shape':'box', 'width': 0, 'height': 0},
+                     edge_defaults={'sametail':True})
+
+    # Options
+    if options.get('dir', 'RL') != 'TB': # default: right-to-left.
+        graph.body += 'rankdir=%s\n' % options.get('dir', 'RL')
+
+    # Add a node for each module.
+    nodes = add_valdoc_nodes(graph, modules, linker, context)
+
+    # Edges.
+    edges = Set()
+    for dst in modules:
+        for var_name in dst.imports:
+            for i in range(len(var_name), 0, -1):
+                val_doc = docindex.get_valdoc(DottedName(*var_name[:i]))
+                if isinstance(val_doc, ModuleDoc):
+                    edges.add( (val_doc, dst) )
+                    break
+
+    for (src, dst) in edges:
+        if src in nodes and dst in nodes:
+            graph.edges.append(DotGraphEdge(nodes[src], nodes[dst]))
+
+    return graph
+    
+# [xx] Use short names when possible, but long names when needed?
+def add_valdoc_nodes(graph, val_docs, linker, context):
+    nodes = {}
+    val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
+    for i, val_doc in enumerate(val_docs):
+        node = nodes[val_doc] = DotGraphNode(val_doc.canonical_name)
+        graph.nodes.append(node)
+        if val_doc == context:
+            node.attribs.update({'fillcolor':'black', 'fontcolor':'white',
+                                 'style':'filled'})
+        else:
+            url = linker.url_for(val_doc)
+            if url: node.attribs['href'] = url
+    return nodes
 
