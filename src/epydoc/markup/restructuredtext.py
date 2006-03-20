@@ -517,9 +517,13 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         # Generate the image map.
         cmapx = graph.render('cmapx') or ''
         # Display the graph.
-        self.body.append('%s<p><img src="%s.gif" alt="%s" '
-                         'usemap="#%s" smap="ismap"/></p>\n' %
-                         (cmapx, graph.uid, graph.uid, graph.uid))
+        title = plaintext_to_html(graph.title) or '&nbsp;'
+        self.body.append(
+            '<table border="0" cellpadding="0" cellspacing="0">\n  '
+            '<tr><td>\n%s\n    <img src="%s.gif" alt="%s" usemap="#%s"'
+            'smap="ismap"/>\n  </td></tr>\n  <tr><th class="graph">'
+            '%s</th></tr>\n  </table><br />\n' % 
+            (cmapx, graph.uid, graph.uid, graph.uid, title))
 
     def depart_dotgraph(self, node):
         pass # Nothing to do.
@@ -582,8 +586,10 @@ def digraph_directive(name, arguments, options, content, lineno,
        a -> b -> c
        c -> a [dir=\"none\"]
     """
-    return dotgraph(_construct_digraph, arguments[0], '\n'.join(content))
-digraph_directive.arguments = (1, 0, 0)
+    if arguments: title = arguments[0]
+    else: title = ''
+    return dotgraph(_construct_digraph, title, '\n'.join(content))
+digraph_directive.arguments = (0, 1, 1)
 digraph_directive.content = True
 directives.register_directive('digraph', digraph_directive)
 
@@ -665,3 +671,15 @@ def _construct_packagetree(docindex, context, linker, arguments, options):
 
     return package_tree_graph(packages, linker, context, **options)
 
+def importgraph_directive(name, arguments, options, content, lineno,
+                        content_offset, block_text, state, state_machine):
+    return dotgraph(_construct_importgraph, arguments, options)
+importgraph_directive.arguments = None
+importgraph_directive.options = {'dir': _dir_option}
+importgraph_directive.content = False
+directives.register_directive('importgraph', importgraph_directive)
+
+def _construct_importgraph(docindex, context, linker, arguments, options):
+    """Graph generator for L{importgraph_directive}"""
+    modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
+    return import_graph(modules, docindex, linker, context, **options)
