@@ -1088,7 +1088,7 @@ def _colorize_graph(doc, graph, token, end, errors):
         pieces = children[0].data.split(None, 1)
         graphtype = pieces[0].replace(':','').strip().lower()
         if graphtype in GRAPH_TYPES:
-            if pieces[1]:
+            if len(pieces) == 2:
                 if re.match(r'\s*:?\s*([\w\.]+\s*,?\s*)*', pieces[1]):
                     args = pieces[1].replace(',', ' ').replace(':','').split()
                 else:
@@ -1834,6 +1834,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif tree.tagName == 'graph':
             graph = self._build_graph(variables[0], variables[1:], linker,
                                       docindex, context)
+            if not graph: return ''
             # Write the graph's image to a file
             path = os.path.join(directory, graph.uid)
             if not graph.write('%s.gif' % path, 'gif'):
@@ -1859,9 +1860,30 @@ class ParsedEpytextDocstring(ParsedDocstring):
             if graph_args:
                 bases = [docindex.find(name, context)
                          for name in graph_args]
-            else:
+            elif isinstance(context, ClassDoc):
                 bases = [context]
+            else:
+                log.warning("Could not construct class tree: you must "
+                            "specify one or more base classes.")
+                return None
             return class_tree_graph(bases, linker, context)
+        elif graph_type == 'packagetree':
+            if graph_args:
+                packages = [docindex.find(name, context)
+                            for name in graph_args]
+            elif isinstance(context, ModuleDoc):
+                packages = [context]
+            else:
+                log.warning("Could not construct package tree: you must "
+                            "specify one or more root packages.")
+                return None
+            return package_tree_graph(packages, linker, context)
+        elif graph_type == 'importgraph':
+            modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
+            return import_graph(modules, docindex, linker, context)
+        else:
+            log.warning("Unknown graph type %s" % graph_type)
+            
     
     def _to_latex(self, tree, linker, indent=0, seclevel=0, breakany=0):
         if isinstance(tree, Text):
