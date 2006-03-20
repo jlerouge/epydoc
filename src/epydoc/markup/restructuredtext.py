@@ -517,13 +517,20 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         # Generate the image map.
         cmapx = graph.render('cmapx') or ''
         # Display the graph.
-        title = plaintext_to_html(graph.title) or '&nbsp;'
-        self.body.append(
-            '<table border="0" cellpadding="0" cellspacing="0">\n  '
-            '<tr><td>\n%s\n    <img src="%s.gif" alt="%s" usemap="#%s"'
-            'smap="ismap"/>\n  </td></tr>\n  <tr><th class="graph">'
-            '%s</th></tr>\n  </table><br />\n' % 
-            (cmapx, graph.uid, graph.uid, graph.uid, title))
+        title = plaintext_to_html(graph.title) or ''
+        if not title:
+            self.body.append(
+                '%s\n<center>\n<img src="%s.gif" alt="%s" usemap="#%s" '
+                'ismap="ismap" class="graph-without-title"/>\n</center>' % 
+                (cmapx, graph.uid, graph.uid, graph.uid, title))
+        else:
+            self.body.append(
+                '<center><table border="0" cellpadding="0" cellspacing'
+                '="0">\n  <tr><td>\n%s\n    <img src="%s.gif" alt="%s" '
+                'usemap="#%s" ismap="ismap" class="graph-with-title"/>'
+                '\n  </td></tr>\n  <tr><th class="graph-title">%s</th>'
+                '</tr>\n  </table><br /></center>\n' % 
+                (cmapx, graph.uid, graph.uid, graph.uid, title))
 
     def depart_dotgraph(self, node):
         pass # Nothing to do.
