@@ -20,15 +20,11 @@ Render Graphviz directed graphs as images.  Below are some examples.
 """
 __docformat__ = 'restructuredtext'
 
-from sets import Set
 import re
 from epydoc import log
 from epydoc.apidoc import *
 from epydoc.util import plaintext_to_html
-
-# Backwards compatibility imports:
-try: sorted
-except NameError: from epydoc.util import py_sorted as sorted
+from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
 #{ Dot Graphs
@@ -63,7 +59,7 @@ class DotGraph:
     To render the graph, use the methods `write()` and `render()`.
     Usually, you should call `link()` before you render the graph.
     """
-    _uids = Set()
+    _uids = set()
     """A set of all uids that that have been generated, used to ensure
     that each new graph has a unique uid."""
 
@@ -122,8 +118,8 @@ class DotGraph:
         this should be generated separately with the L{write()} method.
         """
         cmapx = self.render('cmapx') or ''
-        title = plaintext_to_html(self.title) or ''
-        caption = plaintext_to_html(self.caption) or ''
+        title = plaintext_to_html(self.title or '')
+        caption = plaintext_to_html(self.caption or '')
         if title or caption:
             css_class = 'graph-with-title'
         else:
@@ -316,7 +312,7 @@ def package_tree_graph(packages, linker, context=None, **options):
 
     # Get a list of all modules in the package.
     queue = list(packages)
-    modules = Set(packages)
+    modules = set(packages)
     for module in queue:
         queue.extend(module.submodules)
         modules.update(module.submodules)
@@ -347,7 +343,7 @@ def class_tree_graph(bases, linker, context=None, **options):
         graph.body += 'rankdir=%s\n' % options.get('dir', 'TB')
 
     # Find all superclasses & subclasses of the given classes.
-    classes = Set(bases)
+    classes = set(bases)
     queue = list(bases)
     for cls in queue:
         if cls.subclasses not in (None, UNKNOWN):
@@ -365,7 +361,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     nodes = add_valdoc_nodes(graph, classes, linker, context)
 
     # Add an edge for each package/subclass relationship.
-    edges = Set()
+    edges = set()
     for cls in classes:
         for subcls in cls.subclasses:
             if cls in nodes and subcls in nodes:
@@ -387,7 +383,7 @@ def import_graph(modules, docindex, linker, context=None, **options):
     nodes = add_valdoc_nodes(graph, modules, linker, context)
 
     # Edges.
-    edges = Set()
+    edges = set()
     for dst in modules:
         if dst.imports in (None, UNKNOWN): continue
         for var_name in dst.imports:
@@ -425,9 +421,7 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
     return nodes
 
 def name_list(api_docs):
-    log.debug(api_docs)
     names = ['%s' % d.canonical_name for d in api_docs]
-    log.debug(names)
     if len(names) == 0: return ''
     if len(names) == 1: return '%s' % names[0]
     elif len(names) == 2: return '%s and %s' % (names[0], names[1])
