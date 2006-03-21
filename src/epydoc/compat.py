@@ -14,6 +14,8 @@ functions and classes that were not available in earlier versions of
 Python.  Intented usage:
 
     >>> from epydoc.compat import *
+
+Currently, epydoc requires Python 2.3+.
 """
 __docformat__ = 'epytext'
 
