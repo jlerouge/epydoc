@@ -138,6 +138,7 @@ span.pysrc-toggle  { font-size: 80%; font-style: normal;
 /* For Graphs */
 .graph-without-title { border: none; }
 .graph-with-title    { border: 1px solid black; }
+.graph-title         { font-weight: bold; }
 
 /* Lists */
 ul { margin-top: 0; }

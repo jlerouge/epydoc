@@ -1839,23 +1839,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             path = os.path.join(directory, graph.uid)
             if not graph.write('%s.gif' % path, 'gif'):
                 return
-            # Generate the image map.
-            cmapx = graph.render('cmapx') or ''
-            # Display the graph.
-            title = plaintext_to_html(graph.title) or ''
-            if not title:
-                return (
-                    '%s\n<center>\n<img src="%s.gif" alt="%s" usemap="#%s" '
-                    'ismap="ismap" class="graph-without-title"/>\n</center>' % 
-                    (cmapx, graph.uid, graph.uid, graph.uid, title))
-            else:
-                return (
-                    '<center><table border="0" cellpadding="0" cellspacing'
-                    '="0">\n  <tr><td>\n%s\n    <img src="%s.gif" alt="%s" '
-                    'usemap="#%s" ismap="ismap" class="graph-with-title"/>'
-                    '\n  </td></tr>\n  <tr><th class="graph-title">%s</th>'
-                    '</tr>\n  </table><br /></center>\n' % 
-                    (cmapx, graph.uid, graph.uid, graph.uid, title))
+            return graph.to_html('%s.gif' % graph.uid)
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
 

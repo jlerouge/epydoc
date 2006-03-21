@@ -514,23 +514,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         path = os.path.join(self._directory, graph.uid)
         if not graph.write('%s.gif' % path, 'gif'):
             return
-        # Generate the image map.
-        cmapx = graph.render('cmapx') or ''
-        # Display the graph.
-        title = plaintext_to_html(graph.title) or ''
-        if not title:
-            self.body.append(
-                '%s\n<center>\n<img src="%s.gif" alt="%s" usemap="#%s" '
-                'ismap="ismap" class="graph-without-title"/>\n</center>' % 
-                (cmapx, graph.uid, graph.uid, graph.uid, title))
-        else:
-            self.body.append(
-                '<center><table border="0" cellpadding="0" cellspacing'
-                '="0">\n  <tr><td>\n%s\n    <img src="%s.gif" alt="%s" '
-                'usemap="#%s" ismap="ismap" class="graph-with-title"/>'
-                '\n  </td></tr>\n  <tr><th class="graph-title">%s</th>'
-                '</tr>\n  </table><br /></center>\n' % 
-                (cmapx, graph.uid, graph.uid, graph.uid, title))
+        self.body.append(graph.to_html('%s.gif' % graph.uid))
 
     def depart_dotgraph(self, node):
         pass # Nothing to do.
@@ -595,14 +579,17 @@ def digraph_directive(name, arguments, options, content, lineno,
     """
     if arguments: title = arguments[0]
     else: title = ''
-    return dotgraph(_construct_digraph, title, '\n'.join(content))
+    return dotgraph(_construct_digraph, title, options['caption'],
+                    '\n'.join(content))
 digraph_directive.arguments = (0, 1, 1)
+digraph_directive.options = {'caption': directives.unchanged}
 digraph_directive.content = True
 directives.register_directive('digraph', digraph_directive)
 
-def _construct_digraph(docindex, context, linker, title, body):
+def _construct_digraph(docindex, context, linker, title, caption,
+                       body):
     """Graph generator for L{digraph_directive}"""
-    graph = DotGraph(title, body)
+    graph = DotGraph(title, body, caption=caption)
     graph.link(linker)
     return graph
 

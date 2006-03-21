@@ -24,6 +24,7 @@ from sets import Set
 import re
 from epydoc import log
 from epydoc.apidoc import *
+from epydoc.util import plaintext_to_html
 
 # Backwards compatibility imports:
 try: sorted
@@ -66,12 +67,16 @@ class DotGraph:
     """A set of all uids that that have been generated, used to ensure
     that each new graph has a unique uid."""
 
-    def __init__(self, title, body='', node_defaults=None, edge_defaults=None):
+    def __init__(self, title, body='', node_defaults=None,
+                 edge_defaults=None, caption=None):
         """
         Create a new `DotGraph`.
         """
         self.title = title
         """The title of the graph."""
+
+        self.caption = caption
+        """A caption for the graph."""
         
         self.nodes = []
         """A list of the nodes that are present in the graph.
@@ -97,12 +102,57 @@ class DotGraph:
         filename when rendering the graph.  No two `DotGraph`\s will
         have the same uid."""
 
+        # Encode the title, if necessary.
+        if isinstance(self.title, unicode):
+            self.title = self.title.encode('ascii', 'xmlcharrefreplace')
+            
         # Make sure the UID is unique
         if self.uid in self._uids:
             n = 2
             while ('%s_%s' % (self.uid, n)) in self._uids: n += 1
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
+
+    def to_html(self, image_url):
+        """
+        Return the HTML code that should be uesd to display this graph
+        (including a client-side image map).
+        
+        @param image_url: The URL of the image file for this graph;
+        this should be generated separately with the L{write()} method.
+        """
+        cmapx = self.render('cmapx') or ''
+        title = plaintext_to_html(self.title) or ''
+        caption = plaintext_to_html(self.caption) or ''
+        if title or caption:
+            css_class = 'graph-with-title'
+        else:
+            css_class = 'graph-without-title'
+        if len(title)+len(caption) > 80:
+            title_align = 'left'
+            table_width = ' width="600"'
+        else:
+            title_align = 'center'
+            table_width = ''
+            
+        s = '<center>'
+        if title or caption:
+            s += ('<table border="0" cellpadding="0" cellspacing="0" '
+                  '%s>\n  <tr><td align="center">\n') % table_width
+        s += ('  %s\n  <img src="%s" alt=%r usemap="#%s" '
+              'ismap="ismap" class=%s">\n' %
+              (cmapx.strip(), image_url, title, self.uid, css_class))
+        if title or caption:
+            s += '  </td></tr>\n  <tr><td align=%r>\n' % title_align
+            if title:
+                s += '<span class="graph-title">%s</span>' % title
+            if title and caption:
+                s += ' -- '
+            if caption:
+                s += '<span class="graph-caption">%s</span>' % caption
+            s += '\n  </th></tr>\n</table>'
+        s += '</center>'
+        return s
 
     def link(self, docstring_linker):
         """
@@ -162,12 +212,16 @@ class DotGraph:
             cmd = [DOT_COMMAND, '-T%s' % language]
             pipe = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE,
                          close_fds=True)
-            (to_child, from_child) = (pipe.stdin, pipe.stdout)
+            to_child = pipe.stdin
+            from_child = pipe.stdout
+            child_err = pipe.stderr
         except ImportError:
-            from popen2 import Popen4
+            from popen2 import Popen3
             cmd = '%s -T%s' % (DOT_COMMAND, language)
-            pipe = Popen4(cmd)
-            (to_child, from_child) = (pipe.tochild, pipe.fromchild)
+            pipe = Popen3(cmd, True)
+            to_child = pipe.tochild
+            from_child = pipe.fromchild
+            child_err = pipe.childerr
 
         to_child.write(self.to_dotfile())
         to_child.close()
@@ -178,8 +232,9 @@ class DotGraph:
         exitval = pipe.wait()
         
         if exitval:
-            log.warning("Unable to render Graphviz dot graph:\n%s" %
-                        from_child.read())
+            error = "Unable to render Graphviz dot graph."
+            if child_err is not None: error += '\n%s' % child_err.read()
+            log.warning(error)
             return None
 
         return result
@@ -251,7 +306,7 @@ def package_tree_graph(packages, linker, context=None, **options):
     Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('Package Tree',
+    graph = DotGraph('Package Tree for %s' % name_list(packages),
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
     
@@ -276,12 +331,13 @@ def package_tree_graph(packages, linker, context=None, **options):
 
     return graph
 
+
 def class_tree_graph(bases, linker, context=None, **options):
     """
     Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('Class Hierarchy',
+    graph = DotGraph('Class Hierarchy for %s' % name_list(bases),
                      body='ranksep=0.3\n',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True, 'dir':'none'})
@@ -319,7 +375,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     return graph
 
 def import_graph(modules, docindex, linker, context=None, **options):
-    graph = DotGraph('Import Graph',
+    graph = DotGraph('Import Graph for %s' % name_list(modules),
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
 
@@ -344,7 +400,11 @@ def import_graph(modules, docindex, linker, context=None, **options):
     graph.edges = [DotGraphEdge(src,dst) for (src,dst) in edges]
 
     return graph
-    
+
+######################################################################
+#{ Helper Functions
+######################################################################
+
 def add_valdoc_nodes(graph, val_docs, linker, context):
     nodes = {}
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
@@ -363,4 +423,14 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
             url = linker.url_for(val_doc)
             if url: node.attribs['href'] = url
     return nodes
+
+def name_list(api_docs):
+    log.debug(api_docs)
+    names = ['%s' % d.canonical_name for d in api_docs]
+    log.debug(names)
+    if len(names) == 0: return ''
+    if len(names) == 1: return '%s' % names[0]
+    elif len(names) == 2: return '%s and %s' % (names[0], names[1])
+    else:
+        return '%s, and %s' % (', '.join(names[:-1]), names[-1])
 
