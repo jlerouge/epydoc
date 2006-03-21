@@ -60,10 +60,22 @@ class DottedName:
         'api_doc'
     """
     UNREACHABLE = "??"
-    _IDENTIFIER_RE = re.compile(r"(script-)?[a-zA-Z_]\w*'?"
-                                r"(\.[a-zA-Z_]\w*'?)*$" + "|" +
-                                re.escape(UNREACHABLE)+
-                                r"(\.[a-zA-Z_]\w*'?)*(-\d+)?$")
+    _IDENTIFIER_RE = re.compile("""(?x)
+        (                  # First piece
+            (script-)?       # Prefix: script (not a module)
+            [a-zA-Z_]\w*     # Identifier
+            '?               # Suffix: submodule that is shadowed by a var
+            (-\d+)?          # Suffix: unreachable vals with the same name
+          |
+            %s               # UNREACHABLE marker
+            (-\d+)?          # Suffix: unreachable vals with the same name
+        )
+        (\.                # Remaining pieces
+            [a-zA-Z_]\w*     # Identifier
+            '?               # Suffix: submodule that is shadowed by a var
+            (-\d+)?          # Suffix: unreachable vals with the same name
+        )*$"""
+        % re.escape(UNREACHABLE))
     
     def __init__(self, *pieces):
         """
@@ -84,9 +96,11 @@ class DottedName:
                 self._identifiers += piece._identifiers
             elif isinstance(piece, basestring):
                 if not self._IDENTIFIER_RE.match(piece):
+                    #log.debug('Bad identifier %r' % (piece,))
                     raise ValueError('Bad identifier %r' % (piece,))
                 self._identifiers += piece.split('.')
             else:
+                #log.debug('Bad identifier %r' % (piece,))
                 raise ValueError('Bad identifier %r' % (piece,))
         self._identifiers = tuple(self._identifiers)
 
@@ -151,7 +165,9 @@ class DottedName:
         else:
             return DottedName(*self._identifiers[:-1])
 
-    def dominates(self, name):
+    def dominates(self, name, strict=False):
+        if strict and len(self._identifiers)==len(name._identifiers):
+            return False
         return self._identifiers == name._identifiers[:len(self)]
 
 ######################################################################
@@ -1404,6 +1420,11 @@ class DocIndex:
         if isinstance(api_doc, VariableDoc):
             api_doc = api_doc.container
         if api_doc.defining_module == UNKNOWN: return None
+        if not isinstance(api_doc.defining_module, ModuleDoc):
+            log.error("Internal error -- %r claims that its defining "
+                      "module is %r, but the latter is not a module." %
+                      (api_doc, api_doc.defining_module))
+            return None
         return api_doc.defining_module
     
 ######################################################################
