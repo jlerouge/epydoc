@@ -546,7 +546,7 @@ class dotgraph(docutils.nodes.image):
     extra arguments that are passed to the C{dotgraph} constructor.
     """
     def __init__(self, generate_graph_func, *generate_graph_args):
-        docutils.nodes.TextElement.__init__(self)
+        docutils.nodes.image.__init__(self)
         self.graph_func = generate_graph_func
         self.args = generate_graph_args
     def graph(self, docindex, context, linker):
