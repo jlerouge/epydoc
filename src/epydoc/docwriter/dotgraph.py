@@ -101,7 +101,10 @@ class DotGraph:
         # Encode the title, if necessary.
         if isinstance(self.title, unicode):
             self.title = self.title.encode('ascii', 'xmlcharrefreplace')
-            
+
+        # Make sure the UID isn't too long.
+        self.uid = self.uid[:30]
+        
         # Make sure the UID is unique
         if self.uid in self._uids:
             n = 2
@@ -371,7 +374,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     return graph
 
 def import_graph(modules, docindex, linker, context=None, **options):
-    graph = DotGraph('Import Graph for %s' % name_list(modules),
+    graph = DotGraph('Import Graph',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
 
