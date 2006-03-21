@@ -24,7 +24,6 @@ to progress displays; but also with respect to message blocks).
 __docformat__ = 'epytext en'
 
 import sys, os
-from sets import Set
 
 DEBUG = 10
 INFO = 20
@@ -124,7 +123,7 @@ class SimpleLogger(Logger):
 # Logger Registry
 ######################################################################
 
-_loggers = Set()
+_loggers = []
 """
 The list of registered logging functions.
 """
@@ -135,7 +134,7 @@ def register_logger(logger):
     defined by this module will be delegated to each registered
     logger.
     """
-    _loggers.add(logger)
+    _loggers.append(logger)
 
 def remove_logger(logger):
     _loggers.remove(logger)
