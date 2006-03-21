@@ -77,9 +77,13 @@ from docutils.utils import new_document
 from docutils.nodes import NodeVisitor, Text, SkipChildren
 from docutils.nodes import SkipNode, TreeCopyVisitor
 from docutils.frontend import OptionParser
+from docutils.parsers.rst import directives
 import docutils.nodes
 
+from epydoc.compat import * # Backwards compatibility
 from epydoc.markup import *
+from epydoc.apidoc import ModuleDoc, ClassDoc
+from epydoc.docwriter.dotgraph import *
 
 #: A dictionary whose keys are the "consolidated fields" that are
 #: recognized by epydoc; and whose values are the corresponding epydoc
@@ -522,11 +526,6 @@ class _EpydocHTMLTranslator(HTMLTranslator):
 ######################################################################
 #{ Graph Generation Directives
 ######################################################################
-from epydoc.apidoc import ModuleDoc, DottedName, UNKNOWN, ClassDoc
-from sets import Set
-import urllib
-from docutils.parsers.rst import directives
-from epydoc.docwriter.dotgraph import *
 
 class dotgraph(docutils.nodes.image):
     """
