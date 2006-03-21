@@ -74,6 +74,7 @@ from epydoc.docparser import parse_docs, ParseError
 from epydoc.docstringparser import parse_docstring
 from epydoc import log
 from epydoc.util import *
+from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
 ## 1. build_docs()
@@ -422,7 +423,7 @@ def _get_docs_from_package_dir(package_dir, introspect, parse,
         pkg_path = pkg_docs[1].path
 
     module_filenames = {}
-    subpackage_dirs = Set()
+    subpackage_dirs = set()
     for subdir in pkg_path:
         if os.path.isdir(subdir):
             for name in os.listdir(subdir):
@@ -617,7 +618,7 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     assert isinstance(parse_doc, APIDoc)
 
     if cyclecheck is None:
-        cyclecheck = Set()
+        cyclecheck = set()
         if introspect_doc.canonical_name not in (None, UNKNOWN):
             path = '%s' % introspect_doc.canonical_name
         elif parse_doc.canonical_name not in (None, UNKNOWN):
@@ -684,7 +685,7 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
         _merge_posargs_and_defaults(introspect_doc, parse_doc, path)
     
     # Merge the two api_doc's attributes.
-    for attrib in Set(introspect_doc.__dict__.keys() +
+    for attrib in set(introspect_doc.__dict__.keys() +
                       parse_doc.__dict__.keys()):
         # Be sure not to merge any private attributes (especially
         # __mergeset or __has_been_hashed!)
@@ -915,7 +916,7 @@ been assigned to its current cannonical name.  If
 L{assign_canonical_names()} finds a canonical name with a better
 score, then it will replace the old name."""
 
-_unreachable_names = Set()
+_unreachable_names = set()
 """The set of names that have been used for unreachable objects.  This
 is used to ensure there are no duplicate cannonical names assigned."""
 
