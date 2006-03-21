@@ -31,6 +31,10 @@ def is_module_file(path):
     return (os.path.isfile(path) and
             re.match('[a-zA-Z_]\w*$', basename) and
             extension in PY_SRC_EXTENSIONS+PY_BIN_EXTENSIONS)
+
+def is_src_filename(filename):
+    if not isinstance(filename, basestring): return False
+    return os.path.splitext(filename) in PY_SRC_EXTENSIONS
     
 def is_package_dir(dirname):
     """
