@@ -39,6 +39,8 @@ import __builtin__
 import epydoc.docintrospecter 
 # Misc utility functions:
 from epydoc.util import *
+# Backwards compatibility
+from epydoc.compat import *
 
 ######################################################################
 ## Doc Parser
@@ -316,7 +318,7 @@ def handle_special_module_vars(module_doc):
     toktree = _module_var_toktree(module_doc, '__all__')
     if toktree is not None:
         try:
-            public_names = Set(parse_string_list(toktree))
+            public_names = set(parse_string_list(toktree))
             for name, var_doc in module_doc.variables.items():
                 if name in public_names:
                     var_doc.is_public = True
@@ -1226,13 +1228,10 @@ def process_multi_stmt(line, parent_docs, prev_line_doc, lineno,
     sub-statements.
     @return: C{None}
     """
-    start = 0
-    while start < len(line):
-        try: end = line.index((token.OP, ';'), start)
-        except ValueError: end = len(line)
-        doc = process_line(line[start:end], parent_docs, prev_line_doc, 
+    for statement in split_on(line, (token.OP, ';')):
+        if not statement: continue
+        doc = process_line(statement, parent_docs, prev_line_doc, 
                            lineno, None, decorators, encoding)
-        start = end+1
         prev_line_doc = doc
         decorators = []
     return None
@@ -1816,9 +1815,9 @@ def pp_toktree(elts, spacing='normal', indent=0):
             elt_s = pp_toktree(elt, spacing, indent)
             # Join them.  s = left side; elt_s = right side.
             if (elt_s=='' or s=='' or
-                s in '-`' or elt_s in '}])`:' or
-                elt_s[0] in '.,' or s[-1] in '([{.\n ' or
-                (elt_s[0] == '(' and s[-1] not in ',=')):
+                s in ('-','`') or elt_s in ('}',']',')','`',':') or
+                elt_s[0] in ('.',',') or s[-1] in ('(','[','{','.','\n',' ') or
+                (elt_s[0] == '(' and s[-1] not in (',','='))):
                 s = '%s%s' % (s, elt_s)
             elif (spacing=='tight' and
                   s[-1] in '+-*/=,' or elt_s[0] in '+-*/=,'):
