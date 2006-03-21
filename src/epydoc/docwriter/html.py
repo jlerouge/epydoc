@@ -25,10 +25,7 @@ from epydoc.docwriter.html_help import HTML_HELP
 from epydoc.docwriter.dotgraph import *
 from epydoc import log
 from epydoc.util import plaintext_to_html
-
-# Backwards compatibility imports:
-try: sorted
-except NameError: from epydoc.util import py_sorted as sorted
+from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
 ## Template Compiler
@@ -2284,6 +2281,7 @@ class HTMLWriter:
 
         group_names = [''] + [n for n,_ in doc.group_specs]
         for group_name in group_names:
+            if not doc.submodule_groups[group_name]: continue
             if group_name:
                 self.write_group_header(out, group_name)
             out('  <tr><td><ul>\n')
@@ -2299,7 +2297,7 @@ class HTMLWriter:
             out(': <em class="summary">'+
                 self.description(doc.summary, doc, 8)+'</em>')
         out('</li>\n')
-        if doc.submodules:
+        if doc.submodules != UNKNOWN and doc.submodules:
             out('    <ul>\n')
             for submodule in doc.submodules:
                 self.write_module_tree_item(out, submodule)
@@ -2325,7 +2323,7 @@ class HTMLWriter:
             first mention.
         """
         # [XX] sort? and backref for multiple inheritance?
-        classes = Set([doc for doc in self.valdocs
+        classes = set([doc for doc in self.valdocs
                        if isinstance(doc, ClassDoc)])
         if not classes: return
 
@@ -2361,7 +2359,7 @@ class HTMLWriter:
         >>> # endif
         >>> if doc.subclasses:
             <ul>
-        >>>   for subclass in Set(doc.subclasses):
+        >>>   for subclass in set(doc.subclasses):
         >>>     if subclass in classes:
         >>>       self.write_class_tree_item(out, subclass, classes)
         >>>     #endif
@@ -2731,7 +2729,7 @@ class HTMLWriter:
         return descr
     
     def doc_kind(self, doc):
-        if isinstance(doc, ModuleDoc) and doc.is_package:
+        if isinstance(doc, ModuleDoc) and doc.is_package == True:
             return 'Package'
         elif (isinstance(doc, ModuleDoc) and
               doc.canonical_name[0].startswith('script')):
