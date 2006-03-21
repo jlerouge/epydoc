@@ -2675,12 +2675,16 @@ class HTMLWriter:
                 label = str(target.name)
             elif isinstance(target, ValueDoc):
                 label = str(target.canonical_name)
-                if label.startswith('script-'):
-                    label = label[7:] + ' (script)'
             elif isinstance(target, DottedName):
                 label = str(target)
             else:
                 raise ValueError, "bad label"
+            # Munge names for scripts & unreachable values
+            if label.startswith('script-'):
+                label = label[7:] + ' (script)'
+            if label.startswith('??'):
+                label = '<i>unreachable</i>' + label[2:]
+                label = re.sub(r'-\d+$', '', label)
 
         # Get the url for the target.
         url = self.url(target)
