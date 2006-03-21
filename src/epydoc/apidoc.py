@@ -22,7 +22,7 @@ about each value type:
 
 G{classtree: APIDoc}
 
-The distinction between variables and values is intentionally kept
+The distinction between variables and values is intentionally made
 explicit.  This allows us to distinguish information about a variable
 itself (such as whether it should be considered 'public' in its
 containing namespace) from information about the value it contains
@@ -38,14 +38,10 @@ __docformat__ = 'epytext en'
 ######################################################################
 
 import types, re
-from sets import Set
 from epydoc import log
 import epydoc
 import __builtin__
-
-# Backwards compatibility imports:
-try: sorted
-except NameError: from epydoc.util import py_sorted as sorted
+from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
 # Dotted Names
@@ -389,8 +385,8 @@ def reachable_valdocs(root, sorted_by_name=False, **filters):
         description.
     """
     apidoc_queue = list(root)
-    val_set = Set()
-    var_set = Set()
+    val_set = set()
+    var_set = set()
     while apidoc_queue:
         api_doc = apidoc_queue.pop()
         if isinstance(api_doc, ValueDoc):
@@ -646,9 +642,9 @@ class NamespaceDoc(ValueDoc):
         # Add any variables that are listed in sort_spec
         if self.sort_spec is not UNKNOWN:
             for ident in self.sort_spec:
-                var_doc = unsorted.pop(ident, None)
-                if var_doc is not None:
-                    self.sorted_variables.append(var_doc)
+                if ident in unsorted:
+                    self.sorted_variables.append(unsorted[ident])
+                    del unsorted[ident]
                 elif '*' in ident:
                     regexp = re.compile('^%s$' % ident.replace('*', '(.*)'))
                     # sort within matching group?
@@ -694,7 +690,7 @@ class NamespaceDoc(ValueDoc):
         if len(self.group_specs) == 0:
             return {'': [elt[1] for elt in elts]}
 
-        ungrouped = Set([elt_doc for (elt_name, elt_doc) in elts])
+        ungrouped = set([elt_doc for (elt_name, elt_doc) in elts])
         groups = {}
         for (group_name, elt_names) in self.group_specs:
             group_re = re.compile('|'.join([n.replace('*','.*')+'$'
@@ -762,6 +758,8 @@ class ModuleDoc(NamespaceDoc):
         Initialize the L{submodule_groups} attribute, based on the
         L{submodules} and L{group_specs} attributes.
         """
+        if self.submodules in (None, UNKNOWN):
+            return
         self.submodules = sorted(self.submodules,
                                  key=lambda m:m.canonical_name)
         elts = [(m.canonical_name[-1], m) for m in self.submodules]
@@ -881,7 +879,7 @@ class ClassDoc(NamespaceDoc):
         if self.is_newstyle_class():
             return self._c3_mro(warn_about_bad_bases)
         else:
-            return self._dfs_bases([], Set(), warn_about_bad_bases)
+            return self._dfs_bases([], set(), warn_about_bad_bases)
                 
     def _dfs_bases(self, mro, seen, warn_about_bad_bases):
         if self in seen: return mro
