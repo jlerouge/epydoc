@@ -193,7 +193,7 @@ class DotGraph:
         """
         s = self.render(language)
         if s is not None:
-            out = open(filename, 'w')
+            out = open(filename, 'wb')
             out.write(s)
             out.close()
             return True
