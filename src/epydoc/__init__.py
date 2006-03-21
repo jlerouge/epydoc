@@ -50,6 +50,12 @@ to document, and produce API documentation using the following steps:
    * other formats (under construction)
 
 .. digraph:: Overview of epydoc's architecture
+   :caption: The boxes represent steps in epydoc's processing chain.
+             Arrows are annotated with the data classes used to
+             communicate between steps.  The lines along the right
+             side mark what portions of the processing chain are
+             initiated by build_doc_index() and cli().  Click on
+             any item to see its documentation.
 
    ranksep = 0.1;
    node [shape="box", height="0", width="0"]
