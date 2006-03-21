@@ -28,8 +28,6 @@ import inspect, re, sys, os.path, imp
 from epydoc.apidoc import *
 # Type comparisons:
 from types import *
-# Set datatype:
-from sets import Set
 # Error reporting:
 from epydoc import log
 # Helper functions:
@@ -38,6 +36,8 @@ from epydoc.util import *
 import epydoc.docparser
 # Builtin values
 import __builtin__
+# Backwards compatibility
+from epydoc.compat import * 
 
 ######################################################################
 ## Caches
@@ -179,8 +179,10 @@ def _get_valuedoc(value):
     pyid = id(value)
     val_doc = _valuedoc_cache.get(pyid)
     if val_doc is None:
+        try: canonical_name = get_canonical_name(value)
+        except ValueError: canonical_name = UNKNOWN
         val_doc = ValueDoc(pyval=value, repr=value_repr(value),
-                           canonical_name = get_canonical_name(value))
+                           canonical_name = canonical_name)
         _valuedoc_cache[pyid] = val_doc
         
         # If it's a module, then do some preliminary introspection.
@@ -250,7 +252,7 @@ def introspect_module(module, module_doc, preliminary=False):
     # Record the module's __all__ attribute (public names).
     if hasattr(module, '__all__'):
         try:
-            public_names = Set([str(name) for name in module.__all__])
+            public_names = set([str(name) for name in module.__all__])
             for name, var_doc in module_doc.variables.items():
                 if name in public_names:
                     var_doc.is_public = True
