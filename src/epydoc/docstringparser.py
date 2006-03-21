@@ -16,7 +16,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import logging, re, sys
+import re, sys
 from epydoc import markup
 from epydoc.apidoc import *
 from epydoc.docintrospecter import introspect_docstring_lineno
