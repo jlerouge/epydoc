@@ -7,7 +7,20 @@
 # $Id$
 
 """
-Parse the docstrings of APIDoc objects.
+Parse docstrings and handle any fields it defines, such as C{@type}
+and C{@author}.  Fields are used to describe specific information
+about an object.  There are two classes of fields: X{simple fields}
+and X{special fields}.
+
+Simple fields are fields that get stored directly in an C{APIDoc}'s
+metadata dictionary, without any special processing.  The set of
+simple fields is defined by the list L{STANDARD_FIELDS}, whose
+elements are L{DocstringField}s.
+
+Special fields are fields that perform some sort of processing on the
+C{APIDoc}, or add information to attributes other than the metadata
+dictionary.  Special fields are are handled by field handler
+functions, which are registered using L{register_field_handler}.
 """
 __docformat__ = 'epytext en'
 
@@ -25,15 +38,15 @@ from epydoc import log
 import __builtin__, exceptions
 
 ######################################################################
-## Docstring Fields
+# Docstring Fields
 ######################################################################
 
 class DocstringField:
     """
-    A generic docstring field.  Docstring field are used to describe
-    specific information about an object, such as its author or its
-    version.  Generic docstring fields are fields that take no
-    arguments, and are displayed as simple sections.
+    A simple docstring field, which can be used to describe specific
+    information about an object, such as its author or its version.
+    Simple docstring fields are fields that take no arguments, and
+    are displayed as simple sections.
 
     @ivar tags: The set of tags that can be used to identify this
         field.
@@ -79,34 +92,13 @@ class DocstringField:
     def __repr__(self):
         return '<Field: %s>' % self.tags[0]
 
-######################################################################
-## Field Errors
-######################################################################
-
-class DocstringFieldError(ValueError):
-    def __init__(self, tag):
-        ValueError.__init__(self, self.MSG % tag)
-class UnexpectedArgError(DocstringFieldError):
-    MSG = '%s did not expect an argument'
-class ExpectedArgError(DocstringFieldError):
-    MSG = '%s expected an argument'
-class InvalidContextError(DocstringFieldError):
-    MSG = 'Invalid context for %s'
-class AlreadyDefinedError(DocstringFieldError):
-    MSG = '%s already defined'
-class UnsupportedError(DocstringFieldError): # [XX]
-    MSG = '%s not supported yet'
-
-######################################################################
-## Docstring Parser
-######################################################################
-
-DEFAULT_DOCFORMAT = 'plaintext'
-DEFAULT_DOCFORMAT = 'epytext'
-
-# [XX] rename to SIMPLE_FIELDS?
-# Note: order is significant.
 STANDARD_FIELDS = [
+    #: A list of the standard simple fields accepted by epydoc.  This
+    #: list can be augmented at run-time by a docstring with the special
+    #: C{@deffield} field.  The order in which fields are listed here
+    #: determines the order in which they will be displayed in the
+    #: output.
+    
     # If it's deprecated, put that first.
     DocstringField(['deprecated', 'depreciated'],
              'Deprecated', multivalue=0),
@@ -151,16 +143,31 @@ STANDARD_FIELDS = [
     DocstringField(['permission', 'permissions'], 'Permission', 'Permissions')
     ]
 
+######################################################################
+#{ Docstring Parsing
+######################################################################
+
+DEFAULT_DOCFORMAT = 'epytext'
+"""The name of the default markup languge used to process docstrings."""
+
 # [xx] keep track of which ones we've already done, in case we're
 # asked to process one twice?  e.g., for @include we might have to
 # parse the included docstring earlier than we might otherwise..??
 
 def parse_docstring(api_doc, docindex):
     """
+    Process the given C{APIDoc}'s docstring.  In particular, populate
+    the C{APIDoc}'s C{descr} and C{summary} attributes, and add any
+    information provided by fields in the docstring.
+    
     @param docindex: A DocIndex, used to find the containing
         module (to look up the docformat); and to find any
         user docfields defined by containing objects.
     """
+    if api_doc.metadata is not UNKNOWN:
+        log.debug("%s's docstring processed twice" % api_doc.canonical_name)
+        return
+        
     initialize_api_doc(api_doc)
 
     # If there's no docstring, then there's nothing more to do.
@@ -195,21 +202,25 @@ def parse_docstring(api_doc, docindex):
                                field.arg(), field.body())
         except ValueError, e: field_warnings.append(str(e))
 
-    # Take care of any postprocessing tasks.
-    postprocess_api_doc(api_doc, field_warnings)
+    # Extract a summary
+    if api_doc.summary is None and api_doc.descr is not None:
+        api_doc.summary = api_doc.descr.summary()
+
+    # [XX] Make sure we don't have types/param descrs for unknown
+    # vars/params?
 
     # Report any errors that occured
     report_errors(api_doc, docindex, parse_errors, field_warnings)
 
 def initialize_api_doc(api_doc):
-    # Initialize the attributes that are set by the docstring
-    # contents (including docstring fields).
+    """A helper function for L{parse_docstring()} that initializes
+    the attributes that C{parse_docstring()} will write to."""
     if api_doc.descr is UNKNOWN:
         api_doc.descr = None
     if api_doc.summary is UNKNOWN:
         api_doc.summary = None
     if api_doc.metadata is UNKNOWN:
-        api_doc.metadata = {}
+        api_doc.metadata = []
     if isinstance(api_doc, RoutineDoc):
         if api_doc.arg_descrs is UNKNOWN:
             api_doc.arg_descrs = []
@@ -230,15 +241,10 @@ def initialize_api_doc(api_doc):
         if api_doc.sort_spec is UNKNOWN:
             api_doc.sort_spec = []
 
-def postprocess_api_doc(api_doc, field_warnings):
-    # Extract a summary
-    if api_doc.summary is None and api_doc.descr is not None:
-        api_doc.summary = api_doc.descr.summary()
-
-    # Make sure we don't have types/param descrs for unknown
-    # vars/params.
-
 def report_errors(api_doc, docindex, parse_errors, field_warnings):
+    """A helper function for L{parse_docstring()} that reports any
+    markup warnings and field warnings that we encountered while
+    processing C{api_doc}'s docstring."""
     if not parse_errors and not field_warnings: return
 
     # Get the name of the item containing the error, and the
@@ -309,36 +315,68 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
     # End the message block.
     log.end_block()
 
-#////////////////////////////////////////////////////////////
-# Field Processing
-#////////////////////////////////////////////////////////////
+######################################################################
+#{ Field Processing Error Messages
+######################################################################
+
+UNEXPECTED_ARG = '%r did not expect an argument'
+EXPECTED_ARG = '%r expected an argument'
+EXPECTED_SINGLE_ARG = '%r expected a single argument'
+BAD_CONTEXT = 'Invalid context for %r'
+REDEFINED = 'Redefinition of %s'
+UNKNOWN_TAG = 'Unknown field tag %r'
+
+######################################################################
+#{ Field Processing
+######################################################################
 
 def process_field(api_doc, docindex, tag, arg, descr):
     """
-    @type warnings: C{list} of C{string}
+    Process a single field, and use it to update C{api_doc}.  If
+    C{tag} is the name of a special field, then call its handler
+    function.  If C{tag} is the name of a simple field, then use
+    C{process_simple_field} to process it.  Otherwise, check if it's a
+    user-defined field, defined in this docstring or the docstring of
+    a containing object; and if so, process it with
+    C{process_simple_field}.
+
+    @param tag: The field's tag, such as C{'author'}
+    @param arg: The field's optional argument
+    @param descr: The description following the field tag and
+        argument.
+    @raise ValueError: If a problem was encountered while processing
+        the field.  The C{ValueError}'s string argument is an
+        explanation of the problem, which should be displayed as a
+        warning message.
     """
-    # 1. standard special fields
+    # standard special fields
     if tag in _field_dispatch_table:
         handler = _field_dispatch_table[tag]
-        handler(api_doc, tag, arg, descr)
+        handler(api_doc, docindex, tag, arg, descr)
         return
 
-    # 2. standard simple fields
-    for field in STANDARD_FIELDS:
+    # standard simple fields & user-defined fields
+    for field in STANDARD_FIELDS + user_docfields(api_doc, docindex):
         if tag in field.tags:
-            process_standard_field(api_doc, tag, arg, descr)
-            return
-
-    # 3. user-defined fields
-    for field in user_docfields(api_doc, docindex):
-        if tag in field.tags:
-            process_standard_field(api_doc, tag, arg, descr)
+            # [xx] check if it's redefined if it's not multivalue??
+            if not field.takes_arg:
+                _check(api_doc, tag, arg, expect_arg=False)
+            api_doc.metadata.append((field, arg, descr))
             return
 
     # If we didn't handle the field, then report a warning.
     raise ValueError(UNKNOWN_TAG % tag)
 
 def user_docfields(api_doc, docindex):
+    """
+    Return a list of user defined fields that can be used for the
+    given object.  This list is taken from the given C{api_doc}, and
+    any of its containing C{NamepaceDoc}s.
+    
+    @bug: If a child's docstring is parsed before its parents, then
+        its parent won't yet have had its C{extra_docstring_fields}
+        attribute initialized.
+    """
     docfields = []
     # Get any docfields from `api_doc` itself
     if api_doc.extra_docstring_fields not in (None, UNKNOWN):
@@ -351,44 +389,38 @@ def user_docfields(api_doc, docindex):
             docfields += ancestor.extra_docstring_fields
     return docfields
 
-def process_standard_field(api_doc, tag, arg, descr):
-    for field in STANDARD_FIELDS:
-        if tag in field.tags:            
-            # Use the cannonical tag name.
-            tag = field.tags[0]
-            if not field.takes_arg:
-                _check(api_doc, tag, arg, expect_arg=False)
-            if field.takes_arg and arg is not None:
-                values = api_doc.metadata.setdefault((tag,arg), [])
-            else:
-                values = api_doc.metadata.setdefault(tag, [])
-            if not field.multivalue and len(values) > 0:
-                raise ValueError(REDEFINED % tag)
-            values.append(descr)
-            return
-
-# Error messages:
-UNEXPECTED_ARG = '%r did not expect an argument'
-EXPECTED_ARG = '%r expected an argument'
-EXPECTED_SINGLE_ARG = '%r expected a single argument'
-BAD_CONTEXT = 'Invalid context for %r'
-REDEFINED = 'Redefinition of %s'
-UNKNOWN_TAG = 'Unknown field tag %r'
-
 _field_dispatch_table = {}
-# [xx] if I move to 2.4 only, this would be better done as a decorator.
 def register_field_handler(handler, *field_tags):
+    """
+    Register the given field handler function for processing any
+    of the given field tags.  Field handler functions should
+    have the following signature:
+
+        >>> def field_handler(api_doc, docindex, tag, arg, descr):
+        ...     '''update api_doc in response to the field.'''
+
+    Where C{api_doc} is the documentation object to update;
+    C{docindex} is a L{DocIndex} that can be used to look up the
+    documentation for related objects; C{tag} is the field tag that
+    was used; C{arg} is the optional argument; and C{descr} is the
+    description following the field tag and argument.
+    """
     for field_tag in field_tags:
         _field_dispatch_table[field_tag] = handler
 
-def process_summary_field(api_doc, tag, arg, descr):
+######################################################################
+#{ Field Handler Functions
+######################################################################
+
+def process_summary_field(api_doc, docindex, tag, arg, descr):
+    """Store C{descr} in C{api_doc.summary}"""
     _check(api_doc, tag, arg, expect_arg=False)
     if api_doc.summary is not None:
         raise ValueError(REDEFINED % tag)
     api_doc.summary = descr
 
-def process_include_field(api_doc, tag, arg, descr):
-    # [xx] need docindex!!
+def process_include_field(api_doc, docindex, tag, arg, descr):
+    """Copy the docstring contents from the object named in C{descr}"""
     _check(api_doc, tag, arg, expect_arg=False)
     # options:
     #   a. just append the descr to our own
@@ -400,7 +432,8 @@ def process_include_field(api_doc, tag, arg, descr):
     # how does this interact with documentation inheritance??
     raise ValueError('%s not implemented yet' % tag)
 
-def process_undocumented_field(api_doc, tag, arg, descr):
+def process_undocumented_field(api_doc, docindex, tag, arg, descr):
+    """Remove any documentation for the variables named in C{descr}"""
     _check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=False)
     for ident in _descr_to_identifiers(descr):
         var_name_re = re.compile('^%s$' % ident.replace('*', '(.*)'))
@@ -409,12 +442,15 @@ def process_undocumented_field(api_doc, tag, arg, descr):
                 # Remove the variable from `variables`.
                 api_doc.variables.pop(var_name, None)
 
-def process_group_field(api_doc, tag, arg, descr):
+def process_group_field(api_doc, docindex, tag, arg, descr):
+    """Define a group named C{arg} containing the variables whose
+    names are listed in C{descr}."""
     _check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=True)
     api_doc.group_specs.append( (arg, _descr_to_identifiers(descr)) )
     # [xx] should this also set sort order?
 
-def process_deffield_field(api_doc, tag, arg, descr):
+def process_deffield_field(api_doc, docindex, tag, arg, descr):
+    """Define a new custom field."""
     _check(api_doc, tag, arg, expect_arg=True)
     if api_doc.extra_docstring_fields is UNKNOWN:
         api_doc.extra_docstring_fields = []
@@ -424,21 +460,20 @@ def process_deffield_field(api_doc, tag, arg, descr):
     except ValueError, e:
         raise ValueError('Bad %s: %s' % (tag, e))
 
-def process_raise_field(api_doc, tag, arg, descr):
+def process_raise_field(api_doc, docindex, tag, arg, descr):
+    """Record the fact that C{api_doc} can raise the exception named
+    C{tag} in C{api_doc.exception_descrs}."""
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg='single')
     try: name = DottedName(arg)
     except ValueError: name = arg
     api_doc.exception_descrs.append( (name, descr) )
 
-def process_todo_field(api_doc, tag, arg, descr):
-    raise ValueError('not implemented yet?')
-
-def process_sort_field(api_doc, tag, arg, descr):
+def process_sort_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=NamespaceDoc, expect_arg=False)
     api_doc.sort_spec = _descr_to_identifiers(descr) + api_doc.sort_spec
 
 # [xx] should I notice when they give a type for an unknown var?
-def process_type_field(api_doc, tag, arg, descr):
+def process_type_field(api_doc, docindex, tag, arg, descr):
     # In namespace, "@type var: ..." describes the type of a var.
     if isinstance(api_doc, NamespaceDoc):
         _check(api_doc, tag, arg, expect_arg='single')
@@ -460,41 +495,41 @@ def process_type_field(api_doc, tag, arg, descr):
     else:
         raise ValueError(BAD_CONTEXT % arg)
 
-def process_var_field(api_doc, tag, arg, descr):
+def process_var_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=ModuleDoc, expect_arg=True)
     for ident in re.split('[:;, ] *', arg):
         set_var_descr(api_doc, ident, descr)
         
-def process_cvar_field(api_doc, tag, arg, descr):
+def process_cvar_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
     for ident in re.split('[:;, ] *', arg):
         set_var_descr(api_doc, ident, descr)
         api_doc.variables[ident].is_instvar = False
         
-def process_ivar_field(api_doc, tag, arg, descr):
+def process_ivar_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
     for ident in re.split('[:;, ] *', arg):
         set_var_descr(api_doc, ident, descr)
         api_doc.variables[ident].is_instvar = True
 
-def process_return_field(api_doc, tag, arg, descr):
+def process_return_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=False)
     if api_doc.return_descr is not None:
         raise ValueError(REDEFINED % 'return value description')
     api_doc.return_descr = descr
 
-def process_rtype_field(api_doc, tag, arg, descr):
+def process_rtype_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=False)
     if api_doc.return_type is not None:
         raise ValueError(REDEFINED % 'return value description')
     api_doc.return_type = descr
 
-def process_arg_field(api_doc, tag, arg, descr):
+def process_arg_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=True)
     idents = re.split('[:;, ] *', arg)
     api_doc.arg_descrs.append( (idents, descr) )
 
-def process_kwarg_field(api_doc, tag, arg, descr):
+def process_kwarg_field(api_doc, docindex, tag, arg, descr):
     # [xx] these should -not- be checked if they exist..
     # and listed separately or not??
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=True)
@@ -519,9 +554,9 @@ register_field_handler(process_kwarg_field, 'kwarg', 'keyword', 'kwparam')
 register_field_handler(process_raise_field, 'raise', 'raises',
                                             'except', 'exception')
 
-#////////////////////////////////////////////////////////////
-# Helper functions (2)
-#////////////////////////////////////////////////////////////
+######################################################################
+#{ Helper Functions
+######################################################################
 
 def set_var_descr(api_doc, ident, descr):
     if ident not in api_doc.variables:
@@ -560,10 +595,6 @@ def _check(api_doc, tag, arg, context=None, expect_arg=None):
                 raise ValueError(EXPECTED_SINGLE_ARG % tag)
         else:
             assert 0, 'bad value for expect_arg'
-
-#////////////////////////////////////////////////////////////
-# Helper functions (1)
-#////////////////////////////////////////////////////////////
 
 def get_docformat(api_doc, docindex):
     """
@@ -607,9 +638,50 @@ def unindent_docstring(docstring):
     #    lines.pop(0)
     return '\n'.join(lines)
                            
-#////////////////////////////////////////////////////////////
-# Function signature extraction.
-#////////////////////////////////////////////////////////////
+_IDENTIFIER_LIST_REGEXP = re.compile(r'^[\w.\*]+([\s,:;]\s*[\w.\*]+)*$')
+def _descr_to_identifiers(descr):
+    """
+    Given a C{ParsedDocstring} that contains a list of identifiers,
+    return a list of those identifiers.  This is used by fields such
+    as C{@group} and C{@sort}, which expect lists of identifiers as
+    their values.  To extract the identifiers, the docstring is first
+    converted to plaintext, and then split.  The plaintext content of
+    the docstring must be a a list of identifiers, separated by
+    spaces, commas, colons, or semicolons.
+    
+    @rtype: C{list} of C{string}
+    @return: A list of the identifier names contained in C{descr}.
+    @type descr: L{markup.ParsedDocstring}
+    @param descr: A C{ParsedDocstring} containing a list of
+        identifiers.
+    @raise ValueError: If C{descr} does not contain a valid list of
+        identifiers.
+    """
+    idents = descr.to_plaintext(None).strip()
+    idents = re.sub(r'\s+', ' ', idents)
+    if not _IDENTIFIER_LIST_REGEXP.match(idents):
+        raise ValueError, 'Bad Identifier list: %r' % idents
+    rval = re.split('[:;, ] *', idents)
+    return rval
+    
+def _descr_to_docstring_field(arg, descr):
+    tags = [s.lower() for s in re.split('[:;, ] *', arg)]
+    descr = descr.to_plaintext(None).strip()
+    args = re.split('[:;,] *', descr)
+    if len(args) == 0 or len(args) > 3:
+        raise ValueError, 'Wrong number of arguments'
+    singular = args[0]
+    if len(args) >= 2: plural = args[1]
+    else: plural = None
+    short = 0
+    if len(args) >= 3:
+        if args[2] == 'short': short = 1
+        else: raise ValueError('Bad arg 2 (expected "short")')
+    return DocstringField(tags, singular, plural, short)
+
+######################################################################
+#{ Function Signature Extraction
+######################################################################
 
 # [XX] todo: add optional type modifiers?
 _SIGNATURE_RE = re.compile(
@@ -708,48 +780,4 @@ def parse_function_signature(func_doc):
         
     # We found a signature.
     return True
-
-
-_IDENTIFIER_LIST_REGEXP = re.compile(r'^[\w.\*]+([\s,:;]\s*[\w.\*]+)*$')
-def _descr_to_identifiers(descr):
-    """
-    Given a C{ParsedDocstring} that contains a list of identifiers,
-    return a list of those identifiers.  This is used by fields such
-    as C{@group} and C{@sort}, which expect lists of identifiers as
-    their values.  To extract the identifiers, the docstring is first
-    converted to plaintext, and then split.  The plaintext content of
-    the docstring must be a a list of identifiers, separated by
-    spaces, commas, colons, or semicolons.
-    
-    @rtype: C{list} of C{string}
-    @return: A list of the identifier names contained in C{descr}.
-    @type descr: L{markup.ParsedDocstring}
-    @param descr: A C{ParsedDocstring} containing a list of
-        identifiers.
-    @raise ValueError: If C{descr} does not contain a valid list of
-        identifiers.
-    """
-    idents = descr.to_plaintext(None).strip()
-    idents = re.sub(r'\s+', ' ', idents)
-    if not _IDENTIFIER_LIST_REGEXP.match(idents):
-        raise ValueError, 'Bad Identifier list: %r' % idents
-    rval = re.split('[:;, ] *', idents)
-    return rval
-    
-def _descr_to_docstring_field(arg, descr):
-    tags = [s.lower() for s in re.split('[:;, ] *', arg)]
-    descr = descr.to_plaintext(None).strip()
-    args = re.split('[:;,] *', descr)
-    if len(args) == 0 or len(args) > 3:
-        raise ValueError, 'Wrong number of arguments'
-    singular = args[0]
-    if len(args) >= 2: plural = args[1]
-    else: plural = None
-    short = 0
-    if len(args) >= 3:
-        if args[2] == 'short': short = 1
-        else: raise ValueError('Bad arg 2 (expected "short")')
-    return DocstringField(tags, singular, plural, short)
-
-
 

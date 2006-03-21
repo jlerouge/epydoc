@@ -24,7 +24,7 @@ from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc.docwriter.dotgraph import *
 from epydoc import log
-from epydoc.util import plaintext_to_html
+from epydoc.util import plaintext_to_html, is_src_filename
 from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
@@ -365,9 +365,10 @@ class HTMLWriter:
 
         # Figure out how many output files there will be (for progress
         # reporting).
-        self.modules_with_sourcecode = [d for d in self.valdocs
-                                        if (isinstance(d, ModuleDoc) and
-                                            d.filename not in (None, UNKNOWN))]
+        self.modules_with_sourcecode = set()
+        for doc in self.valdocs:
+            if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
+                self.modules_with_sourcecode.add(doc)
         self._num_files = (len([d for d in self.valdocs
                                 if isinstance(d, ClassDoc)]) +
                            2*len([d for d in self.valdocs
@@ -2333,7 +2334,7 @@ class HTMLWriter:
                 for base in doc.bases:
                     if base not in self.valdocs:
                         if isinstance(base, ClassDoc):
-                            classes.union_update(base.mro())
+                            classes.update(base.mro())
                         else:
                             # [XX] need to deal with this -- how?
                             pass
@@ -2374,10 +2375,8 @@ class HTMLWriter:
     #{ Standard Fields
     #////////////////////////////////////////////////////////////
 
-    write_standard_fields = compile_template(
+    def write_standard_fields(self, out, doc):
         """
-        write_standard_fields(self, out, doc)
-        
         Write HTML code containing descriptions of any standard markup
         fields that are defined by the given L{APIDoc} object (such as
         C{@author} and C{@todo} fields).
@@ -2385,31 +2384,57 @@ class HTMLWriter:
         @param doc: The L{APIDoc} object containing the API documentation
             for the object whose standard markup fields should be
             described.
+        """
+        fields = []
+        field_values = {}
+        
+        #if _sort_fields: fields = STANDARD_FIELD_NAMES [XX]
+        
+        for (field, arg, descr) in doc.metadata:
+            if field not in field_values:
+                fields.append(field)
+            if field.takes_arg:
+                subfields = field_values.setdefault(field,{})
+                subfields.setdefault(arg,[]).append(descr)
+            else:
+                field_values.setdefault(field,[]).append(descr)
+
+        for field in fields:
+            if field.takes_arg:
+                for arg, descrs in field_values[field].items():
+                    self.write_standard_field(out, doc, field, descrs, arg)
+                                              
+            else:
+                self.write_standard_field(out, doc, field, field_values[field])
+
+    write_standard_field = compile_template(
+        """
+        write_standard_field(self, out, doc, field, descrs, arg='')
+        
         """,
         # /------------------------- Template -------------------------\
         """
-        >>> for field in epydoc.docstringparser.STANDARD_FIELDS:
-        >>>   vals = doc.metadata.get(field.tags[0])
-        >>>   if vals is None: continue
-        >>>   if len(vals) == 1:
-              <p><strong>$field.singular$:</strong>
-                $self.description(vals[0], doc, 8)$
+        >>> if arg: arglabel = ' (%s)' % arg
+        >>> else: arglabel = ''
+        >>>   if len(descrs) == 1:
+              <p><strong>$field.singular+arglabel$:</strong>
+                $self.description(descrs[0], doc, 8)$
               </p>
         >>>   elif field.short:
-              <dl><dt>$field.plural$:</dt>
+              <dl><dt>$field.plural+arglabel$:</dt>
                 <dd>
-        >>>     for val in vals[:-1]:
-                  $self.description(val, doc, 10)$,
+        >>>     for descr in descrs[:-1]:
+                  $self.description(descr, doc, 10)$,
         >>>     # end for
-                  $self.description(vals[-1], doc, 10)$
+                  $self.description(descrs[-1], doc, 10)$
                 </dd>
               </dl>
         >>>   else:
-              <p><strong>$field.plural$:</strong>
+              <p><strong>$field.plural+arglabel$:</strong>
               <ul>
-        >>>     for val in vals:
+        >>>     for descr in descrs:
                 <li>
-                $self.description(val, doc, 8)$
+                $self.description(descr, doc, 8)$
                 </li>
         >>>   # end for
               </ul>
@@ -2464,9 +2489,8 @@ class HTMLWriter:
         for doc in self.valdocs:
             self._get_index_terms(doc.descr, doc, terms, links)
             if doc.metadata not in (None, UNKNOWN):
-                for descrlist in doc.metadata.values():
-                    for descr in descrlist:
-                        self._get_index_terms(descr, doc, terms, links)
+                for (field, arg, descr) in doc.metadata:
+                    self._get_index_terms(descr, doc, terms, links)
             # summary?
             if isinstance(doc, NamespaceDoc):
                 for var in doc.variables.items():
@@ -2611,20 +2635,28 @@ class HTMLWriter:
         if isinstance(api_doc, VariableDoc):
             if api_doc.value not in (None, UNKNOWN):
                 return pysrc_link(api_doc.value)
+            else:
+                return None
         elif isinstance(api_doc, ModuleDoc):
-            if api_doc.filename not in (None, UNKNOWN):
+            if api_doc in self.modules_with_sourcecode:
                 return ('%s-pysrc.html' %
                        urllib.quote('%s' % api_doc.canonical_name))
+            else:
+                return None
         else:
             module = self.docindex.module_that_defines(api_doc)
             if module is None: return None
             module_pysrc_url = self.pysrc_url(module)
-            if module_pysrc_url is not None:
-                mname_len = len(module.canonical_name)
-                anchor = DottedName(*api_doc.canonical_name[mname_len:])
-                return ('%s-pysrc.html#%s' % 
-                        (urllib.quote('%s' % module.canonical_name),
-                         urllib.quote('%s' % anchor)))
+            if module_pysrc_url is None: return None
+            module_name = module.canonical_name
+            if not module_name.dominates(api_doc.canonical_name, True):
+                log.debug('%r is in %r but name does not dominate' %
+                          (api_doc, module))
+                return module_pysrc_url
+            mname_len = len(module.canonical_name)
+            anchor = '%s' % DottedName(*api_doc.canonical_name[mname_len:])
+            return '%s#%s' % (module_pysrc_url, urllib.quote(anchor))
+        
         # We didn't find it:
         return None
 
