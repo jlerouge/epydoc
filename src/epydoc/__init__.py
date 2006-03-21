@@ -123,7 +123,7 @@ to document, and produce API documentation using the following steps:
 :group Docstring Processing: docstringparser, markup
 :group Output Generation: docwriter
 :group Completeness Checking: checker
-:group Miscellaneous: log, util, test
+:group Miscellaneous: log, util, test, compat
 
 :author: `Edward Loper <edloper@gradient.cis.upenn.edu>`__
 :requires: Python 2.3+
