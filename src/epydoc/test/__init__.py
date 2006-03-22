@@ -4,7 +4,7 @@
 # Author: Edward Loper <edloper@loper.org>
 # URL: <http://epydoc.sf.net>
 #
-# $Id: apidoc.py 946 2006-03-10 00:40:50Z edloper $
+# $Id$
 
 """
 Regression testing.

@@ -3,7 +3,7 @@
 # Edward Loper
 #
 # Created [01/30/01 05:18 PM]
-# $Id: html.py 959 2006-03-10 21:27:50Z edloper $
+# $Id$
 #
 
 """
