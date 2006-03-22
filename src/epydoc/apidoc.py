@@ -47,6 +47,10 @@ from epydoc.compat import * # Backwards compatibility
 # Dotted Names
 ######################################################################
 
+# [xx] define a new exception specifically for bad dotted names?
+# ValueError is a bit generic, and there are a couple places where
+# I catch this a bit far from where it gets raised.
+
 class DottedName:
     """
     A sequence of identifiers, separated by periods, used to name a
@@ -61,20 +65,12 @@ class DottedName:
     """
     UNREACHABLE = "??"
     _IDENTIFIER_RE = re.compile("""(?x)
-        (                  # First piece
-            (script-)?       # Prefix: script (not a module)
-            [a-zA-Z_]\w*     # Identifier
-            '?               # Suffix: submodule that is shadowed by a var
-            (-\d+)?          # Suffix: unreachable vals with the same name
-          |
-            %s               # UNREACHABLE marker
-            (-\d+)?          # Suffix: unreachable vals with the same name
-        )
-        (\.                # Remaining pieces
-            [a-zA-Z_]\w*     # Identifier
-            '?               # Suffix: submodule that is shadowed by a var
-            (-\d+)?          # Suffix: unreachable vals with the same name
-        )*$"""
+        (%s |             # UNREACHABLE marker, or..
+         (script-)?       #   Prefix: script (not a module)
+         [a-zA-Z_]\w*     #   Identifier
+         '?)              #   Suffix: submodule that is shadowed by a var
+        (-\d+)?           # Suffix: unreachable vals with the same name
+        $"""
         % re.escape(UNREACHABLE))
     
     def __init__(self, *pieces):
@@ -95,12 +91,13 @@ class DottedName:
             if isinstance(piece, DottedName):
                 self._identifiers += piece._identifiers
             elif isinstance(piece, basestring):
-                if not self._IDENTIFIER_RE.match(piece):
-                    #log.debug('Bad identifier %r' % (piece,))
-                    raise ValueError('Bad identifier %r' % (piece,))
-                self._identifiers += piece.split('.')
+                for subpiece in piece.split('.'):
+                    if not self._IDENTIFIER_RE.match(subpiece):
+                        log.debug('Bad identifier %r' % (piece,))
+                        raise ValueError('Bad identifier %r' % (piece,))
+                    self._identifiers.append(subpiece)
             else:
-                #log.debug('Bad identifier %r' % (piece,))
+                log.debug('Bad identifier %r' % (piece,))
                 raise ValueError('Bad identifier %r' % (piece,))
         self._identifiers = tuple(self._identifiers)
 
@@ -256,6 +253,7 @@ class APIDoc(object):
     summary = UNKNOWN
     metadata = UNKNOWN
     extra_docstring_fields = UNKNOWN
+    docs_extracted_by = UNKNOWN # 'parser' or 'introspecter' or 'both'
     
     def __init__(self, **kwargs):
         """
@@ -1337,8 +1335,14 @@ class DocIndex:
         @type name: C{str} or L{DottedName}
         @type context: L{ValueDoc}
         """
-        try: name = DottedName(name)
-        except: return None
+        if isinstance(name, basestring):
+            name = re.sub(r'\(.*\)$', '', name.strip())
+            if re.match('([a-zA-Z_]\w*)(\.[a-zA-Z_]\w*)*', name):
+                name = DottedName(name)
+            else:
+                return None
+        elif not isinstance(name, DottedName):
+            raise TypeError("'name' should be a string or DottedName")
         
         if context is None or context.canonical_name is None:
             container_name = []
