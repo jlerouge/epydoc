@@ -661,13 +661,6 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     if introspect_doc == parse_doc:
         return introspect_doc
 
-    if introspect_doc.docs_extracted_by == 'parser':
-        log.debug("HMM", `introspect_doc`, `parse_doc`, path)
-        log.debug("%r extracted by parser" % introspect_doc, path)
-    if parse_doc.docs_extracted_by == 'introspecter':
-        # this is ok if it's a builtin:
-        log.debug("%r extracted by introspector" % parse_doc, path)
-        
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
     # happen.
@@ -797,8 +790,14 @@ def merge_value(value1, value2, precedence, cyclecheck, path):
 
 # [xx] are these really necessary or useful??
 def merge_package(v1, v2, precedence, cyclecheck, path):
+    if v1 is None or v2 is None:
+        if precedence == 'introspect': return v1
+        else: return v2
     return merge_value(v1, v2, precedence, cyclecheck, path+'.<package>')
 def merge_container(v1, v2, precedence, cyclecheck, path):
+    if v1 is None or v2 is None:
+        if precedence == 'introspect': return v1
+        else: return v2
     return merge_value(v1, v2, precedence, cyclecheck, path+'.<container>')
 def merge_overrides(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.<overrides>')
@@ -812,10 +811,7 @@ def merge_fdel(v1, v2, precedence, cyclecheck, path):
 def merge_imported_from(v1, v2, precedence, cyclecheck, path):
     # Anything we got from introspection shouldn't have an imported_from
     # attribute -- it should be the actual object's documentation.
-    if v1 is not None:
-        log.debug("Ouch, inspected thing with imported_from attribute?",
-                  `v1`, `v2`, path)
-    return None
+    return v1
 
 def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
     # Be careful here -- if we get it wrong, then we could end up
@@ -913,14 +909,14 @@ def link_imports(val_doc, docindex):
         # If we *do* have something at that address, then
         # merge the proxy `val_doc` with it.
         elif src_doc != val_doc:
-            src_doc.merge_and_overwrite(val_doc)
+            src_doc.merge_and_overwrite(val_doc, ignore_hash_conflict=True)
 
         # If the imported_from link points back at src_doc
         # itself, then we most likely have a variable that's
         # shadowing a submodule that it should be equal to.
         # So just get rid of the variable.
         elif src_doc == val_doc:
-            parent_name = DottedName(*val_doc.imported_from[:-1])
+            parent_name = val_doc.imported_from[:-1]
             var_name = val_doc.imported_from[-1]
             parent = docindex.get_valdoc(parent_name)
             if parent is not None and var_name in parent.variables:
@@ -1014,7 +1010,7 @@ def _fix_self_shadowing_var(var_doc, varname, docindex):
     # If possible, find another name for the shadowed value.
     cname = var_doc.value.canonical_name
     for i in range(1, len(cname)-1):
-        new_name = DottedName(*(cname[:i]+(cname[i]+"'",)+cname[i+1:]))
+        new_name = cname[:i] + (cname[i]+"'") + cname[i+1:]
         val_doc = docindex.get_valdoc(new_name)
         if val_doc is not None:
             log.warning("%s shadows its own value -- using %s instead" %
