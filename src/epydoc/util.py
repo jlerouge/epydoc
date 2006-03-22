@@ -154,7 +154,7 @@ def wordwrap(str, indent=0, right=75, startindex=0, splitchars=''):
                           (re.escape(splitchars), re.escape(splitchars)),
                           str.expandtabs())
     else:
-        chunks = re.split(r'( +|\n%s)', str.expandtabs())
+        chunks = re.split(r'( +|\n)', str.expandtabs())
     result = [' '*(indent-startindex)]
     charindex = max(indent, startindex)
     for chunknum, chunk in enumerate(chunks):
