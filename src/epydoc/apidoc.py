@@ -120,14 +120,26 @@ class DottedName:
         Return a new C{DottedName} whose identifier sequence is formed
         by adding C{other}'s identifier sequence to C{self}'s.
         """
-        return DottedName(self, other)
+        if isinstance(other, (basestring, DottedName)):
+            return DottedName(self, other)
+        else:
+            return DottedName(self, *other)
+
+    def __radd__(self, other):
+        if isinstance(other, (basestring, DottedName)):
+            return DottedName(other, self)
+        else:
+            return DottedName(*(list(other)+[self]))
 
     def __getitem__(self, i):
         """
-        Return the C{i}th identifier in this C{DottedName}.
+        Return the C{i}th identifier in this C{DottedName}.  If C{i} is
+        a slice, then return a C{DottedName} 
         """
         if isinstance(i, types.SliceType):
-            return self._identifiers[i.start:i.stop]
+            pieces = self._identifiers[i.start:i.stop]
+            if pieces: return DottedName(*pieces)
+            else: return []
         else:
             return self._identifiers[i]
 
@@ -222,6 +234,14 @@ class APIDoc(object):
     C{UNKNOWN} values.  For example, to test if a boolean attribute is
     C{True} or C{UNKNOWN}, use 'C{attrib in (True, UNKNOWN)}' or
     'C{attrib is not False}'.
+
+    Two C{APIDoc} objects describing the same object can be X{merged},
+    using the method L{merge_and_overwrite(other)}.  After two
+    C{APIDoc}s are merged, any changes to one will be reflected in the
+    other.  This is accomplished by setting the two C{APIDoc} objects
+    to use a shared instance dictionary.  See the documentation for
+    L{merge_and_overwrite} for more information, and some important
+    caveats about hashing.
     
     @ivar docstring: The documented item's docstring.
     @type docstring: C{string} or C{None}
@@ -322,7 +342,7 @@ class APIDoc(object):
         else: return -1
 
     __mergeset = None
-    def merge_and_overwrite(self, other):
+    def merge_and_overwrite(self, other, ignore_hash_conflict=False):
         """
         Combine C{self} and C{other} into a X{merged object}, such
         that any changes made to one will affect the other.  Any
@@ -333,7 +353,12 @@ class APIDoc(object):
         Care must be taken with this method, since it modifies the
         hash value of C{other}.  To help avoid the problems that this
         can cause, C{merge_and_overwrite} will raise an exception if
-        C{other} has ever been hashed.
+        C{other} has ever been hashed, unless C{ignore_hash_conflict}
+        is True.  Note that adding C{other} to a dictionary, set, or
+        similar data structure will implicitly cause it to be hashed.
+        If you do set C{ignore_hash_conflict} to True, then any
+        existing data structures that rely on C{other}'s hash staying
+        constant may become corrupted.
 
         @return: C{self}
         @raise ValueError: If C{other} has ever been hashed.
@@ -342,10 +367,9 @@ class APIDoc(object):
         if (self.__dict__ is other.__dict__ and
             self.__class__ is other.__class__): return self
             
-        if other.__has_been_hashed:
-            pass # [XX !!]
-#             raise ValueError("Can only merge with APIDoc objects that "
-#                              "have never been hashed")
+        if other.__has_been_hashed and not ignore_hash_conflict:
+            raise ValueError("%r has already been hashed!  Merging it "
+                             "would cause its has value to change." % other)
 
         # If other was itself already merged with anything,
         # then we need to merge those too.
@@ -385,6 +409,8 @@ class APIDoc(object):
         """
         return []
 
+# [xx] use sorted() to replace sorted_by_name, and make 
+# APIDoc.__cmp__ use the name??
 def reachable_valdocs(root, sorted_by_name=False, **filters):
     """
     Return a list of all C{ValueDoc}s that can be reached, directly or
@@ -1357,7 +1383,7 @@ class DocIndex:
         # Check for the name in all containing namespaces, starting
         # with the closest one.
         for i in range(len(container_name), -1, -1):
-            relative_name = DottedName(*(container_name[:i]+(name,)))
+            relative_name = container_name[:i]+name
             # Is `name` the absolute name of a documented value?
             val_doc = self.get_valdoc(relative_name)
             if val_doc is not None: return val_doc
