@@ -21,6 +21,7 @@ Render Graphviz directed graphs as images.  Below are some examples.
 __docformat__ = 'restructuredtext'
 
 import re
+import sys
 from epydoc import log
 from epydoc.apidoc import *
 from epydoc.util import plaintext_to_html
@@ -209,8 +210,9 @@ class DotGraph:
         try:
             from subprocess import Popen, PIPE
             cmd = [DOT_COMMAND, '-T%s' % language]
+            close_fds = sys.platform != 'win32'
             pipe = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                         close_fds=True)
+                         close_fds=close_fds)
             to_child = pipe.stdin
             from_child = pipe.stdout
             child_err = pipe.stderr
