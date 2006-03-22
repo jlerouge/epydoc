@@ -23,7 +23,7 @@ import os, os.path, re
 ######################################################################
 
 PY_SRC_EXTENSIONS = ['.py', '.pyw']
-PY_BIN_EXTENSIONS = ['.pyc', '.so']
+PY_BIN_EXTENSIONS = ['.pyc', '.so', '.pyd']
 
 def is_module_file(path):
     (dir, filename) = os.path.split(path)
@@ -125,7 +125,7 @@ def decode_with_backslashreplace(s):
             .encode('ascii', 'backslashreplace')
             .decode('ascii'))
 
-def wordwrap(str, indent=0, right=75, startindex=0):
+def wordwrap(str, indent=0, right=75, startindex=0, splitchars=''):
     """
     Word-wrap the given string.  I.e., add newlines to the string such
     that any lines that are longer than C{right} are broken into
@@ -144,9 +144,17 @@ def wordwrap(str, indent=0, right=75, startindex=0):
     @param startindex: If specified, then assume that the first line
         is already preceeded by C{startindex} characters.
     @type startindex: C{int}
+    @param splitchars: A list of non-whitespace characters which can
+        be used to split a line.  (E.g., use '/\\' to allow path names
+        to be split over multiple lines.)
     @rtype: C{str}
     """
-    chunks = re.split(r'( +|\n)', str.expandtabs())
+    if splitchars:
+        chunks = re.split(r'( +|\n|[^ \n%s]*[%s])' %
+                          (re.escape(splitchars), re.escape(splitchars)),
+                          str.expandtabs())
+    else:
+        chunks = re.split(r'( +|\n%s)', str.expandtabs())
     result = [' '*(indent-startindex)]
     charindex = max(indent, startindex)
     for chunknum, chunk in enumerate(chunks):
