@@ -48,6 +48,7 @@ Verbosity levels::
 __docformat__ = 'epytext en'
 
 import sys, os, time, re
+from glob import glob
 from optparse import OptionParser, OptionGroup
 import epydoc
 from epydoc import log
@@ -211,6 +212,10 @@ def parse_arguments():
     # Check to make sure all options are valid.
     if len(names) == 0:
         optparser.error("No names specified.")
+        
+    # perform shell expansion.
+    names = reduce(list.__add__, map(glob, names), [])
+        
     if options.inheritance not in INHERITANCE_STYLES:
         optparser.error("Bad inheritance style.  Valid options are " +
                         ",".join(INHERITANCE_STYLES))
