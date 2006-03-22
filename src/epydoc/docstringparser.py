@@ -521,7 +521,7 @@ def process_return_field(api_doc, docindex, tag, arg, descr):
 def process_rtype_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=False)
     if api_doc.return_type is not None:
-        raise ValueError(REDEFINED % 'return value description')
+        raise ValueError(REDEFINED % 'return value type')
     api_doc.return_type = descr
 
 def process_arg_field(api_doc, docindex, tag, arg, descr):
