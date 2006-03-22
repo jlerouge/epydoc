@@ -454,23 +454,26 @@ def _get_docs_from_package_dir(package_dir, introspect, parse,
 
 def _report_errors(name, introspect_doc, parse_doc,
                    introspect_error, parse_error):
+    if len(name) < 30: hdr = 'In %s: ' % name
+    else: hdr = 'In %s:\n' % name
     if introspect_doc == parse_doc == None:
+        log.start_block('%sNo documentation available!' % hdr)
         if introspect_error:
-            log.warning('Introspection failed for %s:\n%s' %
-                        (name, introspect_error))
+            log.error('Import failed:\n%s' % introspect_error)
         if parse_error:
-            log.warning('Source code parsing failed for %s:\n%s' %
-                        (name, parse_error))
-        log.error('No documentation available for %s!' % name)
-    else:
-        if introspect_error:
-            log.warning('Introspection failed for %s; using parse '
-                        'information only:\n%s' % (name, introspect_error))
-        if parse_error:
-            log.warning('Source code parsing failed for %s; using '
-                        'introspection information only:\n%s' %
-                        (name, parse_error))
-    
+            log.error('Source code parsing failed:\n%s' % parse_error)
+        log.end_block()
+    elif introspect_error:
+        log.start_block('%sImport failed (but source code parsing '
+                        'was successful).' % hdr)
+        log.error(introspect_error)
+        log.end_block()
+    elif parse_error:
+        log.start_block('%sSource code parsing failed (but '
+                        'introspection was successful).' % hdr)
+        log.error(parse_error)
+        log.end_block()
+
 
 #/////////////////////////////////////////////////////////////////
 # Progress Estimation (for Documentation Generation)
@@ -523,18 +526,36 @@ class _ProgressEstimator:
 
 MERGE_PRECEDENCE = {
     'repr': 'parse',
-    'canonical_name': 'introspect', # hmm.. change this? [xx]
-    'is_imported': 'parse',
-    'is_alias': 'parse',
-    'docformat': 'parse',
-    'is_package': 'parse',
-    'sort_spec': 'parse', # sort according to the order in the file.
-    'subpackages': 'introspect',
-    'filename': 'parse', # use src filename when possible
 
-    # parse is more likely to get the encoding right, but introspect
-    # will handle programatically generated docstrings.  Which is
-    # better?
+    # Why?
+    'canonical_name': 'introspect',
+
+    # The parser can tell if a variable is imported or not; the
+    # introspector must guess.
+    'is_imported': 'parse',
+
+    # The parser can tell if an assignment creates an alias or not.
+    'is_alias': 'parse',
+
+    # Why?
+    'docformat': 'parse',
+
+    # The parse should be able to tell definitively whether a module
+    # is a package or not.
+    'is_package': 'parse',
+
+    # Extract the sort spec from the order in which values are defined
+    # in the source file.
+    'sort_spec': 'parse',
+    
+    'submodules': 'introspect',
+
+    # The filename used by 'parse' is the source file.
+    'filename': 'parse',
+
+    # 'parse' is more likely to get the encoding right, but
+    # 'introspect' will handle programatically generated docstrings.
+    # Which is better?
     'docstring': 'introspect',
     }
 """Indicates whether information from introspection or parsing should be
@@ -626,7 +647,6 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
         else:
             path = '??'
 
-
     # If we've already examined this pair, then there's nothing
     # more to do.  The reason that we check id's here is that we
     # want to avoid hashing the APIDoc objects for now, so we can
@@ -641,6 +661,13 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     if introspect_doc == parse_doc:
         return introspect_doc
 
+    if introspect_doc.docs_extracted_by == 'parser':
+        log.debug("HMM", `introspect_doc`, `parse_doc`, path)
+        log.debug("%r extracted by parser" % introspect_doc, path)
+    if parse_doc.docs_extracted_by == 'introspecter':
+        # this is ok if it's a builtin:
+        log.debug("%r extracted by introspector" % parse_doc, path)
+        
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
     # happen.
@@ -752,8 +779,8 @@ def merge_attribute(attrib, introspect_doc, parse_doc, cyclecheck, path):
 def merge_variables(varlist1, varlist2, precedence, cyclecheck, path):
     # Merge all variables that are in both sets.
     for varname, var1 in varlist1.items():
-        if varname in varlist2:
-            var2 = varlist2[varname]
+        var2 = varlist2.get(varname)
+        if var2 is not None:
             var = merge_docs(var1, var2, cyclecheck, path+'.'+varname)
             varlist1[varname] = var
             varlist2[varname] = var
@@ -765,18 +792,8 @@ def merge_variables(varlist1, varlist2, precedence, cyclecheck, path):
     return varlist1
 
 def merge_value(value1, value2, precedence, cyclecheck, path):
-    if value1 is None and value2 is None:
-        return None
-    elif value1 is None or value2 is None:
-        if precedence == 'introspect': return value1
-        else: return value2
-    elif value1 is UNKNOWN:
-        return value2
-    elif value2 is UNKNOWN:
-        if precedence == 'introspect': return value1
-        else: return value2
-    else:
-        return merge_docs(value1, value2, cyclecheck, path)
+    assert value1 is not None and value2 is not None
+    return merge_docs(value1, value2, cyclecheck, path)
 
 # [xx] are these really necessary or useful??
 def merge_package(v1, v2, precedence, cyclecheck, path):
@@ -796,8 +813,8 @@ def merge_imported_from(v1, v2, precedence, cyclecheck, path):
     # Anything we got from introspection shouldn't have an imported_from
     # attribute -- it should be the actual object's documentation.
     if v1 is not None:
-        log.warning("Ouch, inspected thing with imported_from attribute?",
-                    `v1`, `v2`)
+        log.debug("Ouch, inspected thing with imported_from attribute?",
+                  `v1`, `v2`, path)
     return None
 
 def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
@@ -856,6 +873,9 @@ def merge_docstring(docstring1, docstring2, precedence, cyclecheck, path):
     else:
         return docstring1
 
+def merge_docs_extracted_by(v1, v2, precedence, cyclecheck, path):
+    return 'both'
+
 register_attribute_mergefunc('variables', merge_variables)
 register_attribute_mergefunc('value', merge_value)
 # [xx] are these useful/necessary?
@@ -869,6 +889,7 @@ register_attribute_mergefunc('imported_from', merge_imported_from)
 register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 register_attribute_mergefunc('docstring', merge_docstring)
+register_attribute_mergefunc('docs_extracted_by', merge_docs_extracted_by)
 
 ######################################################################
 ## Import Linking
