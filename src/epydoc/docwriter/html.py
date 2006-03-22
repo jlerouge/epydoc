@@ -286,7 +286,7 @@ class HTMLWriter:
         """
         self.docindex = docindex
         self.valdocs = docindex.reachable_valdocs(
-            sort_by_name=True, imports=False, packages=False,
+            sorted_by_name=True, imports=False, packages=False,
             submodules=False, bases=False, subclasses=False)
         
         # Process keyword arguments.
@@ -574,7 +574,6 @@ class HTMLWriter:
         if src_link: out('\n<br/>' + src_link)
         out('</h2>\n')
         
-            
         # If the module has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
             out(self.descr(doc, 2)+'<br /><br />\n\n')
@@ -1482,8 +1481,6 @@ class HTMLWriter:
         while True:
             container = self.docindex.container(doc)
             if container is None:
-                #if doc.canonical_name[0].startswith('script-'):
-                #    return ['Script %s' % str(doc.canonical_name)[7:]]+crumbs
                 if doc.canonical_name is UNKNOWN:
                     return ['??']+crumbs
                 elif isinstance(doc, ModuleDoc):
@@ -1736,6 +1733,8 @@ class HTMLWriter:
             rtype = self.rtype(var_doc, indent=10)
             rdescr = self.return_descr(var_doc, indent=10)
             arg_descrs = []
+            # [xx] if we have a @type but no @param, this won't list it!
+            # [xx] put them in the right order??
             for (arg_names, arg_descr) in var_doc.value.arg_descrs:
                 lhs = ', '.join([self.arg_name_to_html(var_doc.value, n)
                                  for n in arg_names])
@@ -1854,7 +1853,8 @@ class HTMLWriter:
         >>> if var_doc.overrides not in (None, UNKNOWN):
             <dl><dt>Overrides:
               $self.href(var_doc.overrides.value)$
-        >>>   if var_doc.overrides.value.descr == var_doc.value.descr:
+        >>>   if (func_doc.docstring in (None, UNKNOWN) and
+        >>>       var_doc.overrides.value.docstring not in (None, UNKNOWN)):
                 <dd><em class="note">(inherited documentation)</em></dd>
         >>>   #endif
             </dt></dl>
@@ -2180,6 +2180,8 @@ class HTMLWriter:
                         self.find_tree_width(base)+4)
         return width
 
+    # [xx] is 'doc' what I care about here?? hm.. cuz base_tree
+    # recurses??
     def base_label(self, doc, base):
         if (base.canonical_name[:-1] == doc.canonical_name[:-1]):
             return base.canonical_name[-1]
@@ -2216,8 +2218,11 @@ class HTMLWriter:
             args = [self.func_arg(n, d, css_class) for (n, d)
                     in zip(func_doc.posargs, func_doc.posarg_defaults)]
         if func_doc.vararg:
-            args.append('<span class="%s-arg">*%s</span>' %
-                        (css_class, func_doc.vararg))
+            if func_doc.vararg == '...':
+                args.append('<span class="%s-arg">...</span>' % css_class)
+            else:
+                args.append('<span class="%s-arg">*%s</span>' %
+                            (css_class, func_doc.vararg))
         if func_doc.kwarg:
             args.append('<span class="%s-arg">**%s</span>' %
                         (css_class, func_doc.kwarg))
@@ -2225,7 +2230,9 @@ class HTMLWriter:
         return ('<span class="%s">%s(%s)</span>' %
                 (css_class, name, ',\n        '.join(args)))
 
+    # [xx] tuple args???
     def func_arg(self, name, default, css_class):
+        name = self._arg_name(name)
         s = '<span class="%s-arg">%s</span>' % (css_class, name)
         if default is not None:
             if default.repr is not UNKNOWN:
@@ -2234,6 +2241,14 @@ class HTMLWriter:
             else:
                 s += '=<span class="%s-default">??</span>' % css_class
         return s
+
+    def _arg_name(self, arg):
+        if isinstance(arg, basestring):
+            return arg
+        elif len(arg) == 1:
+            return '(%s,)' % self._arg_name(arg[0])
+        else:
+            return '(%s)' % (', '.join([self._arg_name(a) for a in arg]))
 
 
     
@@ -2280,6 +2295,8 @@ class HTMLWriter:
         if len(doc.submodules) == 0: return
         self.write_table_header(out, "details", "Submodules")
 
+        # [xx] But what if there are multiple @group specs in
+        # the list for the same group???
         group_names = [''] + [n for n,_ in doc.group_specs]
         for group_name in group_names:
             if not doc.submodule_groups[group_name]: continue
@@ -2654,7 +2671,7 @@ class HTMLWriter:
                           (api_doc, module))
                 return module_pysrc_url
             mname_len = len(module.canonical_name)
-            anchor = '%s' % DottedName(*api_doc.canonical_name[mname_len:])
+            anchor = '%s' % api_doc.canonical_name[mname_len:]
             return '%s#%s' % (module_pysrc_url, urllib.quote(anchor))
         
         # We didn't find it:
@@ -2763,7 +2780,8 @@ class HTMLWriter:
                                          context=where).strip()
         if descr == '': return '&nbsp;'
         return descr
-    
+
+    # [xx] Should this be defined by the APIDoc classes themselves??
     def doc_kind(self, doc):
         if isinstance(doc, ModuleDoc) and doc.is_package == True:
             return 'Package'
@@ -2862,7 +2880,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
 #         # Check for the name in all containing namespaces, starting
 #         # with the closest one.
 #         for i in range(len(container_name), -1, -1):
-#             relative_name = DottedName(*(container_name[:i]+(name,)))
+#             relative_name = container_name[:i]+name
 #             # Is `name` the absolute name of a documented value?
 #             val_doc = self.docindex.get_valdoc(relative_name)
 #             if val_doc is not None: return val_doc
@@ -2892,7 +2910,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
 #         else:
 #             for i in range(len(container_name), -1, -1):
 #                 for j in range(len(name), 0, -1):
-#                     var_name = DottedName(*(container_name[:i]+name[:j]))
+#                     var_name = container_name[:i]+name[:j]
 #                     var_doc = self.docindex.get_vardoc(var_name)
 #                     if (var_doc is not None and var_doc.is_imported==True and
 #                         var_doc.value not in self.valdocs):
