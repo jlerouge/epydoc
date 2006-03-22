@@ -59,6 +59,7 @@ import re, types, sys
 from epydoc import log
 from epydoc.util import plaintext_to_html, plaintext_to_latex
 import epydoc
+from epydoc.compat import *
 
 ##################################################
 ## Contents
@@ -75,6 +76,8 @@ import epydoc
 ##################################################
 ## Dispatcher
 ##################################################
+
+MARKUP_LANGUAGES_USED = set()
 
 def parse(docstring, markup='plaintext', errors=None, **options):
     """
@@ -120,6 +123,9 @@ def parse(docstring, markup='plaintext', errors=None, **options):
         _parse_warn('Unsupported markup language %r.  Treating '
                     'docstrings as plaintext.' % markup)
         return plaintext.parse_docstring(docstring, errors, **options)
+
+    # Keep track of which markup languages have been used so far.
+    MARKUP_LANGUAGES_USED.add(markup)
 
     # Parse the docstring.
     try: parsed_docstring = parse_docstring(docstring, errors, **options)
