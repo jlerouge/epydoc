@@ -406,6 +406,7 @@ class APIDoc(object):
           - C{bases}: Bases for classes.
           - C{subclasses}: Subclasses for classes.
           - C{variables}: All variables.
+          - C{private}: Private variables.
         """
         return []
 
@@ -661,13 +662,23 @@ class NamespaceDoc(ValueDoc):
         assert self.variables != UNKNOWN
 
     def apidoc_links(self, **filters):
-        if not filters.get('variables', True):
+        variables = filters.get('variables', True)
+        imports = filters.get('imports', True)
+        private = filters.get('private', True)
+        if variables and imports and private:
+            return self.variables.values() # list the common case first.
+        elif not variables:
             return []
-        elif not filters.get('imports', True):
+        elif not imports and not private:
+            return [v for v in self.variables.values() if
+                    v.is_imported != True and v.is_private != True]
+        elif not private:
+            return [v for v in self.variables.values() if
+                    v.is_private != True]
+        elif not imports:
             return [v for v in self.variables.values() if
                     v.is_imported != True]
-        else:
-            return self.variables.values()
+        assert 0, 'this line should be unreachable'
 
     def init_sorted_variables(self):
         """
@@ -711,6 +722,19 @@ class NamespaceDoc(ValueDoc):
         elts = [(v.name, v) for v in self.sorted_variables]
         self.variable_groups = self._init_grouping(elts)
 
+    def group_names(self):
+        """
+        Return a list of the group names defined by this namespace, in
+        the order in which they should be listed, with no duplicates.
+        """
+        name_list = ['']
+        name_set = set()
+        for name, spec in self.group_specs:
+            if name not in name_set:
+                name_set.add(name)
+                name_list.append(name)
+        return name_list
+
     def _init_grouping(self, elts):
         """
         Divide a given a list of APIDoc objects into groups, as
@@ -735,7 +759,7 @@ class NamespaceDoc(ValueDoc):
         for (group_name, elt_names) in self.group_specs:
             group_re = re.compile('|'.join([n.replace('*','.*')+'$'
                                             for n in elt_names]))
-            group = []
+            group = groups.get(group_name, [])
             for elt_name, elt_doc in list(elts):
                 if group_re.match(elt_name):
                     group.append(elt_doc)
