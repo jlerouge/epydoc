@@ -24,7 +24,7 @@ import re
 import sys
 from epydoc import log
 from epydoc.apidoc import *
-from epydoc.util import plaintext_to_html
+from epydoc.util import plaintext_to_html, run_subprocess
 from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
@@ -212,35 +212,10 @@ class DotGraph:
         if the rendering failed.
         """
         try:
-            from subprocess import Popen, PIPE
-            cmd = [DOT_COMMAND, '-T%s' % language]
-            close_fds = sys.platform != 'win32'
-            pipe = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE,
-                         close_fds=close_fds)
-            to_child = pipe.stdin
-            from_child = pipe.stdout
-            child_err = pipe.stderr
-        except ImportError:
-            from popen2 import Popen3
-            cmd = '%s -T%s' % (DOT_COMMAND, language)
-            pipe = Popen3(cmd, True)
-            to_child = pipe.tochild
-            from_child = pipe.fromchild
-            child_err = pipe.childerr
-
-        to_child.write(self.to_dotfile())
-        to_child.close()
-        result = ''
-        while pipe.poll() is None:
-            result += from_child.read()
-        result += from_child.read()
-        exitval = pipe.wait()
-        
-        if exitval:
-            error = "Unable to render Graphviz dot graph."
-            if child_err is not None: error += '\n%s' % child_err.read()
-            log.warning(error)
-            return None
+            result, err = run_subprocess([DOT_COMMAND, '-T%s' % language],
+                                         self.to_dotfile())
+        except OSError, e:
+            log.warning("Unable to render Graphviz dot graph:\n%s" % e)
 
         return result
 
@@ -397,7 +372,7 @@ def import_graph(modules, docindex, linker, context=None, **options):
         if dst.imports in (None, UNKNOWN): continue
         for var_name in dst.imports:
             for i in range(len(var_name), 0, -1):
-                val_doc = docindex.get_valdoc(DottedName(*var_name[:i]))
+                val_doc = docindex.get_valdoc(var_name[:i])
                 if isinstance(val_doc, ModuleDoc):
                     if val_doc in nodes and dst in nodes:
                         edges.add((nodes[val_doc], nodes[dst]))
