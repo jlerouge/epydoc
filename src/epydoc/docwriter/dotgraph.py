@@ -216,6 +216,7 @@ class DotGraph:
                                          self.to_dotfile())
         except OSError, e:
             log.warning("Unable to render Graphviz dot graph:\n%s" % e)
+            return None
 
         return result
 

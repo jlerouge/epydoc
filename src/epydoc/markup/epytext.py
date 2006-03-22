@@ -1838,7 +1838,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             # Write the graph's image to a file
             path = os.path.join(directory, graph.uid)
             if not graph.write('%s.gif' % path, 'gif'):
-                return
+                return ''
             return graph.to_html('%s.gif' % graph.uid)
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
