@@ -244,8 +244,7 @@ def run_subprocess(cmd, data=None):
     # Under Python 2.4+, use subprocess
     try:
         from subprocess import Popen, PIPE
-        pipe = Popen(cmd, stdin=PIPE, stdout=PIPE,
-                     stderr=PIPE, close_fds=True)
+        pipe = Popen(cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         out, err = pipe.communicate(data)
         if hasattr(pipe, 'returncode'):
             if pipe.returncode == 0:
