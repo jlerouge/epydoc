@@ -383,13 +383,12 @@ def _find(name, package_doc=None):
     # First, check to see if it's in a variable (but ignore
     # variables that just contain imported submodules).
     if not _is_submodule_import_var(module_doc, name[1]):
-        try: return _find_in_namespace(DottedName(*name[1:]),
-                                            module_doc)
+        try: return _find_in_namespace(name[1:], module_doc)
         except ImportError: pass
 
     # If not, then check to see if it's in a subpackage.
     if module_doc.is_package:
-        return _find(DottedName(*name[1:]), module_doc)
+        return _find(name[1:], module_doc)
 
     # If it's not in a variable or a subpackage, then we can't
     # find it.
@@ -421,7 +420,7 @@ def _find_in_namespace(name, namespace_doc):
     # If the variable's value was imported, then follow its
     # alias link.
     if val_doc.imported_from not in (None, UNKNOWN):
-        return _find(DottedName(val_doc.imported_from, *name[1:]))
+        return _find(val_doc.imported_from+name[1:])
 
     # Otherwise, if the name has one identifier, then this is the
     # value we're looking for; return it.
@@ -430,7 +429,7 @@ def _find_in_namespace(name, namespace_doc):
 
     # Otherwise, if this value is a namespace, look inside it.
     elif isinstance(val_doc, NamespaceDoc):
-        return _find_in_namespace(DottedName(*name[1:]), val_doc)
+        return _find_in_namespace(name[1:], val_doc)
 
     # Otherwise, we ran into a dead end.
     else:
@@ -969,7 +968,7 @@ def _import_var(name, parent_docs):
         if (identifier not in container.variables or
             not isinstance(container.variables[identifier], ModuleDoc)):
             val_doc = NamespaceDoc(variables={}, sort_spec=[],
-                                   imported_from=DottedName(*name[:i+1]),
+                                   imported_from=name[:i+1],
                                    docs_extracted_by='parser')
             var_doc = VariableDoc(name=identifier, value=val_doc,
                                   is_imported=True, is_alias=False,
@@ -1725,8 +1724,7 @@ def del_variable(namespace, name):
             if not var_doc.is_alias and var_doc.value is not UNKNOWN:
                 var_doc.value.canonical_name = UNKNOWN
         else:
-            del_variable(namespace.variables[name[0]].value,
-                              DottedName(*name[1:]))
+            del_variable(namespace.variables[name[0]].value, name[1:])
             
 #/////////////////////////////////////////////////////////////////
 #{ Name Lookup
