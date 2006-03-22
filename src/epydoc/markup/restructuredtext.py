@@ -423,6 +423,11 @@ class _SplitFieldsTranslator(NodeVisitor):
     def unknown_visit(self, node):
         'Ignore all unknown nodes'
 
+def latex_head_prefix():
+    document = new_document('<fake>')
+    translator = _EpydocLaTeXTranslator(document, None)
+    return translator.head_prefix
+    
 class _EpydocLaTeXTranslator(LaTeXTranslator):
     def __init__(self, document, docstring_linker):
         # Set the document's settings.
@@ -444,7 +449,11 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
 
     def visit_document(self, node): pass
     def depart_document(self, node): pass
-        
+
+    # For now, just ignore dotgraphs. [XXX]
+    def visit_dotgraph(self, node): pass
+    def depart_dotgraph(self, node): pass
+    
 class _EpydocHTMLTranslator(HTMLTranslator):
     def __init__(self, document, docstring_linker, directory,
                  docindex, context):
@@ -578,7 +587,7 @@ def digraph_directive(name, arguments, options, content, lineno,
     """
     if arguments: title = arguments[0]
     else: title = ''
-    return dotgraph(_construct_digraph, title, options['caption'],
+    return dotgraph(_construct_digraph, title, options.get('caption'),
                     '\n'.join(content))
 digraph_directive.arguments = (0, 1, 1)
 digraph_directive.options = {'caption': directives.unchanged}
