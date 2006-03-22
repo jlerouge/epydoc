@@ -77,15 +77,18 @@ class DotGraph:
         
         self.nodes = []
         """A list of the nodes that are present in the graph.
+        
         :type: `list` of `DocGraphNode`"""
         
         self.edges = []
         """A list of the edges that are present in the graph.
+        
         :type: `list` of `DocGraphEdge`"""
 
         self.body = body
         """A string that should be included as-is in the body of the
         graph.
+        
         :type: `str`"""
         
         self.node_defaults = node_defaults or {}
@@ -118,8 +121,8 @@ class DotGraph:
         Return the HTML code that should be uesd to display this graph
         (including a client-side image map).
         
-        @param image_url: The URL of the image file for this graph;
-        this should be generated separately with the L{write()} method.
+        :param image_url: The URL of the image file for this graph;
+        this should be generated separately with the `write()` method.
         """
         cmapx = self.render('cmapx') or ''
         title = plaintext_to_html(self.title or '')
@@ -190,6 +193,7 @@ class DotGraph:
         """
         Render the graph using the output format `language`, and write
         the result to `filename`.
+        
         :return: True if rendering was successful.
         """
         s = self.render(language)
