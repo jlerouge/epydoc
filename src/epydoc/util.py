@@ -220,3 +220,81 @@ def plaintext_to_latex(str, nbsp=0, breakany=0):
     
     return str
 
+class RunSubprocessError(OSError):
+    def __init__(self, cmd, out, err):
+        OSError.__init__(self, '%s failed' % cmd[0])
+        self.out = out
+        self.err = err
+
+def run_subprocess(cmd, data=None):
+    """
+    Execute the command C{cmd} in a subprocess.
+    
+    @param cmd: The command to execute, specified as a list
+        of string.
+    @param data: A string containing data to send to the
+        subprocess.
+    @return: A tuple C{(out, err)}.
+    @raise OSError: If there is any problem executing the
+        command, or if its exitval is not 0.
+    """
+    if isinstance(cmd, basestring):
+        cmd = cmd.split()
+
+    # Under Python 2.4+, use subprocess
+    try:
+        from subprocess import Popen, PIPE
+        pipe = Popen(cmd, stdin=PIPE, stdout=PIPE,
+                     stderr=PIPE, close_fds=True)
+        out, err = pipe.communicate(data)
+        if hasattr(pipe, 'returncode'):
+            if pipe.returncode == 0:
+                return out, err
+            else:
+                raise RunSubprocessError(cmd, out, err)
+        else:
+            # Assume that there was an error iff anything was written
+            # to the child's stderr.
+            if err == '':
+                return out, err
+            else:
+                raise RunSubprocessError(cmd, out, err)
+    except ImportError:
+        pass
+
+    # Under Python 2.3 or earlier, on unix, use popen2.Popen3 so we
+    # can access the return value.
+    import popen2
+    if hasattr(popen2, 'Popen3'):
+        pipe = popen2.Popen3(' '.join(cmd), True)
+        to_child = pipe.tochild
+        from_child = pipe.fromchild
+        child_err = pipe.childerr
+        if data:
+            to_child.write(data)
+        to_child.close()
+        out = err = ''
+        while pipe.poll() is None:
+            out += from_child.read()
+            err += child_err.read()
+        out += from_child.read()
+        err += child_err.read()
+        if pipe.wait() == 0:
+            return out, err
+        else:
+            raise RunSubprocessError(cmd, out, err)
+
+    # Under Python 2.3 or earlier, on non-unix, use os.popen3
+    else:
+        to_child, from_child, child_err = os.popen3(' '.join(cmd), 'b')
+        if data:
+            to_child.write(data)
+        to_child.close()
+        err = child_err.read()
+        out = from_child.read()
+        # Assume that there was an error iff anything was written
+        # to the child's stderr.
+        if err == '':
+            return out, err
+        else:
+            raise RunSubprocessError(cmd, out, err)
