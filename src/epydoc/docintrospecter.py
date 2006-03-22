@@ -182,7 +182,8 @@ def _get_valuedoc(value):
         try: canonical_name = get_canonical_name(value)
         except ValueError: canonical_name = UNKNOWN
         val_doc = ValueDoc(pyval=value, repr=value_repr(value),
-                           canonical_name = canonical_name)
+                           canonical_name = canonical_name,
+                           docs_extracted_by='introspecter')
         _valuedoc_cache[pyid] = val_doc
         
         # If it's a module, then do some preliminary introspection.
@@ -193,12 +194,9 @@ def _get_valuedoc(value):
             val_doc.defining_module = val_doc
         else:
             module_name = get_containing_module(value)
-            if module_name:
-                try:
-                    module = get_value_from_name(module_name)
-                    val_doc.defining_module = _get_valuedoc(module)
-                except KeyboardInterrupt: raise
-                except Exception: pass
+            #if (module_name and module_name in sys.modules and
+            if inspect.ismodule(sys.modules.get(module_name)):
+                val_doc.defining_module = _get_valuedoc(module)
             
     return val_doc
 
@@ -299,20 +297,23 @@ def introspect_module(module, module_doc, preliminary=False):
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
                                         is_imported=False,
-                                        container=module_doc)
+                                        container=module_doc,
+                                        docs_extracted_by='introspecter')
         elif container is None or module_doc.canonical_name is UNKNOWN:
             # Possibly imported variable.
             child_val_doc = introspect_docs(child, context=module_doc)
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
-                                        container=module_doc)
+                                        container=module_doc,
+                                        docs_extracted_by='introspecter')
         else:
             # Imported variable.
             child_val_doc = _get_valuedoc(child)
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
                                         is_imported=True,
-                                        container=module_doc)
+                                        container=module_doc,
+                                        docs_extracted_by='introspecter')
 
         module_doc.variables[child_name] = child_var_doc
 
@@ -393,7 +394,8 @@ def introspect_class(cls, class_doc):
             #except: continue
             val_doc = introspect_docs(child, context=class_doc)
             var_doc = VariableDoc(name=child_name, value=val_doc,
-                                  container=class_doc)
+                                  container=class_doc,
+                                  docs_extracted_by='introspecter')
             class_doc.variables[child_name] = var_doc
 
     return class_doc

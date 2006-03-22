@@ -261,7 +261,8 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
         module_doc = ModuleDoc(canonical_name=module_name, variables={},
                                sort_spec=[], imports=[],
                                filename=filename, package=context,
-                               is_package=is_pkg, submodules=[])
+                               is_package=is_pkg, submodules=[],
+                               docs_extracted_by='parser')
         module_doc.defining_module = module_doc
         _moduledoc_cache[filename] = module_doc
 
@@ -775,7 +776,8 @@ def process_control_flow_line(line, parent_docs, prev_line_doc,
         parent = get_lhs_parent(loopvar_name, parent_docs)
         if parent is not None:
             var_doc = VariableDoc(name=loopvar_name[-1], is_alias=False, 
-                                  is_imported=False, is_instvar=False)
+                                  is_imported=False, is_instvar=False,
+                                  docs_extracted_by='parser')
             set_variable(parent, var_doc)
     
     if ((keyword == 'if' and PARSE_IF_BLOCKS) or
@@ -893,11 +895,13 @@ def _process_fromstar_import(src, parent_docs):
                     not (name.startswith('__') and name.endswith('__'))):
                     if IMPORT_HANDLING == 'link':
                         val_src = DottedName(src, name)
-                        val_doc = ValueDoc(imported_from=val_src)
+                        val_doc = ValueDoc(imported_from=val_src,
+                                           docs_extracted_by='parser')
                     else:
                         val_doc = imp_var.value
                     var_doc = VariableDoc(name=name, is_alias=False,
-                                          value=val_doc, is_imported=True)
+                                          value=val_doc, is_imported=True,
+                                          docs_extracted_by='parser')
                     set_variable(parent_docs[-1], var_doc)
 
     # If we got here, then either IMPORT_HANDLING='link' or we
@@ -950,7 +954,8 @@ def _import_var(name, parent_docs):
             # module and create a variable for it.
             mod_doc = _find(DottedName(name[0]))
             var_doc = VariableDoc(name=name[0], value=mod_doc,
-                                  is_imported=True, is_alias=False)
+                                  is_imported=True, is_alias=False,
+                                  docs_extracted_by='parser')
             set_variable(parent_docs[-1], var_doc)
             return
 
@@ -964,9 +969,11 @@ def _import_var(name, parent_docs):
         if (identifier not in container.variables or
             not isinstance(container.variables[identifier], ModuleDoc)):
             val_doc = NamespaceDoc(variables={}, sort_spec=[],
-                                   imported_from=DottedName(*name[:i+1]))
+                                   imported_from=DottedName(*name[:i+1]),
+                                   docs_extracted_by='parser')
             var_doc = VariableDoc(name=identifier, value=val_doc,
-                                  is_imported=True, is_alias=False)
+                                  is_imported=True, is_alias=False,
+                                  docs_extracted_by='parser')
             set_variable(container, var_doc)
         container = container.variables[identifier].value
 
@@ -1000,7 +1007,8 @@ def _import_var_as(src, name, parent_docs):
         except ImportError: val_doc = None
         if val_doc is not None:
             var_doc = VariableDoc(name=name, value=val_doc,
-                                  is_imported=True, is_alias=False)
+                                  is_imported=True, is_alias=False,
+                                  docs_extracted_by='parser')
             set_variable(parent_docs[-1], var_doc)
             return
 
@@ -1014,9 +1022,11 @@ def _add_import_var(src, name, container):
     Add a new variable named C{name} to C{container}, whose value
     is a C{ValueDoc} with an C{imported_from=src}.
     """
-    val_doc = ValueDoc(imported_from=src)
+    val_doc = ValueDoc(imported_from=src,
+                       docs_extracted_by='parser')
     var_doc = VariableDoc(name=name, value=val_doc,
-                          is_imported=True, is_alias=False)
+                          is_imported=True, is_alias=False,
+                          docs_extracted_by='parser')
     set_variable(container, var_doc)
 
 def _global_name(name, parent_docs):
@@ -1051,8 +1061,6 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
     # If it's an instance var, then discard the value.
     is_instvar = lhs_is_instvar(lhs_pieces, parent_docs)
     
-    if is_instvar: rhs_val = UNKNOWN
-
     # if it's not an instance var, and we're not in a namespace,
     # then it's just a local var -- so ignore it.
     if not (is_instvar or isinstance(parent_docs[-1], NamespaceDoc)):
@@ -1077,7 +1085,8 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
             # Create the VariableDoc.
             var_doc = VariableDoc(name=lhs_name[-1], value=rhs_val,
                                   is_imported=False, is_alias=is_alias,
-                                  is_instvar=is_instvar)
+                                  is_instvar=is_instvar,
+                                  docs_extracted_by='parser')
             # Extract a docstring from the comments, when present,
             # but only if there's a single LHS.
             if len(lhs_pieces) == 1:
@@ -1113,7 +1122,8 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
                 var_doc = VariableDoc(name=lhs_name[-1],
                                       is_imported=False,
                                       is_alias=is_alias,
-                                      is_instvar=is_instvar)
+                                      is_instvar=is_instvar,
+                                      docs_extracted_by='parser')
                 set_variable(lhs_parent, var_doc, True)
 
         # If we have multiple left-hand-sides, then all but the
@@ -1166,7 +1176,8 @@ def rhs_to_valuedoc(rhs, parent_docs):
     # Nothing else to do: make a val with the source as its repr.
     valdoc_repr = pp_toktree(rhs)
     return ValueDoc(repr=valdoc_repr, toktree=rhs,
-                    defining_module=parent_docs[0]), False
+                    defining_module=parent_docs[0],
+                    docs_extracted_by='parser'), False
     
 
 def get_lhs_parent(lhs_name, parent_docs):
@@ -1338,7 +1349,8 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
 
     # Create the function's RoutineDoc.
     func_doc = RoutineDoc(canonical_name=canonical_name,
-                          defining_module=parent_docs[0])
+                          defining_module=parent_docs[0],
+                          docs_extracted_by='parser')
 
     # Process the signature.
     init_arglist(func_doc, line[2])
@@ -1367,7 +1379,8 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
 
     # Add a variable to the containing namespace.
     var_doc = VariableDoc(name=func_name, value=func_doc,
-                          is_imported=False, is_alias=False)
+                          is_imported=False, is_alias=False,
+                          docs_extracted_by='parser')
     set_variable(parent_doc, var_doc)
     
     # Return the new ValueDoc.
@@ -1381,7 +1394,7 @@ def apply_decorator(decorator_name, func_doc):
     elif DEFAULT_DECORATOR_BEHAVIOR == 'transparent':
         return func_doc.__class__(**func_doc.__dict__)
     elif DEFAULT_DECORATOR_BEHAVIOR == 'opaque':
-        return ValueDoc()
+        return ValueDoc(docs_extracted_by='parser')
     else:
         raise ValueError, 'Bad value for DEFAULT_DECORATOR_BEHAVIOR'
 
@@ -1420,7 +1433,8 @@ def init_arglist(func_doc, arglist):
         elif arg[1] != (token.OP, '=') or len(arg) == 2:
             raise ParseError("Bad argument list")
         else:
-            default_val = ValueDoc(repr=pp_toktree(arg[2:]))
+            default_val = ValueDoc(repr=pp_toktree(arg[2:]),
+                                   docs_extracted_by='parser')
             func_doc.posarg_defaults.append(default_val)
 
 #/////////////////////////////////////////////////////////////////
@@ -1454,9 +1468,11 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     class_doc = ClassDoc(variables={}, sort_spec=[],
                          bases=[], subclasses=[],
                          canonical_name=canonical_name,
-                         defining_module=parent_docs[0])
+                         defining_module=parent_docs[0],
+                         docs_extracted_by='parser')
     var_doc = VariableDoc(name=class_name, value=class_doc,
-                          is_imported=False, is_alias=False)
+                          is_imported=False, is_alias=False,
+                          docs_extracted_by='parser')
 
     # Add the bases.
     if len(line) == 4:
@@ -1469,7 +1485,8 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
                 if base_doc is None: # [XX] This might be a problem??
                     base_doc = ClassDoc(variables={}, sort_spec=[],
                                         bases=[], subclasses=[],
-                                        imported_from = base)
+                                        imported_from = base,
+                                        docs_extracted_by='parser')
                 class_doc.bases.append(base_doc)
         except ParseError:
             class_doc.bases = UNKNOWN
@@ -1764,7 +1781,8 @@ def lookup_value(dotted_name, parent_docs):
             assert isinstance(var_doc.value.imported_from, DottedName)
             from_name = DottedName(var_doc.value.imported_from,
                                    *dotted_name[i:])
-            return ValueDoc(imported_from=from_name)
+            return ValueDoc(imported_from=from_name,
+                            docs_extracted_by='parser')
 
         if isinstance(var_doc.value, NamespaceDoc):
             var_dict = var_doc.value.variables
