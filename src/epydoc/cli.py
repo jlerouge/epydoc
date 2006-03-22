@@ -553,12 +553,16 @@ class ConsoleLogger(log.Logger):
             header = wordwrap(header, right=width-2).rstrip()
             header = '\n'.join([prefix+self.term.CYAN+l+self.term.NORMAL
                                 for l in header.split('\n')])
+            # Construct the body:
+            body = ''
+            for message in messages:
+                if message.endswith('\n'): body += message
+                else: body += message+'\n'
             # Indent the body:
-            body = '\n'.join(messages)
             body = '\n'.join([prefix+'  '+l for l in body.split('\n')])
             # Put it all together:
             message = divider + '\n' + header + '\n' + body + '\n'
-            self._report(message, rstrip=False)
+            self._report(message)
             
     def _format(self, prefix, message, color):
         """
@@ -572,7 +576,7 @@ class ConsoleLogger(log.Logger):
                 lines[i] = ' '*(indent-startindex) + lines[i] + '\n'
             else:
                 width = self.term.COLS - 5 - 4*len(self._message_blocks)
-                lines[i] = wordwrap(lines[i], indent, width, startindex)
+                lines[i] = wordwrap(lines[i], indent, width, startindex, '\\/')
             startindex = 0
         return color+prefix+self.term.NORMAL+''.join(lines)
 
@@ -594,8 +598,8 @@ class ConsoleLogger(log.Logger):
             
         self._report(message)
 
-    def _report(self, message, rstrip=True):
-        if rstrip: message = message.rstrip()
+    def _report(self, message):
+        if not message.endswith('\n'): message += '\n'
         
         if self._message_blocks:
             self._message_blocks[-1][-1].append(message)
@@ -613,7 +617,7 @@ class ConsoleLogger(log.Logger):
                                  self.term.CLEAR_EOL + self.term.UP*2)
 
             # Display the message message.
-            print message
+            sys.stdout.write(message)
             sys.stdout.flush()
                 
     def progress(self, percent, message=''):
