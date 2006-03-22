@@ -51,7 +51,7 @@ import sys, os, time, re
 from optparse import OptionParser, OptionGroup
 import epydoc
 from epydoc import log
-from epydoc.util import wordwrap
+from epydoc.util import wordwrap, run_subprocess, RunSubprocessError
 from epydoc.apidoc import UNKNOWN
 import ConfigParser
 
@@ -322,6 +322,9 @@ def main(options, names):
         logger = ConsoleLogger(options.verbosity)
         log.register_logger(logger)
     else:
+        # Roughly how long does each action take?
+        action_time = {'html': [100], 'text': 30, 'latex': 60, 'ps': 70,
+                       'pdf': 80}
         # Each number is a rough approximation of how long we spend on
         # that task, used to divide up the unified progress bar.
         stages = [40,  # Building documentation
@@ -330,8 +333,13 @@ def main(options, names):
                   3,   # Indexing documentation
                   30,  # Parsing Docstrings
                   1,   # Inheriting documentation
-                  2,   # Sorting & Grouping
-                  100] # Generating output
+                  2]   # Sorting & Grouping
+        if options.action == 'html': stages += [100]
+        elif options.action == 'text': stages += [30]
+        elif options.action == 'latex': stages += [60,30]
+        elif options.action == 'ps': stages += [60,40]
+        elif options.action == 'pdf': stages += [60,50]
+        else: raise ValueError, '%r not supported' % options.action
         if options.parse and not options.introspect:
             del stages[1] # no merging
         if options.introspect and not options.parse:
@@ -364,25 +372,11 @@ def main(options, names):
 
     # Perform the specified action.
     if options.action == 'html':
-        from epydoc.docwriter.html import HTMLWriter
-        html_writer = HTMLWriter(docindex, **options.__dict__)
-        if options.verbose > 0:
-            log.start_progress('Writing HTML docs to %r' % options.target)
-        else:
-            log.start_progress('Writing HTML docs')
-        html_writer.write(options.target)
-        log.end_progress()
+        write_html(docindex, options)
+    elif options.action in ('latex', 'ps', 'pdf'):
+        write_latex(docindex, options, options.action)
     elif options.action == 'text':
-        log.start_progress('Writing output')
-        from epydoc.docwriter.plaintext import PlaintextWriter
-        plaintext_writer = PlaintextWriter()
-        s = ''
-        for apidoc in docindex.root:
-            s += plaintext_writer.write(apidoc)
-        log.end_progress()
-        if isinstance(s, unicode):
-            s = s.encode('ascii', 'backslashreplace')
-        print s
+        write_text(docindex, options)
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
@@ -400,6 +394,108 @@ def main(options, names):
     if options.verbosity >= 2 and logger is not None:
         logger.print_times()
 
+def write_html(docindex, options):
+    from epydoc.docwriter.html import HTMLWriter
+    html_writer = HTMLWriter(docindex, **options.__dict__)
+    if options.verbose > 0:
+        log.start_progress('Writing HTML docs to %r' % options.target)
+    else:
+        log.start_progress('Writing HTML docs')
+    html_writer.write(options.target)
+    log.end_progress()
+
+_RERUN_LATEX_RE = re.compile(r'(?im)^LaTeX\s+Warning:\s+Label\(s\)\s+may'
+                             r'\s+have\s+changed.\s+Rerun')
+
+def write_latex(docindex, options, format):
+    from epydoc.docwriter.latex import LatexWriter
+    latex_writer = LatexWriter(docindex, **options.__dict__)
+    log.start_progress('Writing LaTeX docs')
+    latex_writer.write(options.target)
+    log.end_progress()
+    
+    if format == 'latex': steps = 4
+    elif format == 'ps': steps = 5
+    elif format == 'pdf': steps = 6
+    
+    log.start_progress('Processing LaTeX docs')
+    oldpath = os.path.abspath(os.curdir)
+    running = None # keep track of what we're doing.
+    try:
+        try:
+            os.chdir(options.target)
+
+            # Clear any old files out of the way.
+            for ext in 'tex aux log out idx ilg toc ind'.split():
+                if os.path.exists('apidoc.%s' % ext):
+                    os.remove('apidoc.%s' % ext)
+
+            # The first pass generates index files.
+            running = 'latex'
+            log.progress(0./steps, 'LaTeX: First pass')
+            run_subprocess('latex api.tex')
+
+            # Build the index.
+            running = 'makeindex'
+            log.progress(1./steps, 'LaTeX: Build index')
+            run_subprocess('makeindex api.idx')
+
+            # The second pass generates our output.
+            running = 'latex'
+            log.progress(2./steps, 'LaTeX: Second pass')
+            out, err = run_subprocess('latex api.tex')
+            
+            # The third pass is only necessary if the second pass
+            # changed what page some things are on.
+            running = 'latex'
+            if _RERUN_LATEX_RE.match(out):
+                log.progress(3./steps, 'LaTeX: Third pass')
+                out, err = run_subprocess('latex api.tex')
+ 
+            # A fourth path should (almost?) never be necessary.
+            running = 'latex'
+            if _RERUN_LATEX_RE.match(out):
+                log.progress(3./steps, 'LaTeX: Fourth pass')
+                run_subprocess('latex api.tex')
+
+            # If requested, convert to postscript.
+            if format in ('ps', 'pdf'):
+                running = 'dvips'
+                log.progress(4./steps, 'dvips')
+                run_subprocess('dvips api.dvi -o api.ps -G0 -Ppdf')
+
+            # If requested, convert to pdf.
+            if format in ('pdf'):
+                running = 'ps2pdf'
+                log.progress(5./steps, 'ps2pdf')
+                run_subprocess(
+                    'ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '
+                    '-dSubsetFonts=true -dCompatibilityLevel=1.2 '
+                    '-dEmbedAllFonts=true api.ps api.pdf')
+        except RunSubprocessError, e:
+            if running == 'latex':
+                e.out = re.sub(r'(?sm)\A.*?!( LaTeX Error:)?', r'', e.out)
+                e.out = re.sub(r'(?sm)\s*Type X to quit.*', '', e.out)
+                e.out = re.sub(r'(?sm)^! Emergency stop.*', '', e.out)
+            log.error("%s failed: %s" % (running, (e.out+e.err).lstrip()))
+        except OSError, e:
+            log.error("%s failed: %s" % (running, e))
+    finally:
+        os.chdir(oldpath)
+        log.end_progress()
+
+def write_text(docindex, options):
+    log.start_progress('Writing output')
+    from epydoc.docwriter.plaintext import PlaintextWriter
+    plaintext_writer = PlaintextWriter()
+    s = ''
+    for apidoc in docindex.root:
+        s += plaintext_writer.write(apidoc)
+    log.end_progress()
+    if isinstance(s, unicode):
+        s = s.encode('ascii', 'backslashreplace')
+    print s
+                
 def cli():
     # Parse command-line arguments.
     options, names = parse_arguments()
@@ -550,7 +646,7 @@ class ConsoleLogger(log.Logger):
             divider = (self.term.CYAN+self.term.BOLD+'+'+'-'*(width-1)+
                        self.term.NORMAL)
             # Mark up the header:
-            header = wordwrap(header, right=width-2).rstrip()
+            header = wordwrap(header, right=width-2, splitchars='\\/').rstrip()
             header = '\n'.join([prefix+self.term.CYAN+l+self.term.NORMAL
                                 for l in header.split('\n')])
             # Construct the body:
