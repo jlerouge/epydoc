@@ -1950,7 +1950,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
             else:
                 return '[??]'
         elif tree.tagName == 'graph':
-            raise ValueError, 'graph not implemented yet for latex'
+            return '(GRAPH)'
+            #raise ValueError, 'graph not implemented yet for latex'
         else:
             # Assume that anything else can be passed through.
             return childstr
