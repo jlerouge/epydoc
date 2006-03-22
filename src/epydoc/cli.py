@@ -214,7 +214,7 @@ def parse_arguments():
         optparser.error("No names specified.")
         
     # perform shell expansion.
-    names = reduce(list.__add__, map(glob, names), [])
+    names = sum(map(glob, names), [])
         
     if options.inheritance not in INHERITANCE_STYLES:
         optparser.error("Bad inheritance style.  Valid options are " +
