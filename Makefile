@@ -117,16 +117,16 @@ api-html: .api-html.up2date
 	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
 	       --url http://epydoc.sourceforge.net \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
-	       --docformat plaintext $(PY_SRC)
+	       --docformat plaintext -v --graph classtree $(PY_SRC)
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
 .api-pdf.up2date: $(PY_SRCFILES)
 	@echo "Skipping pdf generation (not implemented yet)"
-#	rm -rf $(LATEX_API)
-#	mkdir -p $(LATEX_API)
-#	$(EPYDOC) --pdf -o $(LATEX_API) \
-#	       -n "Epydoc $(VERSION)" $(PY_SRC)
+	rm -rf $(LATEX_API)
+	mkdir -p $(LATEX_API)
+	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
+	       --name "Epydoc $(VERSION)" $(PY_SRC) -v
 	touch .api-pdf.up2date
 
 examples: .examples.up2date
@@ -195,9 +195,10 @@ stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_STDLIB)
 	mkdir -p $(HTML_STDLIB)
-	$(EPYDOC) -o $(HTML_STDLIB) -c white \
-	       -n $(SLNAME) -u $(SLURL) --docformat plaintext --debug \
-	       --show-imports --builtins $(SLFILES)
+	@echo "Building stdlib html docs..."
+	@$(EPYDOC) -o $(HTML_STDLIB) --css white \
+	       --name $(SLNAME) --url $(SLURL) --debug \
+	       --show-imports __builtin__ $(SLFILES)
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
@@ -206,7 +207,7 @@ stdlib-pdf: .stdlib-pdf.up2date
 	rm -rf $(LATEX_STDLIB)
 	mkdir -p $(LATEX_STDLIB)
 	$(EPYDOC) --pdf -o $(LATEX_STDLIB) \
-		--no-private -n $(SLNAME) --docformat plaintext \
+		--no-private --name $(SLNAME) --docformat plaintext \
 		--debug --builtins $(SLFILES)
 ##//////////////////////////////////////////////////////////////////////
 ## Unit Testing
