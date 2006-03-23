@@ -428,7 +428,9 @@ def reachable_valdocs(root, sorted_by_name=False, **filters):
     apidoc_queue = list(root)
     val_set = set()
     var_set = set()
+    #if 'private' in filters: log.debug('RR', root)
     while apidoc_queue:
+        #if 'private' in filters: log.debug('  ', apidoc_queue)
         api_doc = apidoc_queue.pop()
         if isinstance(api_doc, ValueDoc):
             val_set.add(api_doc)
@@ -671,10 +673,10 @@ class NamespaceDoc(ValueDoc):
             return []
         elif not imports and not private:
             return [v for v in self.variables.values() if
-                    v.is_imported != True and v.is_private != True]
+                    v.is_imported != True and v.is_public != False]
         elif not private:
             return [v for v in self.variables.values() if
-                    v.is_private != True]
+                    v.is_public != False]
         elif not imports:
             return [v for v in self.variables.values() if
                     v.is_imported != True]
