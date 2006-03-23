@@ -285,11 +285,16 @@ class HTMLWriter:
               source code files for each python module.
         """
         self.docindex = docindex
-        self.valdocs = docindex.reachable_valdocs(
-            sorted_by_name=True, imports=False, packages=False,
-            submodules=False, bases=False, subclasses=False)
         
         # Process keyword arguments.
+        self._show_private = kwargs.get('show_private', 1)
+        """Should private docs be included?"""
+
+        self.valdocs = docindex.reachable_valdocs(
+            sorted_by_name=True, imports=False, packages=False, bases=False, 
+            submodules=False, subclasses=False, private=self._show_private)
+        log.debug(self.valdocs)
+        
         self._prj_name = kwargs.get('prj_name', None)
         """The project's name (for the project link in the navbar)"""
         
@@ -298,9 +303,6 @@ class HTMLWriter:
         
         self._prj_link = kwargs.get('prj_link', None)
         """HTML code for the project link in the navbar"""
-        
-        self._create_private_docs = kwargs.get('show_private', 1)
-        """Should private docs be included?"""
         
         self._top_page = self._find_top_page(kwargs.get('top_page', None))
         """The 'main' page"""
@@ -347,6 +349,12 @@ class HTMLWriter:
         self._graph_types = kwargs.get('graphs', ()) or ()
         """Graphs that we should include in our output."""
 
+        # For use with select_variables():
+        if self._show_private:
+            self._public_filter = None
+        else:
+            self._public_filter = True
+        
         # Make sure inheritance has a sane value.
         if self._inheritance not in ('listed', 'included', 'grouped'):
             raise ValueError, 'Bad value for inheritance'
@@ -789,6 +797,8 @@ class HTMLWriter:
         if terms:
             self.write_term_index(out, terms)
 
+        # [xx] this will only find variables if they have values.
+        # (e.g., it won't list any instance variables.)
         identifiers = []
         for doc in self.valdocs:
             name = doc.canonical_name
@@ -974,7 +984,9 @@ class HTMLWriter:
         >>>            isinstance(d, ModuleDoc)]
         >>> self.write_toc_section(out, "Modules", modules)
         <hr />
-        $self.PRIVATE_LINK$
+        >>> if self._show_private:
+          $self.PRIVATE_LINK$
+        >>> #endif
         >>> self.write_footer(out, short=True)
         ''')
         # \------------------------------------------------------------/
@@ -994,6 +1006,7 @@ class HTMLWriter:
             doc_url = self.url(doc)
             toc_url = 'toc-%s' % doc_url
             if isinstance(doc, VariableDoc) and doc.is_public is False:
+                if not self._show_private: continue
                 out('  <div class="private">\n')
                 
             out('  <p class="toc">\n')
@@ -1028,18 +1041,15 @@ class HTMLWriter:
         for doc in self.valdocs:
             if isinstance(doc, ModuleDoc):
                 vars += doc.select_variables(value_type='other',
-                                             imported=False)
+                                             imported=False,
+                                             public=self._public_filter)
         self.write_toc_section(out, "All Variables", vars)
 
         # Footer material.
         out('<hr />\n')
-        out(self.PRIVATE_LINK+'\n')
+        if self._show_private:
+            out(self.PRIVATE_LINK+'\n')
         self.write_footer(out, short=True)
-
-    PRIVATE_LINK = '''
-    <span class="options">[<a href="javascript: void(0);" class="privatelink"
-    onclick="toggle_private();">hide private</a>]</span>
-    '''.strip()
 
     def write_module_toc(self, out, doc):
         """
@@ -1057,20 +1067,24 @@ class HTMLWriter:
 
 
         # List the classes.
-        classes = doc.select_variables(value_type='class', imported=False)
+        classes = doc.select_variables(value_type='class', imported=False,
+                                       public=self._public_filter)
         self.write_toc_section(out, "Classes", classes, fullname=False)
 
         # List the functions.
-        funcs = doc.select_variables(value_type='function', imported=False)
+        funcs = doc.select_variables(value_type='function', imported=False,
+                                     public=self._public_filter)
         self.write_toc_section(out, "Functions", funcs, fullname=False)
 
         # List the variables.
-        variables = doc.select_variables(value_type='other', imported=False)
+        variables = doc.select_variables(value_type='other', imported=False,
+                                         public=self._public_filter)
         self.write_toc_section(out, "Variables", variables, fullname=False)
         
         # Footer material.
         out('<hr />\n')
-        out(self.PRIVATE_LINK+'\n')
+        if self._show_private:
+            out(self.PRIVATE_LINK+'\n')
         self.write_footer(out, short=True)
 
     #////////////////////////////////////////////////////////////
@@ -1462,7 +1476,9 @@ class HTMLWriter:
             <td>
               <table cellpadding="0" cellspacing="0">
                 <!-- hide/show private -->
+        >>> if self._show_private:
                 <tr><td align="right">$self.PRIVATE_LINK$</td></tr>
+        >>> #endif
                 <tr><td align="right"><span class="options"
                     >[<a href="frames.html" target="_top">frames</a
                     >]&nbsp;|&nbsp;<a href="$self.url(context)$"
@@ -1528,11 +1544,11 @@ class HTMLWriter:
         grouped_inh_vars = {}
 
         # Divide all public variables of the given type into groups.
-        group_names = [''] + [n for n,_ in doc.group_specs]
         groups = [(plaintext_to_html(group_name),
                    doc.select_variables(group=group_name, imported=False,
-                                        value_type=value_type))
-                  for group_name in group_names]
+                                        value_type=value_type,
+                                        public=self._public_filter))
+                  for group_name in doc.group_names()]
                 
         # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
@@ -1614,7 +1630,7 @@ class HTMLWriter:
                     self.href(base, self.base_label(doc, base)))
                 self.write_var_list(out, public_vars)
                 out('      </p>\n')
-            if private_vars:
+            if private_vars and self._show_private:
                 out('    <div class="private">')
                 out('    <p class="varlist">'
                     '<span class="varlist-header">Inherited '
@@ -1708,10 +1724,12 @@ class HTMLWriter:
         # Get a list of the VarDocs we should describe.
         if isinstance(doc, ClassDoc):
             var_docs = doc.select_variables(value_type=value_type,
-                                            imported=False, inherited=False)
+                                            imported=False, inherited=False,
+                                            public=self._public_filter)
         else:
             var_docs = doc.select_variables(value_type=value_type,
-                                            imported=False)
+                                            imported=False,
+                                            public=self._public_filter)
         if not var_docs: return
 
         # Write a header
@@ -2260,7 +2278,8 @@ class HTMLWriter:
     def write_imports(self, out, doc):
         assert  isinstance(doc, NamespaceDoc)
 
-        imports = doc.select_variables(imported=True)
+        imports = doc.select_variables(imported=True,
+                                       public=self._public_filter)
         if not imports: return
 
         out('<p class="imports">')
@@ -2295,10 +2314,7 @@ class HTMLWriter:
         if len(doc.submodules) == 0: return
         self.write_table_header(out, "details", "Submodules")
 
-        # [xx] But what if there are multiple @group specs in
-        # the list for the same group???
-        group_names = [''] + [n for n,_ in doc.group_specs]
-        for group_name in group_names:
+        for group_name in doc.group_names():
             if not doc.submodule_groups[group_name]: continue
             if group_name:
                 self.write_group_header(out, group_name)
@@ -2576,6 +2592,11 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     TABLE_FOOTER = '</table>\n'
+
+    PRIVATE_LINK = '''
+    <span class="options">[<a href="javascript: void(0);" class="privatelink"
+    onclick="toggle_private();">hide private</a>]</span>
+    '''.strip()
 
     write_group_header = compile_template(
         '''
