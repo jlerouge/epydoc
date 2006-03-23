@@ -744,16 +744,6 @@ def process_line(line, parent_docs, prev_line_doc, lineno,
         return None
         # [xx] do something with control structures like for/if?
 
-
-def process_special_comment(comments, parent_docs, lineno):
-    comment = '\n'.join([line for (line, lineno) in comments]).strip()
-    if comment.startswith('@group:'):
-        log.debug('start a group! %r' % comment[7:].strip())
-    elif comment == '@endgroup':
-        log.debug('end a group!')
-    else:
-        module_doc = parent_docs[0]
-
 #/////////////////////////////////////////////////////////////////
 # Line handler: control flow
 #/////////////////////////////////////////////////////////////////
