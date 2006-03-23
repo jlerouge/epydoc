@@ -7,8 +7,10 @@
 #
 
 """
-The LATEX output generator for epydoc.  The main interface provided by
+The LaTeX output generator for epydoc.  The main interface provided by
 this module is the L{LatexWriter} class.
+
+@todo: Inheritance=listed
 """
 __docformat__ = 'epytext en'
 
@@ -66,12 +68,6 @@ class LatexWriter:
 
     def __init__(self, docindex, **kwargs):
         self.docindex = docindex
-        # [xx] if show_private is False, then use a private=false
-        # filter??
-        self.valdocs = docindex.reachable_valdocs(
-            sorted_by_name=True, imports=False, packages=False,
-            submodules=False, bases=False, subclasses=False)
-
         # Process keyword arguments
         self._show_private = kwargs.get('private', 0)
         self._prj_name = kwargs.get('prj_name', None) or 'API Documentation'
@@ -84,13 +80,13 @@ class LatexWriter:
         self._index_functions = 1
         self._hyperref = 1
         self._encoding = kwargs.get('encoding', 'latin1')
-
-        # [xx]
-        #self._module_uids = kwargs.get('modules', [])[:]
-        #if kwargs.get('alphabetical', 1):
-        #    self._module_uids.sort()
-        
+        self.valdocs = docindex.reachable_valdocs(
+            sorted_by_name=True, imports=False, packages=False, bases=False, 
+            submodules=False, subclasses=False, private=self._show_private)
         self._num_files = self.num_files()
+        # For use with select_variables():
+        if self._show_private: self._public_filter = None
+        else: self._public_filter = True
 
     def write(self, directory=None):
         """
@@ -297,7 +293,8 @@ class LatexWriter:
 
         # Class list.
         if not self._list_classes_separately:
-            classes = doc.select_variables(imported=False, value_type='class')
+            classes = doc.select_variables(imported=False, value_type='class',
+                                           public=self._public_filter)
             for var_doc in classes:
                 self.write_class(out, var_doc.value)
 
@@ -381,8 +378,7 @@ class LatexWriter:
         out('\\begin{itemize}\n')
         out('\\setlength{\\parskip}{0ex}\n')
 
-        group_names = [''] + [n for n,_ in doc.group_specs]
-        for group_name in group_names:
+        for group_name in doc.group_names():
             if not doc.submodule_groups[group_name]: continue
             if group_name:
                 out('  \\item \\textbf{%s}\n' % group_name)
@@ -485,11 +481,11 @@ class LatexWriter:
     #////////////////////////////////////////////////////////////
     
     def write_class_list(self, out, doc):
-        group_names = [''] + [n for n,_ in doc.group_specs]
         groups = [(plaintext_to_latex(group_name),
                    doc.select_variables(group=group_name, imported=False,
-                                        value_type='class'))
-                  for group_name in group_names]
+                                        value_type='class',
+                                        public=self._public_filter))
+                  for group_name in doc.group_names()]
 
         # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
@@ -529,11 +525,11 @@ class LatexWriter:
     #////////////////////////////////////////////////////////////
     
     def write_func_list(self, out, heading, doc, value_type, seclevel=1):
-        group_names = [''] + [n for n,_ in doc.group_specs]
         groups = [(plaintext_to_latex(group_name),
                    doc.select_variables(group=group_name, imported=False,
-                                        value_type=value_type))
-                  for group_name in group_names]
+                                        value_type=value_type,
+                                        public=self._public_filter))
+                  for group_name in doc.group_names()]
 
         # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
@@ -702,11 +698,11 @@ class LatexWriter:
 
     # Also used for the property list.
     def write_var_list(self, out, heading, doc, value_type, seclevel=1):
-        group_names = [''] + [n for n,_ in doc.group_specs]
         groups = [(plaintext_to_latex(group_name),
                    doc.select_variables(group=group_name, imported=False,
-                                        value_type=value_type))
-                  for group_name in group_names]
+                                        value_type=value_type,
+                                        public=self._public_filter))
+                  for group_name in doc.group_names()]
 
         # Discard any empty groups; and return if they're all empty.
         groups = [(g,vars) for (g,vars) in groups if vars]
@@ -953,9 +949,7 @@ class LatexWriter:
             return '\\index{%s|)}\n' % '!'.join(pieces)
         else:
             raise AssertionError('Bad index position %s' % pos)
-
-
-    # [xx] is \label{??.foo-2} valid?
+        
     def label(self, doc):
         return ':'.join(doc.canonical_name)
 
