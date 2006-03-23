@@ -293,7 +293,6 @@ class HTMLWriter:
         self.valdocs = docindex.reachable_valdocs(
             sorted_by_name=True, imports=False, packages=False, bases=False, 
             submodules=False, subclasses=False, private=self._show_private)
-        log.debug(self.valdocs)
         
         self._prj_name = kwargs.get('prj_name', None)
         """The project's name (for the project link in the navbar)"""
