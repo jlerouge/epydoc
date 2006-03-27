@@ -339,7 +339,7 @@ class HTMLWriter:
         """How should inheritance be displayed?  'listed', 'included',
         or 'grouped'"""
 
-        self._incl_sourcecode = kwargs.get('include_soucre_code', True)
+        self._incl_sourcecode = kwargs.get('include_source_code', True)
         """Should pages be generated for source code of modules?"""
 
         self._mark_docstrings = kwargs.get('mark_docstrings', False)

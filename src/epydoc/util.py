@@ -34,7 +34,7 @@ def is_module_file(path):
 
 def is_src_filename(filename):
     if not isinstance(filename, basestring): return False
-    return os.path.splitext(filename) in PY_SRC_EXTENSIONS
+    return os.path.splitext(filename)[1] in PY_SRC_EXTENSIONS
     
 def is_package_dir(dirname):
     """
