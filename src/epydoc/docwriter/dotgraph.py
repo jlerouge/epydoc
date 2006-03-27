@@ -122,7 +122,7 @@ class DotGraph:
         (including a client-side image map).
         
         :param image_url: The URL of the image file for this graph;
-        this should be generated separately with the `write()` method.
+            this should be generated separately with the `write()` method.
         """
         cmapx = self.render('cmapx') or ''
         title = plaintext_to_html(self.title or '')

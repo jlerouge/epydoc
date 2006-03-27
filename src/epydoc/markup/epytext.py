@@ -157,10 +157,10 @@ for symbol in SYMBOLS: _SYMBOLS[symbol] = 1
 
 # Add symbols to the docstring.
 symblist = '      '
-symblist += ';\n      '.join(['C{E{S}{%s}}=S{%s}' % (symbol, symbol)
+symblist += ';\n      '.join([' - C{E{S}{%s}}=S{%s}' % (symbol, symbol)
                               for symbol in SYMBOLS])
 __doc__ = __doc__.replace('<<<SYMBOLS>>>', symblist)
-del symblist
+del symbol, symblist
 
 # Tags for colorizing text.
 _COLORIZING_TAGS = {
