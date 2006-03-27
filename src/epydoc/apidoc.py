@@ -179,6 +179,20 @@ class DottedName:
             return False
         return self._identifiers == name._identifiers[:len(self)]
 
+    def contextualize(self, context):
+        """
+        Return a reduced version of a dotted name. This name may be ambigious
+        (it is if its name is the same of the context), but is should be
+        explicit enough for humans, and may be considerably shorter and more
+        readable than a fully qualified one.
+        """
+        if context is UNKNOWN or not context or len(self) <= 1:
+            return self
+        if self[0] == context[0]:
+            return self[1:].contextualize(context[1:])
+        else:
+            return self
+
 ######################################################################
 # UNKNOWN Value
 ######################################################################

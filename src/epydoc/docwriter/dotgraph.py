@@ -287,7 +287,7 @@ def package_tree_graph(packages, linker, context=None, **options):
     Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('Package Tree for %s' % name_list(packages),
+    graph = DotGraph('Package Tree for %s' % name_list(packages, context),
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
     
@@ -318,7 +318,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages.
     """
-    graph = DotGraph('Class Hierarchy for %s' % name_list(bases),
+    graph = DotGraph('Class Hierarchy for %s' % name_list(bases, context),
                      body='ranksep=0.3\n',
                      node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True, 'dir':'none'})
@@ -390,11 +390,7 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
     nodes = {}
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
     for i, val_doc in enumerate(val_docs):
-        if (val_doc.canonical_name[:-1] == context.canonical_name[:-1] or
-            val_doc.canonical_name[:-1] == context.canonical_name[:]):
-            label = val_doc.canonical_name[-1]
-        else:
-            label = val_doc.canonical_name
+        label = val_doc.canonical_name.contextualize(context.canonical_name)
         node = nodes[val_doc] = DotGraphNode(label)
         graph.nodes.append(node)
         if val_doc == context:
@@ -405,8 +401,10 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
             if url: node.attribs['href'] = url
     return nodes
 
-def name_list(api_docs):
-    names = ['%s' % d.canonical_name for d in api_docs]
+def name_list(api_docs, context=None):
+    if context is not None:
+        context = context.canonical_name
+    names = [str(d.canonical_name.contextualize(context)) for d in api_docs]
     if len(names) == 0: return ''
     if len(names) == 1: return '%s' % names[0]
     elif len(names) == 2: return '%s and %s' % (names[0], names[1])

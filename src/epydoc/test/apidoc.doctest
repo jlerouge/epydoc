@@ -172,6 +172,24 @@ This is used when we can't find any name for an object (e.g., if
 there's a class that was used as the base class, but is not contained
 in any module or class).
     
+A dotted name can be queried into a context to obtain a reduced version:
+
+    >>> DottedName('foo.bar').contextualize(DottedName('foo'))
+    DottedName('bar')
+    >>> DottedName('foo.bar.baz.qux').contextualize(DottedName('foo.bar'))
+    DottedName('baz', 'qux')
+    >>> DottedName('foo.bar').contextualize(DottedName('baz'))
+    DottedName('foo', 'bar')
+    >>> DottedName('foo.bar').contextualize(DottedName('foo').container())
+    DottedName('foo', 'bar')
+    >>> DottedName('foo.bar').contextualize(UNKNOWN)
+    DottedName('foo', 'bar')
+    
+But a contextualization can't reduce to an empty DottedName:
+
+    >>> DottedName('foo').contextualize(DottedName('foo'))
+    DottedName('foo')
+
 APIDoc Objects
 ==============
 API documentation about Python programs is broken into small pieces,

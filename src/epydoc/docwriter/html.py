@@ -689,7 +689,7 @@ class HTMLWriter:
                 if (doc.subclasses not in (UNKNOWN, None) and
                     len(doc.subclasses) > 0):
                     out('<dl><dt>Known Subclasses:</dt>\n<dd>\n    ')
-                    out(',\n    '.join([self.href(c, c.canonical_name[-1])
+                    out(',\n    '.join([self.href(c, context=doc)
                                         for c in doc.subclasses]))
                     out('\n</dd></dl>\n\n')
 
@@ -1566,7 +1566,7 @@ class HTMLWriter:
         if grouped_inh_vars:
             for base in doc.mro():
                 if base in grouped_inh_vars:
-                    hdr = 'Inherited from %s' % self.href(base)
+                    hdr = 'Inherited from %s' % self.href(base, context=doc)
                     tr_class = ''
                     if len([v for v in grouped_inh_vars[base]
                             if v.is_public]) == 0:
@@ -1626,7 +1626,7 @@ class HTMLWriter:
                 out('    <p class="varlist">'
                     '<span class="varlist-header">Inherited '
                     'from <code>%s</code></span>:\n' %
-                    self.href(base, self.base_label(doc, base)))
+                    self.href(base, context=doc))
                 self.write_var_list(out, public_vars)
                 out('      </p>\n')
             if private_vars and self._show_private:
@@ -1634,7 +1634,7 @@ class HTMLWriter:
                 out('    <p class="varlist">'
                     '<span class="varlist-header">Inherited '
                     'from <code>%s</code></span> (private):\n' %
-                    self.href(base, self.base_label(doc, base)))
+                    self.href(base, context=doc))
                 self.write_var_list(out, private_vars)
                 out('      </p></div>\n')
         out('    </td>\n  </tr>\n')
@@ -1869,7 +1869,7 @@ class HTMLWriter:
         >>> # === overrides ===
         >>> if var_doc.overrides not in (None, UNKNOWN):
             <dl><dt>Overrides:
-              $self.href(var_doc.overrides.value)$
+              $self.href(var_doc.overrides.value, context=var_doc)$
         >>>   if (func_doc.docstring in (None, UNKNOWN) and
         >>>       var_doc.overrides.value.docstring not in (None, UNKNOWN)):
                 <dd><em class="note">(inherited documentation)</em></dd>
@@ -2150,14 +2150,16 @@ class HTMLWriter:
     #{ Base Tree
     #////////////////////////////////////////////////////////////
 
-    def base_tree(self, doc, width=None, postfix=''):
+    def base_tree(self, doc, width=None, postfix='', context=None):
         """
         @return: The HTML code for a class's base tree.  The tree is
             drawn 'upside-down' and right justified, to allow for
             multiple inheritance.
         @rtype: C{string}
         """
-        if width == None: width = self.find_tree_width(doc)
+        if context is None:
+            context = doc
+        if width == None: width = self.find_tree_width(doc, context)
         if isinstance(doc, ClassDoc):
             bases = doc.bases
         else:
@@ -2166,11 +2168,11 @@ class HTMLWriter:
         if postfix == '':
             # [XX] use var name instead of canonical name?
             s = (' '*(width-2) + '<strong class="uidshort">'+
-                   doc.canonical_name[-1]+'</strong>\n')
+                   self.contextual_label(doc, context)+'</strong>\n')
         else: s = ''
         for i in range(len(bases)-1, -1, -1):
             base = bases[i]
-            label = self.base_label(doc, base)
+            label = self.contextual_label(base, context)
             s = (' '*(width-4-len(label)) + self.href(base, label)
                    +' --+'+postfix+'\n' + 
                    ' '*(width-4) +
@@ -2182,7 +2184,7 @@ class HTMLWriter:
                 s = (self.base_tree(base, width-4, '    '+postfix)+s)
         return s
 
-    def find_tree_width(self, doc):
+    def find_tree_width(self, doc, context):
         """
         Helper function for L{base_tree}.
         @return: The width of a base tree, when drawn
@@ -2193,18 +2195,20 @@ class HTMLWriter:
         if not isinstance(doc, ClassDoc): return 2
         width = 2
         for base in doc.bases:
-            width = max(width, len(self.base_label(doc, base))+4,
-                        self.find_tree_width(base)+4)
+            width = max(width, len(self.contextual_label(base, context))+4,
+                        self.find_tree_width(base, context)+4)
         return width
 
-    # [xx] is 'doc' what I care about here?? hm.. cuz base_tree
-    # recurses??
-    def base_label(self, doc, base):
-        if (base.canonical_name[:-1] == doc.canonical_name[:-1]):
-            return base.canonical_name[-1]
-        else:
-            return str(base.canonical_name)
-    
+    def contextual_label(self, doc, context):
+        """
+        Return the label for L{doc} to be shown in C{context}.
+        """
+        context = context.canonical_name
+        if context is not UNKNOWN:
+            context = context.container()
+            
+        return str(doc.canonical_name.contextualize(context))
+        
     #////////////////////////////////////////////////////////////
     #{ Function Signatures
     #////////////////////////////////////////////////////////////
@@ -2698,24 +2702,32 @@ class HTMLWriter:
         return None
 
     # [xx] add code to automatically do <code> wrapping or the like?
-    def href(self, target, label=None, css_class=None):
+    def href(self, target, label=None, css_class=None, context=None):
         """
         Return the HTML code for an HREF link to the given target
         (which can be a C{VariableDoc}, a C{ValueDoc}, or a
         C{DottedName}.
+        If a C{NamespaceDoc} C{context} is specified, the target label is
+        contextualized to it.
         """
         assert isinstance(target, (APIDoc, DottedName))
 
         # Pick a label, if none was given.
         if label is None:
             if isinstance(target, VariableDoc):
-                label = str(target.name)
+                label = target.name
             elif isinstance(target, ValueDoc):
-                label = str(target.canonical_name)
+                label = target.canonical_name
             elif isinstance(target, DottedName):
-                label = str(target)
+                label = target
             else:
                 raise ValueError, "bad label"
+                
+            if context is not None:
+                label = label.contextualize(context.canonical_name.container())
+                
+            label = str(label)
+            
             # Munge names for scripts & unreachable values
             if label.startswith('script-'):
                 label = label[7:] + ' (script)'
