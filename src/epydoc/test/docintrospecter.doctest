@@ -205,6 +205,7 @@ Introspected functions are represented by `RoutineDoc` objects:
     ...     """, introspect="f", exclude='defining_module')
     RoutineDoc for epydoc_test.f [0]
      +- canonical_name = DottedName('epydoc_test', 'f')
+     +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = None
      +- posarg_defaults = [None]
@@ -228,6 +229,7 @@ of the variable argument and keyword argument, respectively:
     ...     """, introspect="f", exclude='defining_module')
     RoutineDoc for epydoc_test.f [0]
      +- canonical_name = DottedName('epydoc_test', 'f')
+     +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = 'kw'
      +- posarg_defaults = [None, <ValueDoc 22>, <ValueDoc 1>]
@@ -264,6 +266,7 @@ instance method:
     ...     g=A().f
     ...     """, introspect="g", exclude='defining_module')
     RoutineDoc [0]
+     +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring'
      +- kwarg = None
      +- posarg_defaults = [None]
@@ -280,6 +283,7 @@ Decorators & Wrapper Assignments
     ...     def f(cls, x): 'docstring for f'
     ...     """, introspect="f")
     ClassMethodDoc [0]
+     +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = None
      +- posarg_defaults = [None, None]
@@ -559,6 +563,7 @@ Recursive objects
     ClassDoc for epydoc_test.A [0]
      +- bases = []
      +- canonical_name = DottedName('epydoc_test', 'A')
+     +- docs_extracted_by = 'introspecter'
      +- docstring = u'A base referring to a child'
      +- pyval = <class epydoc_test.A at ...>
      +- repr = u'<class epydoc_test.A at ...>'
@@ -567,6 +572,7 @@ Recursive objects
      |     +- bases
      |     |  +- ClassDoc for epydoc_test.A [0] (defined above)
      |     +- canonical_name = DottedName('epydoc_test', 'B')
+     |     +- docs_extracted_by = 'introspecter'
      |     +- docstring = u'Its child.'
      |     +- pyval = <class epydoc_test.B at ...>
      |     +- repr = u'<class epydoc_test.B at ...>'
@@ -576,6 +582,7 @@ Recursive objects
         +- b => VariableDoc for epydoc_test.A.b [2]
            +- container
            |  +- ClassDoc for epydoc_test.A [0] (defined above)
+           +- docs_extracted_by = 'introspecter'
            +- is_public = True
            +- name = 'b'
            +- value

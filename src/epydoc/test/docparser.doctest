@@ -63,6 +63,7 @@ assignments, is_imported and is_instvar will always be False.)
      +- canonical_name = DottedName('test')
      +- defining_module
      |  +- ModuleDoc for test [0] (defined above)
+     +- docs_extracted_by = 'parser'
      +- filename = ...
      +- imports = []
      +- is_package = False
@@ -73,6 +74,7 @@ assignments, is_imported and is_instvar will always be False.)
         +- x => VariableDoc for test.x [1]
         |  +- container
         |  |  +- ModuleDoc for test [0] (defined above)
+        |  +- docs_extracted_by = 'parser'
         |  +- is_alias = False
         |  +- is_imported = False
         |  +- is_instvar = False
@@ -82,11 +84,13 @@ assignments, is_imported and is_instvar will always be False.)
         |     +- ValueDoc [2]
         |        +- defining_module
         |        |  +- ModuleDoc for test [0] (defined above)
+        |        +- docs_extracted_by = 'parser'
         |        +- repr = u'12'
         |        +- toktree = [(2, u'12')]
         +- y => VariableDoc for test.y [3]
         |  +- container
         |  |  +- ModuleDoc for test [0] (defined above)
+        |  +- docs_extracted_by = 'parser'
         |  +- is_alias = False
         |  +- is_imported = False
         |  +- is_instvar = False
@@ -96,11 +100,13 @@ assignments, is_imported and is_instvar will always be False.)
         |     +- ValueDoc [4]
         |        +- defining_module
         |        |  +- ModuleDoc for test [0] (defined above)
+        |        +- docs_extracted_by = 'parser'
         |        +- repr = u'[1,2,3]+ [4,5]'
         |        +- toktree = [[(51, u'['), (2, u'1'), (51, u','), ...
         +- z => VariableDoc for test.z [5]
            +- container
            |  +- ModuleDoc for test [0] (defined above)
+           +- docs_extracted_by = 'parser'
            +- is_alias = False
            +- is_imported = False
            +- is_instvar = False
@@ -110,6 +116,7 @@ assignments, is_imported and is_instvar will always be False.)
               +- ValueDoc [6]
                  +- defining_module
                  |  +- ModuleDoc for test [0] (defined above)
+                 +- docs_extracted_by = 'parser'
                  +- repr = u'f(x,y)'
                  +- toktree = [(1, u'f'), [(51, u'('), (1, u'x'), (...
 
@@ -402,6 +409,7 @@ VariableDoc object in the module's children list).
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- docs_extracted_by = 'parser'
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = None
@@ -424,6 +432,7 @@ of the variable argument and keyword argument, respectively:
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- docs_extracted_by = 'parser'
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = u'kw'
@@ -437,6 +446,7 @@ Tuple arguments are encoded as a single ArgDoc with a complex name:
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- docs_extracted_by = 'parser'
      +- kwarg = None
      +- posarg_defaults = [None]
      +- posargs = [[u'x', [u'y', u'z']]]
