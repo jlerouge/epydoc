@@ -1073,6 +1073,12 @@ def inherit_docs(class_doc):
             if name.startswith('__') and not name.endswith('__'):
                 continue
             
+            # Inhetit only from the defining class. Or else, in case of
+            # multiple inheritance, we may import from a grand-ancestor
+            # variables overridden by a class that follows in mro.
+            if base_class != var_doc.container:
+                continue
+            
             # If class_doc doesn't have a variable with this name,
             # then inherit it.
             if name not in class_doc.variables:
