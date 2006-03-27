@@ -1032,7 +1032,8 @@ class HTMLWriter:
         # List the functions.
         funcs = [d for d in self.valdocs
                  if (isinstance(d, RoutineDoc) and
-                     not isinstance(self.docindex.container(d), ClassDoc))]
+                     not isinstance(self.docindex.container(d), 
+                                    (ClassDoc, types.NoneType)))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
