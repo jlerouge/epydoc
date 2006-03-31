@@ -1229,6 +1229,20 @@ class HTMLWriter:
             elts[i].style.display = ((cmd=="hide private")?"none":"");
           }
         }
+        // Update all list items containing private objects.
+        var elts = document.getElementsByTagName("li");
+        for(var i=0; i<elts.length; i++) {
+          if (elts[i].className == "private") {
+            elts[i].style.display = ((cmd=="hide private")?"none":"list-item");
+          }
+        }
+        // Update all list items containing private objects.
+        var elts = document.getElementsByTagName("ul");
+        for(var i=0; i<elts.length; i++) {
+          if (elts[i].className == "private") {
+            elts[i].style.display = ((cmd=="hide private")?"none":"block");
+          }
+        }
         // Set a cookie to remember the current option.
         document.cookie = "EpydocPrivate="+cmd;
       }
@@ -2324,21 +2338,29 @@ class HTMLWriter:
                 self.write_group_header(out, group_name)
             out('  <tr><td><ul>\n')
             for submodule in doc.submodule_groups[group_name]:
-                self.write_module_tree_item(out, submodule)
+                self.write_module_tree_item(out, submodule, package=doc)
             out('  </ul></td></tr>\n')
                 
         out(self.TABLE_FOOTER+'\n<br />\n')
 
-    def write_module_tree_item(self, out, doc):
-        out('    <li> <strong class="uidlink">'+self.href(doc)+'</strong>')
+    def write_module_tree_item(self, out, doc, package=None):
+        # If it's a private variable, then mark its <li>.
+        var = package and package.variables.get(doc.canonical_name[-1])
+        if var is not None:
+            priv = var.is_public is False
+        else:
+            priv = doc.canonical_name[-1].startswith('_')
+                
+        out('    <li%s> <strong class="uidlink">%s</strong>'
+            % (priv and ' class="private"' or '', self.href(doc)))
         if doc.summary not in (None, UNKNOWN):
             out(': <em class="summary">'+
                 self.description(doc.summary, doc, 8)+'</em>')
         out('</li>\n')
         if doc.submodules != UNKNOWN and doc.submodules:
-            out('    <ul>\n')
+            out('    <ul%s>\n' % (priv and ' class="private"' or ''))
             for submodule in doc.submodules:
-                self.write_module_tree_item(out, submodule)
+                self.write_module_tree_item(out, submodule, package=doc)
             out('    </ul>\n    </li>\n')
 
     #////////////////////////////////////////////////////////////
