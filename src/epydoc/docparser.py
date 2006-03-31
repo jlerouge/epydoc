@@ -328,7 +328,10 @@ def handle_special_module_vars(module_doc):
                 else:
                     var_doc.is_public = False
         except ParseError:
-            pass # [xx]
+            # If we couldn't parse the list, give precedence to introspection.
+            for name, var_doc in module_doc.variables.items():
+                if not isinstance(var_doc, ModuleDoc):
+                    var_doc.is_imported = UNKNOWN
         del module_doc.variables['__all__']
 
     # If __path__ is defined, then extract its value (pkgs only)

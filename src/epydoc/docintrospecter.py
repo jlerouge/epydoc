@@ -247,20 +247,6 @@ def introspect_module(module, module_doc, preliminary=False):
     else:
         module_doc.is_package = False
 
-    # Record the module's __all__ attribute (public names).
-    if hasattr(module, '__all__'):
-        try:
-            public_names = set([str(name) for name in module.__all__])
-            for name, var_doc in module_doc.variables.items():
-                if name in public_names:
-                    var_doc.is_public = True
-                    if not isinstance(var_doc, ModuleDoc):
-                        var_doc.is_imported = False
-                else:
-                    var_doc.is_public = False
-        except KeyboardInterrupt, SystemExit: raise
-        except: pass
-
     # Make sure we have a name for the package.
     dotted_name = module_doc.canonical_name
     if dotted_name is UNKNOWN:
@@ -316,6 +302,20 @@ def introspect_module(module, module_doc, preliminary=False):
                                         docs_extracted_by='introspecter')
 
         module_doc.variables[child_name] = child_var_doc
+
+    # Record the module's __all__ attribute (public names).
+    if hasattr(module, '__all__'):
+        try:
+            public_names = set([str(name) for name in module.__all__])
+            for name, var_doc in module_doc.variables.items():
+                if name in public_names:
+                    var_doc.is_public = True
+                    if not isinstance(var_doc, ModuleDoc):
+                        var_doc.is_imported = False
+                else:
+                    var_doc.is_public = False
+        except KeyboardInterrupt, SystemExit: raise
+        except: pass
 
     return module_doc
 

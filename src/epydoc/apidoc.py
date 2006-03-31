@@ -905,7 +905,7 @@ class ModuleDoc(NamespaceDoc):
         elif value_type == 'other':
             return [var_doc for var_doc in var_list
                     if not isinstance(var_doc.value,
-                                      (ClassDoc, RoutineDoc))]
+                                      (ClassDoc, RoutineDoc, ModuleDoc))]
         else:
             raise ValueError('Bad value type %r' % value_type)
 
