@@ -209,6 +209,14 @@ def parse_arguments():
     # Parse the arguments.
     options, names = optparser.parse_args()
     
+    # Process any config files.
+    if options.configfiles:
+        try:
+            parse_configfiles(options.configfiles, options, names)
+        except KeyboardInterrupt,SystemExit: raise
+        except Exception, e:
+            optparser.error('Error reading config file:\n    %s' % e)
+    
     # Check to make sure all options are valid.
     if len(names) == 0:
         optparser.error("No names specified.")
@@ -239,7 +247,13 @@ def parse_arguments():
 
 def parse_configfiles(configfiles, options, names):
     configparser = ConfigParser.ConfigParser()
-    configparser.read(configfiles)
+    # ConfigParser.read() silently ignores errors, so open the files
+    # manually (since we want to notify the user of any errors).
+    for configfile in configfiles:
+        log.debug('here')
+        fp = open(configfile, 'r') # may raise IOError.
+        log.debug('here2')
+        configparser.readfp(fp, configfile)
     for optname in configparser.options('epydoc'):
         val = configparser.get('epydoc', optname).strip()
         if optname in ('modules', 'objects', 'values',
@@ -292,6 +306,8 @@ def parse_configfiles(configfiles, options, names):
                     raise ValueError('"graph" expected one of: %s.' %
                                      ', '.join(GRAPH_TYPES))
             options.graphs.extend(graphtypes)
+        else:
+            raise ValueError('Unknown option %s' % optname)
 
 def _str_to_bool(val, optname):
     if val.lower() in ('0', 'no', 'false', 'n', 'f', 'hide'):
@@ -299,7 +315,7 @@ def _str_to_bool(val, optname):
     elif val.lower() in ('1', 'yes', 'true', 'y', 't', 'show'):
         return True
     else:
-        raise ValueError('"%s" expected a boolean' % optname)
+        raise ValueError('"%s" option expected a boolean' % optname)
         
 ######################################################################
 #{ Interface
@@ -310,18 +326,6 @@ def main(options, names):
         if options.parse and options.introspect:
             options.parse = False
 
-    # Process any config files.
-    if options.configfiles:
-        try:
-            parse_configfiles(options.configfiles, options, names)
-        except KeyboardInterrupt,SystemExit: raise
-        except ValueError, e:
-            print 'Error reading config file: %s' % e
-            return
-        except ConfigParser.ParsingError, e:
-            print 'Error reading config file: %s' % e
-            return
-    
     # Set up the logger
     if options.action == 'text':
         logger = None # no logger for text output.
