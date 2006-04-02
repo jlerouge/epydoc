@@ -805,6 +805,10 @@ def _import(name, filename=None):
     old_sys_path = sys.path[:]
     old_builtins = __builtin__.__dict__.copy()
 
+    # Add the current directory to sys.path, in case they're trying to
+    # import a module by name that resides in the current directory.
+    sys.path.insert(0, '')
+
     # Supress input and output.  (These get restored when we restore
     # sys to old_sys).  
     sys.stdin = sys.stdout = sys.stderr = _dev_null
