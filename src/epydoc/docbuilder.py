@@ -933,7 +933,7 @@ been assigned to its current cannonical name.  If
 L{assign_canonical_names()} finds a canonical name with a better
 score, then it will replace the old name."""
 
-_unreachable_names = set()
+_unreachable_names = set(DottedName(DottedName.UNREACHABLE))
 """The set of names that have been used for unreachable objects.  This
 is used to ensure there are no duplicate cannonical names assigned."""
 
@@ -1044,7 +1044,7 @@ def _unreachable_name_for(val_doc, docindex):
         try:
             name = DottedName(DottedName.UNREACHABLE,
                               val_doc.pyval.__name__)
-        except ValueError:
+        except DottedName.Invalid:
             name = DottedName(DottedName.UNREACHABLE)
     else:
         name = DottedName(DottedName.UNREACHABLE)

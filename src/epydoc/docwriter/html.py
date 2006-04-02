@@ -2877,10 +2877,7 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         if label is None: label = plaintext_to_html(identifier)
 
         # Find the APIDoc for it (if it's available).
-        try:
-            doc = self.docindex.find(identifier, self.container)
-        except ValueError:
-            doc = None # e.g., if identifier == '[1,2]'
+        doc = self.docindex.find(identifier, self.container)
 
         # Translate it into HTML.
         if doc is None:

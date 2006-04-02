@@ -465,7 +465,7 @@ def process_raise_field(api_doc, docindex, tag, arg, descr):
     C{tag} in C{api_doc.exception_descrs}."""
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg='single')
     try: name = DottedName(arg)
-    except ValueError: name = arg
+    except DottedName.Invalid: name = arg
     api_doc.exception_descrs.append( (name, descr) )
 
 def process_sort_field(api_doc, docindex, tag, arg, descr):

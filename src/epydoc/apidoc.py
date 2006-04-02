@@ -72,6 +72,12 @@ class DottedName:
         (-\d+)?           # Suffix: unreachable vals with the same name
         $"""
         % re.escape(UNREACHABLE))
+
+    class Invalid(ValueError):
+        """
+        An exception raised by the DottedName constructor when one of
+        its arguments is not a valid dotted name.
+        """
     
     def __init__(self, *pieces):
         """
@@ -85,7 +91,7 @@ class DottedName:
         it is a valid identifier.
         """
         if len(pieces) == 0:
-            raise ValueError, 'Empty DottedName'
+            raise DottedName.Invalid('Empty DottedName')
         self._identifiers = []
         for piece in pieces:
             if isinstance(piece, DottedName):
@@ -94,11 +100,11 @@ class DottedName:
                 for subpiece in piece.split('.'):
                     if not self._IDENTIFIER_RE.match(subpiece):
                         log.debug('Bad identifier %r' % (piece,))
-                        raise ValueError('Bad identifier %r' % (piece,))
+                        raise DottedName.Invalid('Bad identifier %r' % (piece,))
                     self._identifiers.append(subpiece)
             else:
                 log.debug('Bad identifier %r' % (piece,))
-                raise ValueError('Bad identifier %r' % (piece,))
+                raise DottedName.Invalid('Bad identifier %r' % (piece,))
         self._identifiers = tuple(self._identifiers)
 
     def __repr__(self):
@@ -894,6 +900,8 @@ class ModuleDoc(NamespaceDoc):
         elif imported is False:
             var_list = [v for v in var_list if v.is_imported is not True]
 
+        # [xx] Modules are not currently included in any of these
+        # value types.
         if value_type is None:
             return var_list
         elif value_type == 'class':

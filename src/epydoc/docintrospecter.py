@@ -180,7 +180,7 @@ def _get_valuedoc(value):
     val_doc = _valuedoc_cache.get(pyid)
     if val_doc is None:
         try: canonical_name = get_canonical_name(value)
-        except ValueError: canonical_name = UNKNOWN
+        except DottedName.Invalid: canonical_name = UNKNOWN
         val_doc = ValueDoc(pyval=value, repr=value_repr(value),
                            canonical_name = canonical_name,
                            docs_extracted_by='introspecter')
