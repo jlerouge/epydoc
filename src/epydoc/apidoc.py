@@ -1365,9 +1365,10 @@ class DocIndex:
                 for identifier in name[len(root_valdoc.canonical_name):]:
                     if val_doc is None: break
                     var_doc, val_doc = self._get_from(val_doc, identifier)
-                # If we found it, then return.
-                if var_doc is not None or val_doc is not None:
-                    return var_doc, val_doc
+                else:
+                    # If we found it, then return.
+                    if var_doc is not None or val_doc is not None:
+                        return var_doc, val_doc
 
         # We didn't find it.
         return None, None
