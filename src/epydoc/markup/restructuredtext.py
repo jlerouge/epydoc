@@ -153,7 +153,8 @@ class ParsedRstDocstring(ParsedDocstring):
     def summary(self):
         # Inherit docs
         visitor = _SummaryExtractor(self._document)
-        self._document.walk(visitor)
+        try: self._document.walk(visitor)
+        except docutils.nodes.NodeFound: pass
         return visitor.summary
 
 #     def concatenate(self, other):
@@ -258,10 +259,13 @@ class _SummaryExtractor(NodeVisitor):
                     summary_pieces.append(docutils.nodes.Text(m.group(1)))
                     break
             summary_pieces.append(child)
-            
-        summary_doc = self.document.copy()
-        summary_doc[:] = summary_pieces
+
+        summary_doc = self.document.copy() # shallow copy
+        summary_para = node.copy() # shallow copy
+        summary_doc[:] = [summary_para]
+        summary_para[:] = summary_pieces
         self.summary = ParsedRstDocstring(summary_doc)
+        raise docutils.nodes.NodeFound('Found summary')
 
     def unknown_visit(self, node):
         'Ignore all unknown nodes'
