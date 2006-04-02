@@ -634,16 +634,16 @@ def process_file(module_doc):
                                      (module_doc.filename, lineno, e))
 
                 # grouping...
-                if groups[-1] and prev_line_doc:
+                if groups[-1] and prev_line_doc not in (None, 'skip_block'):
                     if isinstance(prev_line_doc, VariableDoc):
+                        # This special case is needed for inst vars, where
+                        # parent_docs[-1] is the __init__ function, not the
+                        # containing class:
                         add_to_group(prev_line_doc.container,
                                      prev_line_doc, groups[-1])
                     elif isinstance(parent_docs[-1], NamespaceDoc):
                         add_to_group(parent_docs[-1], prev_line_doc,
                                      groups[-1])
-                    else:
-                        log.warning("Not in a namespace!")
-                        
             else:
                 prev_line_doc = None
 
