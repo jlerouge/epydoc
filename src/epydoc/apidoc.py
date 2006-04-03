@@ -158,7 +158,6 @@ class DottedName:
         Compare this dotted name to C{other}.  Two dotted names are
         considered equal if their identifier subsequences are equal.
         """
-        if other is None: return -1
         if not isinstance(other, DottedName):
             return -1
         return cmp(self._identifiers, other._identifiers)
