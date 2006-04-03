@@ -2754,7 +2754,7 @@ class HTMLWriter:
             if context is not None:
                 label = label.contextualize(context.canonical_name.container())
                 
-            label = str(label)
+            label = plaintext_to_html(str(label))
             
             # Munge names for scripts & unreachable values
             if label.startswith('script-'):
@@ -2765,7 +2765,7 @@ class HTMLWriter:
 
         # Get the url for the target.
         url = self.url(target)
-        if url is None: return plaintext_to_html(label)
+        if url is None: return label
 
         # Construct a string for the class attribute.
         if css_class is None:
@@ -2773,7 +2773,7 @@ class HTMLWriter:
         else:
             css = ' class="%s"' % css_class
 
-        return '<a href="%s"%s>%s</a>' % (url, css, plaintext_to_html(label))
+        return '<a href="%s"%s>%s</a>' % (url, css, label)
 
     def summary(self, api_doc, indent=0):
         assert isinstance(api_doc, APIDoc)
