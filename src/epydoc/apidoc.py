@@ -1430,12 +1430,11 @@ class DocIndex:
 
     def _get_from(self, val_doc, identifier):
         if isinstance(val_doc, NamespaceDoc):
-            for child_name, child_var in val_doc.variables.items():
-                if child_name == identifier:
-                    var_doc = child_var
-                    val_doc = var_doc.value
-                    if val_doc is UNKNOWN: val_doc = None
-                    return var_doc, val_doc
+            child_var = val_doc.variables.get(identifier)
+            if child_var is not None:
+                child_val = child_var.value
+                if child_val == UNKNOWN: child_val = None
+                return child_var, child_val
 
         # If that fails, then see if it's a submodule.
         if (isinstance(val_doc, ModuleDoc) and
@@ -1479,11 +1478,6 @@ class DocIndex:
         else:
             container_name = context.canonical_name
 
-        # Is it a parameter's name?
-        if (isinstance(context, RoutineDoc) and
-            len(name) == 1 and name[0] in context.all_args()):
-            return None
-
         # Check for the name in all containing namespaces, starting
         # with the closest one.
         for i in range(len(container_name), -1, -1):
@@ -1505,9 +1499,9 @@ class DocIndex:
         if len(name)==1 and hasattr(__builtin__, name[0]):
             return None
         
-        # Is it an attribute of a parameter?
+        # Is it a parameter's name or an attribute of a parameter?
         if (isinstance(context, RoutineDoc) and
-            len(name) > 1 and name[0] in context.all_args()):
+            name[0] in context.all_args()):
             return None
 
     #////////////////////////////////////////////////////////////
