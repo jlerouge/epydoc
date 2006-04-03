@@ -262,39 +262,50 @@ class APIDoc(object):
     to use a shared instance dictionary.  See the documentation for
     L{merge_and_overwrite} for more information, and some important
     caveats about hashing.
-    
-    @ivar docstring: The documented item's docstring.
-    @type docstring: C{string} or C{None}
-    @ivar descr: A description of the documented item, extracted from
-        its docstring.
-    @type descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
-    @ivar summary: A summary description of the documented item,
-        extracted from its docstring.
-    @type summary: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
-    @ivar metadata: Metadata about the documented item, extracted from
-        fields in its docstring.  This metadata is encoded as a
-        dictionary whose keys are cannonical field tag names (such as
-        C{'author'} or tuples of field tag name and argument value
-        (such as C{('todo', '1.2')}.  The metadata dictionary's values
-        are lists of L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
-        segments, each corresponding to the body of a single docstring
-        field.
-    @type metadata: C{dict}
-    @ivar extra_docstring_fields: A list of new docstring fields
-        tags that are defined by the documented item's docstring.
-        These new field tags can be used by this item or by any
-        item it contains.
-    @type extra_docstring_fields: L{DocstringField
-        <epydoc.docstringparser.DocstringField>}
     """
+    #{ Docstrings
     docstring = UNKNOWN
-    docstring_lineno = UNKNOWN # [xx] document!
-    descr = UNKNOWN
-    summary = UNKNOWN
-    metadata = UNKNOWN
-    extra_docstring_fields = UNKNOWN
-    docs_extracted_by = UNKNOWN # 'parser' or 'introspecter' or 'both'
+    """@ivar: The documented item's docstring.
+       @type: C{string} or C{None}"""
     
+    docstring_lineno = UNKNOWN
+    """@ivar: The line number on which the documented item's docstring
+       begins.
+       @type: C{int}"""
+    #} end of "docstrings" group
+
+    #{ Information Extracted from Docstrings
+    descr = UNKNOWN
+    """@ivar: A description of the documented item, extracted from its
+       docstring.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
+    
+    summary = UNKNOWN
+    """@ivar: A summary description of the documented item, extracted from
+       its docstring.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
+    
+    metadata = UNKNOWN
+    """@ivar: Metadata about the documented item, extracted from fields in
+       its docstring.  I{Currently} this is encoded as a list of tuples
+       C{(field, arg, descr)}.  But that may change.
+       @type: C{(str, str, L{ParsedDocstring<markup.ParsedDocstring>})}"""
+    
+    extra_docstring_fields = UNKNOWN
+    """@ivar: A list of new docstring fields tags that are defined by the
+       documented item's docstring.  These new field tags can be used by
+       this item or by any item it contains.
+       @type: L{DocstringField <epydoc.docstringparser.DocstringField>}"""
+    #} end of "information extracted from docstrings" group
+
+    #{ Source Information
+    docs_extracted_by = UNKNOWN # 'parser' or 'introspecter' or 'both'
+    """@ivar: Information about where the information contained by this
+       C{APIDoc} came from.  Can be one of C{'parser'},
+       C{'introspector'}, or C{'both'}.
+       @type: C{str}"""
+    #} end of "source information" group
+
     def __init__(self, **kwargs):
         """
         Construct a new C{APIDoc} object.  Keyword arguments may be
@@ -475,47 +486,70 @@ class VariableDoc(APIDoc):
     is if that variable was created using an assignment statement, and
     that assignment statement had a docstring-comment or was followed
     by a pseudo-docstring.
-
-    @ivar container: API documentation for the namespace that contains
-        this variable.
-    @type container: L{ValueDoc}
-    @ivar name: The name of this variable in its containing namespace.
-    @type name: C{str}
-    @ivar value: API documentation about this variable's value.
-    @type value: L{ValueDoc}
-    
-    @ivar is_imported: Is this variable's value defined in another module?
-        (Exception: variables that are explicitly included in __all__
-        are considered non-imported, even if they are in fact imported.)
-    @type is_imported: C{bool}
-    @ivar is_instvar: Is this an instance variable?
-    @type is_instvar: C{bool}
-    @ivar is_alias: Is this an 'alias' variable?
-    @type is_alias: C{bool}
-    @ivar is_public: Is the variable considered 'public'?
-    @type is_public: C{bool}
-
-    @ivar overrides: The API documentation for the variable that is
-        overridden by this variable (only applicable if the containing
-        namespace is a class).  If the containing namespace is not a
-        class, then C{overrides} should be C{None}.
-    @type overrides: L{VariableDoc} or C{None}
-    
-    @ivar type_descr: A description of the variable's expected type,
-        extracted from its docstring.
-    @type type_descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
     """
-    container = UNKNOWN
+    #{ Basic Variable Information
     name = UNKNOWN
-    value = UNKNOWN
-    is_imported = UNKNOWN
-    imported_from = UNKNOWN
-    is_instvar = UNKNOWN
-    is_alias = UNKNOWN
-    is_public = UNKNOWN
-    overrides = UNKNOWN #: rename -- don't use a verb.
-    type_descr = UNKNOWN
+    """@ivar: The name of this variable in its containing namespace.
+       @type: C{str}"""
     
+    container = UNKNOWN
+    """@ivar: API documentation for the namespace that contains this
+       variable.
+       @type: L{ValueDoc}"""
+    
+    value = UNKNOWN
+    """@ivar: The API documentation for this variable's value.
+       @type: L{ValueDoc}"""
+    #}
+
+    #{ Information Extracted from Docstrings
+    type_descr = UNKNOWN 
+    """@ivar: A description of the variable's expected type, extracted from
+       its docstring.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
+    #} end of "information extracted from docstrings" group
+    
+    #{ Information about Imported Variables
+    imported_from = None
+    """@ivar: The fully qualified dotted name of the variable that this
+       variable's value was imported from.  This should be C{None} unless
+       C{is_instvar} is true.
+       @type: L{DottedName}"""
+
+    is_imported = UNKNOWN
+    """@ivar: Was this variable's value imported from another module?
+       (Exception: variables that are explicitly included in __all__ have
+       C{is_imported} set to C{False}, even if they are in fact
+       imported.)
+       @type: C{bool}"""
+    #} end of "information about imported variables" group
+
+    #{ Information about Variables in Classes
+    is_instvar = UNKNOWN
+    """@ivar: If true, then this variable is an instance variable; if false,
+       then this variable is a class variable.  This attribute should
+       only be defined if the containing namespace is a class    
+       @type: C{bool}"""
+    
+    overrides = UNKNOWN # [XXX] rename -- don't use a verb.
+    """@ivar: The API documentation for the variable that is overridden by
+       this variable.  This attribute should only be defined if the
+       containing namespace is a class.
+       @type: L{VariableDoc}"""
+    #} end of "information about variables in classes" group
+
+    #{ Flags
+    is_alias = UNKNOWN
+    """@ivar: Is this variable an alias for another variable with the same
+       value?  If so, then this variable will be dispreferred when
+       assigning canonical names.
+       @type: C{bool}"""
+    
+    is_public = UNKNOWN
+    """@ivar: Is this variable part of its container's public API?
+       @type: C{bool}"""
+    #} end of "flags" group
+
     def __init__(self, **kwargs):
         APIDoc.__init__(self, **kwargs)
         if self.is_public is UNKNOWN and self.name is not UNKNOWN:
@@ -559,62 +593,78 @@ class VariableDoc(APIDoc):
 class ValueDoc(APIDoc):
     """
     API documentation information about a single Python value.
-
-    @ivar canonical_name: A dotted name that serves as a unique
-        identifier for this C{ValueDoc}'s value.  If the value can be
-        reached using a single sequence of identifiers (given the
-        appropriate imports), then that sequence of identifiers is
-        used as its canonical name.  If the value can be reached by
-        multiple sequences of identifiers (i.e., if it has multiple
-        aliases), then one of those sequences of identifiers is used.
-        If the value cannot be reached by any sequence of identifiers
-        (e.g., if it was used as a base class but then its variable
-        was deleted), then its canonical name will start with C{'??'}.
-        If necessary, a dash followed by a number will be appended to
-        the end of a non-reachable identifier to make its canonical
-        name unique.
-
-        When possible, canonical names are chosen when new
-        C{ValueDoc}s are created.  However, this is sometimes not
-        possible.  If a canonical name can not be chosen when the
-        C{ValueDoc} is created, then one will be assigned during
-        indexing.
-    @type canonical_name: L{DottedName}
-
-    @ivar pyval: A pointer to the actual Python object described by
-        this C{ValueDoc}.
-    @type pyval: Python object
-    @ivar ast: The syntax tree of the Python source code that was used
-        to create this value.
-    @type ast: C{list}
-    @ivar repr: A text representation of this value.
-    @type repr: C{unicode}
-    @ivar type: API documentation for the value's type
-    @type type: L{ValueDoc}
-    @ivar imported_from: If C{imported_from} is not None, then this
-        value was imported from another file.  C{imported_from} is
-        the dotted name of the variable that this value was imported
-        from.  If that variable is documented, then its C{value} may
-        contain more complete API documentation about this value.  The
-        C{imported_from} attribute is used by the source code parser
-        to link imported values to their source values.  When
-        possible, these alias C{ValueDoc}s are replaced by the
-        imported value's C{ValueDoc} during indexing.
-    @ivar defining_module: The documentation for the module that
-        defines this value.  This is used, e.g., to lookup the
-        appropriate markup language for docstrings.  For a
-        C{ModuleDoc}, C{defining_module} should be C{self}.
-    @type defining_mdoule: L{ModuleDoc}
     """
     canonical_name = UNKNOWN
+    """@ivar: A dotted name that serves as a unique identifier for
+       this C{ValueDoc}'s value.  If the value can be reached using a
+       single sequence of identifiers (given the appropriate imports),
+       then that sequence of identifiers is used as its canonical name.
+       If the value can be reached by multiple sequences of identifiers
+       (i.e., if it has multiple aliases), then one of those sequences of
+       identifiers is used.  If the value cannot be reached by any
+       sequence of identifiers (e.g., if it was used as a base class but
+       then its variable was deleted), then its canonical name will start
+       with C{'??'}.  If necessary, a dash followed by a number will be
+       appended to the end of a non-reachable identifier to make its
+       canonical name unique.
+
+       When possible, canonical names are chosen when new C{ValueDoc}s
+       are created.  However, this is sometimes not possible.  If a
+       canonical name can not be chosen when the C{ValueDoc} is created,
+       then one will be assigned by L{assign_canonical_names()
+       <docbuilder.assign_canonical_names>}.
+       
+       @type: L{DottedName}"""
+
+    #{ Value Representation
     pyval = UNKNOWN
-    ast = UNKNOWN
-    repr = UNKNOWN
-    type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
-    toktree = UNKNOWN # from the tokenizing docparser.
+    """@ivar: A pointer to the actual Python object described by this
+       C{ValueDoc}.
+       @type: Python object"""
+
+    repr = UNKNOWN # [xx] replace w/ parse_repr.
+    """@ivar: A text representation of this value.
+       @type: C{unicode}"""
+    #} end of "value representation" group
+
+    #{ Context
     defining_module = UNKNOWN
+    """@ivar: The documentation for the module that defines this
+       value.  This is used, e.g., to lookup the appropriate markup
+       language for docstrings.  For a C{ModuleDoc},
+       C{defining_module} should be C{self}.
+       @type: L{ModuleDoc}"""
+    #} end of "context group"
+
+    #{ Information about Imported Variables
     proxy_for = None # [xx] in progress.
-    
+    """@ivar: If C{proxy_for} is not None, then this value was
+       imported from another file.  C{proxy_for} is the dotted name of
+       the variable that this value was imported from.  If that
+       variable is documented, then its C{value} may contain more
+       complete API documentation about this value.  The C{proxy_for}
+       attribute is used by the source code parser to link imported
+       values to their source values (in particular, for base
+       classes).  When possible, these proxy C{ValueDoc}s are replaced
+       by the imported value's C{ValueDoc} by
+       L{link_imports()<docbuilder.link_imports>}.
+       @type: L{DottedName}"""
+    #{ end of "information about imported variables" group
+
+    #{ Unused??
+    type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
+    """@ivar: API documentation for the value's type.
+       @type: L{ValueDoc}"""
+    #}
+
+    # this is currently used to extract values from __all__, etc, in
+    # the docparser module; maybe I should specialize
+    # process_assignment and extract it there?  Although, for __all__,
+    # it's not clear where I'd put the value, since I just use it to
+    # set private/public/imported attribs on other vars (that might not
+    # exist yet at the time.)
+    toktree = UNKNOWN
+
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
             return '<%s %s>' % (self.__class__.__name__, self.canonical_name)
@@ -626,6 +676,8 @@ class ValueDoc(APIDoc):
     def apidoc_links(self, **filters):
         return []
 
+## I plan to use something like this eventually:
+##
 # class SimpleValueDoc(ValueDoc):
 #     """
 #     API documentation about a 'simple' value, i.e., one that does not
@@ -797,6 +849,7 @@ class NamespaceDoc(ValueDoc):
                     if elt_doc in ungrouped:
                         ungrouped.remove(elt_doc)
                     else:
+                        # [xx] might just be listed in the same group twice!
                         log.warning("%s.%s is in multiple groups" %
                                     (self.canonical_name, elt_name))
             groups[group_name] = group
