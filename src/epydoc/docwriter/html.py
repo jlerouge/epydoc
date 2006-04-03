@@ -289,10 +289,6 @@ class HTMLWriter:
         # Process keyword arguments.
         self._show_private = kwargs.get('show_private', 1)
         """Should private docs be included?"""
-
-        self.valdocs = docindex.reachable_valdocs(
-            sorted_by_name=True, imports=False, packages=False, bases=False, 
-            submodules=False, subclasses=False, private=self._show_private)
         
         self._prj_name = kwargs.get('prj_name', None)
         """The project's name (for the project link in the navbar)"""
@@ -303,9 +299,9 @@ class HTMLWriter:
         self._prj_link = kwargs.get('prj_link', None)
         """HTML code for the project link in the navbar"""
         
-        self._top_page = self._find_top_page(kwargs.get('top_page', None))
+        self._top_page = kwargs.get('top_page', None)
         """The 'main' page"""
-        
+
         self._css = kwargs.get('css')
         """CSS stylesheet to use"""
         
@@ -370,17 +366,44 @@ class HTMLWriter:
             self._prj_link = ('<a class="navbar" target="_top" href="'+
                               self._prj_url+'">'+self._prj_link+'</a>')
 
+        # Precompute lists & sets of APIDoc objects that we're
+        # interested in.
+        self.valdocs = valdocs = sorted(docindex.reachable_valdocs(
+            sorted_by_name=True, imports=False, packages=False, bases=False, 
+            submodules=False, subclasses=False, private=self._show_private))
+        self.module_list = [d for d in valdocs if isinstance(d, ModuleDoc)]
+        """The list of L{ModuleDoc}s for the documented modules."""
+        self.module_set = set(self.module_list)
+        """The set of L{ModuleDoc}s for the documented modules."""
+        self.class_list = [d for d in valdocs if isinstance(d, ClassDoc)]
+        """The list of L{ClassDoc}s for the documented classes."""
+        self.class_set = set(self.class_list)
+        """The set of L{ClassDoc}s for the documented classes."""
+        self.routine_list = [d for d in valdocs if isinstance(d, RoutineDoc)]
+        """The list of L{RoutineDoc}s for the documented routines."""
+        self.indexed_docs = []
+        """The list of L{APIDoc}s for variables and values that should
+        be included in the index."""
+
+        # Construct the value for self.indexed_docs.
+        self.indexed_docs += [d for d in valdocs
+                              if not isinstance(d, GenericValueDoc)]
+        for doc in valdocs:
+            if isinstance(doc, NamespaceDoc):
+                self.indexed_docs += [doc for doc in doc.variables.values() if
+                                      isinstance(doc.value, GenericValueDoc)]
+        self.indexed_docs.sort()
+
+        # Figure out the url for the top page.
+        self._top_page_url = self._find_top_page(self._top_page)
+        
         # Figure out how many output files there will be (for progress
         # reporting).
         self.modules_with_sourcecode = set()
-        for doc in self.valdocs:
+        for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = (len([d for d in self.valdocs
-                                if isinstance(d, ClassDoc)]) +
-                           2*len([d for d in self.valdocs
-                                if isinstance(d, ModuleDoc)]) +
-                           9)
+        self._num_files = len(self.class_list) + 2*len(self.module_list) + 9
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
             
@@ -488,19 +511,17 @@ class HTMLWriter:
         self._write(self.write_frames_index, directory, 'frames.html')
         self._write(self.write_toc, directory, 'toc.html')
         self._write(self.write_project_toc, directory, 'toc-everything.html')
-        for doc in self.valdocs:
-            if isinstance(doc, ModuleDoc):
-                filename = 'toc-%s' % urllib.unquote(self.url(doc))
-                self._write(self.write_module_toc, directory, filename, doc)
+        for doc in self.module_list:
+            filename = 'toc-%s' % urllib.unquote(self.url(doc))
+            self._write(self.write_module_toc, directory, filename, doc)
 
         # Write the object documentation.
-        for doc in self.valdocs:
-            if not isinstance(doc, (ModuleDoc, ClassDoc)): continue
+        for doc in self.module_list:
             filename = urllib.unquote(self.url(doc))
-            if isinstance(doc, ModuleDoc):
-                self._write(self.write_module, directory, filename, doc)
-            else:
-                self._write(self.write_class, directory, filename, doc)
+            self._write(self.write_module, directory, filename, doc)
+        for doc in self.class_list:
+            filename = urllib.unquote(self.url(doc))
+            self._write(self.write_class, directory, filename, doc)
 
         # Write source code files.
         if self._incl_sourcecode:
@@ -723,6 +744,9 @@ class HTMLWriter:
 
         # Write detailed descriptions of functions & variables defined
         # in this class.
+        # [xx] why group methods into one section but split vars into two?
+        # seems like we should either group in both cases or split in both
+        # cases.
         self.write_details_list(out, "Method Details", doc, "method")
         self.write_details_list(out, "Class Variable Details", doc,
                                 "classvariable")
@@ -757,9 +781,7 @@ class HTMLWriter:
         self.write_module_tree(out)
 
         # Does the project define any classes?
-        defines_classes = False
-        for doc in self.valdocs:
-            if isinstance(doc, ClassDoc): defines_classes = True; break
+        defines_classes = len(self.class_list) > 0
 
         # Write the class hierarchy
         if defines_classes:
@@ -799,7 +821,7 @@ class HTMLWriter:
         # [xx] this will only find variables if they have values.
         # (e.g., it won't list any instance variables.)
         identifiers = []
-        for doc in self.valdocs:
+        for doc in self.indexed_docs:
             name = doc.canonical_name
             if self.url(doc) is None: continue
             key = name[-1].lower()
@@ -848,7 +870,12 @@ class HTMLWriter:
         >>> letters = "abcdefghijklmnopqrstuvwxyz"
           <a name="_"></a>
         >>> for sortkey, name, doc in index:
+        >>>     if self._doc_or_ancestor_is_private(doc):
+        >>>         if not self._show_private: continue
+          <tr class="private"><td width="15%">
+        >>>     else:
           <tr><td width="15%">
+        >>>     #endif
         >>>     while letters and letters[0] <= name[-1][:1].lower():
                   <a name="$letters[0]$"></a>
         >>>       letters = letters[1:]
@@ -961,7 +988,7 @@ class HTMLWriter:
             <frame src="toc-everything.html" name="moduleFrame"
                    id="moduleFrame" />
           </frameset>
-          <frame src="$self._top_page$" name="mainFrame" id="mainFrame" />
+          <frame src="$self._top_page_url$" name="mainFrame" id="mainFrame" />
         </frameset>
         </html>
         ''')
@@ -979,9 +1006,7 @@ class HTMLWriter:
         <p class="toc">
           <a target="moduleFrame" href="toc-everything.html">Everything</a>
         </p>
-        >>> modules = [d for d in self.valdocs if
-        >>>            isinstance(d, ModuleDoc)]
-        >>> self.write_toc_section(out, "Modules", modules)
+        >>> self.write_toc_section(out, "Modules", self.module_list)
         <hr />
         >>> if self._show_private:
           $self.PRIVATE_LINK$
@@ -1004,7 +1029,8 @@ class HTMLWriter:
         for label, doc in docs:
             doc_url = self.url(doc)
             toc_url = 'toc-%s' % doc_url
-            if isinstance(doc, VariableDoc) and doc.is_public is False:
+            is_private = self._doc_or_ancestor_is_private(doc)
+            if is_private:
                 if not self._show_private: continue
                 out('  <div class="private">\n')
                 
@@ -1016,7 +1042,7 @@ class HTMLWriter:
             else:
                 out('    <a target="mainFrame" href="%s"\n'
                     '     >%s</a></p>' % (doc_url, label))
-            if isinstance(doc, VariableDoc) and doc.is_public is False:
+            if is_private:
                 out('  </div>\n')
 
     def write_project_toc(self, out):
@@ -1025,24 +1051,20 @@ class HTMLWriter:
         out('<hr />\n')
 
         # List the classes.
-        classes = [d for d in self.valdocs
-                   if isinstance(d, ClassDoc)]
-        self.write_toc_section(out, "All Classes", classes)
+        self.write_toc_section(out, "All Classes", self.class_list)
 
         # List the functions.
-        funcs = [d for d in self.valdocs
-                 if (isinstance(d, RoutineDoc) and
-                     not isinstance(self.docindex.container(d), 
-                                    (ClassDoc, types.NoneType)))]
+        funcs = [d for d in self.routine_list 
+                 if not isinstance(self.docindex.container(d), 
+                                   (ClassDoc, types.NoneType))]
         self.write_toc_section(out, "All Functions", funcs)
 
         # List the variables.
         vars = []
-        for doc in self.valdocs:
-            if isinstance(doc, ModuleDoc):
-                vars += doc.select_variables(value_type='other',
-                                             imported=False,
-                                             public=self._public_filter)
+        for doc in self.module_list:
+            vars += doc.select_variables(value_type='other',
+                                         imported=False,
+                                         public=self._public_filter)
         self.write_toc_section(out, "All Variables", vars)
 
         # Footer material.
@@ -1105,7 +1127,7 @@ class HTMLWriter:
         """
         filename = os.path.join(directory, 'index.html')
         if self._frames_index: top = 'frames.html'
-        else: top = self._top_page
+        else: top = self._top_page_url
 
         # Copy the non-frames index file from top, if it's internal.
         if top[:5] != 'http:' and '/' not in top:
@@ -1398,15 +1420,15 @@ class HTMLWriter:
         <table class="navbar" border="0" width="100%" cellpadding="0"
                bgcolor="#a0c0ff" cellspacing="0">
           <tr valign="middle">
-        >>> if self._top_page not in ("trees.html", "indices.html", "help.html"):
+        >>> if self._top_page_url not in ("trees.html", "indices.html", "help.html"):
           <!-- Home link -->
         >>>   if (isinstance(context, ValueDoc) and
-        >>>       self._top_page == self.url(context.canonical_name)):
+        >>>       self._top_page_url == self.url(context.canonical_name)):
               <th bgcolor="#70b0f0" class="navselect"
                   >&nbsp;&nbsp;&nbsp;Home&nbsp;&nbsp;&nbsp;</th>
         >>>   else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
-                href="$self._top_page$">Home</a>&nbsp;&nbsp;&nbsp;</th>
+                href="$self._top_page_url$">Home</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Tree link -->
@@ -1605,8 +1627,8 @@ class HTMLWriter:
         for var_doc in var_docs:
             if var_doc.container != doc:
                 base = var_doc.container
-                if (base not in self.valdocs
-                    or self._inheritance == 'listed'):
+                if (base not in self.class_set or
+                    self._inheritance == 'listed'):
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
                     grouped_inh_vars.setdefault(base,[]).append(var_doc)
@@ -2339,17 +2361,13 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
 
     def write_module_tree(self, out):
-        # Get all modules.
-        modules = [doc for doc in self.valdocs
-                   if isinstance(doc, ModuleDoc)]
-        if not modules: return
-        # [XX] sort?
+        if not self.module_list: return
 
         # Write entries for all top-level modules/packages.
         out('<ul>\n')
-        for doc in modules:
+        for doc in self.module_list:
             if (doc.package in (None, UNKNOWN) or
-                doc.package not in self.valdocs):
+                doc.package not in self.module_set):
                 self.write_module_tree_item(out, doc)
         out('</ul>\n')
     
@@ -2407,32 +2425,33 @@ class HTMLWriter:
             second time a class is mentioned; instead, link to the
             first mention.
         """
-        # [XX] sort? and backref for multiple inheritance?
-        classes = set([doc for doc in self.valdocs
-                       if isinstance(doc, ClassDoc)])
-        if not classes: return
-
-        # Add external classes.
-        for doc in self.valdocs:
-            if isinstance(doc, ClassDoc) and doc.bases != UNKNOWN:
+        # [XX] backref for multiple inheritance?
+        if not self.class_list: return
+        
+        # Build a set containing all classes that we should list.
+        # This includes everything in class_list, plus any of those
+        # class' bases, but not undocumented subclasses.
+        class_set = self.class_set.copy()
+        for doc in self.class_list:
+            if doc.bases != UNKNOWN:
                 for base in doc.bases:
-                    if base not in self.valdocs:
+                    if base not in class_set:
                         if isinstance(base, ClassDoc):
-                            classes.update(base.mro())
+                            class_set.update(base.mro())
                         else:
                             # [XX] need to deal with this -- how?
                             pass
-                            #classes.add(base)
+                            #class_set.add(base)
  
         out('<ul>\n')
-        for doc in classes:
+        for doc in sorted(class_set):
             if doc.bases != UNKNOWN and len(doc.bases)==0:
-                self.write_class_tree_item(out, doc, classes)
+                self.write_class_tree_item(out, doc, class_set)
         out('</ul>\n')
 
     write_class_tree_item = compile_template(
         '''
-        write_class_tree_item(self, out, doc, classes)
+        write_class_tree_item(self, out, doc, class_set)
         ''',
         # /------------------------- Template -------------------------\
         '''
@@ -2445,8 +2464,8 @@ class HTMLWriter:
         >>> if doc.subclasses:
             <ul>
         >>>   for subclass in set(doc.subclasses):
-        >>>     if subclass in classes:
-        >>>       self.write_class_tree_item(out, subclass, classes)
+        >>>     if subclass in class_set:
+        >>>       self.write_class_tree_item(out, subclass, class_set)
         >>>     #endif
         >>>   #endfor
             </ul>
@@ -2575,10 +2594,12 @@ class HTMLWriter:
             if doc.metadata not in (None, UNKNOWN):
                 for (field, arg, descr) in doc.metadata:
                     self._get_index_terms(descr, doc, terms, links)
-            # summary?
+            # [xx] summary? type_descr? others?
             if isinstance(doc, NamespaceDoc):
-                for var in doc.variables.items():
-                    pass # [XX] ????? add these???
+                for var in doc.variables.values():
+                    self._get_index_terms(var.descr, var, terms, links)
+                    for (field, arg, descr) in var.metadata:
+                        self._get_index_terms(descr, var, terms, links)
             elif isinstance(doc, RoutineDoc):
                 self._get_index_terms(doc.return_descr, doc, terms, links)
                 self._get_index_terms(doc.return_type, doc, terms, links)
@@ -2668,11 +2689,11 @@ class HTMLWriter:
         """
         # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
-            if obj not in self.valdocs: return None
+            if obj not in self.module_set: return None
             return urllib.quote('%s'%obj.canonical_name) + '-module.html'
         # Class: <canonical_name>-class.html
         elif isinstance(obj, ClassDoc):
-            if obj not in self.valdocs: return None
+            if obj not in self.class_set: return None
             return urllib.quote('%s'%obj.canonical_name) + '-class.html'
         # Variable
         elif isinstance(obj, VariableDoc):
@@ -2884,12 +2905,18 @@ class HTMLWriter:
         else:
             return 'Variable'
         
+    def _doc_or_ancestor_is_private(self, api_doc):
+        name = api_doc.canonical_name
+        for i in range(len(name), 0, -1):
+            var_doc = self.docindex.get_vardoc(name[:i])
+            if var_doc is not None and var_doc.is_public == False:
+                return True
+        return False
 
 class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     def __init__(self, htmlwriter, container):
         self.htmlwriter = htmlwriter
         self.docindex = htmlwriter.docindex
-        self.valdocs = htmlwriter.valdocs
         self.container = container
         
     def translate_indexterm(self, indexterm):
