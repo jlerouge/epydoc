@@ -200,7 +200,7 @@ def parse_arguments():
     optparser.set_defaults(action="html", show_frames=True,
                            docformat='epytext', 
                            show_private=True, show_imports=False,
-                           inheritance="grouped",
+                           inheritance="listed",
                            verbose=0, quiet=0,
                            parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False,
