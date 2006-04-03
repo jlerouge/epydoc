@@ -193,9 +193,9 @@ def _get_valuedoc(value):
             introspect_module(value, val_doc, preliminary=True)
             val_doc.defining_module = val_doc
         else:
-            module_name = get_containing_module(value)
-            #if (module_name and module_name in sys.modules and
-            if inspect.ismodule(sys.modules.get(module_name)):
+            module_name = str(get_containing_module(value))
+            module = sys.modules.get(module_name)
+            if module is not None and inspect.ismodule(module):
                 val_doc.defining_module = _get_valuedoc(module)
             
     return val_doc
