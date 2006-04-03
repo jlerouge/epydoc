@@ -1077,8 +1077,16 @@ def _unreachable_name_for(val_doc, docindex):
 def inherit_docs(class_doc):
     for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
         if base_class == class_doc: continue
-        if base_class.variables is UNKNOWN: continue
 
+        # Inherit any groups.  Place them *after* this class's groups,
+        # so that any groups that are important to this class come
+        # first.
+        if base_class.group_specs not in (None, UNKNOWN):
+            class_doc.group_specs += [gs for gs in base_class.group_specs
+                                      if gs not in class_doc.group_specs]
+
+        # Inherit any variables.
+        if base_class.variables is UNKNOWN: continue
         for name, var_doc in base_class.variables.items():
             # If it's a __private variable, then don't inherit it.
             if name.startswith('__') and not name.endswith('__'):
@@ -1100,7 +1108,7 @@ def inherit_docs(class_doc):
             # local, then record the fact that it overrides
             # var_doc.
             elif (class_doc.variables[name].container==class_doc and
-                  class_doc.variables[name].overrides is UNKNOWN):
+                  class_doc.variables[name].overrides==UNKNOWN):
                 class_doc.variables[name].overrides = var_doc
                 _inherit_info(class_doc.variables[name])
 
