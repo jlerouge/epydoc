@@ -661,10 +661,10 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     if introspect_doc == parse_doc:
         return introspect_doc
 
-    # Never merge a ValueDoc with another ValueDoc..???  E.g., we
-    # don't want to merge 2+2 with 4...  Instead, combine them in a
-    # special way?? [XXX]!!
-    if type(introspect_doc) == type(parse_doc) == ValueDoc:
+    # If both values are GenericValueDoc, then we don't want to merge
+    # them.  E.g., we don't want to merge 2+2 with 4.  So just copy
+    # the inspect_doc's pyval to the parse_doc, and return the parse_doc.
+    if type(introspect_doc) == type(parse_doc) == GenericValueDoc:
         parse_doc.pyval = introspect_doc.pyval
         parse_doc.docs_extracted_by = 'both'
         return parse_doc

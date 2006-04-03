@@ -773,7 +773,7 @@ def parse_function_signature(func_doc):
         for name in params.split(','):
             if '=' in name:
                 (name, default_repr) = name.split('=',1)
-                default = ValueDoc(parse_repr=default_repr)
+                default = GenericValueDoc(parse_repr=default_repr)
             else:
                 default = None
             name = name.strip()

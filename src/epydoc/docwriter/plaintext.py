@@ -128,7 +128,8 @@ class PlaintextWriter:
         if name is None: name = var_doc.name
         out(prefix+self.bold(str(name)))
         if (var_doc.value not in (UNKNOWN, None) and
-            var_doc.is_alias is True and var_doc.value.__class__ != ValueDoc):
+            var_doc.is_alias is True and
+            var_doc.value.canonical_name not in (None, UNKNOWN)):
             out(' = %s' % var_doc.value.canonical_name)
         elif var_doc.value not in (UNKNOWN, None):
             pyval_repr = var_doc.value.pyval_repr()

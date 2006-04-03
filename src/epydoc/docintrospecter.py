@@ -482,9 +482,8 @@ def introspect_property(prop, prop_doc):
 #////////////////////////////////////////////////////////////
 
 def introspect_other(val, val_doc):
-    """
-    Create and return a C{ValueDoc} for the given value.
-    """
+    """Specialize val_doc to a C{GenericValueDoc} and return it."""
+    val_doc.specialize_to(GenericValueDoc)
     return val_doc
 
 #////////////////////////////////////////////////////////////

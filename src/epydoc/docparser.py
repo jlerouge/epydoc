@@ -552,8 +552,11 @@ def process_file(module_doc):
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
         # BOM encoding marker: ignore.
+        if toktype == token.ERRORTOKEN:
+            log.debug(type(toktext), `toktext`)
         if (toktype == token.ERRORTOKEN and
-            (toktext == u'\ufeff' or toktext == '\xef\xbb\xbf')):
+            (toktext == u'\ufeff' or
+             toktext.encode(encoding) == '\xef\xbb\xbf')):
             pass
             
         # Error token: abort
@@ -1183,10 +1186,9 @@ def rhs_to_valuedoc(rhs, parent_docs):
             return doc, False
 
     # Nothing else to do: make a val with the source as its repr.
-    return ValueDoc(parse_repr=pp_toktree(rhs), toktree=rhs,
-                    defining_module=parent_docs[0],
-                    docs_extracted_by='parser'), False
-    
+    return GenericValueDoc(parse_repr=pp_toktree(rhs), toktree=rhs,
+                           defining_module=parent_docs[0],
+                           docs_extracted_by='parser'), False
 
 def get_lhs_parent(lhs_name, parent_docs):
     assert isinstance(lhs_name, DottedName)
@@ -1377,6 +1379,8 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
             deco_repr = '%s(%s)' % (pp_toktree(decorator[1:]),
                                     func_doc.canonical_name)
         elif func_doc.parse_repr not in (None, UNKNOWN):
+            # [xx] this case should be improved.. when will func_doc
+            # have a known parse_repr??
             deco_repr = '%s(%s)' % (pp_toktree(decorator[1:]),
                                     func_doc.parse_repr)
         else:
@@ -1395,14 +1399,15 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     return func_doc
 
 def apply_decorator(decorator_name, func_doc):
+    # [xx] what if func_doc is not a RoutineDoc?
     if decorator_name == DottedName('staticmethod'):
         return StaticMethodDoc(**func_doc.__dict__)
     elif decorator_name == DottedName('classmethod'):
         return ClassMethodDoc(**func_doc.__dict__)
     elif DEFAULT_DECORATOR_BEHAVIOR == 'transparent':
-        return func_doc.__class__(**func_doc.__dict__)
+        return func_doc.__class__(**func_doc.__dict__) # make a copy.
     elif DEFAULT_DECORATOR_BEHAVIOR == 'opaque':
-        return ValueDoc(docs_extracted_by='parser')
+        return GenericValueDoc(docs_extracted_by='parser')
     else:
         raise ValueError, 'Bad value for DEFAULT_DECORATOR_BEHAVIOR'
 
@@ -1441,8 +1446,8 @@ def init_arglist(func_doc, arglist):
         elif arg[1] != (token.OP, '=') or len(arg) == 2:
             raise ParseError("Bad argument list")
         else:
-            default_val = ValueDoc(parse_repr=pp_toktree(arg[2:]),
-                                   docs_extracted_by='parser')
+            default_val = GenericValueDoc(parse_repr=pp_toktree(arg[2:]),
+                                          docs_extracted_by='parser')
             func_doc.posarg_defaults.append(default_val)
 
 #/////////////////////////////////////////////////////////////////
@@ -1842,8 +1847,10 @@ def lookup_value(dotted_name, parent_docs):
         elif (var_doc.value == UNKNOWN and
             var_doc.imported_from not in (None, UNKNOWN)):
             src_name = var_doc.imported_from + dotted_name[i:]
-            # do I want to create a proxy here?? [xxx]
-            return ValueDoc(proxy_for=src_name, docs_extracted_by='parser')
+            # [xx] do I want to create a proxy here??
+            return GenericValueDoc(proxy_for=src_name,
+                                   parse_repr=str(dotted_name),
+                                   docs_extracted_by='parser')
         else:
             return None
 

@@ -1805,7 +1805,7 @@ class HTMLWriter:
             if isinstance(val_doc, RoutineDoc):
                 return self.function_signature(val_doc, css_class=
                                                "summary-sig")
-            elif type(val_doc) == ValueDoc:
+            elif isinstance(val_doc, GenericValueDoc):
                 if val_doc.parse_repr is not UNKNOWN:
                     return plaintext_to_html(val_doc.parse_repr)
                 else:

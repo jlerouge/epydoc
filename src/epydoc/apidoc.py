@@ -695,17 +695,15 @@ class ValueDoc(APIDoc):
     def apidoc_links(self, **filters):
         return []
 
-## I plan to use something like this eventually:
-##
-# class SimpleValueDoc(ValueDoc):
-#     """
-#     API documentation about a 'simple' value, i.e., one that does not
-#     have its own docstring or any information other than its value and
-#     parse representation.  C{SimpleValueDoc}s do not get assigned
-#     cannonical names.
-#     """
-#     canonical_name = None
-
+class GenericValueDoc(ValueDoc):
+    """
+    API documentation about a 'generic' value, i.e., one that does not
+    have its own docstring or any information other than its value and
+    parse representation.  C{GenericValueDoc}s do not get assigned
+    cannonical names.
+    """
+    canonical_name = None
+    
 class NamespaceDoc(ValueDoc):
     """
     API documentation information about a singe Python namespace
@@ -1563,6 +1561,8 @@ class DocIndex:
         Return the C{ValueDoc} that contains the given C{APIDoc}, or
         C{None} if its container is not in the index.
         """
+        if isinstance(api_doc, GenericValueDoc):
+            return None # [xx] unknown.
         if isinstance(api_doc, VariableDoc):
             return api_doc.container
         if len(api_doc.canonical_name) == 1:
