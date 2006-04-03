@@ -651,18 +651,13 @@ class ValueDoc(APIDoc):
        @type: L{DottedName}"""
     #{ end of "information about imported variables" group
 
-    #{ Unused??
-    type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
-    """@ivar: API documentation for the value's type.
-       @type: L{ValueDoc}"""
-    #}
-
-    # this is currently used to extract values from __all__, etc, in
-    # the docparser module; maybe I should specialize
-    # process_assignment and extract it there?  Although, for __all__,
-    # it's not clear where I'd put the value, since I just use it to
-    # set private/public/imported attribs on other vars (that might not
-    # exist yet at the time.)
+    #: @ivar:
+    #: This is currently used to extract values from __all__, etc, in
+    #: the docparser module; maybe I should specialize
+    #: process_assignment and extract it there?  Although, for __all__,
+    #: it's not clear where I'd put the value, since I just use it to
+    #: set private/public/imported attribs on other vars (that might not
+    #: exist yet at the time.)
     toktree = UNKNOWN
 
     def __repr__(self):
@@ -691,19 +686,21 @@ class NamespaceDoc(ValueDoc):
     """
     API documentation information about a singe Python namespace
     value.  (I.e., a module or a class).
-
-    @ivar variables: The contents of the namespace, encoded as a
+    """
+    #{ Information about Variables
+    variables = UNKNOWN
+    """@ivar: The contents of the namespace, encoded as a
         dictionary mapping from identifiers to C{VariableDoc}s.  This
         dictionary contains all names defined by the namespace,
         including imported variables, aliased variables, and variables
         inherited from base classes (once L{DocInheriter
         <epydoc.docinheriter.DocInheriter>} has added them).
-    @type variables: C{dict} from C{string} to L{VariableDoc}
-    @ivar sorted_variables: A list of all variables defined by this
-        namespace, in sorted order.  The elements of this list should
-        exactly match the values of L{variables}.  The sort order for
-        this list is defined as follows:
-        
+       @type: C{dict} from C{string} to L{VariableDoc}"""
+    sorted_variables = UNKNOWN
+    """@ivar: A list of all variables defined by this
+       namespace, in sorted order.  The elements of this list should
+       exactly match the values of L{variables}.  The sort order for
+       this list is defined as follows:
           - Any variables listed in a C{@sort} docstring field are
             listed in the order given by that field.
           - These are followed by any variables that were found while
@@ -711,33 +708,30 @@ class NamespaceDoc(ValueDoc):
             defined in the source file.
           - Finally, any remaining variables are listed in
             alphabetical order.
-            
-    @type sorted_variables: C{list} of L{VariableDoc}
-    @ivar group_specs: The groups that are defined by this namespace's
-        docstrings.  C{group_specs} is encoded as an ordered list of
-        tuples C{(group_name, elt_names)}, where C{group_name} is the
-        
-        name of a group and C{elt_names} is a list of element names in
-        that group.  (An element can be a variable or a submodule.)  A
-        '*' in an element name will match any string of characters.
-    @type group_specs: C{list} of C{(str,list)}
-    @ivar variable_groups: A dictionary specifying what group each
-        variable belongs to.  The keys of the dictionary are group
-        names, and the values are lists of C{VariableDoc}s.  The order
-        that groups should be listed in should be taken from
-        L{group_specs}.
-    @type variable_groups: C{dict} from C{str} to C{list} of L{APIDoc}
-    @ivar sort_spec: The order in which variables should be listed,
-        encoded as a list of names.  Any variables whose names are not
-        included in this list should be listed alphabetically,
-        following the variables that are included.
-    @type sort_spec: C{list} of C{str}
-    """
-    variables = UNKNOWN
-    sorted_variables = UNKNOWN
-    variable_groups = UNKNOWN
-    group_specs = UNKNOWN
+       @type: C{list} of L{VariableDoc}"""
     sort_spec = UNKNOWN
+    """@ivar: The order in which variables should be listed,
+       encoded as a list of names.  Any variables whose names are not
+       included in this list should be listed alphabetically,
+       following the variables that are included.
+       @type: C{list} of C{str}"""
+    group_specs = UNKNOWN
+    """@ivar: The groups that are defined by this namespace's
+       docstrings.  C{group_specs} is encoded as an ordered list of
+       tuples C{(group_name, elt_names)}, where C{group_name} is the
+        
+       name of a group and C{elt_names} is a list of element names in
+       that group.  (An element can be a variable or a submodule.)  A
+       '*' in an element name will match any string of characters.
+       @type: C{list} of C{(str,list)}"""
+    variable_groups = UNKNOWN
+    """@ivar: A dictionary specifying what group each
+       variable belongs to.  The keys of the dictionary are group
+       names, and the values are lists of C{VariableDoc}s.  The order
+       that groups should be listed in should be taken from
+       L{group_specs}.
+       @type: C{dict} from C{str} to C{list} of L{APIDoc}"""
+    #} end of group "information about variables"
 
     def __init__(self, **kwargs):
         kwargs.setdefault('variables', {})
@@ -862,34 +856,45 @@ class NamespaceDoc(ValueDoc):
 class ModuleDoc(NamespaceDoc):
     """
     API documentation information about a single module.
-
-    @ivar package: API documentation for the module's containing package.
-    @type package: L{ModuleDoc}
-    @ivar docformat: The markup language used by docstrings in this module.
-    @type docformat: C{string}
-    @ivar submodules: Modules contained by this module (if this module
-        is a package).  (Note: on rare occasions, a module may have a
-        submodule that is shadowed by a variable with the same name.)
-    @ivar filename: The name of the file that defines the module.
-    @type filename: C{string}
-    @ivar variable_groups: A dictionary specifying what group each
-        submodule belongs to.  The keys of the dictionary are group
-        names, and the values are lists of C{ModuleDoc}s.  The order
-        that groups should be listed in should be taken from
-        L{group_specs}.
-    @type submodule_groups: C{dict} from C{str} to C{list} of L{APIDoc}
-
-    @ivar imports: list of names..?
     """
-    package = UNKNOWN
-    docformat = UNKNOWN
-    submodules = UNKNOWN
-    is_package = UNKNOWN
+    #{ Information about the Module
     filename = UNKNOWN
-    path = UNKNOWN
+    """@ivar: The name of the file that defines the module.
+       @type: C{string}"""
+    docformat = UNKNOWN
+    """@ivar: The markup language used by docstrings in this module.
+       @type: C{string}"""
+    #{ Information about Submodules
+    submodules = UNKNOWN
+    """@ivar: Modules contained by this module (if this module
+       is a package).  (Note: on rare occasions, a module may have a
+       submodule that is shadowed by a variable with the same name.)
+       @type: C{list} of L{ModuleDoc}"""
     submodule_groups = UNKNOWN
-
+    """@ivar: A dictionary specifying what group each
+       submodule belongs to.  The keys of the dictionary are group
+       names, and the values are lists of C{ModuleDoc}s.  The order
+       that groups should be listed in should be taken from
+       L{group_specs}.
+       @type: C{dict} from C{str} to C{list} of L{APIDoc}"""
+    #{ Information about Packages
+    package = UNKNOWN
+    """@ivar: API documentation for the module's containing package.
+       @type: L{ModuleDoc}"""
+    is_package = UNKNOWN
+    """@ivar: True if this C{ModuleDoc} describes a package.
+       @type: C{bool}"""
+    path = UNKNOWN
+    """@ivar: If this C{ModuleDoc} describes a package, then C{path}
+       contains a list of directories that constitute its path (i.e.,
+       the value of its C{__path__} variable).
+       @type: C{list} of C{str}"""
+    #{ Information about Imported Variables
     imports = UNKNOWN
+    """@ivar: A list of the source names of variables imported into
+       this module.  This is used to construct import graphs.
+       @type: C{list} of L{DottedName}"""
+    #}
 
     def apidoc_links(self, **filters):
         val_docs = NamespaceDoc.apidoc_links(self, **filters)
@@ -982,14 +987,16 @@ class ModuleDoc(NamespaceDoc):
 class ClassDoc(NamespaceDoc):
     """
     API documentation information about a single class.
-
-    @ivar bases: API documentation for the class's base classes.
-    @type bases: C{list} of L{ClassDoc}
-    @ivar subclasses: API documentation for the class's known subclasses.
-    @type subclasses: C{list} of L{ClassDoc}
     """
+    #{ Information about Base Classes
     bases = UNKNOWN
+    """@ivar: API documentation for the class's base classes.
+    @type: C{list} of L{ClassDoc}"""
+    #{ Information about Subclasses
     subclasses = UNKNOWN
+    """@ivar: API documentation for the class's known subclasses.
+    @type: C{list} of L{ClassDoc}"""
+    #}
 
     def apidoc_links(self, **filters):
         val_docs = NamespaceDoc.apidoc_links(self, **filters)
@@ -1199,65 +1206,63 @@ class ClassDoc(NamespaceDoc):
 class RoutineDoc(ValueDoc):
     """
     API documentation information about a single routine.
-
-    @ivar posargs: The names of the routine's positional arguments.
-        If an argument list contains \"unpacking\" arguments, then
-        their names will be specified using nested lists.  E.g., if
-        a function's argument list is C{((x1,y1), (x2,y2))}, then
-        posargs will be C{[['x1','y1'], ['x2','y2']]}.
-    @type posargs: C{list}
-    @ivar posarg_defaults: API documentation for the positional arguments'
-        default values.  This list has the same length as C{posargs}, and
-        each element of C{posarg_defaults} describes the corresponding
-        argument in C{posargs}.  For positional arguments with no default,
-        C{posargs_defaults} will contain None.
-    @type posargs_defaults: C{list} of C{ValueDoc} or C{None}
-    @ivar vararg: The name of the routine's vararg argument, or C{None} if
-        it has no vararg argument.
-    @type vararg: C{string} or C{None}
-    @ivar kwarg: The name of the routine's keyword argument, or C{None} if
-        it has no keyword argument.
-    @type kwarg: C{string} or C{None}
-
-    @ivar arg_descrs: A list of descriptions of the routine's
-        arguments.  Each element of this list is a tuple C{(arg,
-        descr)}, where C{arg} is an argument name (or a tuple of 
-        of argument names); and C{descr} is a L{ParsedDocstring
-        <epydoc.markup.ParsedDocstring>} describing the argument(s)
-        specified by C{arg}.
-    @type arg_descrs: C{list}
-    
-    @ivar arg_types: Descriptions of the expected types for the
-        routine's arguments, encoded as a dictionary mapping from
-        argument names to type descriptions.
-    @type arg_types: C{dict} from C{string} to L{ParsedDocstring
-        <epydoc.markup.ParsedDocstring>}
-
-    @ivar return_descr: A description of the value returned by this
-        routine.
-    @type return_descr: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
-    @ivar return_type: A description of expected type for the value
-        returned by this routine.
-    @type return_type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}
-
-    @ivar exception_descrs: A list of descriptions of exceptions
-        that the routine might raise.  Each element of this list is a
-        tuple C{(exc, descr)}, where C{exc} is a string contianing the
-        exception name; and C{descr} is a L{ParsedDocstring
-        <epydoc.markup.ParsedDocstring>} describing the circumstances
-        under which the exception specified by C{exc} is raised.
-        
-    @type exception_descrs: C{list}
     """
+    #{ Signature
     posargs = UNKNOWN
+    """@ivar: The names of the routine's positional arguments.
+       If an argument list contains \"unpacking\" arguments, then
+       their names will be specified using nested lists.  E.g., if
+       a function's argument list is C{((x1,y1), (x2,y2))}, then
+       posargs will be C{[['x1','y1'], ['x2','y2']]}.
+       @type: C{list}"""
     posarg_defaults = UNKNOWN
+    """@ivar: API documentation for the positional arguments'
+       default values.  This list has the same length as C{posargs}, and
+       each element of C{posarg_defaults} describes the corresponding
+       argument in C{posargs}.  For positional arguments with no default,
+       C{posargs_defaults} will contain None.
+       @type: C{list} of C{ValueDoc} or C{None}"""
     vararg = UNKNOWN
+    """@ivar: The name of the routine's vararg argument, or C{None} if
+       it has no vararg argument.
+       @type: C{string} or C{None}"""
     kwarg = UNKNOWN
+    """@ivar: The name of the routine's keyword argument, or C{None} if
+       it has no keyword argument.
+       @type: C{string} or C{None}"""
+    #} end of "signature" group
+
+    #{ Information Extracted from Docstrings
     arg_descrs = UNKNOWN
+    """@ivar: A list of descriptions of the routine's
+       arguments.  Each element of this list is a tuple C{(arg,
+       descr)}, where C{arg} is an argument name (or a tuple of 
+       of argument names); and C{descr} is a L{ParsedDocstring
+       <epydoc.markup.ParsedDocstring>} describing the argument(s)
+       specified by C{arg}.
+       @type: C{list}"""
     arg_types = UNKNOWN
+    """@ivar: Descriptions of the expected types for the
+       routine's arguments, encoded as a dictionary mapping from
+       argument names to type descriptions.
+       @type: C{dict} from C{string} to L{ParsedDocstring
+       <epydoc.markup.ParsedDocstring>}"""
     return_descr = UNKNOWN
+    """@ivar: A description of the value returned by this routine.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
     return_type = UNKNOWN
+    """@ivar: A description of expected type for the value
+       returned by this routine.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
     exception_descrs = UNKNOWN
+    """@ivar: A list of descriptions of exceptions
+       that the routine might raise.  Each element of this list is a
+       tuple C{(exc, descr)}, where C{exc} is a string contianing the
+       exception name; and C{descr} is a L{ParsedDocstring
+       <epydoc.markup.ParsedDocstring>} describing the circumstances
+       under which the exception specified by C{exc} is raised.
+       @type: C{list}"""
+    #} end of "information extracted from docstrings" group
 
     def all_args(self):
         """
@@ -1291,18 +1296,24 @@ class StaticMethodDoc(RoutineDoc): pass
 class PropertyDoc(ValueDoc):
     """
     API documentation information about a single property.
-    
-    @ivar fget: API documentation for the property's get function.
-    @type fget: L{RoutineDoc}
-    @ivar fset: API documentation for the property's set function.
-    @type fset: L{RoutineDoc}
-    @ivar fdel: API documentation for the property's delete function.
-    @type fdel: L{RoutineDoc}
     """
+    #{ Property Access Functions
     fget = UNKNOWN
+    """@ivar: API documentation for the property's get function.
+       @type: L{RoutineDoc}"""
     fset = UNKNOWN
+    """@ivar: API documentation for the property's set function.
+       @type: L{RoutineDoc}"""
     fdel = UNKNOWN
-    type_descr = UNKNOWN # [XX]?? type of value that should be stored in the prop
+    """@ivar: API documentation for the property's delete function.
+       @type: L{RoutineDoc}"""
+    #}
+    #{ Information Extracted from Docstrings
+    type_descr = UNKNOWN
+    """@ivar: A description of the property's expected type, extracted
+       from its docstring.
+       @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
+    #} end of "information extracted from docstrings" group
 
     def apidoc_links(self, **filters):
         val_docs = []
