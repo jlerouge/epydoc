@@ -501,17 +501,41 @@ def process_var_field(api_doc, docindex, tag, arg, descr):
         set_var_descr(api_doc, ident, descr)
         
 def process_cvar_field(api_doc, docindex, tag, arg, descr):
-    _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
-    for ident in re.split('[:;, ] *', arg):
-        set_var_descr(api_doc, ident, descr)
-        api_doc.variables[ident].is_instvar = False
+    # If @cvar is used *within* a variable, then use it as the
+    # variable's description, and treat the variable as a class var.
+    if (isinstance(api_doc, VariableDoc) and
+        isinstance(api_doc.container, ClassDoc)):
+        _check(api_doc, tag, arg, expect_arg=False)
+        api_doc.is_instvar = False
+        api_doc.descr = api_doc.descr.concatenate(descr)
+        api_doc.summary = descr.summary()
+
+    # Otherwise, @cvar should be used in a class.
+    else:
+        _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
+        for ident in re.split('[:;, ] *', arg):
+            set_var_descr(api_doc, ident, descr)
+            api_doc.variables[ident].is_instvar = False
         
 def process_ivar_field(api_doc, docindex, tag, arg, descr):
-    _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
-    for ident in re.split('[:;, ] *', arg):
-        set_var_descr(api_doc, ident, descr)
-        api_doc.variables[ident].is_instvar = True
+    # If @ivar is used *within* a variable, then use it as the
+    # variable's description, and treat the variable as an instvar.
+    if (isinstance(api_doc, VariableDoc) and
+        isinstance(api_doc.container, ClassDoc)):
+        _check(api_doc, tag, arg, expect_arg=False)
+        api_doc.is_instvar = True
+        api_doc.descr = api_doc.descr.concatenate(descr)
+        api_doc.summary = descr.summary()
 
+    # Otherwise, @ivar should be used in a class.
+    else:
+        _check(api_doc, tag, arg, context=ClassDoc, expect_arg=True)
+        for ident in re.split('[:;, ] *', arg):
+            set_var_descr(api_doc, ident, descr)
+            api_doc.variables[ident].is_instvar = True
+
+# [xx] '@return: foo' used to get used as a descr if no other
+# descr was present.  is that still true?
 def process_return_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=False)
     if api_doc.return_descr is not None:
