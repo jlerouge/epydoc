@@ -665,8 +665,9 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     # don't want to merge 2+2 with 4...  Instead, combine them in a
     # special way?? [XXX]!!
     if type(introspect_doc) == type(parse_doc) == ValueDoc:
-        introspect_doc.pyval = parse_doc.pyval
-        return introspect_doc
+        parse_doc.pyval = introspect_doc.pyval
+        parse_doc.docs_extracted_by = 'both'
+        return parse_doc
 
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
