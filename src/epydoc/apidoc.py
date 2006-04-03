@@ -509,6 +509,7 @@ class VariableDoc(APIDoc):
     name = UNKNOWN
     value = UNKNOWN
     is_imported = UNKNOWN
+    imported_from = UNKNOWN
     is_instvar = UNKNOWN
     is_alias = UNKNOWN
     is_public = UNKNOWN
@@ -610,10 +611,9 @@ class ValueDoc(APIDoc):
     ast = UNKNOWN
     repr = UNKNOWN
     type = UNKNOWN # [XX] NOT USED YET?? FOR PROPERTY??
-    imported_from = None
     toktree = UNKNOWN # from the tokenizing docparser.
     defining_module = UNKNOWN
-    
+    proxy_for = None # [xx] in progress.
     
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
@@ -625,6 +625,15 @@ class ValueDoc(APIDoc):
 
     def apidoc_links(self, **filters):
         return []
+
+# class SimpleValueDoc(ValueDoc):
+#     """
+#     API documentation about a 'simple' value, i.e., one that does not
+#     have its own docstring or any information other than its value and
+#     parse representation.  C{SimpleValueDoc}s do not get assigned
+#     cannonical names.
+#     """
+#     canonical_name = None
 
 class NamespaceDoc(ValueDoc):
     """
@@ -975,7 +984,7 @@ class ClassDoc(NamespaceDoc):
         seen.add(self)
         if self.bases is not UNKNOWN:
             for base in self.bases:
-                if isinstance(base, ClassDoc):
+                if isinstance(base, ClassDoc) and base.proxy_for is None:
                     base._dfs_bases(mro, seen, warn_about_bad_bases)
                 elif warn_about_bad_bases:
                     self._report_bad_base(base)
@@ -989,19 +998,20 @@ class ClassDoc(NamespaceDoc):
         bases = [base for base in self.bases if isinstance(base, ClassDoc)]
         if len(bases) != len(self.bases) and warn_about_bad_bases:
             for base in self.bases:
-                if not isinstance(base, ClassDoc):
+                if (not isinstance(base, ClassDoc) or
+                    base.proxy_for is not None):
                     self._report_bad_base(base)
         w = [warn_about_bad_bases]*len(bases)
         return self._c3_merge([[self]] + map(ClassDoc._c3_mro, bases, w) +
                               [list(bases)])
 
     def _report_bad_base(self, base):
-        if base.__class__ == ValueDoc and base.repr == UNKNOWN:
-            log.info("No information available for %s's base %s" %
-                     (self.canonical_name, base.canonical_name))
-        else:
+        if not isinstance(base, ClassDoc):
             log.warning("%s's base %s is not a class" %
                         (self.canonical_name, base.canonical_name))
+        elif base.proxy_for is not None:
+            log.warning("No information available for %s's base %s" %
+                        (self.canonical_name, base.proxy_for))
 
     def _c3_merge(self, seqs):
         """
@@ -1254,6 +1264,8 @@ class PropertyDoc(ValueDoc):
 
 class DocIndex:
     """
+    [xx] out of date.
+    
     An index that .. hmm...  it *can't* be used to access some things,
     cuz they're not at the root level.  Do I want to add them or what?
     And if so, then I have a sort of a new top level.  hmm..  so
@@ -1264,17 +1276,7 @@ class DocIndex:
       - container of current thing not examined?
     
     An index of all the C{APIDoc} objects that can be reached from a
-    root set of C{ValueDoc}s.  As a side effect of constructing this
-    index, the reachable C{APIDoc}s are modified in several ways:
-    
-      - Canonicalization:
-        - A cannonical name is assigned to any C{ValueDoc} that does
-          not already have one.
-          
-      - Linking:
-        - Any C{ValueDoc}s that define the C{imported_from} attribute
-          are replaced by the referenced C{ValueDoc}, if it is
-          reachable from the root set.
+    root set of C{ValueDoc}s.  
     
     The members of this index can be accessed by dotted name.  In
     particular, C{DocIndex} defines two mappings, accessed via the

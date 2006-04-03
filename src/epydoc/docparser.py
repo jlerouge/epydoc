@@ -35,7 +35,7 @@ import codecs
 # API documentation encoding:
 from epydoc.apidoc import *
 # For looking up the docs of builtins:
-import __builtin__
+import __builtin__, exceptions
 import epydoc.docintrospecter 
 # Misc utility functions:
 from epydoc.util import *
@@ -127,9 +127,9 @@ PARSE_FOR_BLOCKS = False
 
 #{ Configuration Constants: Imports
 IMPORT_HANDLING = 'link'
-"""What should the C{DocParser} do when it encounters an import
+"""What should C{docparser} do when it encounters an import
 statement?
-  - C{'link'}: Create valuedoc objects with imported_from pointers
+  - C{'link'}: Create variabledoc objects with imported_from pointers
     to the source object.
   - C{'parse'}: Parse the imported file, to find the actual
     documentation for the imported object.  (This will fall back
@@ -138,7 +138,7 @@ statement?
 """
 
 IMPORT_STAR_HANDLING = 'parse'
-"""When C{DocParser} encounters a C{'from M{m} import *'}
+"""When C{docparser} encounters a C{'from M{m} import *'}
 statement, and is unable to parse C{M{m}} (either because
 L{IMPORT_HANDLING}=C{'link'}, or because parsing failed), how
 should it determine the list of identifiers expored by C{M{m}}?
@@ -160,6 +160,17 @@ it do to the documentation of the decorated function?
   - C{'opaque'}: replace the function's documentation with an
     empty C{ValueDoc} object, reflecting the fact that we have no
     knowledge about what value the decorator returns.
+"""
+
+BASE_HANDLING = 'link'
+"""What should C{docparser} do when it encounters a base class that
+was imported from another module?
+  - C{'link'}: Create a valuedoc with a C{proxy_for} pointer to the
+    base class.
+  - C{'parse'}: Parse the file containing the base class, to find
+    the actual documentation for it.  (This will fall back to the
+    'link' behavior if the imported file can't be parsed, e.g., if
+    it's a builtin.)
 """
 
 #{ Configuration Constants: Comment docstrings
@@ -210,6 +221,11 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
         C{name} argument is used.
     @rtype: L{ValueDoc}
     """
+    # Always introspect __builtins__ & exceptions (e.g., in case
+    # they're used as base classes.)
+    epydoc.docintrospecter.introspect_docs(__builtin__)
+    epydoc.docintrospecter.introspect_docs(exceptions)
+    
     # If our input is a python object name, then delegate to
     # _find().
     if filename is None and name is not None:
@@ -407,8 +423,7 @@ def _is_submodule_import_var(module_doc, var_name):
     var_doc = module_doc.variables.get(var_name)
     full_var_name = DottedName(module_doc.canonical_name, var_name)
     return (var_doc is not None and
-            var_doc.value is not None and
-            var_doc.value.imported_from == full_var_name)
+            var_doc.imported_from == full_var_name)
     
 def _find_in_namespace(name, namespace_doc):
     if name[0] not in namespace_doc.variables:
@@ -422,8 +437,8 @@ def _find_in_namespace(name, namespace_doc):
 
     # If the variable's value was imported, then follow its
     # alias link.
-    if val_doc.imported_from not in (None, UNKNOWN):
-        return _find(val_doc.imported_from+name[1:])
+    if var_doc.imported_from not in (None, UNKNOWN):
+        return _find(var_doc.imported_from+name[1:])
 
     # Otherwise, if the name has one identifier, then this is the
     # value we're looking for; return it.
@@ -440,11 +455,11 @@ def _find_in_namespace(name, namespace_doc):
     
 def _get_filename(identifier, path=None):
     if path == UNKNOWN: path = None
-    try: file, filename, (s,m,typ) = imp.find_module(identifier, path)
+    try:
+        fp, filename, (s,m,typ) = imp.find_module(identifier, path)
+        if fp is not None: fp.close()
     except ImportError:
         raise ImportError, 'No Python source file found.'
-    try: file.close()
-    except: pass
 
     if typ == imp.PY_SOURCE:
         return filename
@@ -791,6 +806,9 @@ def process_control_flow_line(line, parent_docs, prev_line_doc,
 #/////////////////////////////////////////////////////////////////
 # Line handler: imports
 #/////////////////////////////////////////////////////////////////
+# [xx] I could optionally add ValueDoc's for the imported
+# variables with proxy_for set to the imported source; but
+# I don't think I gain much of anything by doing so.
 
 def process_import(line, parent_docs, prev_line_doc, lineno,
                    comments, decorators, encoding):
@@ -854,14 +872,12 @@ def _process_fromstar_import(src, parent_docs):
     the module C{M{<src>}}, and copy all of its exported variables
     to C{parent_docs[-1]}.
 
-    Otherwise, try to determine the names of the variables
-    exported by C{M{<src>}}, and create a new variable for each
-    export, using proxy values (i.e., values with C{imported_from}
-    attributes pointing to the imported objects).  If
-    L{IMPORT_STAR_HANDLING} is C{'parse'}, then the list of
-    exports if found by parsing C{M{<src>}}; if it is
-    C{'introspect'}, then the list of exports is found by importing
-    and introspecting C{M{<src>}}.
+    Otherwise, try to determine the names of the variables exported by
+    C{M{<src>}}, and create a new variable for each export.  If
+    L{IMPORT_STAR_HANDLING} is C{'parse'}, then the list of exports if
+    found by parsing C{M{<src>}}; if it is C{'introspect'}, then the
+    list of exports is found by importing and introspecting
+    C{M{<src>}}.
     """
     # Record the import
     parent_docs[0].imports.append(src) # mark that it's .*??
@@ -885,16 +901,10 @@ def _process_fromstar_import(src, parent_docs):
                 # listed in __all__.
                 if (imp_var.is_public and
                     not (name.startswith('__') and name.endswith('__'))):
-                    if IMPORT_HANDLING == 'link':
-                        val_src = DottedName(src, name)
-                        val_doc = ValueDoc(imported_from=val_src,
-                                           docs_extracted_by='parser')
-                    else:
-                        val_doc = imp_var.value
-                    var_doc = VariableDoc(name=name, is_alias=False,
-                                          value=val_doc, is_imported=True,
-                                          docs_extracted_by='parser')
-                    set_variable(parent_docs[-1], var_doc)
+                    var_doc = _add_import_var(DottedName(src, name), name,
+                                              parent_docs[-1])
+                    if IMPORT_HANDLING == 'parse':
+                        var_doc.value = imp_var.value
 
     # If we got here, then either IMPORT_HANDLING='link' or we
     # failed to parse the `src` module.
@@ -918,12 +928,10 @@ def _import_var(name, parent_docs):
     the value by parsing; and create an appropriate variable in
     parentdoc.
 
-    Otherwise, create one or more variables using proxy values
-    (i.e., values with C{imported_from} attributes pointing to the
-    imported objects).  (More than one variable may be created for
-    cases like C{'import a.b'}, where we need to create a variable
-    C{'a'} in parentdoc containing a proxy module; and a variable
-    C{'b'} in the proxy module containing a proxy value.
+    Otherwise, add a variable for the imported variable.  (More than
+    one variable may be created for cases like C{'import a.b'}, where
+    we need to create a variable C{'a'} in parentdoc containing a
+    proxy module; and a variable C{'b'} in the proxy module.
     """
     # Record the import
     parent_docs[0].imports.append(name)
@@ -931,46 +939,43 @@ def _import_var(name, parent_docs):
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If name is package-local, then convert it to a global name.
-    name = _global_name(name, parent_docs)
+    src = _global_name(name, parent_docs)
+    src_prefix = src[:len(src)-len(name)]
 
     # [xx] add check for if we already have the source docs in our
     # cache??
 
     if IMPORT_HANDLING == 'parse':
         # Check to make sure that we can actually find the value.
-        try: val_doc = _find(name)
+        try: val_doc = _find(src)
         except ImportError: val_doc = None
         if val_doc is not None:
             # We found it; but it's not the value itself we want to
             # import, but the module containing it; so import that
-            # module and create a variable for it.
-            mod_doc = _find(DottedName(name[0]))
-            var_doc = VariableDoc(name=name[0], value=mod_doc,
-                                  is_imported=True, is_alias=False,
-                                  docs_extracted_by='parser')
-            set_variable(parent_docs[-1], var_doc)
+            # module (=top_mod) and create a variable for it.
+            top_mod = src_prefix+name[0]
+            var_doc = _add_import_var(top_mod, name[0], parent_docs[-1])
+            var_doc.value = _find(DottedName(name[0]))
             return
 
     # If we got here, then either IMPORT_HANDLING='link', or we
     # did not successfully find the value's docs by parsing; use
-    # a variable with a proxy value.
+    # a variable with an UNKNOWN value.
     
     # Create any necessary intermediate proxy module values.
     container = parent_docs[-1]
     for i, identifier in enumerate(name[:-1]):
         if (identifier not in container.variables or
             not isinstance(container.variables[identifier], ModuleDoc)):
-            val_doc = NamespaceDoc(variables={}, sort_spec=[],
-                                   imported_from=name[:i+1],
-                                   docs_extracted_by='parser')
-            var_doc = VariableDoc(name=identifier, value=val_doc,
-                                  is_imported=True, is_alias=False,
-                                  docs_extracted_by='parser')
-            set_variable(container, var_doc)
+            var_doc = _add_import_var(name[:i+1], identifier, container)
+            var_doc.value = ModuleDoc(variables={}, sort_spec=[],
+                                      proxy_for=src_prefix+name[:i+1],
+                                      submodules={}, 
+                                      docs_extracted_by='parser')
         container = container.variables[identifier].value
 
     # Add the variable to the container.
-    _add_import_var(name, name[-1], parent_docs[-1])
+    _add_import_var(src, name[-1], container)
 
 def _import_var_as(src, name, parent_docs):
     """
@@ -981,9 +986,8 @@ def _import_var_as(src, name, parent_docs):
     the value by parsing; and create an appropriate variable in
     parentdoc.
 
-    Otherwise, create a variables with a proxy value (i.e., a
-    value with C{imported_from} attributes pointing to the
-    imported object).
+    Otherwise, create a variables with its C{imported_from} attribute
+    pointing to the imported object.
     """
     # Record the import
     parent_docs[0].imports.append(src)
@@ -1000,6 +1004,7 @@ def _import_var_as(src, name, parent_docs):
         if val_doc is not None:
             var_doc = VariableDoc(name=name, value=val_doc,
                                   is_imported=True, is_alias=False,
+                                  imported_from=src,
                                   docs_extracted_by='parser')
             set_variable(parent_docs[-1], var_doc)
             return
@@ -1011,15 +1016,13 @@ def _import_var_as(src, name, parent_docs):
 
 def _add_import_var(src, name, container):
     """
-    Add a new variable named C{name} to C{container}, whose value
-    is a C{ValueDoc} with an C{imported_from=src}.
+    Add a new imported variable named C{name} to C{container}, with
+    C{imported_from=src}.
     """
-    val_doc = ValueDoc(imported_from=src,
-                       docs_extracted_by='parser')
-    var_doc = VariableDoc(name=name, value=val_doc,
-                          is_imported=True, is_alias=False,
-                          docs_extracted_by='parser')
+    var_doc = VariableDoc(name=name, is_imported=True, is_alias=False,
+                          imported_from=src, docs_extracted_by='parser')
     set_variable(container, var_doc)
+    return var_doc
 
 def _global_name(name, parent_docs):
     """
@@ -1027,15 +1030,29 @@ def _global_name(name, parent_docs):
     context, as determined by C{parent_docs}), then convert it
     to a global name.
     """
-    module_doc = parent_docs[0]
-    if module_doc.is_package in (False, UNKNOWN):
-        return name
+    # Get the containing package from parent_docs.
+    if parent_docs[0].is_package:
+        package = parent_docs[0]
     else:
+        package = parent_docs[0].package
+
+    # Check each package (from closest to furthest) to see if it
+    # contains a module named name[0]; if so, then treat `name` as
+    # relative to that package.
+    while package not in (None, UNKNOWN):
         try:
-            _get_filename(name[0], module_doc.path)
-            return DottedName(module_doc.canonical_name, name)
+            fp = imp.find_module(name[0], package.path)[0]
+            if fp is not None: fp.close()
         except ImportError:
-            return name
+            # No submodule found here; try the next package up.
+            package = package.package
+            continue
+        # A submodule was found; return its name.
+        return package.canonical_name + name
+
+    # We didn't find any package containing `name`; so just return
+    # `name` as-is.
+    return name
 
 #/////////////////////////////////////////////////////////////////
 # Line handler: assignment
@@ -1472,15 +1489,11 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
             line[2][0] != (token.OP, '(')):
             raise ParseError("Expected base list")
         try:
-            for base in parse_classdef_bases(line[2]):
-                base_doc = lookup_value(base, parent_docs)
-                if base_doc is None: # [XX] This might be a problem??
-                    base_doc = ClassDoc(variables={}, sort_spec=[],
-                                        bases=[], subclasses=[],
-                                        imported_from = base,
-                                        docs_extracted_by='parser')
-                class_doc.bases.append(base_doc)
-        except ParseError:
+            for base_name in parse_classdef_bases(line[2]):
+                class_doc.bases.append(find_base(base_name, parent_docs))
+        except ParseError, e:
+            log.warning("Unable to extract the base list for %s: %s" %
+                        (canonical_name, e))
             class_doc.bases = UNKNOWN
     else:
         class_doc.bases = []
@@ -1498,6 +1511,46 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     set_variable(parent_doc, var_doc)
 
     return class_doc
+
+def find_base(name, parent_docs):
+    assert isinstance(name, DottedName)
+
+    # Find the variable containing the base.
+    base_var = lookup_variable(name, parent_docs)
+    if base_var is None:
+        # If it looks like it's in an external module, then try
+        # "importing" it.
+        if (lookup_name(name[0], parent_docs).imported_from not in
+            (None, UNKNOWN)):
+            _import_var(name, parent_docs)
+            base_var = lookup_variable(name, parent_docs)
+        # If we still don't have a var containing the base, give up.
+        if base_var is None:
+            raise ParseError("Could not find %s" % name)
+
+    # If the variable has a value, return that value.
+    if base_var.value != UNKNOWN:
+        return base_var.value
+
+    # Otherwise, if BASE_HANDLING is 'parse', try parsing the docs for
+    # the base class; if that fails, or if BASE_HANDLING is 'link',
+    # just make a proxy object.
+    if base_var.imported_from not in (None, UNKNOWN):
+        if BASE_HANDLING == 'parse':
+            try:
+                return parse_docs(name=base_var.imported_from)
+            except ParseError:
+                pass
+        # Either BASE_HANDLING='link' or parsing the base class failed;
+        # return a proxy value for the base class.
+        return ClassDoc(variables={}, sort_spec=[], bases=[],
+                        subclasses=[], proxy_for=base_var.imported_from,
+                        docs_extracted_by='parser')
+    else:
+        raise ParseError() # no value available for var.
+                    
+                    
+    
 
 #/////////////////////////////////////////////////////////////////
 #{ Parsing
@@ -1757,6 +1810,23 @@ def lookup_name(identifier, parent_docs):
     # We didn't find it; return None.
     return None
 
+def lookup_variable(dotted_name, parent_docs):
+    assert isinstance(dotted_name, DottedName)
+    # If it's a simple identifier, use lookup_name.
+    if len(dotted_name) == 1:
+        return lookup_name(dotted_name[0], parent_docs)
+
+    # If it's a dotted name with multiple pieces, look up the
+    # namespace containing the var (=parent) first; and then
+    # look for the var in that namespace.
+    else:
+        parent = lookup_value(dotted_name[:-1], parent_docs)
+        if (isinstance(parent, NamespaceDoc) and
+            dotted_name[-1] in parent.variables):
+            return parent.variables[dotted_name[-1]]
+        else:
+            return None # var not found.
+
 def lookup_value(dotted_name, parent_docs):
     """
     Find and return the documentation for the value contained in
@@ -1767,16 +1837,14 @@ def lookup_value(dotted_name, parent_docs):
 
     for i in range(1, len(dotted_name)):
         if var_doc is None: return None
-        
-        if var_doc.value.imported_from not in (UNKNOWN, None):
-            assert isinstance(var_doc.value.imported_from, DottedName)
-            from_name = DottedName(var_doc.value.imported_from,
-                                   *dotted_name[i:])
-            return ValueDoc(imported_from=from_name,
-                            docs_extracted_by='parser')
 
         if isinstance(var_doc.value, NamespaceDoc):
             var_dict = var_doc.value.variables
+        elif (var_doc.value == UNKNOWN and
+            var_doc.imported_from not in (None, UNKNOWN)):
+            src_name = var_doc.imported_from + dotted_name[i:]
+            # do I want to create a proxy here?? [xxx]
+            return ValueDoc(proxy_for=src_name, docs_extracted_by='parser')
         else:
             return None
 

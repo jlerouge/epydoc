@@ -661,6 +661,13 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     if introspect_doc == parse_doc:
         return introspect_doc
 
+    # Never merge a ValueDoc with another ValueDoc..???  E.g., we
+    # don't want to merge 2+2 with 4...  Instead, combine them in a
+    # special way?? [XXX]!!
+    if type(introspect_doc) == type(parse_doc) == ValueDoc:
+        introspect_doc.pyval = parse_doc.pyval
+        return introspect_doc
+
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
     # happen.
@@ -808,8 +815,8 @@ def merge_fset(v1, v2, precedence, cyclecheck, path):
 def merge_fdel(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.fdel')
 
-def merge_imported_from(v1, v2, precedence, cyclecheck, path):
-    # Anything we got from introspection shouldn't have an imported_from
+def merge_proxy_for(v1, v2, precedence, cyclecheck, path):
+    # Anything we got from introspection shouldn't have a proxy_for
     # attribute -- it should be the actual object's documentation.
     return v1
 
@@ -881,7 +888,7 @@ register_attribute_mergefunc('overrides', merge_overrides)
 register_attribute_mergefunc('fget', merge_fget)
 register_attribute_mergefunc('fset', merge_fset)
 register_attribute_mergefunc('fdel', merge_fdel)
-register_attribute_mergefunc('imported_from', merge_imported_from)
+register_attribute_mergefunc('proxy_for', merge_proxy_for)
 register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 register_attribute_mergefunc('docstring', merge_docstring)
@@ -892,36 +899,40 @@ register_attribute_mergefunc('docs_extracted_by', merge_docs_extracted_by)
 ######################################################################
 
 def link_imports(val_doc, docindex):
-    # Check if the ValueDoc has an unresolved imported_from link.
+    # Check if the ValueDoc has an unresolved proxy_for link.
     # If so, then resolve it.
-    while val_doc.imported_from not in (UNKNOWN, None):
-        # Find the valuedoc that the imported_from name points to.
-        src_doc = docindex.get_valdoc(val_doc.imported_from)
+    while val_doc.proxy_for not in (UNKNOWN, None):
+        # Find the valuedoc that the proxy_for name points to.
+        src_doc = docindex.get_valdoc(val_doc.proxy_for)
 
         # If we don't have any valuedoc at that address, then
-        # promote this proxy valuedoc to a full (albeit empty)
-        # one.
+        # set that address as its canonical name.
+        # [XXX] Do I really want to do this?
         if src_doc is None:
-            val_doc.canonical_name = val_doc.imported_from
-            val_doc.imported_from = None
-            break
+            val_doc.canonical_name = val_doc.proxy_for
+            return
 
         # If we *do* have something at that address, then
         # merge the proxy `val_doc` with it.
         elif src_doc != val_doc:
+            # Copy any subclass information from val_doc->src_doc.
+            for subclass in val_doc.subclasses:
+                if subclass not in src_doc.subclasses:
+                    src_doc.subclasses.append(subclass)
+            # Then overwrite val_doc with the contents of src_doc.
             src_doc.merge_and_overwrite(val_doc, ignore_hash_conflict=True)
 
-        # If the imported_from link points back at src_doc
+        # If the proxy_for link points back at src_doc
         # itself, then we most likely have a variable that's
         # shadowing a submodule that it should be equal to.
         # So just get rid of the variable.
         elif src_doc == val_doc:
-            parent_name = val_doc.imported_from[:-1]
-            var_name = val_doc.imported_from[-1]
+            parent_name = val_doc.proxy_for[:-1]
+            var_name = val_doc.proxy_for[-1]
             parent = docindex.get_valdoc(parent_name)
             if parent is not None and var_name in parent.variables:
                 del parent.variables[var_name]
-            src_doc.imported_from = None
+            src_doc.proxy_for = None
 
 ######################################################################
 ## Canonical Name Assignment

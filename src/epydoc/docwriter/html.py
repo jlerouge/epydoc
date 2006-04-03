@@ -2175,7 +2175,7 @@ class HTMLWriter:
         if context is None:
             context = doc
         if width == None: width = self.find_tree_width(doc, context)
-        if isinstance(doc, ClassDoc):
+        if isinstance(doc, ClassDoc) and doc.bases != UNKNOWN:
             bases = doc.bases
         else:
             bases = []
@@ -2208,6 +2208,7 @@ class HTMLWriter:
         @rtype: C{int}
         """
         if not isinstance(doc, ClassDoc): return 2
+        if doc.bases == UNKNOWN: return 2
         width = 2
         for base in doc.bases:
             width = max(width, len(self.contextual_label(base, context))+4,
@@ -2302,9 +2303,13 @@ class HTMLWriter:
 
         out('<p class="imports">')
         out('<span class="varlist-header">Imports:</span>\n  ')
-        out(',\n  '.join([self.href(v.value) for v in imports]))
+        out(',\n  '.join([self._import(v, doc) for v in imports]))
         out('\n</p>\n')
 
+    def _import(self, var_doc, context):
+        val_doc = self.docindex.get_valdoc(var_doc.imported_from)
+        return self.href(var_doc.imported_from, context=context)
+            
     #////////////////////////////////////////////////////////////
     #{ Function Attributes
     #////////////////////////////////////////////////////////////
@@ -2389,7 +2394,7 @@ class HTMLWriter:
 
         # Add external classes.
         for doc in self.valdocs:
-            if isinstance(doc, ClassDoc):
+            if isinstance(doc, ClassDoc) and doc.bases != UNKNOWN:
                 for base in doc.bases:
                     if base not in self.valdocs:
                         if isinstance(base, ClassDoc):
@@ -2401,7 +2406,7 @@ class HTMLWriter:
  
         out('<ul>\n')
         for doc in classes:
-            if len(doc.bases)==0:
+            if doc.bases != UNKNOWN and len(doc.bases)==0:
                 self.write_class_tree_item(out, doc, classes)
         out('</ul>\n')
 
@@ -2760,7 +2765,7 @@ class HTMLWriter:
 
         # Get the url for the target.
         url = self.url(target)
-        if url is None: return label
+        if url is None: return plaintext_to_html(label)
 
         # Construct a string for the class attribute.
         if css_class is None:
@@ -2768,7 +2773,7 @@ class HTMLWriter:
         else:
             css = ' class="%s"' % css_class
 
-        return '<a href="%s"%s>%s</a>' % (url, css, label)
+        return '<a href="%s"%s>%s</a>' % (url, css, plaintext_to_html(label))
 
     def summary(self, api_doc, indent=0):
         assert isinstance(api_doc, APIDoc)
