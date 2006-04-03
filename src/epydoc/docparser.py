@@ -1179,12 +1179,11 @@ def rhs_to_valuedoc(rhs, parent_docs):
         if isinstance(arg_val, RoutineDoc):
             doc = apply_decorator(DottedName(rhs[0][1]), arg_val)
             doc.canonical_name = UNKNOWN
-            doc.repr = pp_toktree(rhs)
+            doc.parse_repr = pp_toktree(rhs)
             return doc, False
 
     # Nothing else to do: make a val with the source as its repr.
-    valdoc_repr = pp_toktree(rhs)
-    return ValueDoc(repr=valdoc_repr, toktree=rhs,
+    return ValueDoc(parse_repr=pp_toktree(rhs), toktree=rhs,
                     defining_module=parent_docs[0],
                     docs_extracted_by='parser'), False
     
@@ -1377,14 +1376,14 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
         if func_doc.canonical_name is not UNKNOWN:
             deco_repr = '%s(%s)' % (pp_toktree(decorator[1:]),
                                     func_doc.canonical_name)
-        elif func_doc.repr not in (None, UNKNOWN):
+        elif func_doc.parse_repr not in (None, UNKNOWN):
             deco_repr = '%s(%s)' % (pp_toktree(decorator[1:]),
-                                    func_doc.repr)
+                                    func_doc.parse_repr)
         else:
             deco_repr = UNKNOWN
         func_doc = apply_decorator(deco_name, func_doc)
         func_doc.canonical_name = UNKNOWN
-        func_doc.repr = deco_repr
+        func_doc.parse_repr = deco_repr
 
     # Add a variable to the containing namespace.
     var_doc = VariableDoc(name=func_name, value=func_doc,
@@ -1442,7 +1441,7 @@ def init_arglist(func_doc, arglist):
         elif arg[1] != (token.OP, '=') or len(arg) == 2:
             raise ParseError("Bad argument list")
         else:
-            default_val = ValueDoc(repr=pp_toktree(arg[2:]),
+            default_val = ValueDoc(parse_repr=pp_toktree(arg[2:]),
                                    docs_extracted_by='parser')
             func_doc.posarg_defaults.append(default_val)
 

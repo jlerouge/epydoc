@@ -479,7 +479,7 @@ def process_type_field(api_doc, docindex, tag, arg, descr):
         _check(api_doc, tag, arg, expect_arg='single')
         set_var_type(api_doc, arg, descr)
 
-    # For variables, "@type: ..." describes the variable.
+    # For variables & properties, "@type: ..." describes the variable.
     elif isinstance(api_doc, (VariableDoc, PropertyDoc)):
         _check(api_doc, tag, arg, expect_arg=False)
         if api_doc.type_descr is not None:
@@ -523,6 +523,7 @@ def process_ivar_field(api_doc, docindex, tag, arg, descr):
     if (isinstance(api_doc, VariableDoc) and
         isinstance(api_doc.container, ClassDoc)):
         _check(api_doc, tag, arg, expect_arg=False)
+        # require that there be no other descr?
         api_doc.is_instvar = True
         api_doc.descr = api_doc.descr.concatenate(descr)
         api_doc.summary = descr.summary()
@@ -772,7 +773,7 @@ def parse_function_signature(func_doc):
         for name in params.split(','):
             if '=' in name:
                 (name, default_repr) = name.split('=',1)
-                default = ValueDoc(repr=default_repr)
+                default = ValueDoc(parse_repr=default_repr)
             else:
                 default = None
             name = name.strip()

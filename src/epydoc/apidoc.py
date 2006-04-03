@@ -42,6 +42,7 @@ from epydoc import log
 import epydoc
 import __builtin__
 from epydoc.compat import * # Backwards compatibility
+from epydoc.util import decode_with_backslashreplace
 
 ######################################################################
 # Dotted Names
@@ -619,11 +620,16 @@ class ValueDoc(APIDoc):
     #{ Value Representation
     pyval = UNKNOWN
     """@ivar: A pointer to the actual Python object described by this
-       C{ValueDoc}.
+       C{ValueDoc}.  This is used to display the value (e.g., when
+       describing a variable.)  Use L{pyval_repr()} to generate a
+       plaintext string representation of this value.
        @type: Python object"""
 
-    repr = UNKNOWN # [xx] replace w/ parse_repr.
-    """@ivar: A text representation of this value.
+    parse_repr = UNKNOWN
+    """@ivar: A text representation of this value, extracted from 
+       parsing its source code.  This representation may not accurately
+       reflect the actual value (e.g., if the value was modified after
+       the initial assignment).
        @type: C{unicode}"""
     #} end of "value representation" group
 
@@ -663,10 +669,28 @@ class ValueDoc(APIDoc):
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
             return '<%s %s>' % (self.__class__.__name__, self.canonical_name)
-        elif self.repr is not UNKNOWN:
-            return '<%s %s>' % (self.__class__.__name__, self.repr)
+        elif self.pyval_repr() is not UNKNOWN:
+            return '<%s %s>' % (self.__class__.__name__, self.pyval_repr())
+        elif self.parse_repr is not UNKNOWN:
+            return '<%s %s>' % (self.__class__.__name__, self.parse_repr)
         else:                     
             return '<%s>' % self.__class__.__name__
+
+    def pyval_repr(self):
+        """
+        Return a string representation of this value based on its pyval;
+        or UNKNOWN if we don't succeed.  This should probably eventually
+        be replaced by more of a safe-repr variant.
+        """
+        if self.pyval == UNKNOWN:
+            return UNKNOWN
+        try:
+            s = '%r' % self.pyval
+            if isinstance(s, str):
+                s = decode_with_backslashreplace(s)
+            return s
+        except KeyboardInterrupt, SystemExit: raise
+        except: return UNKNOWN
 
     def apidoc_links(self, **filters):
         return []

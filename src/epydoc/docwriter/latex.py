@@ -678,8 +678,10 @@ class LatexWriter:
     def func_arg(self, name, default):
         s = '\\textit{%s}' % plaintext_to_latex(self._arg_name(name))
         if default is not None:
-            if default.repr is not UNKNOWN:
-                s += '=\\texttt{%s}' % plaintext_to_latex(default.repr)
+            if default.parse_repr is not UNKNOWN:
+                s += '=\\texttt{%s}' % plaintext_to_latex(default.parse_repr)
+            elif default.pyval_repr() is not UNKNOWN:
+                s += '=\\texttt{%s}' % plaintext_to_latex(default.pyval_repr())
             else:
                 s += '=\\texttt{??}'
         return s
@@ -755,7 +757,8 @@ class LatexWriter:
         has_descr = var_doc.descr not in (None, UNKNOWN)
         has_type = var_doc.type_descr not in (None, UNKNOWN)
         has_repr = (var_doc.value not in (None, UNKNOWN) and
-                    var_doc.value.repr not in (None, UNKNOWN))
+                    (var_doc.value.parse_repr is not UNKNOWN or
+                     var_doc.value.pyval_repr() is not UNKNOWN))
         if has_descr or has_type:
             out('\\raggedright ')
         if has_descr:
@@ -763,7 +766,11 @@ class LatexWriter:
             if has_type or has_repr: out('\n\n')
         if has_repr:
             out('\\textbf{Value:} \n')
-            out(self._pprint_var_value(var_doc.value.repr, 80))
+            pyval_repr = var_doc.value.pyval_repr()
+            if pyval_repr is not UNKNOWN:
+                out(self._pprint_var_value(pyval_repr, 80))
+            else:
+                out(self._pprint_var_value(parse_repr, 80))
         if has_type:
             ptype = self.docstring_to_latex(var_doc.type_descr, 12).strip()
             out('%s\\textit{(type=%s)}' % (' '*12, ptype))

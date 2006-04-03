@@ -12,7 +12,7 @@ this module is the L{HTMLWriter} class.
 """
 __docformat__ = 'epytext en'
 
-import re, os, sys, codecs, sre_constants
+import re, os, sys, codecs, sre_constants, pprint
 import urllib
 from epydoc.apidoc import *
 import epydoc.docstringparser
@@ -1804,14 +1804,21 @@ class HTMLWriter:
         if val_doc not in (None, UNKNOWN):
             if isinstance(val_doc, RoutineDoc):
                 return self.function_signature(val_doc, css_class=
-                                                "summary-sig")
-            elif (type(val_doc) == ValueDoc and
-                  val_doc.repr not in (None, UNKNOWN)):
-                return plaintext_to_html(val_doc.repr)
+                                               "summary-sig")
+            elif type(val_doc) == ValueDoc:
+                if val_doc.parse_repr is not UNKNOWN:
+                    return plaintext_to_html(val_doc.parse_repr)
+                else:
+                    pyval_repr = val_doc.pyval_repr()
+                    if pyval_repr is not UNKNOWN:
+                        return plaintext_to_html(pyval_repr)
+                    else:
+                        return self.href(val_doc)
             else:
                 return self.href(val_doc)
+        else:
+            return '??'
         
-
     def arg_name_to_html(self, func_doc, arg_name):
         """
         A helper function used to format an argument name, for use in
@@ -1979,10 +1986,9 @@ class HTMLWriter:
             <dl><dt>Type:</dt>
               <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
         >>> #endif
-        >>> if (var_doc.value not in (None, UNKNOWN) and
-        >>>     var_doc.value.repr not in (None, UNKNOWN)):
-        >>>        tooltip = self.variable_tooltip(var_doc.value.repr)
-            <dl title="$tooltip$"><dt>Value:</dt>
+        >>> tooltip = self.variable_tooltip(var_doc)
+        >>> if var_doc.value is not UNKNOWN:
+            <dl$tooltip$><dt>Value:</dt>
               <dd><table><tr><td><pre class="variable">
         $self.pprint_value(var_doc.value)$
               </pre></td></tr></table></dd>
@@ -1997,23 +2003,32 @@ class HTMLWriter:
     _variable_linelen = 70
     _variable_maxlines = 3
     _variable_tooltip_linelen = 70
-    def variable_tooltip(self, s):
+    def variable_tooltip(self, var_doc):
+        if var_doc.value in (None, UNKNOWN):
+            return ''
+        else:
+            pyval_repr = var_doc.value.pyval_repr()
+            if pyval_repr is not UNKNOWN:
+                s = pyval_repr
+            elif var_doc.value.parse_repr is not UNKNOWN:
+                s = var_doc.value.parse_repr
+            else:
+                return ''
+            
         if len(s) > self._variable_tooltip_linelen:
             s = s[:self._variable_tooltip_linelen-3]+'...'
-        return plaintext_to_html(s)
+        return ' title="%s"' % plaintext_to_html(s)
 
     def pprint_value(self, val_doc, multiline=True, summary_linelen=0):
-        # word-wrap, quote, etc?
-        if (val_doc.pyval is not UNKNOWN and
-            type(val_doc.pyval).__name__ == 'SRE_Pattern'):
-            try:
-                s = colorize_re(val_doc.pyval)
-            except TypeError, sre_constants.error:
-                s = plaintext_to_html(val_doc.repr)
+        if val_doc.pyval is not UNKNOWN:
+            return self.pprint_pyval(val_doc.pyval, multiline,
+                                     summary_linelen)
+        elif val_doc.parse_repr is not UNKNOWN:
+            s = plaintext_to_html(val_doc.parse_repr)
+            return self._linewrap_html(s, self._variable_linelen,
+                                       self._variable_maxlines)
         else:
-            s = plaintext_to_html(val_doc.repr)
-        return self._linewrap_html(s, self._variable_linelen,
-                                   self._variable_maxlines)
+            return self.href(val_doc)
 
     def pprint_pyval(self, pyval, multiline=True, summary_linelen=0):
         # Handle the most common cases first.  The following types
@@ -2272,11 +2287,16 @@ class HTMLWriter:
         name = self._arg_name(name)
         s = '<span class="%s-arg">%s</span>' % (css_class, name)
         if default is not None:
-            if default.repr is not UNKNOWN:
+            if default.parse_repr is not UNKNOWN:
                 s += ('=<span class="%s-default">%s</span>' %
-                      (css_class, default.repr))
+                      (css_class, plaintext_to_html(default.parse_repr)))
             else:
-                s += '=<span class="%s-default">??</span>' % css_class
+                pyval_repr = default.pyval_repr()
+                if pyval_repr is not UNKNOWN:
+                    s += ('=<span class="%s-default">%s</span>' %
+                          (css_class, plaintext_to_html(pyval_repr)))
+                else:
+                    s += '=<span class="%s-default">??</span>' % css_class
         return s
 
     def _arg_name(self, arg):

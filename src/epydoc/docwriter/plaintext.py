@@ -130,13 +130,17 @@ class PlaintextWriter:
         if (var_doc.value not in (UNKNOWN, None) and
             var_doc.is_alias is True and var_doc.value.__class__ != ValueDoc):
             out(' = %s' % var_doc.value.canonical_name)
-        elif (var_doc.value not in (UNKNOWN, None) and
-              var_doc.value.repr is not UNKNOWN):
-            val_repr = var_doc.value.repr.expandtabs()
-            if len(val_repr)+len(name) > 75:
-                val_repr = '%s...' % val_repr[:75-len(name)-3]
-            if '\n' in val_repr: val_repr = '%s...' % (val_repr.split()[0])
-            out(' = %s' % val_repr)
+        elif var_doc.value not in (UNKNOWN, None):
+            pyval_repr = var_doc.value.pyval_repr()
+            if pyval_repr is not UNKNOWN:
+                val_repr = pyval_repr.expandtabs()
+            else:
+                var_repr = var_doc.value.parse_repr
+            if var_repr is not UNKNOWN:
+                if len(val_repr)+len(name) > 75:
+                    val_repr = '%s...' % val_repr[:75-len(name)-3]
+                if '\n' in val_repr: val_repr = '%s...' % (val_repr.split()[0])
+                out(' = %s' % val_repr)
         out('\n')
         if not verbose: return
         prefix += '    ' # indent the body.
@@ -196,10 +200,14 @@ class PlaintextWriter:
     def fmt_arg(self, name, default):
         if default is None:
             return '%s' % name
-        elif default.repr is not UNKNOWN:
-            return '%s=%s' % (name, default.repr)
+        elif default.parse_repr is not UNKNOWN:
+            return '%s=%s' % (name, default.parse_repr)
         else:
-            return '%s=??' % name
+            pyval_repr = default.pyval_repr()
+            if pyval_repr is not UNKNOWN:
+                return '%s=%s' % (name, pyval_repr)
+            else:
+                return '%s=??' % name
 
     def write_list(self, out, heading, doc, value_type=None, imported=False,
                    inherited=False, prefix='', noindent=False,

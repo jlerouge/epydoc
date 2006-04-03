@@ -181,8 +181,7 @@ def _get_valuedoc(value):
     if val_doc is None:
         try: canonical_name = get_canonical_name(value)
         except DottedName.Invalid: canonical_name = UNKNOWN
-        val_doc = ValueDoc(pyval=value, repr=value_repr(value),
-                           canonical_name = canonical_name,
+        val_doc = ValueDoc(pyval=value, canonical_name = canonical_name,
                            docs_extracted_by='introspecter')
         _valuedoc_cache[pyid] = val_doc
         
@@ -593,6 +592,7 @@ def verify_name(value, dotted_name):
     else:
         return UNKNOWN
 
+# [xx] not used:
 def value_repr(value):
     try:
         s = '%r' % value
