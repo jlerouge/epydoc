@@ -213,7 +213,7 @@ def parse_arguments():
     if options.configfiles:
         try:
             parse_configfiles(options.configfiles, options, names)
-        except KeyboardInterrupt,SystemExit: raise
+        except (KeyboardInterrupt,SystemExit): raise
         except Exception, e:
             optparser.error('Error reading config file:\n    %s' % e)
     

@@ -690,7 +690,7 @@ class ValueDoc(APIDoc):
             if isinstance(s, str):
                 s = decode_with_backslashreplace(s)
             return s
-        except KeyboardInterrupt, SystemExit: raise
+        except KeyboardInterrupt: raise
         except: return UNKNOWN
 
     def apidoc_links(self, **filters):

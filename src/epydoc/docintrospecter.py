@@ -223,7 +223,7 @@ def introspect_module(module, module_doc, preliminary=False):
     # Record the module's filename
     if hasattr(module, '__file__'):
         try: module_doc.filename = unicode(module.__file__)
-        except KeyboardInterrupt, SystemExit: raise
+        except KeyboardInterrupt: raise
         except: pass
 
     # If this is just a preliminary introspection, then don't do
@@ -241,7 +241,7 @@ def introspect_module(module, module_doc, preliminary=False):
     if hasattr(module, '__path__'):
         module_doc.is_package = True
         try: module_doc.path = [unicode(p) for p in module.__path__]
-        except KeyboardInterrupt, SystemExit: raise
+        except KeyboardInterrupt: raise
         except: pass
     else:
         module_doc.is_package = False
@@ -313,7 +313,7 @@ def introspect_module(module, module_doc, preliminary=False):
                         var_doc.is_imported = False
                 else:
                     var_doc.is_public = False
-        except KeyboardInterrupt, SystemExit: raise
+        except KeyboardInterrupt: raise
         except: pass
 
     return module_doc
@@ -342,7 +342,7 @@ def introspect_class(cls, class_doc):
         try:
             public_names = [str(name) for name in cls.__all__]
             class_doc.public_names = public_names
-        except KeyboardInterrupt, SystemExit: raise
+        except KeyboardInterrupt: raise
         except: pass
 
     # Start a list of subclasses.
@@ -635,7 +635,7 @@ def _find_function_module(func):
     try:
         module = inspect.getmodule(func)
         if module: return module.__name__
-    except KeyboardInterrupt, SystemExit: raise
+    except KeyboardInterrupt: raise
     except: pass
 
     # This fallback shouldn't usually be needed.  But it is needed in
@@ -823,8 +823,7 @@ def _import(name, filename=None):
             else:
                 # For importing scripts:
                 return imp.load_source(name, filename)
-        except KeyboardInterrupt:
-            raise # don't capture keyboard interrupts!
+        except KeyboardInterrupt: raise
         except:
             exc_typ, exc_val, exc_tb = sys.exc_info()
             if exc_val is None:
