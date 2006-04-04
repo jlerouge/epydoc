@@ -313,11 +313,13 @@ class ConcatenatedDocstring:
         latexstring = ''
         for doc in self._parsed_docstrings:
             latexstring += doc.to_latex(docstring_linker, **options)
+        return latexstring
 
     def to_plaintext(self, docstring_linker, **options):
         textstring = ''
         for doc in self._parsed_docstrings:
             textstring += doc.to_plaintext(docstring_linker, **options)
+        return textstring
 
     def index_terms(self):
         terms = []
