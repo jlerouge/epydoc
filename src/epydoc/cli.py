@@ -257,10 +257,9 @@ def parse_configfiles(configfiles, options, names):
     # ConfigParser.read() silently ignores errors, so open the files
     # manually (since we want to notify the user of any errors).
     for configfile in configfiles:
-        log.debug('here')
         fp = open(configfile, 'r') # may raise IOError.
-        log.debug('here2')
         configparser.readfp(fp, configfile)
+        fp.close()
     for optname in configparser.options('epydoc'):
         val = configparser.get('epydoc', optname).strip()
         if optname in ('modules', 'objects', 'values',
