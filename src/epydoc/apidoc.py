@@ -74,7 +74,7 @@ class DottedName:
         $"""
         % re.escape(UNREACHABLE))
 
-    class Invalid(ValueError):
+    class InvalidDottedName(ValueError):
         """
         An exception raised by the DottedName constructor when one of
         its arguments is not a valid dotted name.
@@ -92,7 +92,7 @@ class DottedName:
         it is a valid identifier.
         """
         if len(pieces) == 0:
-            raise DottedName.Invalid('Empty DottedName')
+            raise DottedName.InvalidDottedName('Empty DottedName')
         self._identifiers = []
         for piece in pieces:
             if isinstance(piece, DottedName):
@@ -101,11 +101,13 @@ class DottedName:
                 for subpiece in piece.split('.'):
                     if not self._IDENTIFIER_RE.match(subpiece):
                         log.debug('Bad identifier %r' % (piece,))
-                        raise DottedName.Invalid('Bad identifier %r' % (piece,))
+                        raise DottedName.InvalidDottedName(
+                            'Bad identifier %r' % (piece,))
                     self._identifiers.append(subpiece)
             else:
                 log.debug('Bad identifier %r' % (piece,))
-                raise DottedName.Invalid('Bad identifier %r' % (piece,))
+                raise DottedName.InvalidDottedName(
+                    'Bad identifier %r' % (piece,))
         self._identifiers = tuple(self._identifiers)
 
     def __repr__(self):

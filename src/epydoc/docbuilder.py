@@ -1058,7 +1058,7 @@ def _unreachable_name_for(val_doc, docindex):
         try:
             name = DottedName(DottedName.UNREACHABLE,
                               val_doc.pyval.__name__)
-        except DottedName.Invalid:
+        except DottedName.InvalidDottedName:
             name = DottedName(DottedName.UNREACHABLE)
     else:
         name = DottedName(DottedName.UNREACHABLE)
