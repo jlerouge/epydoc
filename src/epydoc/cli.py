@@ -190,7 +190,7 @@ def parse_arguments():
               "If this executable is not on the path, then use --dotpath "
               "to specify its location.  This option may be repeated to "
               "include multiple graph types in the output.  GRAPHTYPE"
-              "should be one of: %s." % ', '.join(GRAPH_TYPES)))
+              "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -234,6 +234,13 @@ def parse_arguments():
                         "and --introspect-only.")
     if options.action == 'text' and len(names) > 1:
         optparser.error("--text option takes only one name.")
+
+    for graph_type in options.graphs:
+        if graph_type.lower() == 'all':
+            options.graphs = GRAPH_TYPES
+            break
+        elif graph_type not in GRAPH_TYPES:
+            optparser.error("Invalid graph type %s." % graph_type)
 
     # Calculate verbosity.
     options.verbosity = options.verbose - options.quiet
