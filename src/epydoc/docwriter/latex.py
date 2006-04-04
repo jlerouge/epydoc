@@ -769,8 +769,8 @@ class LatexWriter:
             pyval_repr = var_doc.value.pyval_repr()
             if pyval_repr is not UNKNOWN:
                 out(self._pprint_var_value(pyval_repr, 80))
-            else:
-                out(self._pprint_var_value(parse_repr, 80))
+            elif var_doc.value.parse_repr is not UNKNOWN:
+                out(self._pprint_var_value(var_doc.value.parse_repr, 80))
         if has_type:
             ptype = self.docstring_to_latex(var_doc.type_descr, 12).strip()
             out('%s\\textit{(type=%s)}' % (' '*12, ptype))
