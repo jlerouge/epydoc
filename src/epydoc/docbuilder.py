@@ -917,9 +917,11 @@ def link_imports(val_doc, docindex):
         # merge the proxy `val_doc` with it.
         elif src_doc != val_doc:
             # Copy any subclass information from val_doc->src_doc.
-            for subclass in val_doc.subclasses:
-                if subclass not in src_doc.subclasses:
-                    src_doc.subclasses.append(subclass)
+            if (isinstance(val_doc, ClassDoc) and
+                isinstance(src_doc, ClassDoc)):
+                for subclass in val_doc.subclasses:
+                    if subclass not in src_doc.subclasses:
+                        src_doc.subclasses.append(subclass)
             # Then overwrite val_doc with the contents of src_doc.
             src_doc.merge_and_overwrite(val_doc, ignore_hash_conflict=True)
 
