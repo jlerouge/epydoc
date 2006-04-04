@@ -510,10 +510,10 @@ class VariableDoc(APIDoc):
     #} end of "information extracted from docstrings" group
     
     #{ Information about Imported Variables
-    imported_from = None
+    imported_from = UNKNOWN
     """@ivar: The fully qualified dotted name of the variable that this
-       variable's value was imported from.  This should be C{None} unless
-       C{is_instvar} is true.
+       variable's value was imported from.  This attribute should only
+       be defined if C{is_instvar} is true.
        @type: L{DottedName}"""
 
     is_imported = UNKNOWN
@@ -1498,7 +1498,7 @@ class DocIndex:
         """
         if isinstance(name, basestring):
             name = re.sub(r'\(.*\)$', '', name.strip())
-            if re.match('([a-zA-Z_]\w*)(\.[a-zA-Z_]\w*)*', name):
+            if re.match('^([a-zA-Z_]\w*)(\.[a-zA-Z_]\w*)*$', name):
                 name = DottedName(name)
             else:
                 return None
