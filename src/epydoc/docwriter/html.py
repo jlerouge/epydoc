@@ -2337,8 +2337,7 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
         
     def write_imports(self, out, doc):
-        assert  isinstance(doc, NamespaceDoc)
-
+        assert isinstance(doc, NamespaceDoc)
         imports = doc.select_variables(imported=True,
                                        public=self._public_filter)
         if not imports: return
@@ -2349,8 +2348,13 @@ class HTMLWriter:
         out('\n</p>\n')
 
     def _import(self, var_doc, context):
-        val_doc = self.docindex.get_valdoc(var_doc.imported_from)
-        return self.href(var_doc.imported_from, context=context)
+        if var_doc.imported_from not in (None, UNKNOWN):
+            return self.href(var_doc.imported_from, context=context)
+        elif (var_doc.value not in (None, UNKNOWN) and not
+              isinstance(var_doc.value, GenericValueDoc)):
+            return self.href(var_doc.value, context=context)
+        else:
+            return plaintext_to_html(var_doc.name)
             
     #////////////////////////////////////////////////////////////
     #{ Function Attributes
@@ -2785,14 +2789,15 @@ class HTMLWriter:
         if label is None:
             if isinstance(target, VariableDoc):
                 label = target.name
-            elif isinstance(target, ValueDoc):
+            elif (isinstance(target, ValueDoc) and
+                  target.canonical_name is not UNKNOWN):
                 label = target.canonical_name
             elif isinstance(target, DottedName):
                 label = target
             else:
-                raise ValueError, "bad label"
+                raise ValueError("Unable to find a label for %r" % target)
                 
-            if context is not None:
+            if context is not None and isinstance(label, DottedName):
                 label = label.contextualize(context.canonical_name.container())
                 
             label = plaintext_to_html(str(label))
