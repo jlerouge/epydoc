@@ -8,7 +8,6 @@
 
 """
 Classes for encoding API documentation about Python programs.
-
 These classes are used as a common representation for combining
 information derived from introspection and from parsing.
 
@@ -47,10 +46,6 @@ from epydoc.util import decode_with_backslashreplace
 ######################################################################
 # Dotted Names
 ######################################################################
-
-# [xx] define a new exception specifically for bad dotted names?
-# ValueError is a bit generic, and there are a couple places where
-# I catch this a bit far from where it gets raised.
 
 class DottedName:
     """
@@ -100,12 +95,10 @@ class DottedName:
             elif isinstance(piece, basestring):
                 for subpiece in piece.split('.'):
                     if not self._IDENTIFIER_RE.match(subpiece):
-                        log.debug('Bad identifier %r' % (piece,))
                         raise DottedName.InvalidDottedName(
                             'Bad identifier %r' % (piece,))
                     self._identifiers.append(subpiece)
             else:
-                log.debug('Bad identifier %r' % (piece,))
                 raise DottedName.InvalidDottedName(
                     'Bad identifier %r' % (piece,))
         self._identifiers = tuple(self._identifiers)
@@ -135,6 +128,10 @@ class DottedName:
             return DottedName(self, *other)
 
     def __radd__(self, other):
+        """
+        Return a new C{DottedName} whose identifier sequence is formed
+        by adding C{self}'s identifier sequence to C{other}'s.
+        """
         if isinstance(other, (basestring, DottedName)):
             return DottedName(other, self)
         else:
@@ -143,7 +140,9 @@ class DottedName:
     def __getitem__(self, i):
         """
         Return the C{i}th identifier in this C{DottedName}.  If C{i} is
-        a slice, then return a C{DottedName} 
+        a non-empty slice, then return a C{DottedName} built from the
+        identifiers selected by the slice.  If C{i} is an empty slice,
+        return an empty list (since empty C{DottedName}s are not valid).
         """
         if isinstance(i, types.SliceType):
             pieces = self._identifiers[i.start:i.stop]
@@ -159,6 +158,8 @@ class DottedName:
         """
         Compare this dotted name to C{other}.  Two dotted names are
         considered equal if their identifier subsequences are equal.
+        Ordering between dotted names is lexicographic, in order of
+        identifier from left to right.
         """
         if not isinstance(other, DottedName):
             return -1
@@ -183,16 +184,31 @@ class DottedName:
             return DottedName(*self._identifiers[:-1])
 
     def dominates(self, name, strict=False):
+        """
+        Return true if this dotted name is equal to a prefix of
+        C{name}.  If C{strict} is true, then also require that
+        C{self!=name}.
+
+            >>> DottedName('a.b').dominates(DottedName('a.b.c.d'))
+            True
+        """
         if strict and len(self._identifiers)==len(name._identifiers):
             return False
         return self._identifiers == name._identifiers[:len(self)]
 
     def contextualize(self, context):
         """
-        Return a reduced version of a dotted name. This name may be ambigious
-        (it is if its name is the same of the context), but is should be
-        explicit enough for humans, and may be considerably shorter and more
-        readable than a fully qualified one.
+        If C{self} and C{context} share a common ancestor, then return
+        a name for C{self}, relative to that ancestor.  If they do not
+        share a common ancestor (or if C{context} is C{UNKNOWN}), then
+        simply return C{self}.
+
+        This is used to generate shorter versions of dotted names in
+        cases where users can infer the intended target from the
+        context.
+        
+        @type context: L{DottedName}
+        @rtype: L{DottedName}
         """
         if context is UNKNOWN or not context or len(self) <= 1:
             return self
@@ -317,18 +333,23 @@ class APIDoc(object):
             not correspond to a valid attribute for this (sub)class of
             C{APIDoc}.
         """
-        for key in kwargs:
-            if not hasattr(self, key):
-                raise TypeError('%s got unexpected arg %r' %
-                                (self.__class__.__name__, key))
+        if epydoc.DEBUG:
+            for key in kwargs:
+                if not hasattr(self.__class__, key):
+                    raise TypeError('%s got unexpected arg %r' %
+                                    (self.__class__.__name__, key))
         self.__dict__.update(kwargs)
 
     def _debug_setattr(self, attr, val):
         """
-        Modify an C{APIDoc}'s attribute.
+        Modify an C{APIDoc}'s attribute.  This is used when
+        L{epydoc.DEBUG} is true, to make sure we don't accidentally
+        set any inappropriate attributes on C{APIDoc} objects.
 
         @raise AttributeError: If C{attr} is not a valid attribute for
-            this (sub)class of C{APIDoc}.
+            this (sub)class of C{APIDoc}.  (C{attr} is considered a
+            valid attribute iff C{self.__class__} defines an attribute
+            with that name.)
         """
         # Don't intercept special assignments like __class__, or
         # assignments to private variables.
@@ -351,20 +372,32 @@ class APIDoc(object):
         information contained in this C{APIDoc}.
         """
         return pp_apidoc(self, doublespace, depth, exclude, include)
-    
-    def __str__(self):
-        return self.pp()
+    __str__ = pp
 
     def specialize_to(self, cls):
-        if not issubclass(cls, self.__class__):
-            raise ValueError, 'xxx'
-        self.__class__ = cls
+        """
+        Change C{self}'s class to C{cls}.  C{cls} must be a subclass
+        of C{self}'s current class.  For example, if a generic
+        C{ValueDoc} was created for a value, and it is determined that
+        the value is a routine, you can update its class with:
         
-        # DO THIS [xx]?
+            >>> valdoc.specialize_to(RoutineDoc)
+        """
+        if not issubclass(cls, self.__class__):
+            raise ValueError('Can not specialize to %r' % cls)
+        # Update the class.
+        self.__class__ = cls
+        # Update the class of any other apidoc's in the mergeset.
+        if self.__mergeset is not None:
+            for apidoc in self.__mergeset:
+                apidoc.__class__ = cls
+        # Re-initialize self, in case the subclass constructor does
+        # any special processing on its arguments.
         self.__init__(**self.__dict__)
 
-    # [xx] consider making them un-hashable??
     __has_been_hashed = False
+    """True iff L{self.__hash__()} has ever been called."""
+    
     def __hash__(self):
         self.__has_been_hashed = True
         return id(self.__dict__)
@@ -372,9 +405,15 @@ class APIDoc(object):
     def __cmp__(self, other):
         if not isinstance(other, APIDoc): return -1
         if self.__dict__ is other.__dict__: return 0
-        else: return -1
-
+        name_cmp = cmp(self.canonical_name, other.canonical_name)
+        if name_cmp == 0: return -1
+        else: return name_cmp
+        
     __mergeset = None
+    """The set of all C{APIDoc} objects that have been merged with
+    this C{APIDoc} (using L{merge_and_overwrite()}).  Each C{APIDoc}
+    in this set shares a common instance dictionary (C{__dict__})."""
+    
     def merge_and_overwrite(self, other, ignore_hash_conflict=False):
         """
         Combine C{self} and C{other} into a X{merged object}, such
@@ -443,15 +482,11 @@ class APIDoc(object):
         """
         return []
 
-# [xx] use sorted() to replace sorted_by_name, and make 
-# APIDoc.__cmp__ use the name??
-def reachable_valdocs(root, sorted_by_name=False, **filters):
+def reachable_valdocs(root, **filters):
     """
     Return a list of all C{ValueDoc}s that can be reached, directly or
     indirectly from the given root list of C{ValueDoc}s.
 
-    @param sorted_by_name: If true, then sort the list of reachable
-        C{ValueDoc}s by name before returning it.
     @param filters: A set of filters that can be used to prevent
         C{reachable_valdocs} from following specific link types when
         looking for C{ValueDoc}s that can be reached from the root
@@ -461,9 +496,7 @@ def reachable_valdocs(root, sorted_by_name=False, **filters):
     apidoc_queue = list(root)
     val_set = set()
     var_set = set()
-    #if 'private' in filters: log.debug('RR', root)
     while apidoc_queue:
-        #if 'private' in filters: log.debug('  ', apidoc_queue)
         api_doc = apidoc_queue.pop()
         if isinstance(api_doc, ValueDoc):
             val_set.add(api_doc)
@@ -471,10 +504,7 @@ def reachable_valdocs(root, sorted_by_name=False, **filters):
             var_set.add(api_doc)
         apidoc_queue.extend([v for v in api_doc.apidoc_links(**filters)
                              if v not in val_set and v not in var_set])
-    if sorted_by_name:
-        return sorted(val_set, key=lambda d:d.canonical_name)
-    else:
-        return val_set
+    return val_set
 
 ######################################################################
 # Variable Documentation Objects
@@ -1542,20 +1572,18 @@ class DocIndex:
     # etc
     #////////////////////////////////////////////////////////////
 
-    def reachable_valdocs(self, sorted_by_name=False, **filters):
+    def reachable_valdocs(self, **filters):
         """
         Return a list of all C{ValueDoc}s that can be reached,
         directly or indirectly from this C{DocIndex}'s root set.
         
-        @param sorted_by_name: If true, then sort the list of
-            reachable C{ValueDoc}s by name before returning it.
         @param filters: A set of filters that can be used to prevent
             C{reachable_valdocs} from following specific link types
             when looking for C{ValueDoc}s that can be reached from the
             root set.  See C{APIDoc.apidoc_links} for a more complete
             description.
         """
-        return reachable_valdocs(self.root, sorted_by_name, **filters)
+        return reachable_valdocs(self.root, **filters)
 
     def container(self, api_doc):
         """
