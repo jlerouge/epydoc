@@ -443,6 +443,10 @@ def introspect_routine(routine, routine_doc):
             routine_doc.posargs = routine_doc.posargs[1:]
             routine_doc.posarg_defaults = routine_doc.posarg_defaults[1:]
 
+        # Set the routine's line number.
+        if hasattr(func, 'func_code'):
+            routine_doc.lineno = func.func_code.co_firstlineno
+
     else:
         # [XX] I should probably use UNKNOWN here??
         routine_doc.posargs = ['...']

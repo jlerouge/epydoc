@@ -1360,7 +1360,7 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     # Create the function's RoutineDoc.
     func_doc = RoutineDoc(canonical_name=canonical_name,
                           defining_module=parent_docs[0],
-                          docs_extracted_by='parser')
+                          lineno=lineno, docs_extracted_by='parser')
 
     # Process the signature.
     init_arglist(func_doc, line[2])
