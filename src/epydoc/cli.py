@@ -257,9 +257,18 @@ def parse_arguments():
     if options.action == 'text' and len(names) > 1:
         optparser.error("--text option takes only one name.")
 
+    # Check the list of requested graph types to make sure they're
+    # acceptable.
+    options.graphs = [graph_type.lower() for graph_type in options.graphs]
     for graph_type in options.graphs:
-        if graph_type.lower() == 'all':
+        if graph_type == 'callgraph' and not options.pstat_files:
+            optparser.error('"callgraph" graph type may only be used if '
+                            'one or more pstat files are specified.')
+        # If it's 'all', then add everything (but don't add callgraph if
+        # we don't have any profiling info to base them on).
+        if graph_type == 'all':
             options.graphs = GRAPH_TYPES
+            if not options.pstat_files: graph_types.remove('callgraph')
             break
         elif graph_type not in GRAPH_TYPES:
             optparser.error("Invalid graph type %s." % graph_type)
