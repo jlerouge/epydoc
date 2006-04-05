@@ -7,35 +7,47 @@
 # $Id$
 
 """
-Command-line interface for epydoc.
+Command-line interface for epydoc.  Abbreviated Usage::
 
-[xx] this usage message is probably a little out-of-date.
-
-Usage::
-
- epydoc [OPTIONS] MODULES...
+ epydoc [options] NAMES...
  
-     MODULES...                The Python modules to document.
+     NAMES...                  The Python modules to document.
      --html                    Generate HTML output (default).
      --latex                   Generate LaTeX output.
      --pdf                     Generate pdf output, via LaTeX.
-     --check                   Run documentation completeness checks.
      -o DIR, --output DIR      The output directory.
-     -n NAME, --name NAME      The documented project's name.
-     -u URL, --url URL         The documented project's url.
-     -t PAGE, --top PAGE       The top page for the HTML documentation.
-     -c SHEET, --css SHEET     CSS stylesheet for HTML files.
-     --private-css SHEET       CSS stylesheet for private objects.
      --inheritance STYLE       The format for showing inherited objects.
      -V, --version             Print the version of epydoc.
-     -h, -?, --help, --usage   Display a usage message.
-     -h TOPIC, --help TOPIC    Display information about TOPIC (docformat,
-                               css, inheritance, usage, or version).
+     -h, --help                Display a usage message.
 
- Run \"epydoc --help\" for a complete option list.
- See the epydoc(1) man page for more information.
+Run \"epydoc --help\" for a complete option list.  See the epydoc(1)
+man page for more information.
 
-Verbosity levels::
+Config Files
+============
+Configuration files can be specified with the C{--config} option.
+These files are read using U{ConfigParser
+<http://docs.python.org/lib/module-ConfigParser.html>}.  Configuration
+files may set options or add names of modules to document.  Option
+names are (usually) identical to the long names of command line
+options.  To specify names to document, use any of the following
+option names::
+
+  module modules value values object objects
+
+A simple example of a config file is::
+
+  [epydoc]
+  modules: sys, os, os.path, re
+  name: Example
+  graph: classtree
+  introspect: no
+
+Verbosity Levels
+================
+The C{-v} and C{-q} options increase and decrease verbosity,
+respectively.  The default verbosity level is zero.  The verbosity
+levels are currently defined as follows::
 
                 Progress    Markup warnings   Warnings   Errors
  -3               none            no             no        no
@@ -80,29 +92,19 @@ def parse_arguments():
         help="Write plaintext output. (not implemented yet)")
     action_group.add_option(                               # --latex
         "--latex", action="store_const", dest="action", const="latex",
-        help="Write LaTeX output. (not implemented yet)")
+        help="Write LaTeX output.")
     action_group.add_option(                               # --dvi
         "--dvi", action="store_const", dest="action", const="dvi",
-        help="Write DVI output. (not implemented yet)")
+        help="Write DVI output.")
     action_group.add_option(                               # --ps
         "--ps", action="store_const", dest="action", const="ps",
-        help="Write Postscript output. (not implemented yet)")
+        help="Write Postscript output.")
     action_group.add_option(                               # --pdf
         "--pdf", action="store_const", dest="action", const="pdf",
-        help="Write PDF output. (not implemented yet)")
+        help="Write PDF output.")
     action_group.add_option(                               # --check
         "--check", action="store_const", dest="action", const="check",
         help="Check completeness of docs. (not implemented yet)")
-
-    # Options I haven't ported over yet are...
-    # separate-classes (??) -- for latex only
-    # command-line-order (??)
-    # ignore-param-mismatch -- not implemented yet, but will be related
-    #                          to DocInheriter
-    # tests=...
-    # --no-markup-warnings ?
-    # --no-source, --incl-source?
-    
 
     # Add options -- Options
     options_group.add_option(                               # --output
@@ -142,13 +144,13 @@ def parse_arguments():
         "of an HTML file -- navigation bars will be added to it.")
     options_group.add_option(                               # --frames
         "--show-frames", action="store_true", dest="show_frames",
-        help="Include frames in the output.")
+        help="Include frames in the HTML output. (default)")
     options_group.add_option(                               # --no-frames
         "--no-frames", action="store_false", dest="show_frames",
-        help="Do not include frames in the output.")
+        help="Do not include frames in the HTML output.")
     options_group.add_option(                               # --private
         "--show-private", action="store_true", dest="show_private",
-        help="Include private variables in the output.")
+        help="Include private variables in the output. (default)")
     options_group.add_option(                               # --no-private
         "--no-private", action="store_false", dest="show_private",
         help="Do not include private variables in the output.")
@@ -157,7 +159,7 @@ def parse_arguments():
         help="List each module's imports.")
     options_group.add_option(                               # --show-imports
         "--no-imports", action="store_false", dest="show_imports",
-        help="Do not list each module's imports.")
+        help="Do not list each module's imports. (default)")
     options_group.add_option(                               # --quiet
         "--quiet", "-q", action="count", dest="quiet",
         help="Decrease the verbosity.")
@@ -191,6 +193,20 @@ def parse_arguments():
               "to specify its location.  This option may be repeated to "
               "include multiple graph types in the output.  GRAPHTYPE"
               "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
+    options_group.add_option(
+        '--separate-classes', action='store_true',
+        dest='list_classes_separately',
+        help=("When generating LaTeX or PDF output, list each class in "
+              "its own section, instead of listing them under their "
+              "containing module."))
+    options_group.add_option(
+        '--show-sourcecode', action='store_true', dest='include_source_code',
+        help=("Include source code with syntax highlighting in the "
+              "HTML output."))
+    options_group.add_option(
+        '--no-sourcecode', action='store_false', dest='include_source_code',
+        help=("Do not include source code with syntax highlighting in the "
+              "HTML output."))
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -204,7 +220,8 @@ def parse_arguments():
                            verbose=0, quiet=0,
                            parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False,
-                           graphs=[])
+                           graphs=[], list_classes_separately=False,
+                           include_source_code=True)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -262,9 +279,10 @@ def parse_configfiles(configfiles, options, names):
         fp.close()
     for optname in configparser.options('epydoc'):
         val = configparser.get('epydoc', optname).strip()
+        optname = optname.lower().strip()
         if optname in ('modules', 'objects', 'values',
                        'module', 'object', 'value'):
-            names.extend(val.split())
+            names.extend(val.replace(',', ' ').split())
         elif optname in ('output', 'target'):
             options.target = val
         elif optname == 'inheritance':
@@ -312,6 +330,10 @@ def parse_configfiles(configfiles, options, names):
                     raise ValueError('"graph" expected one of: %s.' %
                                      ', '.join(GRAPH_TYPES))
             options.graphs.extend(graphtypes)
+        elif optname in ('separate-classes', 'separate_classes'):
+            options.list_classes_separately = _str_to_bool(val, optname)
+        elif optname == 'sourcecode':
+            options.include_source_code = _str_to_bool(val, optname)
         else:
             raise ValueError('Unknown option %s' % optname)
 
@@ -339,9 +361,6 @@ def main(options, names):
         logger = ConsoleLogger(options.verbosity)
         log.register_logger(logger)
     else:
-        # Roughly how long does each action take?
-        action_time = {'html': [100], 'text': 30, 'latex': 60, 'ps': 70,
-                       'pdf': 80}
         # Each number is a rough approximation of how long we spend on
         # that task, used to divide up the unified progress bar.
         stages = [40,  # Building documentation
@@ -353,7 +372,8 @@ def main(options, names):
                   2]   # Sorting & Grouping
         if options.action == 'html': stages += [100]
         elif options.action == 'text': stages += [30]
-        elif options.action == 'latex': stages += [60,30]
+        elif options.action == 'latex': stages += [60]
+        elif options.action == 'dvi': stages += [60,30]
         elif options.action == 'ps': stages += [60,40]
         elif options.action == 'pdf': stages += [60,50]
         else: raise ValueError, '%r not supported' % options.action
@@ -390,7 +410,7 @@ def main(options, names):
     # Perform the specified action.
     if options.action == 'html':
         write_html(docindex, options)
-    elif options.action in ('latex', 'ps', 'pdf'):
+    elif options.action in ('latex', 'dvi', 'ps', 'pdf'):
         write_latex(docindex, options, options.action)
     elif options.action == 'text':
         write_text(docindex, options)
@@ -430,8 +450,11 @@ def write_latex(docindex, options, format):
     log.start_progress('Writing LaTeX docs')
     latex_writer.write(options.target)
     log.end_progress()
+    # If we're just generating the latex, and not any output format,
+    # then we're done.
+    if format == 'latex': return
     
-    if format == 'latex': steps = 4
+    if format == 'dvi': steps = 4
     elif format == 'ps': steps = 5
     elif format == 'pdf': steps = 6
     
