@@ -369,8 +369,8 @@ class HTMLWriter:
         # Precompute lists & sets of APIDoc objects that we're
         # interested in.
         self.valdocs = valdocs = sorted(docindex.reachable_valdocs(
-            sorted_by_name=True, imports=False, packages=False, bases=False, 
-            submodules=False, subclasses=False, private=self._show_private))
+            imports=False, packages=False, bases=False, submodules=False, 
+            subclasses=False, private=self._show_private))
         self.module_list = [d for d in valdocs if isinstance(d, ModuleDoc)]
         """The list of L{ModuleDoc}s for the documented modules."""
         self.module_set = set(self.module_list)

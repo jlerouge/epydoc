@@ -80,9 +80,9 @@ class LatexWriter:
         self._index_functions = 1
         self._hyperref = 1
         self._encoding = kwargs.get('encoding', 'latin1')
-        self.valdocs = docindex.reachable_valdocs(
-            sorted_by_name=True, imports=False, packages=False, bases=False, 
-            submodules=False, subclasses=False, private=self._show_private)
+        self.valdocs = sorted(docindex.reachable_valdocs(
+            imports=False, packages=False, bases=False, submodules=False, 
+            subclasses=False, private=self._show_private))
         self._num_files = self.num_files()
         # For use with select_variables():
         if self._show_private: self._public_filter = None
