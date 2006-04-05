@@ -584,7 +584,7 @@ class TerminalController:
     A class that can be used to portably generate formatted output to
     a terminal.  See
     U{http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/475116}
-    for documentation.
+    for documentation.  (This is a somewhat stripped-down version.)
     """
     BOL = ''             #: Move the cursor to the beginning of the line
     UP = ''              #: Move the cursor up one line
@@ -602,6 +602,7 @@ class TerminalController:
     BOL=cr UP=cuu1 DOWN=cud1 LEFT=cub1 RIGHT=cuf1
     CLEAR_EOL=el BOLD=bold UNDERLINE=smul NORMAL=sgr0""".split()
     _COLORS = """BLACK BLUE GREEN CYAN RED MAGENTA YELLOW WHITE""".split()
+    _ANSICOLORS = "BLACK RED GREEN YELLOW BLUE MAGENTA CYAN WHITE".split()
 
     def __init__(self, term_stream=sys.stdout):
         # If the stream isn't a tty, then assume it has no capabilities.
@@ -635,6 +636,10 @@ class TerminalController:
         if set_fg:
             for i,color in zip(range(len(self._COLORS)), self._COLORS):
                 setattr(self, color, curses.tparm(set_fg, i) or '')
+        set_fg_ansi = self._tigetstr('setaf')
+        if set_fg_ansi:
+            for i,color in zip(range(len(self._ANSICOLORS)), self._ANSICOLORS):
+                setattr(self, color, curses.tparm(set_fg_ansi, i) or '')
 
     def _tigetstr(self, cap_name):
         # String capabilities can include "delays" of the form "$<2>".
