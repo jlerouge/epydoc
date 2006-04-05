@@ -333,8 +333,6 @@ def parse_configfiles(configfiles, options, names):
             options.parse = _str_to_bool(val, optname)
         elif optname == 'introspect':
             options.introspect = _str_to_bool(val, optname)
-        elif optname == 'profile':
-            options.profile = _str_to_bool(val, optname)
         elif optname == 'dotpath':
             options.dotpath = val
         elif optname == 'graph':
@@ -348,6 +346,8 @@ def parse_configfiles(configfiles, options, names):
             options.list_classes_separately = _str_to_bool(val, optname)
         elif optname == 'sourcecode':
             options.include_source_code = _str_to_bool(val, optname)
+        elif optname == 'pstat':
+            options.pstat_files.extend(val.replace(',', ' ').split())
         else:
             raise ValueError('Unknown option %s' % optname)
 
@@ -593,7 +593,7 @@ def _profile():
     except SystemExit:
         pass
     prof.dump_stats('profile.out')
-
+    return
     # Use the pstats statistical browser.  This is made unnecessarily
     # difficult because the whole browser is wrapped in an
     # if __name__=='__main__' clause.
