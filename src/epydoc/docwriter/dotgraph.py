@@ -24,7 +24,7 @@ import re
 import sys
 from epydoc import log
 from epydoc.apidoc import *
-from epydoc.util import plaintext_to_html, run_subprocess
+from epydoc.util import *
 from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
@@ -219,7 +219,7 @@ class DotGraph:
                 result = result.decode('utf-8')
         except OSError, e:
             log.warning("Unable to render Graphviz dot graph:\n%s" % e)
-            log.debug(self.to_dotfile())
+            #log.debug(self.to_dotfile())
             return None
 
         return result
@@ -249,19 +249,34 @@ class DotGraph:
 
 class DotGraphNode:
     _next_id = 0
-    def __init__(self, label=None, **attribs):
+    def __init__(self, label=None, html_label=None, **attribs):
+        if label is not None and html_label is not None:
+            raise ValueError('Use label or html_label, not both.')
         if label is not None: attribs['label'] = label
-        self.attribs = attribs
+        self._html_label = html_label
+        self._attribs = attribs
         self.id = self.__class__._next_id
         self.__class__._next_id += 1
+
+    def __getitem__(self, attr):
+        return self._attribs[attr]
+
+    def __setitem__(self, attr, val):
+        if attr == 'html_label':
+            self._attribs.pop('label')
+            self._html_label = val
+        else:
+            if attr == 'label': self._html_label = None
+            self._attribs[attr] = val
 
     def to_dotfile(self):
         """
         Return the dot commands that should be used to render this node.
         """
-        attribs = ','.join(['%s="%s"' % (k,v) for (k,v)
-                            in self.attribs.items()])
-        if attribs: attribs = ' [%s]' % attribs
+        attribs = ['%s="%s"' % (k,v) for (k,v) in self._attribs.items()]
+        if self._html_label:
+            attribs.insert(0, 'label=<%s>' % self._html_label)
+        if attribs: attribs = ' [%s]' % (','.join(attribs))
         return 'node%d%s' % (self.id, attribs)
 
 class DotGraphEdge:
@@ -273,14 +288,20 @@ class DotGraphEdge:
         if label is not None: attribs['label'] = label
         self.start = start       #: :type: `DotGraphNode`
         self.end = end           #: :type: `DotGraphNode`
-        self.attribs = attribs
+        self._attribs = attribs
+
+    def __getitem__(self, attr):
+        return self._attribs[attr]
+
+    def __setitem__(self, attr, val):
+        self._attribs[attr] = val
 
     def to_dotfile(self):
         """
         Return the dot commands that should be used to render this edge.
         """
         attribs = ','.join(['%s="%s"' % (k,v) for (k,v)
-                            in self.attribs.items()])
+                            in self._attribs.items()])
         if attribs: attribs = ' [%s]' % attribs
         return 'node%d -> node%d%s' % (self.start.id, self.end.id, attribs)
 
@@ -294,7 +315,6 @@ def package_tree_graph(packages, linker, context=None, **options):
     hierarchies for the given packages.
     """
     graph = DotGraph('Package Tree for %s' % name_list(packages, context),
-                     node_defaults={'shape':'box', 'width': 0, 'height': 0},
                      edge_defaults={'sametail':True})
     
     # Options
@@ -362,8 +382,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     return graph
 
 def import_graph(modules, docindex, linker, context=None, **options):
-    graph = DotGraph('Import Graph',
-                     node_defaults={'shape':'box', 'width': 0, 'height': 0})
+    graph = DotGraph('Import Graph')
 
     # Options
     if options.get('dir', 'RL') != 'TB': # default: right-to-left.
@@ -456,6 +475,28 @@ def call_graph(api_docs, docindex, linker, context=None, **options):
     return graph
 
 ######################################################################
+#{ Dot Version
+######################################################################
+
+_dot_version = None
+_DOT_VERSION_RE = re.compile(r'dot version ([\d\.]+)')
+def get_dot_version():
+    global _dot_version
+    if _dot_version is None:
+        try:
+            out, err = run_subprocess([DOT_COMMAND, '-V'])
+            version_info = err or out
+            m = _DOT_VERSION_RE.match(version_info)
+            if m:
+                _dot_version = [int(x) for x in m.group(1).split('.')]
+            else:
+                _dot_version = (0,)
+        except RunSubprocessError, e:
+            _dot_version = (0,)
+        log.info('Detected dot version %s' % _dot_version)
+    return _dot_version
+
+######################################################################
 #{ Helper Functions
 ######################################################################
 
@@ -467,16 +508,54 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
     for i, val_doc in enumerate(val_docs):
         label = val_doc.canonical_name.contextualize(context.canonical_name)
-        if isinstance(val_doc, RoutineDoc): label = '%s()' % label
         node = nodes[val_doc] = DotGraphNode(label)
         graph.nodes.append(node)
-        if val_doc == context:
-            node.attribs.update({'fillcolor':'black', 'fontcolor':'white',
-                                 'style':'filled'})
-        else:
-            url = linker.url_for(val_doc)
-            if url: node.attribs['href'] = url
+        specialize_valdoc_node(node, val_doc, context, linker.url_for(val_doc))
     return nodes
+
+MODULE_NODE_HTML = '''
+  <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="0">
+  <TR><TD BORDER="0"></TD><TD BORDER="0"></TD>
+  <TD HEIGHT="8" BGCOLOR="%s"></TD></TR>
+  <TR><TD COLSPAN="3" BGCOLOR="%s">%s</TD></TR></TABLE>'''.strip()
+MODULE_BG = '#d0e0ff'
+SELECTED_BG = '#ffd0d0'
+
+def specialize_valdoc_node(node, val_doc, context, url):
+    """
+    Update the style attributes of C{node} to reflext its type
+    and context.
+    """
+    dot_version = get_dot_version()
+    if val_doc != context:
+        if url: node['href'] = url
+
+    if isinstance(val_doc, VariableDoc) and val_doc.value is not UNKNOWN:
+        val_doc = val_doc.value
+        
+    if isinstance(val_doc, ModuleDoc) and dot_version > [2]:
+        node['shape'] = 'plaintext'
+        if val_doc == context: color = SELECTED_BG
+        else: color = MODULE_BG
+        node['html_label'] = MODULE_NODE_HTML % (color, color, node['label'])
+
+    elif isinstance(val_doc, RoutineDoc):
+        node['shape'] = 'box'
+        node['style'] = 'rounded'
+        node['width'] = 0
+        node['height'] = 0
+        node['label'] = '%s()' % node['label']
+        if val_doc == context:
+            node['fillcolor'] = SELECTED_BG
+            node['style'] = 'filled,rounded'
+            
+    else:
+        node['shape'] = 'box' 
+        node['width'] = 0
+        node['height'] = 0
+        if val_doc == context:
+            node['fillcolor'] = SELECTED_BG
+            node['style'] = 'filled'
 
 def name_list(api_docs, context=None):
     if context is not None:
