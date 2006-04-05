@@ -1873,8 +1873,11 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return import_graph(modules, docindex, linker, context)
 
         elif graph_type == 'callgraph':
-            docs = [docindex.find(name, context) for name in graph_args]
-            docs = [doc for doc in docs if doc is not None]
+            if graph_args:
+                docs = [docindex.find(name, context) for name in graph_args]
+                docs = [doc for doc in docs if doc is not None]
+            else:
+                docs = [context]
             return call_graph(docs, docindex, linker, context)
         else:
             log.warning("Unknown graph type %s" % graph_type)
