@@ -539,6 +539,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
 ######################################################################
 #{ Graph Generation Directives
 ######################################################################
+# See http://docutils.sourceforge.net/docs/howto/rst-directives.html
 
 class dotgraph(docutils.nodes.image):
     """
@@ -593,7 +594,7 @@ def digraph_directive(name, arguments, options, content, lineno,
     else: title = ''
     return dotgraph(_construct_digraph, title, options.get('caption'),
                     '\n'.join(content))
-digraph_directive.arguments = (0, 1, 1)
+digraph_directive.arguments = (0, 1, True)
 digraph_directive.options = {'caption': directives.unchanged}
 digraph_directive.content = True
 directives.register_directive('digraph', digraph_directive)
@@ -689,3 +690,24 @@ def _construct_importgraph(docindex, context, linker, arguments, options):
     """Graph generator for L{importgraph_directive}"""
     modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
     return import_graph(modules, docindex, linker, context, **options)
+
+def callgraph_directive(name, arguments, options, content, lineno,
+                        content_offset, block_text, state, state_machine):
+    return dotgraph(_construct_callgraph, arguments, options)
+callgraph_directive.arguments = (0, 1, True)
+callgraph_directive.options = {'dir': _dir_option,
+                                 'add_callers': directives.flag,
+                                 'add_callees': directives.flag}
+callgraph_directive.content = False
+directives.register_directive('callgraph', callgraph_directive)
+
+def _construct_callgraph(docindex, context, linker, arguments, options):
+    """Graph generator for L{callgraph_directive}"""
+    if len(arguments) == 1:
+        docs = [docindex.find(name, context) for name in
+                 arguments[0].replace(',',' ').split()]
+        docs = [doc for doc in docs if doc is not None]
+    else:
+        docs = [context]
+    return call_graph(docs, docindex, linker, context, **options)
+  
