@@ -612,6 +612,15 @@ class VariableDoc(APIDoc):
     container's cannonical name, and adding the variable's name
     to it.""")
 
+    def _get_defining_module(self):
+        if self.container is UNKNOWN:
+            return UNKNOWN
+        return self.container.defining_module
+    defining_module = property(_get_defining_module, doc="""
+    A read-only property that can be used to get the variable's
+    defining module.  This is defined as the defining module
+    of the variable's container.""")
+
     def apidoc_links(self, **filters):
         if self.value in (None, UNKNOWN):
             return []
@@ -1602,23 +1611,6 @@ class DocIndex:
             parent = api_doc.canonical_name.container()
             return self.get_valdoc(parent)
 
-    # [xx] this could be moved out of docindex and/or removed.
-    def module_that_defines(self, api_doc):
-        """
-        Return the C{ModuleDoc} of the module that defines C{api_doc},
-        or C{None} if that module is not in the index.  If C{api_doc}
-        is itself a module, then C{api_doc} will be returned.
-        """
-        if isinstance(api_doc, VariableDoc):
-            api_doc = api_doc.container
-        if api_doc.defining_module == UNKNOWN: return None
-        if not isinstance(api_doc.defining_module, ModuleDoc):
-            log.error("Internal error -- %r claims that its defining "
-                      "module is %r, but the latter is not a module." %
-                      (api_doc, api_doc.defining_module))
-            return None
-        return api_doc.defining_module
-    
 ######################################################################
 ## Pretty Printing
 ######################################################################

@@ -2758,8 +2758,8 @@ class HTMLWriter:
             else:
                 return None
         else:
-            module = self.docindex.module_that_defines(api_doc)
-            if module is None: return None
+            module = self.docindex.defining_module
+            if module == UNKNOWN: return None
             module_pysrc_url = self.pysrc_url(module)
             if module_pysrc_url is None: return None
             module_name = module.canonical_name
