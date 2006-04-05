@@ -36,12 +36,12 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import types, re
+import types, re, os.path
 from epydoc import log
 import epydoc
 import __builtin__
 from epydoc.compat import * # Backwards compatibility
-from epydoc.util import decode_with_backslashreplace
+from epydoc.util import decode_with_backslashreplace, py_src_filename
 
 ######################################################################
 # Dotted Names
@@ -695,7 +695,7 @@ class ValueDoc(APIDoc):
        by the imported value's C{ValueDoc} by
        L{link_imports()<docbuilder.link_imports>}.
        @type: L{DottedName}"""
-    #{ end of "information about imported variables" group
+    #} end of "information about imported variables" group
 
     #: @ivar:
     #: This is currently used to extract values from __all__, etc, in
@@ -1292,6 +1292,12 @@ class RoutineDoc(ValueDoc):
     """@ivar: The name of the routine's keyword argument, or C{None} if
        it has no keyword argument.
        @type: C{string} or C{None}"""
+    lineno = UNKNOWN # used to look up profiling info from pstats.
+    """@ivar: The line number of the first line of the function's
+       signature.  For Python functions, this is equal to
+       C{func.func_code.co_firstlineno}.  The first line of a file
+       is considered line 1.
+       @type: C{int}"""
     #} end of "signature" group
 
     #{ Information Extracted from Docstrings
@@ -1447,6 +1453,20 @@ class DocIndex:
         # ascending order.  (This ensures that variables will shadow
         # submodules when appropriate.)
         self.root = sorted(root, key=lambda d:len(d.canonical_name))
+
+        self.callers = None
+        """A dictionary mapping from C{RoutineDoc}s in this index
+           to lists of C{RoutineDoc}s for the routine's callers.
+           This dictionary is initialized by calling
+           L{read_profiling_info()}.
+           @type: C{list} of L{RoutineDoc}"""
+        
+        self.callees = None
+        """A dictionary mapping from C{RoutineDoc}s in this index
+           to lists of C{RoutineDoc}s for the routine's callees.
+           This dictionary is initialized by calling
+           L{read_profiling_info()}.
+           @type: C{list} of L{RoutineDoc}"""
 
     #////////////////////////////////////////////////////////////
     # Lookup methods
@@ -1610,6 +1630,60 @@ class DocIndex:
         else:
             parent = api_doc.canonical_name.container()
             return self.get_valdoc(parent)
+
+    #////////////////////////////////////////////////////////////
+    # Profiling information
+    #////////////////////////////////////////////////////////////
+
+    def read_profiling_info(self, profile_stats):
+        """
+        Initialize the L{callers} and L{callees} variables, given a
+        C{Stat} object from the C{pstats} module.
+        
+        @warning: This method uses undocumented data structures inside
+            of C{profile_stats}.
+        """
+        if self.callers is None: self.callers = {}
+        if self.callees is None: self.callees = {}
+        
+        # The Stat object encodes functions using `funcid`s, or
+        # tuples of (filename, lineno, funcname).  Create a mapping
+        # from these `funcid`s to `RoutineDoc`s.
+        funcid_to_doc = self._get_funcid_to_doc_mapping(profile_stats)
+        
+        for callee, (cc, nc, tt, ct, callers) in profile_stats.stats.items():
+            callee = funcid_to_doc.get(callee)
+            if callee is None: continue
+            for caller in callers:
+                caller = funcid_to_doc.get(caller)
+                if caller is None: continue
+                self.callers.setdefault(callee, []).append(caller)
+                self.callees.setdefault(caller, []).append(callee)
+
+    def _get_funcid_to_doc_mapping(self, profile_stats):
+        """
+        Return a dictionary mapping from C{pstat.Stat} funciton ids to
+        C{RoutineDoc}s.  C{pstat.Stat} function ids are tuples of
+        C{(filename, lineno, funcname)}.
+        """
+        # Maps (filename, lineno, funcname) -> RoutineDoc
+        funcid_to_doc = {} 
+        for val_doc in self.reachable_valdocs():
+            # We only care about routines.
+            if not isinstance(val_doc, RoutineDoc): continue
+            # Get the filename from the defining module.
+            module = val_doc.defining_module
+            if module is UNKNOWN or module.filename is UNKNOWN: continue
+            # Normalize the filename.
+            filename = os.path.abspath(module.filename)
+            try: filename = py_src_filename(filename)
+            except: pass
+            # Look up the stat_func_id
+            funcid = (filename, val_doc.lineno, val_doc.canonical_name[-1])
+            if funcid in profile_stats.stats:
+                funcid_to_doc[funcid] = val_doc
+
+        return funcid_to_doc
 
 ######################################################################
 ## Pretty Printing
