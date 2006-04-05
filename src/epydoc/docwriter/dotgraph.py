@@ -214,8 +214,12 @@ class DotGraph:
         try:
             result, err = run_subprocess([DOT_COMMAND, '-T%s' % language],
                                          self.to_dotfile())
+            # Decode into unicode, if necessary.
+            if language == 'cmapx' and result is not None:
+                result = result.decode('utf-8')
         except OSError, e:
             log.warning("Unable to render Graphviz dot graph:\n%s" % e)
+            log.debug(self.to_dotfile())
             return None
 
         return result
@@ -239,7 +243,9 @@ class DotGraph:
         for edge in self.edges:
             lines.append(edge.to_dotfile())
         lines.append('}')
-        return '\n'.join(lines)
+
+        # Default dot input encoding is UTF-8
+        return u'\n'.join(lines).encode('utf-8')
 
 class DotGraphNode:
     _next_id = 0
@@ -357,8 +363,7 @@ def class_tree_graph(bases, linker, context=None, **options):
 
 def import_graph(modules, docindex, linker, context=None, **options):
     graph = DotGraph('Import Graph',
-                     node_defaults={'shape':'box', 'width': 0, 'height': 0},
-                     edge_defaults={'sametail':True})
+                     node_defaults={'shape':'box', 'width': 0, 'height': 0})
 
     # Options
     if options.get('dir', 'RL') != 'TB': # default: right-to-left.
@@ -429,8 +434,7 @@ def call_graph(api_docs, docindex, linker, context=None, **options):
                 func_set.update(docindex.callees.get(func_doc, ()))
 
     graph = DotGraph('Call Graph for %s' % name_list(api_docs, context),
-                     node_defaults={'shape':'box', 'width': 0, 'height': 0},
-                     edge_defaults={'sametail':True})
+                     node_defaults={'shape':'box', 'width': 0, 'height': 0})
     
     # Options
     if options.get('dir', 'LR') != 'TB': # default: left-to-right
