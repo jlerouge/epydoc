@@ -139,6 +139,7 @@ span.pysrc-toggle  { font-size: 80%; font-style: normal;
 .graph-without-title { border: none; }
 .graph-with-title    { border: 1px solid black; }
 .graph-title         { font-weight: bold; }
+.callgraph           { border: 1px solid black; }
 
 /* Lists */
 ul { margin-top: 0; }

@@ -59,7 +59,7 @@ levels are currently defined as follows::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time, re
+import sys, os, time, re, pstats
 from glob import glob
 from optparse import OptionParser, OptionGroup
 import epydoc
@@ -69,7 +69,7 @@ from epydoc.apidoc import UNKNOWN
 import ConfigParser
 
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
-GRAPH_TYPES = ('classtree',)
+GRAPH_TYPES = ('classtree', 'callgraph')
 
 ######################################################################
 #{ Argument & Config File Parsing
@@ -175,9 +175,11 @@ def parse_arguments():
     options_group.add_option(                               # --introspect-only
         "--introspect-only", action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
-    options_group.add_option(
-        "--profile", action="store_true", dest="profile",
-        help="Run the profiler.  Output will be written to profile.out")
+    if epydoc.DEBUG:
+        # this option is for developers, not users.
+        options_group.add_option(
+            "--profile-epydoc", action="store_true", dest="profile",
+            help="Run the profiler.  Output will be written to profile.out")
     options_group.add_option(
         "--dotpath", dest="dotpath", metavar='PATH',
         help="The path to the Graphviz 'dot' executable.")
@@ -207,6 +209,9 @@ def parse_arguments():
         '--no-sourcecode', action='store_false', dest='include_source_code',
         help=("Do not include source code with syntax highlighting in the "
               "HTML output."))
+    options_group.add_option(
+        '--pstat', action='append', dest='pstat_files', metavar='FILE',
+        help="A pstat output file, to be used in generating call graphs.")
 
     # Add the option groups.
     optparser.add_option_group(action_group)
@@ -221,7 +226,7 @@ def parse_arguments():
                            parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False,
                            graphs=[], list_classes_separately=False,
-                           include_source_code=True)
+                           include_source_code=True, pstat_files=[])
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -407,6 +412,19 @@ def main(options, names):
     if docindex is None:
         return # docbuilder already logged an error.
 
+    # Load profile information, if it was given.
+    if options.pstat_files:
+        try:
+            profile_stats = pstats.Stats(options.pstat_files[0])
+            for filename in options.pstat_files[1:]:
+                profile_stats.add(filename)
+        except KeyboardInterrupt: raise
+        except Exception, e:
+            log.error("Error reading pstat file: %s" % e)
+            profile_stats = None
+        if profile_stats is not None:
+            docindex.read_profiling_info(profile_stats)
+
     # Perform the specified action.
     if options.action == 'html':
         write_html(docindex, options)
@@ -559,8 +577,13 @@ def cli():
         print >>sys.stderr, 'Use --debug to see trace information.'
 
 def _profile():
-    import profile, pstats, code
-    profile.run('main(*parse_arguments())', 'profile.out')
+    import profile, pstats
+    try:
+        prof = profile.Profile()
+        prof = prof.runctx('main(*parse_arguments())', globals(), {})
+    except SystemExit:
+        pass
+    prof.dump_stats('profile.out')
 
     # Use the pstats statistical browser.  This is made unnecessarily
     # difficult because the whole browser is wrapped in an

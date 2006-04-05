@@ -697,7 +697,7 @@ class HTMLWriter:
             if 'classtree' in self._graph_types:
                 linker = _HTMLDocstringLinker(self, doc)
                 graph = class_tree_graph([doc], linker, doc)
-                self.write_graph(out, graph)
+                out('<center>\n%s</center>\n' % self.render_graph(graph))
 
             # Otherwise, use ascii-art.
             else:
@@ -1214,6 +1214,7 @@ class HTMLWriter:
         print >> jsfile, self.GET_COOKIE_JS
         print >> jsfile, self.SET_FRAME_JS
         print >> jsfile, self.HIDE_PRIVATE_JS
+        print >> jsfile, self.TOGGLE_CALLGRAPH_JS
         jsfile.close()
 
     #: A javascript that is used to show or hide the API documentation
@@ -1308,21 +1309,48 @@ class HTMLWriter:
       }
     '''.strip()
 
+    TOGGLE_CALLGRAPH_JS = '''
+      function toggleCallGraph(id) {
+        var elt = document.getElementById(id);
+        if (elt.style.display == "none")
+            elt.style.display = "block";
+        else
+            elt.style.display = "none";
+      }
+    '''.strip()
+
     #////////////////////////////////////////////////////////////
     #{ 2.10. Graphs
     #////////////////////////////////////////////////////////////
 
-    def write_graph(self, out, graph):
+    def render_graph(self, graph, css='graph-without-title'):
+        if graph is None: return ''
         # Write the graph's image to a file
         path = os.path.join(self._directory, graph.uid)
         if not graph.write('%s.gif' % path, 'gif'):
-            return
+            return ''
         # Generate the image map.
         cmapx = graph.render('cmapx') or ''
         # Display the graph.
-        out('%s\n<center>\n<img src="%s.gif" alt="%s" usemap="#%s" '
-            'ismap="ismap" class="graph-without-title"/>\n</center>' % 
-            (cmapx, graph.uid, graph.uid, graph.uid))
+        uid = graph.uid
+        return ('%s\n<img src="%s.gif" alt="%s" usemap="#%s" ismap="ismap" '
+                'class="%s"/>\n' % (cmapx, uid, uid, uid, css))
+    
+    def render_callgraph(self, callgraph):
+        graph_html = self.render_graph(callgraph, css='callgraph')
+        if graph_html == '': return ''
+        return ('<div style="display:none" id="%s-div"><center>\n'
+                '<table border="0" cellpadding="0" cellspacing="0">\n'
+                '  <tr><td>%s</td></tr>\n'
+                '  <tr><th>Call Graph</th></tr>\n'
+                '</table><br />\n</center></div>\n' %
+                (callgraph.uid, graph_html))
+
+    def callgraph_link(self, callgraph):
+        if callgraph is None: return ''
+        return ('<br /><span class="codelink"><a href="#" '
+                'onclick="toggleCallGraph(\'%s-div\');return false;">'
+                'call&nbsp;graph</a></span>&nbsp;' % callgraph.uid)
 
     #////////////////////////////////////////////////////////////
     #{ 3.1. Page Header
@@ -1794,8 +1822,19 @@ class HTMLWriter:
                                  for n in arg_names])
                 rhs = self.docstring_to_html(arg_descr, var_doc.value, 10)
                 arg_descrs.append( (lhs, rhs) )
-            self.write_function_details_entry(out, var_doc, descr, rtype,
-                                              rdescr, arg_descrs, div_class)
+            # Perpare the call-graph, if requested
+            if 'callgraph' in self._graph_types:
+                linker = _HTMLDocstringLinker(self, var_doc.value)
+                callgraph = call_graph([var_doc.value], self.docindex,
+                                       linker, var_doc, add_callers=True, 
+                                       add_callees=True)
+                if callgraph is not None and len(callgraph.nodes) == 0:
+                    callgraph = None
+            else:
+                callgraph = None
+            self.write_function_details_entry(out, var_doc, descr, callgraph,
+                                              rtype, rdescr, arg_descrs,
+                                              div_class)
 
         # Properties
         elif isinstance(var_doc.value, PropertyDoc):
@@ -1858,7 +1897,7 @@ class HTMLWriter:
 
     write_function_details_entry = compile_template(
         '''
-        write_function_details_entry(self, out, var_doc, descr, \
+        write_function_details_entry(self, out, var_doc, descr, callgraph, \
                                      rtype, rdescr, arg_descrs, div_class)
         ''',
         # /------------------------- Template -------------------------\
@@ -1875,8 +1914,10 @@ class HTMLWriter:
         >>> #endif
           </h3>
           </td><td align="right" valign="top"
-            >$self.pysrc_link(func_doc)$&nbsp;</span></td>
+            >$self.pysrc_link(func_doc)$&nbsp;</span
+            >$self.callgraph_link(callgraph)$</td>
           </table>
+          $self.render_callgraph(callgraph)$
           $descr$
           <dl><dt></dt><dd>
         >>> # === parameters ===
@@ -2758,7 +2799,7 @@ class HTMLWriter:
             else:
                 return None
         else:
-            module = self.docindex.defining_module
+            module = api_doc.defining_module
             if module == UNKNOWN: return None
             module_pysrc_url = self.pysrc_url(module)
             if module_pysrc_url is None: return None

@@ -382,15 +382,88 @@ def import_graph(modules, docindex, linker, context=None, **options):
 
     return graph
 
+def call_graph(api_docs, docindex, linker, context=None, **options):
+    """
+    @param options:
+        - C{dir}: rankdir for the graph.  (default=LR)
+        - C{add_callers}: also include callers for any of the
+          routines in C{api_docs}.  (default=False)
+        - C{add_callees}: also include callees for any of the
+          routines in C{api_docs}.  (default=False)
+    @todo: Add an C{exclude} option?
+    """
+    if docindex.callers is None:
+        log.warning("No profiling information for call graph!")
+        return DotGraph('Call Graph') # return None instead?
+
+    if isinstance(context, VariableDoc):
+        context = context.value
+
+    # Get the set of requested functions.
+    functions = []
+    for api_doc in api_docs:
+        # If it's a variable, get its value.
+        if isinstance(api_doc, VariableDoc):
+            api_doc = api_doc.value
+        # Add the value to the functions list.
+        if isinstance(api_doc, RoutineDoc):
+            functions.append(api_doc)
+        elif isinstance(api_doc, NamespaceDoc):
+            for vardoc in api_doc.variables.values():
+                if isinstance(vardoc.value, RoutineDoc):
+                    functions.append(vardoc.value)
+
+    # Filter out functions with no callers/callees?
+    # [xx] this isnt' quite right, esp if add_callers or add_callees
+    # options are fales.
+    functions = [f for f in functions if
+                 (f in docindex.callers) or (f in docindex.callees)]
+        
+    # Add any callers/callees of the selected functions
+    func_set = set(functions)
+    if options.get('add_callers', False) or options.get('add_callees', False):
+        for func_doc in functions:
+            if options.get('add_callers', False):
+                func_set.update(docindex.callers.get(func_doc, ()))
+            if options.get('add_callees', False):
+                func_set.update(docindex.callees.get(func_doc, ()))
+
+    graph = DotGraph('Call Graph for %s' % name_list(api_docs, context),
+                     node_defaults={'shape':'box', 'width': 0, 'height': 0},
+                     edge_defaults={'sametail':True})
+    
+    # Options
+    if options.get('dir', 'LR') != 'TB': # default: left-to-right
+        graph.body += 'rankdir=%s\n' % options.get('dir', 'LR')
+
+    nodes = add_valdoc_nodes(graph, func_set, linker, context)
+    
+    # Find the edges.
+    edges = set()
+    for func_doc in functions:
+        for caller in docindex.callers.get(func_doc, ()):
+            if caller in nodes:
+                edges.add( (nodes[caller], nodes[func_doc]) )
+        for callee in docindex.callees.get(func_doc, ()):
+            if callee in nodes:
+                edges.add( (nodes[func_doc], nodes[callee]) )
+    graph.edges = [DotGraphEdge(src,dst) for (src,dst) in edges]
+    
+    return graph
+
 ######################################################################
 #{ Helper Functions
 ######################################################################
 
 def add_valdoc_nodes(graph, val_docs, linker, context):
+    """
+    @todo: Use different node styles for different subclasses of APIDoc
+    """
     nodes = {}
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
     for i, val_doc in enumerate(val_docs):
         label = val_doc.canonical_name.contextualize(context.canonical_name)
+        if isinstance(val_doc, RoutineDoc): label = '%s()' % label
         node = nodes[val_doc] = DotGraphNode(label)
         graph.nodes.append(node)
         if val_doc == context:

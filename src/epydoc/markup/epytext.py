@@ -1067,7 +1067,7 @@ def _colorize(doc, token, errors, tagName='para'):
 
     return stack[0]
 
-GRAPH_TYPES = ['classtree', 'packagetree', 'importgraph']
+GRAPH_TYPES = ['classtree', 'packagetree', 'importgraph', 'callgraph']
 
 def _colorize_graph(doc, graph, token, end, errors):
     """
@@ -1082,7 +1082,6 @@ def _colorize_graph(doc, graph, token, end, errors):
     for child in children: graph.removeChild(child)
 
     if len(children) != 1 or not isinstance(children[0], Text):
-        print len(children), children[0]
         bad_graph_spec = "Bad graph specification"
     else:
         pieces = children[0].data.split(None, 1)
@@ -1872,6 +1871,11 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif graph_type == 'importgraph':
             modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
             return import_graph(modules, docindex, linker, context)
+
+        elif graph_type == 'callgraph':
+            docs = [docindex.find(name, context) for name in graph_args]
+            docs = [doc for doc in docs if doc is not None]
+            return call_graph(docs, docindex, linker, context)
         else:
             log.warning("Unknown graph type %s" % graph_type)
             
