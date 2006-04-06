@@ -20,6 +20,7 @@ import sre_constants
 from epydoc import log
 from epydoc.util import decode_with_backslashreplace, plaintext_to_html
 from epydoc.util import py_src_filename
+from epydoc.apidoc import *
 
 ######################################################################
 ## Regular expression colorizer
@@ -433,8 +434,7 @@ function collapse(id) {
     var s = "";
     if (linenumpadding != "")
       s = "<span class=\'lineno\'>" + linenumpadding + "</span>"
-    s = s + "<span class=\'pysrc-toggle\'> </span>" +
-            "<span class=\'py-line\'>" + indent +
+    s = s + "  <span class=\'py-line\'>" + indent +
             "<a href=\'#\' onclick=\'expand(\\"" + id +
             "\\");return false\'>...</a></span><br />";
     elt.innerHTML = s;
@@ -498,6 +498,69 @@ function expandto(href) {
   }
 }
 
+function kill_doclink() {
+  if (!this.contains(event.toElement)) {
+    var parent = document.getElementById(this.parentID);
+    parent.removeChild(parent.childNodes.item(0));
+  }
+}
+
+function doclink(id, name, targets) {
+  var elt = document.getElementById(id);
+
+  // If we already opened the box, then destroy it.
+  // (This case should never occur, but leave it in just in case.)
+  if (elt.childNodes.length > 1) {
+    elt.removeChild(elt.childNodes.item(0));
+  }
+  else {
+    // The outer box: relative + inline positioning.
+    var box1 = document.createElement("div");
+    box1.style.position = "relative";
+    box1.style.display = "inline";
+    box1.style.top = 0;
+    box1.style.left = 0;
+  
+    // A shadow for fun
+    var shadow = document.createElement("div");
+    shadow.style.position = "absolute";
+    shadow.style.left = "-1.3em";
+    shadow.style.top = "-1.3em";
+    shadow.style.background = "#404040";
+    
+    // The inner box: absolute positioning.
+    var box2 = document.createElement("div");
+    box2.style.position = "relative";
+    box2.style.border = "1px solid #a0a0a0";
+    box2.style.left = "-.2em";
+    box2.style.top = "-.2em";
+    box2.style.background = "white";
+    box2.style.padding = ".3em .4em .3em .4em";
+    box2.style.fontStyle = "normal";
+    box2.onmouseout=kill_doclink;
+    box2.parentID = id;
+
+    var links = "";
+    target_list = targets.split(",");
+    for (var i=0; i<target_list.length; i++) {
+        var target = target_list[i].split("=");
+        links += "<li><a href=\'" + target[1] + 
+               "\' style=\'text-decoration:none\'>" +
+               target[0] + "</a></li>";
+    }
+  
+    // Put it all together.
+    elt.insertBefore(box1, elt.childNodes.item(0));
+    //box1.appendChild(box2);
+    box1.appendChild(shadow);
+    shadow.appendChild(box2);
+    box2.innerHTML = "Which <b>"+name+"</b> do you want to see "+
+                     "documentation for?" +
+                     "<ul style=\'margin-bottom: 0;\'>" +
+                     links + "</ul>";
+  }
+}
+
 expandto(location.href);
 // -->
 </script>
@@ -544,12 +607,7 @@ class PythonSourceColorizer:
       - Unicode input is supported (including automatic detection
         of C{'coding:'} declarations).
 
-    Still to do:
-      - cross-referencing within the code..?
-    
-    
     """
-
     #: A look-up table that is used to determine which CSS class
     #: should be used to colorize a given token.  The following keys
     #: may be used:
@@ -612,7 +670,10 @@ class PythonSourceColorizer:
     #: add line numbers.
     ADD_LINE_NUMBERS = True
 
-    def __init__(self, module_filename, module_name):
+    ADD_TOOLTIPS = False
+
+    def __init__(self, module_filename, module_name,
+                 docindex=None, api_docs=None, url_func=None):
         """
         Create a new HTML colorizer for the specified module.
 
@@ -631,6 +692,19 @@ class PythonSourceColorizer:
         
         #: The dotted name of the module we're colorizing.
         self.module_name = module_name
+
+        self.docindex = docindex
+
+        #: A mapping from short names to lists of ValueDoc.
+        self.name_to_docs = {}
+        for api_doc in api_docs:
+            if (api_doc.canonical_name is not None and
+                url_func(api_doc) is not None):
+                name = api_doc.canonical_name[-1]
+                self.name_to_docs.setdefault(name,set()).add(api_doc)
+            
+        #: A function that maps APIDoc -> URL
+        self.url_func = url_func
 
         #: The index in C{text} of the last character of the last
         #: token we've processed.
@@ -668,6 +742,7 @@ class PythonSourceColorizer:
         #: on the previous logical line, or C{None} if the previous
         #: logical line was not a class or function definition.
         self.def_name = None
+
         
     def find_line_offsets(self):
         """
@@ -741,9 +816,6 @@ class PythonSourceColorizer:
         html += PYSRC_JAVASCRIPTS
 
         return html
-    
-        # Add header/footer and return
-        #return PYSRC_TEMPLATE % (self.module_name, html)
 
     def tokeneater(self, toktype, toktext, (srow,scol), (erow,ecol), line):
         """
@@ -776,6 +848,8 @@ class PythonSourceColorizer:
             self.handle_line(self.cur_line)
             self.cur_line = []
 
+    _next_uid = 0
+    
     def handle_line(self, line):
         """
         Render a single logical line from the module, and write the
@@ -797,18 +871,21 @@ class PythonSourceColorizer:
         ended_def_blocks = 0
 
         # The html output.
-        s = '<span class="pysrc-toggle"> </span>'
         if self.ADD_LINE_NUMBERS:
-            s = self.lineno_to_html() + s
+            s = self.lineno_to_html()
             self.lineno += 1
-        s += '<span class="py-line">'
+        else:
+            s = ''
+        s += '  <span class="py-line">'
 
         # Loop through each token, and colorize it appropriately.
         for i, (toktype, toktext) in enumerate(line):
             # For each token, determine its css class and whether it
-            # should link to an href.
+            # should link to a url.
             css_class = None
-            href = None
+            url = None
+            tooltip = None
+            onclick = uid = None # these 3 are used together.
 
             # Is this token the class name in a class definition?  If
             # so, then make it a link back into the API docs.
@@ -818,7 +895,7 @@ class PythonSourceColorizer:
                 def_name = toktext
                 if None not in self.context:
                     cls_name = '.'.join(self.context+[def_name])
-                    href = self.name2href(cls_name)
+                    url = self.name2url(cls_name)
                     s = self.mark_def(s, cls_name)
 
             # Is this token the function name in a function def?  If
@@ -830,7 +907,7 @@ class PythonSourceColorizer:
                 if None not in self.context:
                     cls_name = '.'.join(self.context)
                     func_name = '.'.join(self.context+[def_name])
-                    href = self.name2href(cls_name, def_name)
+                    url = self.name2url(cls_name, def_name)
                     s = self.mark_def(s, func_name)
 
             # For each indent, update the indents list (which we use
@@ -882,7 +959,31 @@ class PythonSourceColorizer:
                   ((i>0 and line[i-1][1]=='@') or
                    (i>1 and line[i-1][0]==None and line[i-2][1] == '@'))):
                 css_class = self.CSS_CLASSES['DECORATOR']
-                
+
+            # If it's a name, try to link it.
+            elif toktype == token.NAME:
+                css_class = self.CSS_CLASSES['NAME']
+                # If we have a variable named `toktext` in the current
+                # context, then link to that.  Note that if we're inside
+                # a function, then that function is our context, not
+                # the namespace that contains it. [xx] this isn't always
+                # the right thing to do.
+                if None not in self.context:
+                    container = DottedName(self.module_name, *self.context)
+                    doc = self.docindex.get_vardoc(container+toktext)
+                    if doc is not None:
+                        url = self.url_func(doc)
+                # Otherwise, check the name_to_docs index to see what
+                # else this name might refer to.
+                if url is None:
+                    docs = sorted(self.name_to_docs.get(toktext, []))
+                    if docs:
+                        if len(docs) == 1:
+                            url = self.url_func(docs[0])
+                            tooltip='%s' % docs[0].canonical_name
+                        else:
+                            uid, onclick = self.doclink(toktext, docs)
+                            tooltip='*.%s' % toktext
 
             # For all other tokens, look up the CSS class to use
             # based on the token's type.
@@ -905,19 +1006,31 @@ class PythonSourceColorizer:
                 if toktext in (')',']','}'): in_param_default -= 1
                 if toktext == ',' and in_param_default == 1:
                     in_param_default = 0
-
                 
             # Write this token, with appropriate colorization.
-            if href: s += '<a href="%s" class="%s">' % (href, css_class)
-            elif css_class: s += '<span class="%s">' % css_class
+            if tooltip and self.ADD_TOOLTIPS:
+                tooltip_html = ' title="%s"' % tooltip
+            else: tooltip_html = ''
+            if css_class: css_class_html = ' class="%s"' % css_class
+            else: css_class_html = ''
+            if onclick:
+                s += ('<span id="%s"%s><a%s%s href="#" onclick="%s">' %
+                      (uid, css_class_html, tooltip_html,
+                       css_class_html, onclick))
+            elif url:
+                s += ('<a%s%s href="%s">' %
+                      (tooltip_html, css_class_html, url))
+            elif css_class_html or tooltip_html:
+                s += '<span%s%s>' % (tooltip_html, css_class_html)
             if i == len(line)-1:
                 s += ' </span>' # Closes <span class="py-line">
                 s += cgi.escape(toktext)
             else:
                 s += self.add_line_numbers(cgi.escape(toktext), css_class)
-                
-            if href: s += '</a>'
-            elif css_class: s += '</span>'
+
+            if onclick: s += "</a></span>"
+            if url: s += '</a>'
+            elif css_class_html or tooltip_html: s += '</span>'
 
         if self.ADD_DEF_BLOCKS:
             for i in range(ended_def_blocks):
@@ -929,7 +1042,7 @@ class PythonSourceColorizer:
         if def_name and None not in self.context:
             self.out('</div>')
 
-        # Add divs if we're starting a def block.
+        # Add div's if we're starting a def block.
         if (self.ADD_DEF_BLOCKS and def_name and
             (line[-2][1] == ':') and None not in self.context):
             indentation = (''.join(self.indents)+'    ').replace(' ', '&nbsp;')
@@ -940,13 +1053,56 @@ class PythonSourceColorizer:
             
         self.def_name = def_name
 
+    def doclink(self, name, docs):
+        uid = 'link-%s' % self._next_uid
+        self._next_uid += 1
+        if None not in self.context:
+            container = DottedName(self.module_name, *self.context)
+        else:
+            container = None
+        targets = ['%s=%s' % (self.doc_descr(d,container), self.url_func(d))
+                   for d in docs]
+        onclick = ("doclink('%s', '%s', '%s'); return false;" %
+                   (uid, name, ','.join(targets)))
+        return uid, onclick
+
+    def doc_descr(self, doc, context):
+        name = doc.canonical_name.contextualize(context)
+        descr = '%s %s' % (self.doc_kind(doc), name)
+        if isinstance(doc, RoutineDoc):
+            descr += '()'
+        return descr
+
+    # [XX] copied streight from html.py; this should be consolidated,
+    # probably into apidoc.
+    def doc_kind(self, doc):
+        if isinstance(doc, ModuleDoc) and doc.is_package == True:
+            return 'Package'
+        elif (isinstance(doc, ModuleDoc) and
+              doc.canonical_name[0].startswith('script')):
+            return 'Script'
+        elif isinstance(doc, ModuleDoc):
+            return 'Module'
+        elif isinstance(doc, ClassDoc):
+            return 'Class'
+        elif isinstance(doc, ClassMethodDoc):
+            return 'Class Method'
+        elif isinstance(doc, StaticMethodDoc):
+            return 'Static Method'
+        elif isinstance(doc, RoutineDoc):
+            if isinstance(self.docindex.container(doc), ClassDoc):
+                return 'Method'
+            else:
+                return 'Function'
+        else:
+            return 'Variable'
+
     def mark_def(self, s, name):
         replacement = ('<a name="%s"></a><div id="%s-def">\\1'
                        '<a class="pysrc-toggle" href="#" id="%s-toggle" '
                        'onclick="toggle(\'%s\'); return false;">-</a>\\2' %
                        (name, name, name, name))
-        return re.sub('(.*<span class="pysrc-toggle">) (</span>.*)\Z',
-                      replacement, s)
+        return re.sub('(.*) (<span class="py-line">.*)\Z', replacement, s)
                     
     def is_docstring(self, line, i):
         if line[i][0] != token.STRING: return False
@@ -967,8 +1123,7 @@ class PythonSourceColorizer:
             result += '\n'
             if self.ADD_LINE_NUMBERS:
                 result += self.lineno_to_html()
-            result += '<span class="pysrc-toggle"> </span>'
-            result += '<span class="py-line">'
+            result += '  <span class="py-line">'
             if css_class: result += '<span class="%s">' % css_class
             start = end
             end = s.find('\n', end)+1
@@ -976,7 +1131,7 @@ class PythonSourceColorizer:
         result += s[start:]
         return result
 
-    def name2href(self, class_name, func_name=None):
+    def name2url(self, class_name, func_name=None):
         if class_name:
             class_name = '%s.%s' % (self.module_name, class_name)
             if func_name:

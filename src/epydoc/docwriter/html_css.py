@@ -119,8 +119,7 @@ comes before them. */
 .continue          { border-top: 0; }
 
 /* Links */ 
-a.navbar:link      { text-decoration: none; }  
-a.navbar:visited   { text-decoration: none; }  
+a.navbar           { text-decoration: none; }  
 
 /* Source Code Listings */
 pre.py-src         { border: 2px solid black; }
@@ -128,12 +127,11 @@ div.highlight-hdr  { border-top: 2px solid black;
                      border-bottom: 1px solid black; }
 div.highlight      { border-bottom: 2px solid black; }
 a.pysrc-toggle     { text-decoration: none; }
-span.pysrc-toggle  { font-size: 80%; font-style: normal;
-                     padding-left: .4em; }
 .py-line           { border-left: 2px solid black; margin-left: .2em;
                      padding-left: .4em; }
 .lineno            { font-style: italic; font-size: 90%;
                      padding-left: .5em; }
+a.py-name          { text-decoration: none; }
 
 /* For Graphs */
 .graph-without-title { border: none; }
@@ -157,7 +155,6 @@ dt                 { font-weight: bold; }
 h2 span.codelink { font-size: 58%; font-weight: normal; }
 span.codelink { font-size: 85%; font-weight; normal; }
 """
-#(* (/ 1. 1.2) .7)
 
 # Black on white, with blue highlights.  This is similar to how
 # javadoc looks.
@@ -202,6 +199,8 @@ h3.prop-details     { background: transparent; color: #000000; }
 .py-keyword        { background: transparent; color: #600000; }
 .py-output         { background: transparent; color: #404040; }
 .py-name           { background: transparent; color: #000050; }
+.py-name:link      { background: transparent; color: #000050; }
+.py-name:visited   { background: transparent; color: #000050; }
 .py-number         { background: transparent; color: #005000; }
 .py-def-name       { background: transparent; color: #000060;
                      font-weight: bold; }
@@ -297,6 +296,8 @@ h3.prop-details     { background: transparent; color: #000000; }
 .py-keyword        { background: transparent; color: #600000; }
 .py-output         { background: transparent; color: #404040; }
 .py-name           { background: transparent; color: #000050; }
+.py-name:link      { background: transparent; color: #000050; }
+.py-name:visited   { background: transparent; color: #000050; }
 .py-number         { background: transparent; color: #005000; }
 .py-def-name       { background: transparent; color: #000060;
                      font-weight: bold; }
@@ -391,6 +392,8 @@ h3.prop-details     { background: transparent; color: #000000; }
 .py-keyword        { background: transparent; color: #800000; }
 .py-output         { background: transparent; color: #484848; }
 .py-name           { background: transparent; color: #000050; }
+.py-name:link      { background: transparent; color: #000050; }
+.py-name:visited   { background: transparent; color: #000050; }
 .py-number         { background: transparent; color: #005000; }
 .py-def-name       { background: transparent; color: #000060;
                      font-weight: bold; }

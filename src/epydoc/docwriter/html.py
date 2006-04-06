@@ -652,7 +652,8 @@ class HTMLWriter:
             self.href(doc, label='%s %s' % (self.doc_kind(doc), name)))
         out('<div class="py-src">\n')
         out('<pre class="py-src">\n')
-        out(PythonSourceColorizer(filename, name).colorize())
+        out(PythonSourceColorizer(filename, name, self.docindex,
+                                  self.indexed_docs, self.url).colorize())
         out('</pre>\n</div>\n<br />\n')
 
         # Footer
