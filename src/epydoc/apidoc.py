@@ -1468,6 +1468,8 @@ class DocIndex:
            L{read_profiling_info()}.
            @type: C{list} of L{RoutineDoc}"""
 
+        self._funcid_to_doc = {}
+
     #////////////////////////////////////////////////////////////
     # Lookup methods
     #////////////////////////////////////////////////////////////
@@ -1649,25 +1651,24 @@ class DocIndex:
         # The Stat object encodes functions using `funcid`s, or
         # tuples of (filename, lineno, funcname).  Create a mapping
         # from these `funcid`s to `RoutineDoc`s.
-        funcid_to_doc = self._get_funcid_to_doc_mapping(profile_stats)
+        self._update_funcid_to_doc(profile_stats)
         
         for callee, (cc, nc, tt, ct, callers) in profile_stats.stats.items():
-            callee = funcid_to_doc.get(callee)
+            callee = self._funcid_to_doc.get(callee)
             if callee is None: continue
             for caller in callers:
-                caller = funcid_to_doc.get(caller)
+                caller = self._funcid_to_doc.get(caller)
                 if caller is None: continue
                 self.callers.setdefault(callee, []).append(caller)
                 self.callees.setdefault(caller, []).append(callee)
 
-    def _get_funcid_to_doc_mapping(self, profile_stats):
+    def _update_funcid_to_doc(self, profile_stats):
         """
-        Return a dictionary mapping from C{pstat.Stat} funciton ids to
+        Update the dictionary mapping from C{pstat.Stat} funciton ids to
         C{RoutineDoc}s.  C{pstat.Stat} function ids are tuples of
         C{(filename, lineno, funcname)}.
         """
         # Maps (filename, lineno, funcname) -> RoutineDoc
-        funcid_to_doc = {} 
         for val_doc in self.reachable_valdocs():
             # We only care about routines.
             if not isinstance(val_doc, RoutineDoc): continue
@@ -1681,9 +1682,7 @@ class DocIndex:
             # Look up the stat_func_id
             funcid = (filename, val_doc.lineno, val_doc.canonical_name[-1])
             if funcid in profile_stats.stats:
-                funcid_to_doc[funcid] = val_doc
-
-        return funcid_to_doc
+                self._funcid_to_doc[funcid] = val_doc
 
 ######################################################################
 ## Pretty Printing
