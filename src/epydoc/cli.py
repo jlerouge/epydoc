@@ -268,7 +268,7 @@ def parse_arguments():
         # we don't have any profiling info to base them on).
         if graph_type == 'all':
             options.graphs = GRAPH_TYPES
-            if not options.pstat_files: graph_types.remove('callgraph')
+            if not options.pstat_files: option.graphs.remove('callgraph')
             break
         elif graph_type not in GRAPH_TYPES:
             optparser.error("Invalid graph type %s." % graph_type)
