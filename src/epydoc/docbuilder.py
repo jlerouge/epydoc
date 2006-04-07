@@ -239,13 +239,9 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
                 doc_pairs.append(_get_docs_from_module_file(
                     item, introspect, parse, progress_estimator))
             elif is_package_dir(item):
-                if add_submodules:
-                    doc_pairs += _get_docs_from_package_dir(
-                        item, introspect, parse, progress_estimator)
-                else:
-                    item = os.path.join(item, '__init__')
-                    doc_pairs.append(_get_docs_from_module_file(
-                        item, introspect, parse, progress_estimator))
+                pkgfile = os.path.join(item, '__init__')
+                doc_pairs.append(_get_docs_from_module_file(
+                    pkgfile, introspect, parse, progress_estimator))
             elif os.path.isfile(item):
                 doc_pairs.append(_get_docs_from_pyscript(
                     item, introspect, parse, progress_estimator))
@@ -266,7 +262,15 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
         else:
             doc_pairs.append(_get_docs_from_pyobject(
                 item, introspect, parse, progress_estimator))
-            
+
+        # This will only have an effect if doc_pairs[-1] contains a
+        # package's docs.  The 'not is_module_file(item)' prevents
+        # us from adding subdirectories if they explicitly specify
+        # a package's __init__.py file.
+        if add_submodules and not is_module_file(item):
+            doc_pairs += _get_docs_from_submodules(
+                item, doc_pairs[-1], introspect, parse, progress_estimator)
+
     log.end_progress()
     return doc_pairs
 
@@ -407,20 +411,17 @@ def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
     # Return the docs we found.
     return (introspect_doc, parse_doc)
 
-def _get_docs_from_package_dir(package_dir, introspect, parse,
-                               progress_estimator, parent_docs=(None,None)):
-    pkg_dir = os.path.normpath(os.path.abspath(package_dir))
-    pkg_file = os.path.join(pkg_dir, '__init__')
-    pkg_docs = _get_docs_from_module_file(
-        pkg_file, introspect, parse, progress_estimator, parent_docs)
-
+def _get_docs_from_submodules(item, pkg_docs, introspect, parse,
+                              progress_estimator):
     # Extract the package's __path__.
-    if pkg_docs == (None, None):
-        return []
-    elif pkg_docs[0] is not None:
+    if isinstance(pkg_docs[0], ModuleDoc) and pkg_docs[0].is_package:
         pkg_path = pkg_docs[0].path
-    else:
+        package_dir = os.path.split(pkg_docs[0].filename)[0]
+    elif isinstance(pkg_docs[1], ModuleDoc) and pkg_docs[1].is_package:
         pkg_path = pkg_docs[1].path
+        package_dir = os.path.split(pkg_docs[1].filename)[0]
+    else:
+        return []
 
     module_filenames = {}
     subpackage_dirs = set()
@@ -438,9 +439,8 @@ def _get_docs_from_package_dir(package_dir, introspect, parse,
                     subpackage_dirs.add(filename)
 
     # Update our estimate of the number of modules in this package.
-    progress_estimator.revise_estimate(package_dir,
-                                             module_filenames.items(),
-                                             subpackage_dirs)
+    progress_estimator.revise_estimate(item, module_filenames.items(),
+                                       subpackage_dirs)
 
     docs = [pkg_docs]
     for module_filename in module_filenames.values():
@@ -448,8 +448,11 @@ def _get_docs_from_package_dir(package_dir, introspect, parse,
             module_filename, introspect, parse, progress_estimator, pkg_docs)
         docs.append(d)
     for subpackage_dir in subpackage_dirs:
-        docs += _get_docs_from_package_dir(
-            subpackage_dir, introspect, parse, progress_estimator, pkg_docs)
+        subpackage_file = os.path.join(subpackage_dir, '__init__')
+        docs.append(_get_docs_from_module_file(
+            subpackage_file, introspect, parse, progress_estimator, pkg_docs))
+        docs += _get_docs_from_submodules(
+            subpackage_dir, docs[-1], introspect, parse, progress_estimator)
     return docs
 
 def _report_errors(name, introspect_doc, parse_doc,
