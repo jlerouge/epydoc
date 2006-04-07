@@ -207,7 +207,7 @@ class DotGraph:
 
     def render(self, language='gif'):
         """
-        Use the `dot` command to render this graph, using the output
+        Use the ``dot`` command to render this graph, using the output
         format `language`.  Return the result as a string, or `None`
         if the rendering failed.
         """
@@ -408,13 +408,13 @@ def import_graph(modules, docindex, linker, context=None, **options):
 
 def call_graph(api_docs, docindex, linker, context=None, **options):
     """
-    @param options:
-        - C{dir}: rankdir for the graph.  (default=LR)
-        - C{add_callers}: also include callers for any of the
-          routines in C{api_docs}.  (default=False)
-        - C{add_callees}: also include callees for any of the
-          routines in C{api_docs}.  (default=False)
-    @todo: Add an C{exclude} option?
+    :param options:
+        - `dir`: rankdir for the graph.  (default=LR)
+        - `add_callers`: also include callers for any of the
+          routines in `api_docs`.  (default=False)
+        - `add_callees`: also include callees for any of the
+          routines in `api_docs`.  (default=False)
+    :todo: Add an `exclude` option?
     """
     if docindex.callers is None:
         log.warning("No profiling information for call graph!")
@@ -523,7 +523,7 @@ SELECTED_BG = '#ffd0d0'
 
 def specialize_valdoc_node(node, val_doc, context, url):
     """
-    Update the style attributes of C{node} to reflext its type
+    Update the style attributes of `node` to reflext its type
     and context.
     """
     dot_version = get_dot_version()
@@ -537,7 +537,9 @@ def specialize_valdoc_node(node, val_doc, context, url):
         node['shape'] = 'plaintext'
         if val_doc == context: color = SELECTED_BG
         else: color = MODULE_BG
+        node['tooltip'] = node['label']
         node['html_label'] = MODULE_NODE_HTML % (color, color, node['label'])
+        node['width'] = node['height'] = 0
 
     elif isinstance(val_doc, RoutineDoc):
         node['shape'] = 'box'
@@ -545,6 +547,7 @@ def specialize_valdoc_node(node, val_doc, context, url):
         node['width'] = 0
         node['height'] = 0
         node['label'] = '%s()' % node['label']
+        node['tooltip'] = node['label']
         if val_doc == context:
             node['fillcolor'] = SELECTED_BG
             node['style'] = 'filled,rounded'
@@ -553,6 +556,7 @@ def specialize_valdoc_node(node, val_doc, context, url):
         node['shape'] = 'box' 
         node['width'] = 0
         node['height'] = 0
+        node['tooltip'] = node['label']
         if val_doc == context:
             node['fillcolor'] = SELECTED_BG
             node['style'] = 'filled'
