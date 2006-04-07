@@ -70,6 +70,8 @@ import ConfigParser
 
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
 GRAPH_TYPES = ('classtree', 'callgraph')
+ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
+DEFAULT_DOCFORMAT = 'epytext'
 
 ######################################################################
 #{ Argument & Config File Parsing
@@ -104,7 +106,7 @@ def parse_arguments():
         help="Write PDF output.")
     action_group.add_option(                               # --check
         "--check", action="store_const", dest="action", const="check",
-        help="Check completeness of docs. (not implemented yet)")
+        help="Check completeness of docs.")
 
     # Add options -- Options
     options_group.add_option(                               # --output
@@ -118,7 +120,7 @@ def parse_arguments():
     options_group.add_option(                               # --output
         "--docformat", dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
-        "to \"%default\".")
+        "to \"%s\"." % DEFAULT_DOCFORMAT)
     options_group.add_option(                               # --css
         "--css", dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
@@ -193,7 +195,7 @@ def parse_arguments():
               "Graphs are generated using the Graphviz dot executable.  "
               "If this executable is not on the path, then use --dotpath "
               "to specify its location.  This option may be repeated to "
-              "include multiple graph types in the output.  GRAPHTYPE"
+              "include multiple graph types in the output.  GRAPHTYPE "
               "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
     options_group.add_option(
         '--separate-classes', action='store_true',
@@ -219,7 +221,7 @@ def parse_arguments():
 
     # Set the option parser's defaults.
     optparser.set_defaults(action="html", show_frames=True,
-                           docformat='epytext', 
+                           docformat=DEFAULT_DOCFORMAT, 
                            show_private=True, show_imports=False,
                            inheritance="listed",
                            verbose=0, quiet=0,
@@ -299,12 +301,17 @@ def parse_configfiles(configfiles, options, names):
         if optname in ('modules', 'objects', 'values',
                        'module', 'object', 'value'):
             names.extend(val.replace(',', ' ').split())
-        elif optname in ('output', 'target'):
+        elif optname == 'output':
+            if optname not in ACTIONS:
+                raise ValueError('"%s" expected one of: %s' %
+                                 (optname, ', '.join(ACTIONS)))
+            options.action = action
+        elif optname == 'target':
             options.target = val
         elif optname == 'inheritance':
             if val.lower() not in INHERITANCE_STYLES:
-                raise ValueError('"inheritance" expected one of: %s.' %
-                                 ', '.join(INHERITANCE_STYLES))
+                raise ValueError('"%s" expected one of: %s.' %
+                                 (optname, ', '.join(INHERITANCE_STYLES)))
             options.inerhitance = val.lower()
         elif optname == 'docformat':
             options.docformat = val
@@ -330,7 +337,7 @@ def parse_configfiles(configfiles, options, names):
             try:
                 options.verbosity = int(val)
             except ValueError:
-                raise ValueError('"verbosity" expected an int')
+                raise ValueError('"%s" expected an int' % optname)
         elif optname == 'parse':
             options.parse = _str_to_bool(val, optname)
         elif optname == 'introspect':
@@ -341,8 +348,8 @@ def parse_configfiles(configfiles, options, names):
             graphtypes = val.replace(',', '').split()
             for graphtype in graphtypes:
                 if graphtype not in GRAPH_TYPES:
-                    raise ValueError('"graph" expected one of: %s.' %
-                                     ', '.join(GRAPH_TYPES))
+                    raise ValueError('"%s" expected one of: %s.' %
+                                     (optname, ', '.join(GRAPH_TYPES)))
             options.graphs.extend(graphtypes)
         elif optname in ('separate-classes', 'separate_classes'):
             options.list_classes_separately = _str_to_bool(val, optname)
@@ -392,6 +399,7 @@ def main(options, names):
         elif options.action == 'dvi': stages += [60,30]
         elif options.action == 'ps': stages += [60,40]
         elif options.action == 'pdf': stages += [60,50]
+        elif options.action == 'check': stages += [10]
         else: raise ValueError, '%r not supported' % options.action
         if options.parse and not options.introspect:
             del stages[1] # no merging
@@ -443,6 +451,8 @@ def main(options, names):
         write_latex(docindex, options, options.action)
     elif options.action == 'text':
         write_text(docindex, options)
+    elif options.action == 'check':
+        check_docs(docindex, options)
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
@@ -564,6 +574,10 @@ def write_text(docindex, options):
     if isinstance(s, unicode):
         s = s.encode('ascii', 'backslashreplace')
     print s
+
+def check_docs(docindex, options):
+    from epydoc.checker import DocChecker
+    DocChecker(docindex).check()
                 
 def cli():
     # Parse command-line arguments.
