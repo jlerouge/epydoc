@@ -659,7 +659,9 @@ def packagetree_directive(name, arguments, options, content, lineno,
     """
     return dotgraph(_construct_packagetree, arguments, options)
 packagetree_directive.arguments = (0, 1, True)
-packagetree_directive.options = {'dir': _dir_option}
+packagetree_directive.options = {
+  'dir': _dir_option,
+  'style': lambda a:directives.choice(a.lower(), ('uml', 'tree'))}
 packagetree_directive.content = False
 directives.register_directive('packagetree', packagetree_directive)
 
