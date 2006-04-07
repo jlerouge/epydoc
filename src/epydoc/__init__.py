@@ -18,36 +18,36 @@ to document, and produce API documentation using the following steps:
    that are related to them (such as the values defined by a module).
    This can be done via introspection, parsing, or both:
 
-   * Use introspection to examine the objects directly.
+   * *Introspection* imports the objects, and examines them directly
+     using Python's introspection mechanisms.
   
-   * Parse the Python source files that define the objects,
-     and extract information from those files.
+   * *Parsing* reads the Python source files that define the objects,
+     and extracts information from those files.
 
 2. Combine and process that information.
 
-   * Merge the information obtained from introspection & parsing
-     each object into a single structure.  (This step is skipped if
-     information was extracted from only introspection or only
-     parsing.)
+   * **Merging**: Merge the information obtained from introspection &
+     parsing each object into a single structure.
      
-   * Replace any 'pointers' that were created for imported
-     variables with the documentation that they point to (if it's
-     available).
+   * **Linking**: Replace any \"pointers\" that were created for
+     imported variables with the documentation that they point to.
      
-   * Assign unique 'canonical names' to each of the specified
-     objects, and any related objects.
+   * **Naming**: Assign unique *canonical names* to each of the
+     specified objects, and any related objects.
      
-   * Parse the docstrings of each of the specified objects, and any
-     related objects.
+   * **Docstrings**: Parse the docstrings of each of the specified
+     objects.
      
-   * Add variables to classes for any values that they inherit from
-     their base classes.
+   * **Inheritance**: Add variables to classes for any values that
+     they inherit from their base classes.
 
 3. Generate output.  Output can be generated in a variety of formats:
 
-   * An HTML webpage
+   * An HTML webpage.
   
-   * other formats (under construction)
+   * A LaTeX document (which can be rendered as a PDF file)
+
+   * A plaintext description.
 
 .. digraph:: Overview of epydoc's architecture
    :caption: The boxes represent steps in epydoc's processing chain.
@@ -113,9 +113,24 @@ to document, and produce API documentation using the following steps:
                href="<docbuilder.build_doc_index>"]
      l1 -> l2 [label=" epydoc.\\l cli()", href="<cli>"]
    }
-   { rank=same; l1 l3 introspect }
+   { rank=same; l1 l3 input }
    { rank=same; l2 write_html }
    { rank=same; l4 output }
+
+Package Organization
+====================
+The epydoc package contains the following subpackages and modules:
+
+.. packagetree::
+   :style: UML
+
+The user interfaces are provided by the `gui` and `cli` modules.
+The `apidoc` module defines the basic data types used to record
+information about Python objects.  The programmatic interface to
+epydoc is provided by `docbuilder`.  Docstring markup parsing is
+handled by the `markup` package, and output generation is handled by
+the `docwriter` package.  See the submodule list for more
+information about the submodules and subpackages.
 
 :group User Interface: gui, cli
 :group Basic Data Types: apidoc
