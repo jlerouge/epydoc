@@ -19,7 +19,7 @@ import epydoc.docstringparser
 import time, epydoc, epydoc.markup
 from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_colorize import PythonSourceColorizer
-from epydoc.docwriter.html_colorize import colorize_re
+from epydoc.docwriter import html_colorize
 from epydoc.docwriter.html_css import STYLESHEETS
 from epydoc.docwriter.html_help import HTML_HELP
 from epydoc.docwriter.dotgraph import *
@@ -1216,6 +1216,7 @@ class HTMLWriter:
         print >> jsfile, self.SET_FRAME_JS
         print >> jsfile, self.HIDE_PRIVATE_JS
         print >> jsfile, self.TOGGLE_CALLGRAPH_JS
+        print >> jsfile, html_colorize.PYSRC_JAVASCRIPTS
         jsfile.close()
 
     #: A javascript that is used to show or hide the API documentation
@@ -1338,7 +1339,7 @@ class HTMLWriter:
                 'class="%s"/>\n' % (cmapx, uid, uid, uid, css))
     
     def render_callgraph(self, callgraph):
-        graph_html = self.render_graph(callgraph, css='callgraph')
+        graph_html = self.render_graph(callgraph, css='graph-with-title')
         if graph_html == '': return ''
         return ('<div style="display:none" id="%s-div"><center>\n'
                 '<table border="0" cellpadding="0" cellspacing="0">\n'

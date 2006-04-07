@@ -401,8 +401,6 @@ Goals:
 
 #: Javascript code for the PythonSourceColorizer
 PYSRC_JAVASCRIPTS = '''\
-<script type="text/javascript">
-<!--
 function expand(id) {
   var elt = document.getElementById(id+"-expanded");
   if (elt) elt.style.display = "block";
@@ -430,13 +428,14 @@ function collapse(id) {
     elt.style.display = "block";
     
     var indent = elt.indent;
-    var linenumpadding = elt.linenumpadding;
-    var s = "";
-    if (linenumpadding != "")
-      s = "<span class=\'lineno\'>" + linenumpadding + "</span>"
-    s = s + "  <span class=\'py-line\'>" + indent +
-            "<a href=\'#\' onclick=\'expand(\\"" + id +
-            "\\");return false\'>...</a></span><br />";
+    var pad = elt.pad;
+    var s = "<span class=\'lineno\'>";
+    for (var i=0; i<pad.length; i++) { s += "&nbsp;" }
+    s += "</span>";
+    s += "&nbsp;&nbsp;<span class=\'py-line\'>";
+    for (var i=0; i<indent.length; i++) { s += "&nbsp;" }
+    s += "<a href=\'#\' onclick=\'expand(\\"" + id;
+    s += "\\");return false\'>...</a></span><br />";
     elt.innerHTML = s;
   }
 }
@@ -560,7 +559,11 @@ function doclink(id, name, targets) {
                      links + "</ul>";
   }
 }
+'''
 
+PYSRC_EXPANDTO_JAVASCRIPT = '''\
+<script type="text/javascript">
+<!--
 expandto(location.href);
 // -->
 </script>
@@ -651,7 +654,7 @@ class PythonSourceColorizer:
     #: ellipsis marker in the collapsed version.
     START_DEF_BLOCK = (
         '<div id="%s-collapsed" style="display:none;" '
-        'linenumpadding="%s" indent="%s"></div>'
+        'pad="%s" indent="%s"></div>'
         '<div id="%s-expanded">')
 
     #: HTML code for the end of a collapsable function or class
@@ -814,8 +817,8 @@ class PythonSourceColorizer:
             coding = 'iso-8859-1'
             html = html.decode(coding).encode('ascii', 'xmlcharrefreplace')
 
-        # Add on the javascripts.
-        html += PYSRC_JAVASCRIPTS
+        # Call expandto.
+        html += PYSRC_EXPANDTO_JAVASCRIPT
 
         return html
 
@@ -1038,6 +1041,9 @@ class PythonSourceColorizer:
             for i in range(ended_def_blocks):
                 self.out(self.END_DEF_BLOCK)
 
+        # Strip any empty <span>s.
+        s = re.sub(r'<span class="[\w+]"></span>', '', s)
+
         # Write the line.
         self.out(s)
 
@@ -1047,8 +1053,8 @@ class PythonSourceColorizer:
         # Add div's if we're starting a def block.
         if (self.ADD_DEF_BLOCKS and def_name and
             (line[-2][1] == ':') and None not in self.context):
-            indentation = (''.join(self.indents)+'    ').replace(' ', '&nbsp;')
-            linenum_padding = '&nbsp;'*self.linenum_size
+            indentation = (''.join(self.indents)+'    ').replace(' ', '+')
+            linenum_padding = '+'*self.linenum_size
             name='.'.join(self.context+[def_name])
             self.out(self.START_DEF_BLOCK % (name, linenum_padding,
                                              indentation, name))
