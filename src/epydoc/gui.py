@@ -24,6 +24,9 @@ Usage::
     -V, --version             Print the version of epydoc.
     -h, -?, --help, --usage   Display this usage message
     --debug                   Do not suppress error messages
+
+@todo: Use ini-style project files, rather than pickles (using the
+same format as the CLI).
 """
 __docformat__ = 'epytext en'
 
@@ -218,7 +221,9 @@ def document(options, cancel, done):
     epydoc.docstringparser.DEFAULT_DOCFORMAT = docformat
 
     try:
-        docindex = build_doc_index(options['modules'])
+        parse = options['introspect_or_parse'] in ('parse', 'both')
+        introspect = options['introspect_or_parse'] in ('introspect', 'both')
+        docindex = build_doc_index(options['modules'], parse, introspect)
         html_writer = HTMLWriter(docindex, **options)
         log.start_progress('Writing HTML docs to %r' % options['target'])
         html_writer.write(options['target'])
@@ -507,7 +512,7 @@ class EpydocGUI:
         div = Frame(oframe2, background=BG_COLOR, border=1, relief='sunk')
         div.pack(ipady=1, fill='x', padx=4, pady=2)
 
-        Label(oframe2, text="CSS Stylesheets", font='helvetica -16',
+        Label(oframe2, text="CSS Stylesheet", font='helvetica -16',
               **COLOR_CONFIG).pack(anchor='w')
         oframe6 = Frame(oframe2, background=BG_COLOR)
         oframe6.pack(fill='x')
@@ -611,6 +616,26 @@ class EpydocGUI:
         b.grid(row=row, column=3, sticky='w')
         row += 1
 
+        # Separater
+        Frame(oframe7, background=BG_COLOR).grid(row=row, column=1, pady=3)
+        row += 1
+
+        # --parse-only, --introspect-only
+        l = Label(oframe7, text="Get docs from:", **COLOR_CONFIG)
+        l.grid(row=row, column=0, sticky='e')
+        iop_var = self._introspect_or_parse_var = StringVar(self._root)
+        self._introspect_or_parse_var.set('both')
+        b = Radiobutton(oframe7, var=iop_var, text='Parsing',
+                        value='parse', **CBUTTON_CONFIG)
+        b.grid(row=row, column=1, sticky='w')
+        b = Radiobutton(oframe7, var=iop_var, text='Introspecting',
+                        value='introspect', **CBUTTON_CONFIG)
+        b.grid(row=row, column=2, sticky='w')
+        b = Radiobutton(oframe7, var=iop_var, text='Both',
+                        value='both', **CBUTTON_CONFIG)
+        b.grid(row=row, column=3, sticky='w')
+        row += 1
+
         #==================== oframe5 ====================
         # --help-file FILE
         row = 0
@@ -644,36 +669,38 @@ class EpydocGUI:
         # -c CSS, --css CSS
         # --private-css CSS
         row = 0
-        l = Label(oframe6, text="Public", **COLOR_CONFIG)
-        l.grid(row=row, column=0, sticky='e')
-        l = Label(oframe6, text="Private", **COLOR_CONFIG)
-        l.grid(row=row, column=1, sticky='w')
+        #l = Label(oframe6, text="Public", **COLOR_CONFIG)
+        #l.grid(row=row, column=0, sticky='e')
+        #l = Label(oframe6, text="Private", **COLOR_CONFIG)
+        #l.grid(row=row, column=1, sticky='w')
         row += 1
         css_var = self._css_var = StringVar(self._root)
         css_var.set('default')
-        private_css_var = self._private_css_var = StringVar(self._root)
-        private_css_var.set('default')
+        #private_css_var = self._private_css_var = StringVar(self._root)
+        #private_css_var.set('default')
         for (name, (sheet, descr)) in items:
             b = Radiobutton(oframe6, var=css_var, value=name, **CBUTTON_CONFIG)
             b.grid(row=row, column=0, sticky='e')
-            b = Radiobutton(oframe6, var=private_css_var, value=name, 
-                            text=name, **CBUTTON_CONFIG)
-            b.grid(row=row, column=1, sticky='w')
+            #b = Radiobutton(oframe6, var=private_css_var, value=name, 
+            #                text=name, **CBUTTON_CONFIG)
+            #b.grid(row=row, column=1, sticky='w')
             l = Label(oframe6, text=descr, **COLOR_CONFIG)
-            l.grid(row=row, column=2, sticky='w')
+            l.grid(row=row, column=1, sticky='w')
             row += 1
-        b = Radiobutton(oframe6, var=css_var, value='-other-', 
+        b = Radiobutton(oframe6, var=css_var, value='-other-',
                         **CBUTTON_CONFIG)
         b.grid(row=row, column=0, sticky='e')
-        b = Radiobutton(oframe6, text='Select File', var=private_css_var, 
-                        value='-other-', **CBUTTON_CONFIG)
-        b.grid(row=row, column=1, sticky='w')
+        #b = Radiobutton(oframe6, text='Select File', var=private_css_var, 
+        #                value='-other-', **CBUTTON_CONFIG)
+        #b.grid(row=row, column=1, sticky='w')
+        #l = Label(oframe6, text='Select File', **COLOR_CONFIG)
+        #l.grid(row=row, column=1, sticky='w')
         self._css_entry = Entry(oframe6, **ENTRY_CONFIG)
-        self._css_entry.grid(row=row, column=2, sticky='ew')
+        self._css_entry.grid(row=row, column=1, sticky='ew')
         self._css_browse = Button(oframe6, text="Browse",
                                   command=self._browse_css,
                                   **BUTTON_CONFIG) 
-        self._css_browse.grid(row=row, column=3, sticky='ew', padx=2)
+        self._css_browse.grid(row=row, column=2, sticky='ew', padx=2)
 
     def _init_bindings(self):
         self._root.bind('<Delete>', self._delete_module)
@@ -700,11 +727,11 @@ class EpydocGUI:
     def _messages_toggle(self, *e):
         if self._messages_visible:
             self._msgsframe.forget()
-            self._message_button['image'] = self._downImage
+            self._message_button['image'] = self._rightImage
             self._messages_visible = 0
         else:
             self._msgsframe.pack(fill='both', side='bottom', expand=1)
-            self._message_button['image'] = self._upImage
+            self._message_button['image'] = self._leftImage
             self._messages_visible = 1
 
     def _configure(self, event):
@@ -818,6 +845,7 @@ class EpydocGUI:
         options['prj_url'] = self._url_entry.get() or None
         options['docformat'] = self._docformat_var.get()
         options['inheritance'] = self._inheritance_var.get()
+        options['introspect_or_parse'] = self._introspect_or_parse_var.get()
         options['target'] = self._out_entry.get() or 'html'
         options['frames'] = self._frames_var.get()
         options['private'] = self._private_var.get()
@@ -830,10 +858,10 @@ class EpydocGUI:
             options['css'] = self._css_entry.get() or 'default'
         else:
             options['css'] = self._css_var.get() or 'default'
-        if self._private_css_var.get() == '-other-':
-            options['private_css'] = self._css_entry.get() or 'default'
-        else:
-            options['private_css'] = self._private_css_var.get() or 'default'
+        #if self._private_css_var.get() == '-other-':
+        #    options['private_css'] = self._css_entry.get() or 'default'
+        #else:
+        #    options['private_css'] = self._private_css_var.get() or 'default'
         return options
     
     def _go(self, *e):
@@ -884,10 +912,13 @@ class EpydocGUI:
             elif level == 'uline':
                 self._messages.insert('end', data, 'uline header')
             elif level >= log.ERROR:
+                data= data.rstrip()+'\n\n'
                 self._messages.insert('end', data, 'guierror')
             elif level >= log.DOCSTRING_WARNING:
+                data= data.rstrip()+'\n\n'
                 self._messages.insert('end', data, 'warning')
             elif log >= log.INFO:
+                data= data.rstrip()+'\n\n'
                 self._messages.insert('end', data, 'message')
 #                 if data == '\n':
 #                     if self._last_tag != 'header2':
@@ -945,6 +976,7 @@ class EpydocGUI:
         self._url_entry.delete(0, 'end')
         self._docformat_var.set('epytext')
         self._inheritance_var.set('grouped')
+        self._introspect_or_parse_var.set('both')
         self._out_entry.delete(0, 'end')
         self._module_entry.delete(0, 'end')
         self._css_entry.delete(0, 'end')
@@ -953,7 +985,7 @@ class EpydocGUI:
         self._private_var.set(1)
         self._imports_var.set(0)
         self._css_var.set('default')
-        self._private_css_var.set('default')
+        #self._private_css_var.set('default')
         self._help_var.set('default')
         self._filename = None
         self._init_dir = None
@@ -990,6 +1022,8 @@ class EpydocGUI:
 
             self._docformat_var.set(opts.get('docformat', 'epytext'))
             self._inheritance_var.set(opts.get('inheritance', 'grouped'))
+            self._introspect_or_parse_var.set(
+                opts.get('introspect_or_parse', 'both'))
 
             self._help_entry.delete(0, 'end')
             if opts.get('help') is None:
@@ -1012,11 +1046,11 @@ class EpydocGUI:
                 self._css_var.set('-other-')
                 self._css_entry.insert(0, opts.get('css', 'default'))
 
-            if opts.get('private_css', 'default') in STYLESHEETS.keys():
-                self._private_css_var.set(opts.get('private_css', 'default'))
-            else:
-                self._private_css_var.set('-other-')
-                self._css_entry.insert(0, opts.get('private_css', 'default'))
+            #if opts.get('private_css', 'default') in STYLESHEETS.keys():
+            #    self._private_css_var.set(opts.get('private_css', 'default'))
+            #else:
+            #    self._private_css_var.set('-other-')
+            #    self._css_entry.insert(0, opts.get('private_css', 'default'))
                                                    
         except Exception, e:
             log.error('Error opening %s: %s' % (prjfile, e))
