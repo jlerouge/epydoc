@@ -670,7 +670,9 @@ class PythonSourceColorizer:
     #: add line numbers.
     ADD_LINE_NUMBERS = True
 
-    ADD_TOOLTIPS = False
+    #: A configuration constant, used to determine whether or not to
+    #: add tooltips for linked names.
+    ADD_TOOLTIPS = True
 
     def __init__(self, module_filename, module_name,
                  docindex=None, api_docs=None, url_func=None):
@@ -978,12 +980,12 @@ class PythonSourceColorizer:
                 if url is None:
                     docs = sorted(self.name_to_docs.get(toktext, []))
                     if docs:
+                        tooltip='\n'.join(['%s'%d.canonical_name
+                                           for d in docs])
                         if len(docs) == 1:
                             url = self.url_func(docs[0])
-                            tooltip='%s' % docs[0].canonical_name
                         else:
                             uid, onclick = self.doclink(toktext, docs)
-                            tooltip='*.%s' % toktext
 
             # For all other tokens, look up the CSS class to use
             # based on the token's type.
