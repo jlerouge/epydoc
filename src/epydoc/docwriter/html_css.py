@@ -166,7 +166,7 @@ body               { background: #ffffff; color: #000000; }
 table.summary, table.details, table.index
                    { background: #e8f0f8; color: #000000; } 
 tr.summary, tr.details, tr.index
-                   { background: #70b0f0; color: #000000; } 
+                   { background: #70b0ff; color: #000000; } 
 th.group           { background: #c0e0f8; color: #000000; } 
 
 /* Details Sections */
