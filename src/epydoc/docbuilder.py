@@ -736,7 +736,7 @@ def _merge_posargs_and_defaults(introspect_doc, parse_doc, path):
 
     # If they are incompatible, then check the precedence.
     elif introspect_doc.posargs != parse_doc.posargs:
-        log.info("Warning: Not merging the parsed & introspected arg "
+        log.info("Not merging the parsed & introspected arg "
                  "lists for %s, since they don't match (%s vs %s)"
                   % (path, introspect_doc.posargs, parse_doc.posargs))
         if (MERGE_PRECEDENCE.get('posargs', DEFAULT_MERGE_PRECEDENCE) ==
@@ -831,7 +831,7 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
     # If the lengths don't match up, then give up.  This is most
     # often caused by __metaclass__.
     if len(baselist1) != len(baselist2):
-        log.info("Warning: Not merging the introspected & parsed base lists "
+        log.info("Not merging the introspected & parsed base lists "
                  "for %s, since their lengths don't match (%s vs %s)" %
                  (path, len(baselist1), len(baselist2)))
         if precedence == 'introspect': return baselist1
@@ -842,7 +842,7 @@ def merge_bases(baselist1, baselist2, precedence, cyclecheck, path):
         if ((base1.canonical_name not in (None, UNKNOWN) and
              base2.canonical_name not in (None, UNKNOWN)) and
             base1.canonical_name != base2.canonical_name):
-            log.info("Warning: Not merging the parsed & introspected base "
+            log.info("Not merging the parsed & introspected base "
                      "lists for %s, since the bases' names don't match "
                      "(%s vs %s)" % (path, base1.canonical_name,
                                      base2.canonical_name))
