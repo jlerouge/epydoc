@@ -772,7 +772,6 @@ class DotGraphUmlClassNode(DotGraphNode):
                 s += '\n' + edge.to_dotfile()
         return s
 
-# [XX] Not used yet.
 class DotGraphUmlModuleNode(DotGraphNode):
     """
     A specialized dot grah node used to display C{ModuleDoc}s using
@@ -799,12 +798,40 @@ class DotGraphUmlModuleNode(DotGraphNode):
 
     """
     def __init__(self, module_doc, linker, context, collapsed=False,
-                 **options):
+                 excluded_submodules=(), **options):
         self.module_doc = module_doc
         self.linker = linker
         self.context = context
+        self.collapsed = collapsed
+        self.options = options
+        self.excluded_submodules = excluded_submodules
+        DotGraphNode.__init__(self, shape='plaintext',
+                              href=linker.url_for(module_doc) or NOOP_URL,
+                              tooltip=module_doc.canonical_name)
 
-    def _nested_package_label(package):
+    #: Expects: (color, color, url, tooltip, body)
+    _MODULE_LABEL = ''' 
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" ALIGN="LEFT">
+    <TR><TD ALIGN="LEFT" VALIGN="BOTTOM" HEIGHT="8" WIDTH="16"
+            FIXEDSIZE="true" BGCOLOR="%s" BORDER="1" PORT="tab"></TD></TR>
+    <TR><TD ALIGN="LEFT" VALIGN="TOP" BGCOLOR="%s" BORDER="1" WIDTH="20"
+            PORT="body" HREF="%s" TOOLTIP="%s">%s</TD></TR>
+    </TABLE>'''
+
+    #: Expects: (name, body_rows)
+    _NESTED_BODY = '''
+    <TABLE BORDER="0" CELLBORDER="0" CELLPADDING="0" CELLSPACING="0">
+    <TR><TD ALIGN="LEFT">%s</TD></TR>
+    %s
+    </TABLE>'''
+
+    #: Expects: (cells,)
+    _NESTED_BODY_ROW = '''
+    <TR><TD>
+      <TABLE BORDER="0" CELLBORDER="0"><TR>%s</TR></TABLE>
+    </TD></TR>'''
+    
+    def _get_html_label(self, package):
         """
         :Return: (label, depth, width) where:
         
@@ -817,46 +844,45 @@ class DotGraphUmlModuleNode(DotGraphNode):
         pkg_name = package.canonical_name
         pkg_url = self.linker.url_for(package) or NOOP_URL
         
-        if not package.is_package or len(package.submodules) == 0:
-            pkg_color = _nested_uml_package_color(package, self.context, 1)
-            label = MODULE_NODE_HTML % (pkg_color, pkg_color, pkg_url,
-                                        pkg_name, pkg_name[-1])
+        if (not package.is_package or len(package.submodules) == 0 or
+            self.collapsed):
+            pkg_color = self._color(package, 1)
+            label = self._MODULE_LABEL % (pkg_color, pkg_color,
+                                          pkg_url, pkg_name, pkg_name[-1])
             return (label, 1, len(pkg_name[-1])+3)
                 
-        submodule_labels = [self._nested_package_label(submodule, self.linker,
-                                                       self.context)
-                            for submodule in package.submodules]
-    
-        ROW_HDR = '<TABLE BORDER="0" CELLBORDER="0"><TR>'
-        # Build the body of the package's icon.
-        body = '<TABLE BORDER="0" CELLBORDER="0">'
-        body += '<TR><TD ALIGN="LEFT">%s</TD></TR>' % pkg_name[-1]
-        body += '<TR><TD>%s' % ROW_HDR
-        row_width = [0]
-        for i, (label, depth, width) in enumerate(submodule_labels):
-            if row_width[-1] > 0 and width+row_width[-1] > MAX_ROW_WIDTH:
-                body += '</TR></TABLE></TD></TR>'
-                body += '<TR><TD>%s' % ROW_HDR
-                row_width.append(0)
-            #submodule_url = self.linker.url_for(package.submodules[i]) or '#'
-            #submodule_name = package.submodules[i].canonical_name
-            body += '<TD ALIGN="LEFT">%s</TD>' % label
-            row_width [-1] += width
-        body += '</TR></TABLE></TD></TR></TABLE>'
-    
-        # Put together our return value.
-        depth = max([d for (l,d,w) in submodule_labels])+1
-        pkg_color = self._color(package, depth)
-        label = ('<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR>'
-                 '<TD ALIGN="LEFT" HEIGHT="8" WIDTH="16" FIXEDSIZE="true" '
-                 'BORDER="1" VALIGN="BOTTOM" BGCOLOR="%s"></TD></TR><TR>'
-                 '<TD COLSPAN="5" VALIGN="TOP" ALIGN="LEFT" BORDER="1" '
-                 'BGCOLOR="%s" HREF="%s" TOOLTIP="%s">%s</TD></TR></TABLE>' %
-                 (pkg_color, pkg_color, pkg_url, pkg_name, body))
-        width = max(max(row_width), len(pkg_name[-1])+3)
-        return label, depth, width
-    
-    def _color(package, depth):
+        # Get the label for each submodule, and divide them into rows.
+        row_list = ['']
+        row_width = 0
+        max_depth = 0
+        max_row_width = len(pkg_name[-1])+3
+        for submodule in package.submodules:
+            if submodule in self.excluded_submodules: continue
+            # Get the submodule's label.
+            label, depth, width = self._get_html_label(submodule)
+            # Check if we should start a new row.
+            if row_width > 0 and width+row_width > MAX_ROW_WIDTH:
+                row_list.append('')
+                row_width = 0
+            # Add the submodule's label to the row.
+            row_width += width
+            row_list[-1] += '<TD ALIGN="LEFT">%s</TD>' % label
+            # Update our max's.
+            max_depth = max(depth, max_depth)
+            max_row_width = max(row_width, max_row_width)
+
+        # Figure out which color to use.
+        pkg_color = self._color(package, depth+1)
+        
+        # Assemble & return the label.
+        rows = ''.join([self._NESTED_BODY_ROW % r for r in row_list])
+        body = self._NESTED_BODY % (pkg_name, rows)
+        label = self._MODULE_LABEL % (pkg_color, pkg_color,
+                                      pkg_url, pkg_name, body)
+        return label, max_depth+1, max_row_width
+
+    _COLOR_DIFF = 24
+    def _color(self, package, depth):
         if package == self.context: return SELECTED_BG
         else: 
             # Parse the base color.
@@ -869,12 +895,17 @@ class DotGraphUmlModuleNode(DotGraphNode):
             blue = (base & 0x0000ff)
             # Make it darker with each level of depth. (but not *too*
             # dark -- package name needs to be readable)
-            red = max(64, red-(depth-1)*10)
-            green = max(64, green-(depth-1)*10)
-            blue = max(64, blue-(depth-1)*10)
+            red = max(64, red-(depth-1)*self._COLOR_DIFF)
+            green = max(64, green-(depth-1)*self._COLOR_DIFF)
+            blue = max(64, blue-(depth-1)*self._COLOR_DIFF)
             # Convert it back to a color string
             return '#%06x' % ((red<<16)+(green<<8)+blue)
         
+    def to_dotfile(self):
+        attribs = ['%s="%s"' % (k,v) for (k,v) in self._attribs.items()]
+        label, depth, width = self._get_html_label(self.module_doc)
+        attribs.append('label=<%s>' % label)
+        return 'node%d%s' % (self.id, ' [%s]' % (','.join(attribs)))
 
 
     
@@ -889,7 +920,7 @@ def package_tree_graph(packages, linker, context=None, **options):
     """
     if options.get('style', 'uml') == 'uml': # default to uml style?
         if get_dot_version() >= [2]:
-            return _nested_package_uml_graph(packages, linker, context,
+            return uml_package_tree_graph(packages, linker, context,
                                              **options)
         elif 'style' in options:
             log.warning('UML style package trees require dot version 2.0+')
@@ -920,7 +951,7 @@ def package_tree_graph(packages, linker, context=None, **options):
 
     return graph
 
-def _nested_package_uml_graph(packages, linker, context=None, **options):
+def uml_package_tree_graph(packages, linker, context=None, **options):
     """
     Return a `DotGraph` that graphically displays the package
     hierarchies for the given packages as a nested set of UML
@@ -939,85 +970,10 @@ def _nested_package_uml_graph(packages, linker, context=None, **options):
     # If the context is a variable, then get its value.
     if isinstance(context, VariableDoc) and context.value is not UNKNOWN:
         context = context.value
-    # Build one (complex) node for each root package.
+    # Return a graph with one node for each root package.
     for package in root_packages:
-        html_label, _, _ = _nested_uml_package_label(package, linker, context)
-        node = DotGraphNode(html_label=html_label, shape='plaintext',
-                            href=linker.url_for(package) or NOOP_URL,
-                            tooltip=package.canonical_name)
-        graph.nodes.append(node)
+        graph.nodes.append(DotGraphUmlModuleNode(package, linker, context))
     return graph
-
-def _nested_uml_package_label(package, linker, context):
-    """
-    :Return: (label, depth, width) where:
-    
-      - `label` is the HTML label
-      - `depth` is the depth of the package tree
-      - `width` is the max width of the HTML label, roughly in
-         units of characters.
-
-    :todo: Add hrefs/tooltips to appropriate <td> or <table> cells.
-    """
-    MAX_ROW_WIDTH = 80 # unit is roughly characters.
-    pkg_name = package.canonical_name
-    pkg_url = linker.url_for(package) or NOOP_URL
-    
-    if not package.is_package or len(package.submodules) == 0:
-        pkg_color = _nested_uml_package_color(package, context, 1)
-        label = MODULE_NODE_HTML % (pkg_color, pkg_color, pkg_url,
-                                    pkg_name, pkg_name[-1])
-        return (label, 1, len(pkg_name[-1])+3)
-            
-    submodule_labels = [_nested_uml_package_label(submodule, linker, context)
-                        for submodule in package.submodules]
-
-    ROW_HDR = '<TABLE BORDER="0" CELLBORDER="0"><TR>'
-    # Build the body of the package's icon.
-    body = '<TABLE BORDER="0" CELLBORDER="0">'
-    body += '<TR><TD ALIGN="LEFT">%s</TD></TR>' % pkg_name[-1]
-    body += '<TR><TD>%s' % ROW_HDR
-    row_width = [0]
-    for i, (label, depth, width) in enumerate(submodule_labels):
-        if row_width[-1] > 0 and width+row_width[-1] > MAX_ROW_WIDTH:
-            body += '</TR></TABLE></TD></TR>'
-            body += '<TR><TD>%s' % ROW_HDR
-            row_width.append(0)
-        #submodule_url = linker.url_for(package.submodules[i]) or '#'
-        #submodule_name = package.submodules[i].canonical_name
-        body += '<TD ALIGN="LEFT">%s</TD>' % label
-        row_width [-1] += width
-    body += '</TR></TABLE></TD></TR></TABLE>'
-
-    # Put together our return value.
-    depth = max([d for (l,d,w) in submodule_labels])+1
-    pkg_color = _nested_uml_package_color(package, context, depth)
-    label = ('<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR>'
-             '<TD ALIGN="LEFT" HEIGHT="8" WIDTH="16" FIXEDSIZE="true" '
-             'BORDER="1" VALIGN="BOTTOM" BGCOLOR="%s"></TD></TR><TR>'
-             '<TD COLSPAN="5" VALIGN="TOP" ALIGN="LEFT" BORDER="1" '
-             'BGCOLOR="%s" HREF="%s" TOOLTIP="%s">%s</TD></TR></TABLE>' %
-             (pkg_color, pkg_color, pkg_url, pkg_name, body))
-    width = max(max(row_width), len(pkg_name[-1])+3)
-    return label, depth, width
-
-def _nested_uml_package_color(package, context, depth):
-    if package == context: return SELECTED_BG
-    else: 
-        # Parse the base color.
-        if re.match(MODULE_BG, 'r#[0-9a-fA-F]{6}$'):
-            base = int(MODULE_BG[1:], 16)
-        else:
-            base = int('d8e8ff', 16)
-        red = (base & 0xff0000) >> 16
-        green = (base & 0x00ff00) >> 8
-        blue = (base & 0x0000ff)
-        # Make it darker with each level of depth.
-        red = max(0, red-(depth-1)*10)
-        green = max(0, green-(depth-1)*10)
-        blue = max(0, blue-(depth-1)*10)
-        # Convert it back to a color string
-        return '#%06x' % ((red<<16)+(green<<8)+blue)
 
 ######################################################################
 def class_tree_graph(bases, linker, context=None, **options):
