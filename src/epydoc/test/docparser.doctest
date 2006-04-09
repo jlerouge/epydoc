@@ -81,11 +81,11 @@ assignments, is_imported and is_instvar will always be False.)
         |  +- is_public = True
         |  +- name = u'x'
         |  +- value
-        |     +- ValueDoc [2]
+        |     +- GenericValueDoc [2]
         |        +- defining_module
         |        |  +- ModuleDoc for test [0] (defined above)
         |        +- docs_extracted_by = 'parser'
-        |        +- repr = u'12'
+        |        +- parse_repr = u'12'
         |        +- toktree = [(2, u'12')]
         +- y => VariableDoc for test.y [3]
         |  +- container
@@ -97,11 +97,11 @@ assignments, is_imported and is_instvar will always be False.)
         |  +- is_public = True
         |  +- name = u'y'
         |  +- value
-        |     +- ValueDoc [4]
+        |     +- GenericValueDoc [4]
         |        +- defining_module
         |        |  +- ModuleDoc for test [0] (defined above)
         |        +- docs_extracted_by = 'parser'
-        |        +- repr = u'[1,2,3]+ [4,5]'
+        |        +- parse_repr = u'[1,2,3]+ [4,5]'
         |        +- toktree = [[(51, u'['), (2, u'1'), (51, u','), ...
         +- z => VariableDoc for test.z [5]
            +- container
@@ -113,11 +113,11 @@ assignments, is_imported and is_instvar will always be False.)
            +- is_public = True
            +- name = u'z'
            +- value
-              +- ValueDoc [6]
+              +- GenericValueDoc [6]
                  +- defining_module
                  |  +- ModuleDoc for test [0] (defined above)
                  +- docs_extracted_by = 'parser'
-                 +- repr = u'f(x,y)'
+                 +- parse_repr = u'f(x,y)'
                  +- toktree = [(1, u'f'), [(51, u'('), (1, u'x'), (...
 
 In this example, DocParser decides that the assignment to y is
@@ -127,21 +127,21 @@ creating an alias.  The same `ValueDoc` is shared by both variables.
     ...     x = [1,2]
     ...     y = x
     ...     """,
-    ...     attribs='variables is_alias name value repr')
+    ...     attribs='variables is_alias name value parse_repr')
     ModuleDoc for test [0]
-     +- repr = <UNKNOWN>
+     +- parse_repr = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
         |  +- is_alias = False
         |  +- name = u'x'
         |  +- value
-        |     +- ValueDoc [2]
-        |        +- repr = u'[1,2]'
+        |     +- GenericValueDoc [2]
+        |        +- parse_repr = u'[1,2]'
         +- y => VariableDoc for test.y [3]
            +- is_alias = True
            +- name = u'y'
            +- value
-              +- ValueDoc [2] (defined above)
+              +- GenericValueDoc [2] (defined above)
 
 DocParser can also parse assignments where the left-hand side is a
 tuple or list; however, it will not extract values.
@@ -191,26 +191,26 @@ variable.)
     >>> runparser(s="""
     ...     x = y = z = 0
     ...     """,
-    ...     attribs="variables is_alias name value repr")
+    ...     attribs="variables is_alias name value parse_repr")
     ModuleDoc for test [0]
-     +- repr = <UNKNOWN>
+     +- parse_repr = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
         |  +- is_alias = True
         |  +- name = u'x'
         |  +- value
-        |     +- ValueDoc [2]
-        |        +- repr = u'0'
+        |     +- GenericValueDoc [2]
+        |        +- parse_repr = u'0'
         +- y => VariableDoc for test.y [3]
         |  +- is_alias = True
         |  +- name = u'y'
         |  +- value
-        |     +- ValueDoc [2] (defined above)
+        |     +- GenericValueDoc [2] (defined above)
         +- z => VariableDoc for test.z [4]
            +- is_alias = False
            +- name = u'z'
            +- value
-              +- ValueDoc [2] (defined above)
+              +- GenericValueDoc [2] (defined above)
 
 If a variable is assigned to twice, then the later assignment
 overwrites the earlier one:
@@ -219,15 +219,15 @@ overwrites the earlier one:
     ...     x = 22
     ...     x = 33
     ...     """,
-    ...     attribs="variables name value repr")
+    ...     attribs="variables name value parse_repr")
     ModuleDoc for test [0]
-     +- repr = <UNKNOWN>
+     +- parse_repr = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
            +- name = u'x'
            +- value
-              +- ValueDoc [2]
-                 +- repr = u'33'
+              +- GenericValueDoc [2]
+                 +- parse_repr = u'33'
 
 Module Control Blocks
 =====================
@@ -413,6 +413,7 @@ VariableDoc object in the module's children list).
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = None
+     +- lineno = 2
      +- posarg_defaults = [None]
      +- posargs = [u'x']
      +- vararg = None
@@ -436,7 +437,8 @@ of the variable argument and keyword argument, respectively:
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
      +- kwarg = u'kw'
-     +- posarg_defaults = [None, <ValueDoc 22>, <ValueDoc (1,)>]
+     +- lineno = 2
+     +- posarg_defaults = [None, <GenericValueDoc None>, <Gener...
      +- posargs = [u'x', u'y', u'z']
      +- vararg = u'v'
 
@@ -448,6 +450,7 @@ Tuple arguments are encoded as a single ArgDoc with a complex name:
      +- canonical_name = DottedName('test', u'f')
      +- docs_extracted_by = 'parser'
      +- kwarg = None
+     +- lineno = 2
      +- posarg_defaults = [None]
      +- posargs = [[u'x', [u'y', u'z']]]
      +- vararg = None
@@ -564,15 +567,15 @@ Deleting variables:
     ...     x = y = 12
     ...     del y
     ...     """,
-    ...     attribs='variables value repr is_alias')
+    ...     attribs='variables value parse_repr is_alias')
     ModuleDoc for test [0]
-     +- repr = <UNKNOWN>
+     +- parse_repr = <UNKNOWN>
      +- variables
         +- x => VariableDoc for test.x [1]
            +- is_alias = True
            +- value
-              +- ValueDoc [2]
-                 +- repr = u'12'
+              +- GenericValueDoc [2]
+                 +- parse_repr = u'12'
 
 The right-hand side of a `del` statement may contain a nested
 combination of lists, tuples, and parenthases.  All variables found
@@ -627,7 +630,7 @@ namespace.
                  +- variables
                     +- b => VariableDoc for test.A.b [3]
                        +- value
-                          +- ValueDoc [4]
+                          +- GenericValueDoc [4]
 
 If one of the variables to be deleted is expressed as anything other
 than a simple identifier or a dotted name, then ignore it.  (In
@@ -675,12 +678,10 @@ Imports
      +- variables
         +- match => VariableDoc for test.match [1]
         |  +- is_imported = True
-        |  +- value
-        |     +- ValueDoc [2]
-        +- re => VariableDoc for test.re [3]
+        |  +- value = <UNKNOWN>
+        +- re => VariableDoc for test.re [2]
            +- is_imported = True
-           +- value
-              +- ValueDoc [4]
+           +- value = <UNKNOWN>
 
 
 Unicode
@@ -756,6 +757,6 @@ Assignments Into Namespaces
                  +- variables
                     +- x => VariableDoc for test.A.x [3]
                        +- value
-                          +- ValueDoc [4]
+                          +- GenericValueDoc [4]
 
 
