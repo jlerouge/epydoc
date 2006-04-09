@@ -154,13 +154,13 @@ contains a string that's not a valid python identifier:
 
     >>> DottedName()
     Traceback (most recent call last):
-    ValueError: Empty DottedName
+    InvalidDottedName: Empty DottedName
     >>> DottedName('1+2')
     Traceback (most recent call last):
-    ValueError: Bad identifier '1+2'
+    InvalidDottedName: Bad identifier '1+2'
     >>> DottedName({})
     Traceback (most recent call last):
-    ValueError: Bad identifier {}
+    InvalidDottedName: Bad identifier {}
 
 The one exception is that '??' is treated as if it were a valid python
 identifier:
