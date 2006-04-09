@@ -1705,10 +1705,10 @@ def pp_apidoc(api_doc, doublespace=0, depth=5, exclude=(), include=(),
     pyid = id(api_doc.__dict__)
     if backpointers is None: backpointers = {}
     if (hasattr(api_doc, 'canonical_name') and
-        api_doc.canonical_name is not UNKNOWN):
+        api_doc.canonical_name not in (None, UNKNOWN)):
         name = '%s for %s' % (api_doc.__class__.__name__,
                               api_doc.canonical_name)
-    elif hasattr(api_doc, 'name') and api_doc.name is not UNKNOWN:
+    elif hasattr(api_doc, 'name') and api_doc.name not in (UNKNOWN, None):
         name = '%s for %s' % (api_doc.__class__.__name__, api_doc.name)
     else:
         name = api_doc.__class__.__name__
