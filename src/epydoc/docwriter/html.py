@@ -587,7 +587,7 @@ class HTMLWriter:
         # Write the page header (incl. navigation bar & breadcrumbs)
         self.write_header(out, str(longname))
         self.write_navbar(out, doc)
-        self.write_breadcrumbs(out, doc)
+        self.write_breadcrumbs(out, doc, self.url(doc))
 
         # Write the name of the module we're describing.
         if doc.is_package is True: typ = 'Package'
@@ -645,7 +645,7 @@ class HTMLWriter:
         # Header
         self.write_header(out, name)
         self.write_navbar(out, doc)
-        self.write_breadcrumbs(out, doc)
+        self.write_breadcrumbs(out, doc, self.pysrc_url(doc))
 
         # Source code listing
         out('<h2 class="py-src">Source Code for %s</h2>\n' %
@@ -678,7 +678,7 @@ class HTMLWriter:
         # Write the page header (incl. navigation bar & breadcrumbs)
         self.write_header(out, str(longname))
         self.write_navbar(out, doc)
-        self.write_breadcrumbs(out, doc)
+        self.write_breadcrumbs(out, doc, self.url(doc))
 
         # Write the name of the class we're describing.
         if doc.is_type(): typ = 'Type'
@@ -695,7 +695,12 @@ class HTMLWriter:
         if ((doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0) or
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
             # Display bases graphically, if requested.
-            if 'classtree' in self._graph_types:
+            if 'umlclasstree' in self._graph_types:
+                linker = _HTMLDocstringLinker(self, doc)
+                graph = uml_class_tree_graph(doc, linker, doc)
+                out('<center>\n%s</center>\n' % self.render_graph(graph))
+                
+            elif 'classtree' in self._graph_types:
                 linker = _HTMLDocstringLinker(self, doc)
                 graph = class_tree_graph([doc], linker, doc)
                 out('<center>\n%s</center>\n' % self.render_graph(graph))
@@ -773,7 +778,7 @@ class HTMLWriter:
         # Header material.
         self.write_header(out, 'Trees')
         self.write_navbar(out, 'trees')
-        self.write_breadcrumbs(out, 'trees')
+        self.write_breadcrumbs(out, 'trees', 'trees.html')
 
         # Write the module hierarchy
         out('<!-- ==================== ' 
@@ -812,7 +817,7 @@ class HTMLWriter:
         # Header material.
         self.write_header(out, 'Index')
         self.write_navbar(out, 'indices')
-        self.write_breadcrumbs(out, 'indices')
+        self.write_breadcrumbs(out, 'indices', 'indices.html')
         out('<br />\n')
 
         terms = self._extract_term_index()
@@ -957,7 +962,7 @@ class HTMLWriter:
         # Insert the help contents into a webpage.
         self.write_header(out, 'Help')
         self.write_navbar(out, 'help')
-        self.write_breadcrumbs(out, 'help')
+        self.write_breadcrumbs(out, 'help', 'help.html')
         out(help)
         self.write_navbar(out, 'help')
         self.write_footer(out)
@@ -1303,11 +1308,15 @@ class HTMLWriter:
           parent.frames[2].location.href = url2;
       }
     '''.strip()
-    
+
+    #: A javascript that is used to hide private variables, unless
+    #: either: (a) the cookie says not to; or (b) we appear to be
+    #: linking to a private variable.
     HIDE_PRIVATE_JS = '''
       function checkCookie() {
         var cmd=getCookie("EpydocPrivate");
-        if (cmd!="show private") {toggle_private();}
+        if (cmd!="show private" && location.href.indexOf("#_") < 0)
+            toggle_private();
       }
     '''.strip()
 
@@ -1350,7 +1359,7 @@ class HTMLWriter:
 
     def callgraph_link(self, callgraph):
         if callgraph is None: return ''
-        return ('<br /><span class="codelink"><a href="#" '
+        return ('<br /><span class="codelink"><a href="javascript: void(0);" '
                 'onclick="toggleCallGraph(\'%s-div\');return false;">'
                 'call&nbsp;graph</a></span>&nbsp;' % callgraph.uid)
 
@@ -1510,7 +1519,7 @@ class HTMLWriter:
 
     write_breadcrumbs = compile_template(
         """
-        write_breadcrumbs(self, out, context)
+        write_breadcrumbs(self, out, context, context_url)
 
         Generate HTML for the breadcrumbs line, and write it to
         C{out}.  The breadcrumbs line is an invisible table with a
@@ -1547,7 +1556,7 @@ class HTMLWriter:
         >>> #endif
                 <tr><td align="right"><span class="options"
                     >[<a href="frames.html" target="_top">frames</a
-                    >]&nbsp;|&nbsp;<a href="$self.url(context)$"
+                    >]&nbsp;|&nbsp;<a href="$context_url$"
                     target="_top">no&nbsp;frames</a>]</span></td></tr>
               </table>
             </td>
@@ -2748,7 +2757,13 @@ class HTMLWriter:
             if isinstance(val_doc, (ModuleDoc, ClassDoc)):
                 return self.url(val_doc)
             elif obj.container in (None, UNKNOWN):
+                if val_doc in (None, UNKNOWN): return None
                 return self.url(val_doc)
+            elif obj.is_imported == True:
+                if obj.imported_from is not UNKNOWN:
+                    return self.url(obj.imported_from)
+                else:
+                    return None
             else:
                 container_url = self.url(obj.container)
                 if container_url is None: return None
