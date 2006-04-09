@@ -735,17 +735,19 @@ class DotGraphUmlClassNode(DotGraphNode):
         
         # Construct the attribute list.  (If it's too long, truncate)
         attrib_cells = [self._attribute_cell(a) for a in self.attributes]
+        max_attributes = self.options.get('max_attributes', 15)
         if len(attrib_cells) == 0:
             attrib_cells = ['<TR><TD></TD></TR>']
-        elif len(attrib_cells) > self.options.get('max_attributes', 15):
+        elif len(attrib_cells) > max_attributes:
             attrib_cells[max_attributes-2:-1] = ['<TR><TD>...</TD></TR>']
         attributes = ''.join(attrib_cells)
                       
         # Construct the operation list.  (If it's too long, truncate)
         oper_cells = [self._operation_cell(a) for a in self.operations]
+        max_operations = self.options.get('max_operations', 15)
         if len(oper_cells) == 0:
             oper_cells = ['<TR><TD></TD></TR>']
-        elif len(oper_cells) > self.options.get('max_operations', 15):
+        elif len(oper_cells) > max_operations:
             oper_cells[max_operations-2:-1] = ['<TR><TD>...</TD></TR>']
         operations = ''.join(oper_cells)
 
