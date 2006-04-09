@@ -497,8 +497,12 @@ function expandto(href) {
   }
 }
 
-function kill_doclink() {
-  if (!this.contains(event.toElement)) {
+function kill_doclink(id) {
+  if (id) {
+    var parent = document.getElementById(id);
+    parent.removeChild(parent.childNodes.item(0));
+  }
+  else if (!this.contains(event.toElement)) {
     var parent = document.getElementById(this.parentID);
     parent.removeChild(parent.childNodes.item(0));
   }
@@ -553,10 +557,13 @@ function doclink(id, name, targets) {
     //box1.appendChild(box2);
     box1.appendChild(shadow);
     shadow.appendChild(box2);
-    box2.innerHTML = "Which <b>"+name+"</b> do you want to see "+
-                     "documentation for?" +
-                     "<ul style=\'margin-bottom: 0;\'>" +
-                     links + "</ul>";
+    box2.innerHTML =
+        "Which <b>"+name+"</b> do you want to see documentation for?" +
+        "<ul style=\'margin-bottom: 0;\'>" +
+        links + 
+        "<li><a href=\'#\' style=\'text-decoration:none\' " +
+        "onclick=\'kill_doclink(\\""+id+"\\");return false;\'>"+
+        "<i>None of the above</i></a></li></ul>";
   }
 }
 '''
@@ -676,6 +683,11 @@ class PythonSourceColorizer:
     #: A configuration constant, used to determine whether or not to
     #: add tooltips for linked names.
     ADD_TOOLTIPS = True
+
+    #: If true, then try to guess which target is appropriate for
+    #: linked names; if false, then always open a div asking the
+    #: user which one they want.
+    GUESS_LINK_TARGETS = True
 
     def __init__(self, module_filename, module_name,
                  docindex=None, api_docs=None, url_func=None):
@@ -973,7 +985,7 @@ class PythonSourceColorizer:
                 # a function, then that function is our context, not
                 # the namespace that contains it. [xx] this isn't always
                 # the right thing to do.
-                if None not in self.context:
+                if None not in self.context and self.GUESS_LINK_TARGETS:
                     container = DottedName(self.module_name, *self.context)
                     doc = self.docindex.get_vardoc(container+toktext)
                     if doc is not None:
@@ -985,7 +997,7 @@ class PythonSourceColorizer:
                     if docs:
                         tooltip='\n'.join(['%s'%d.canonical_name
                                            for d in docs])
-                        if len(docs) == 1:
+                        if len(docs) == 1 and self.GUESS_LINK_TARGETS:
                             url = self.url_func(docs[0])
                         else:
                             uid, onclick = self.doclink(toktext, docs)
