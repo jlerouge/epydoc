@@ -56,6 +56,31 @@ to document, and produce API documentation using the following steps:
              side mark what portions of the processing chain are
              initiated by build_doc_index() and cli().  Click on
              any item to see its documentation.
+             
+   /*
+                  Python module or value                 *       *
+                      /           \                      |       |
+                     V             V                     |       |
+            introspect_docs()  parse_docs()              |       |
+                        \        /                       |       |
+                         V      V                        |       |
+                        merge_docs()                     |       |
+                             |              build_doc_index()  cli()
+                             V                           |       |
+                       link_imports()                    |       |
+                             |                           |       |
+                             V                           |       |
+                    assign_canonical_names()             |       |
+                             |                           |       |
+                             V                           |       |
+                      parse_docstrings()                 |       |
+                             |                           |       |
+                             V                           |       |
+                       inherit_docs()                    *       |
+                      /      |        \                          |
+                     V       V         V                         |
+                HTMLWriter LaTeXWriter PlaintextWriter           *
+   */
 
    ranksep = 0.1;
    node [shape="box", height="0", width="0"]
