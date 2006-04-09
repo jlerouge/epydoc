@@ -118,7 +118,8 @@ class LatexWriter:
             if isinstance(val_doc, ModuleDoc):
                 filename = '%s-module.tex' % val_doc.canonical_name
                 self._write(self.write_module, directory, filename, val_doc)
-            elif isinstance(val_doc, ClassDoc):
+            elif (isinstance(val_doc, ClassDoc) and 
+                  self._list_classes_separately):
                 filename = '%s-class.tex' % val_doc.canonical_name
                 self._write(self.write_class, directory, filename, val_doc)
 
