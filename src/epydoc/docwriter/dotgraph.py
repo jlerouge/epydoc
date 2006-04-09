@@ -27,6 +27,15 @@ from epydoc.apidoc import *
 from epydoc.util import *
 from epydoc.compat import * # Backwards compatibility
 
+# colors for graphs of APIDocs
+MODULE_BG = '#d8e8ff'
+CLASS_BG = '#d8ffe8'
+SELECTED_BG = '#ffd0d0'
+BASECLASS_BG = '#e0b0a0'
+SUBCLASS_BG = '#e0b0a0'
+ROUTINE_BG = '#e8d0b0' # maybe?
+INH_LINK_COLOR = '#800000'
+
 ######################################################################
 #{ Dot Graphs
 ######################################################################
@@ -64,6 +73,9 @@ class DotGraph:
     """A set of all uids that that have been generated, used to ensure
     that each new graph has a unique uid."""
 
+    DEFAULT_NODE_DEFAULTS={'fontsize':10, 'fontname': 'helvetica'}
+    DEFAULT_EDGE_DEFAULTS={'fontsize':10, 'fontname': 'helvetica'}
+    
     def __init__(self, title, body='', node_defaults=None,
                  edge_defaults=None, caption=None):
         """
@@ -78,12 +90,12 @@ class DotGraph:
         self.nodes = []
         """A list of the nodes that are present in the graph.
         
-        :type: `list` of `DocGraphNode`"""
+        :type: `list` of `DotGraphNode`"""
         
         self.edges = []
         """A list of the edges that are present in the graph.
         
-        :type: `list` of `DocGraphEdge`"""
+        :type: `list` of `DotGraphEdge`"""
 
         self.body = body
         """A string that should be included as-is in the body of the
@@ -91,10 +103,10 @@ class DotGraph:
         
         :type: `str`"""
         
-        self.node_defaults = node_defaults or {}
+        self.node_defaults = node_defaults or self.DEFAULT_NODE_DEFAULTS
         """Default attribute values for nodes."""
         
-        self.edge_defaults = edge_defaults or {}
+        self.edge_defaults = edge_defaults or self.DEFAULT_EDGE_DEFAULTS
         """Default attribute values for edges."""
 
         self.uid = re.sub(r'\W', '_', title).lower()
@@ -277,7 +289,8 @@ class DotGraphNode:
         """
         Return the dot commands that should be used to render this node.
         """
-        attribs = ['%s="%s"' % (k,v) for (k,v) in self._attribs.items()]
+        attribs = ['%s="%s"' % (k,v) for (k,v) in self._attribs.items()
+                   if v is not None]
         if self._html_label:
             attribs.insert(0, 'label=<%s>' % (self._html_label,))
         if attribs: attribs = ' [%s]' % (','.join(attribs))
@@ -289,6 +302,8 @@ class DotGraphEdge:
         :type start: `DotGraphNode`
         :type end: `DotGraphNode`
         """
+        assert isinstance(start, DotGraphNode)
+        assert isinstance(end, DotGraphNode)
         if label is not None: attribs['label'] = label
         self.start = start       #: :type: `DotGraphNode`
         self.end = end           #: :type: `DotGraphNode`
@@ -311,11 +326,558 @@ class DotGraphEdge:
         if (self.end.port is not None and 'tailport' not in attribs):
             attribs['tailport'] = self.end.port
         # Convert attribs to a string
-        attribs = ','.join(['%s="%s"' % (k,v) for (k,v) in attribs.items()])
+        attribs = ','.join(['%s="%s"' % (k,v) for (k,v) in attribs.items()
+                            if v is not None])
         if attribs: attribs = ' [%s]' % attribs
         # Return the dotfile edge.
         return 'node%d -> node%d%s' % (self.start.id, self.end.id, attribs)
 
+######################################################################
+#{ Specialized Nodes for UML Graphs
+######################################################################
+
+class DotGraphUmlClassNode(DotGraphNode):
+    """
+    A specialized dot graph node used to display C{ClassDoc}s using
+    UML notation.  The node is rendered as a table with three cells:
+    the top cell contains the class name; the middle cell contains a
+    list of attributes; and the bottom cell contains a list of
+    operations::
+
+         +-------------+
+         |  ClassName  |
+         +-------------+
+         | x: int      |
+         |     ...     |
+         +-------------+
+         | f(self, x)  |
+         |     ...     |
+         +-------------+
+
+    `DotGraphUmlClassNode`s may be *collapsed*, in which case they are
+    drawn as a simple box containing the class name::
+    
+         +-------------+
+         |  ClassName  |
+         +-------------+
+         
+    Attributes with types corresponding to documented classes can
+    optionally be converted into edges, using `link_attributes()`.
+
+    :todo: Add more options?
+      - show/hide operation signature
+      - show/hide operation signature types
+      - show/hide operation signature return type
+      - show/hide attribute types
+      - use qualifiers
+    """
+
+    def __init__(self, class_doc, linker, context, collapsed=False,
+                 bgcolor=CLASS_BG, **options):
+        """
+        Create a new `DotGraphUmlClassNode` based on the class
+        `class_doc`.
+
+        :Parameters:
+            linker: `DocstringLinker<markup.DocstringLinker>`
+                Used to look up URLs for classes.
+            context: `APIDoc`
+                The context in which this node will be drawn; dotted
+                names will be contextualized to this context.
+            collapsed: ``bool``
+                If true, then display this node as a simple box.
+            bgcolor: ``str``
+                The background color for this node.
+            options: ``dict``
+                A set of options used to control how the node should
+                be displayed.
+
+        :Keywords:
+          - `show_private_vars`: If false, then private variables
+            are filtered out of the attributes & operations lists.
+            (Default: *False*)
+          - `show_magic_vars`: If false, then magic variables
+            (such as ``__init__`` and ``__add__``) are filtered out of
+            the attributes & operations lists. (Default: *True*)
+          - `show_inherited_vars`: If false, then inherited variables
+            are filtered out of the attributes & operations lists.
+            (Default: *False*)
+          - `max_attributes`: The maximum number of attributes that
+            should be listed in the attribute box.  If the class has
+            more than this number of attributes, some will be
+            ellided.  Ellipsis is marked with ``'...'``.
+          - `max_operations`: The maximum number of operations that
+            should be listed in the operation box.
+          - `add_nodes_for_linked_attributes`: If true, then
+            `link_attributes()` will create new a collapsed node for
+            the types of a linked attributes if no node yet exists for
+            that type.
+        """
+        self.class_doc = class_doc
+        """The class represented by this node."""
+        
+        self.linker = linker
+        """Used to look up URLs for classes."""
+        
+        self.context = context
+        """The context in which the node will be drawn."""
+        
+        self.bgcolor = bgcolor
+        """The background color of the node."""
+        
+        self.options = options
+        """Options used to control how the node is displayed."""
+
+        self.collapsed = collapsed
+        """If true, then draw this node as a simple box."""
+        
+        self.attributes = []
+        """The list of VariableDocs for attributes"""
+        
+        self.operations = []
+        """The list of VariableDocs for operations"""
+        
+        self.qualifiers = []
+        """List of (key_label, port) tuples."""
+
+        self.edges = []
+        """List of edges used to represent this node's attributes.
+        These should not be added to the `DotGraph`; this node will
+        generate their dotfile code directly."""
+
+        # Initialize operations & attributes lists.
+        show_private = options.get('show_private_vars', False)
+        show_magic = options.get('show_magic_vars', True)
+        show_inherited = options.get('show_inherited_vars', False)
+        for name, var in class_doc.variables.iteritems():
+            if ((not show_private and var.is_public == False) or
+                (not show_magic and re.match('__\w+__$', name)) or
+                (not show_inherited and var.container != class_doc)):
+                pass
+            elif isinstance(var.value, RoutineDoc):
+                self.operations.append(var)
+            else:
+                self.attributes.append(var)
+
+        # Initialize our dot node settings.
+        DotGraphNode.__init__(self, tooltip=class_doc.canonical_name,
+                              width=0, height=0, shape='plaintext',
+                              href=linker.url_for(class_doc) or NOOP_URL)
+
+    #/////////////////////////////////////////////////////////////////
+    #{ Attribute Linking
+    #/////////////////////////////////////////////////////////////////
+    
+    SIMPLE_TYPE_RE = re.compile(
+        r'^([\w\.]+)$')
+    """A regular expression that matches descriptions of simple types."""
+    
+    COLLECTION_TYPE_RE = re.compile(
+        r'^(list|set|sequence|tuple|collection) of ([\w\.]+)$')
+    """A regular expression that matches descriptions of collection types."""
+
+    MAPPING_TYPE_RE = re.compile(
+        r'^(dict|dictionary|map|mapping) from ([\w\.]+) to ([\w\.]+)$')
+    """A regular expression that matches descriptions of mapping types."""
+
+    MAPPING_TO_COLLECTION_TYPE_RE = re.compile(
+        r'^(dict|dictionary|map|mapping) from ([\w\.]+) to '
+        r'(list|set|sequence|tuple|collection) of ([\w\.]+)$')
+    """A regular expression that matches descriptions of mapping types
+    whose value type is a collection."""
+
+    OPTIONAL_TYPE_RE = re.compile(
+        r'^(None or|optional) ([\w\.]+)$|^([\w\.]+) or None$')
+    """A regular expression that matches descriptions of optional types."""
+    
+    def link_attributes(self, nodes):
+        """
+        Convert any attributes with type descriptions corresponding to
+        documented classes to edges.  The following type descriptions
+        are currently handled:
+
+          - Dotted names: Create an attribute edge to the named type,
+            labelled with the variable name.
+          - Collections: Create an attribute edge to the named type,
+            labelled with the variable name, and marked with '*' at the
+            type end of the edge.
+          - Mappings: Create an attribute edge to the named type,
+            labelled with the variable name, connected to the class by
+            a qualifier box that contains the key type description.
+          - Optional: Create an attribute edge to the named type,
+            labelled with the variable name, and marked with '0..1' at
+            the type end of the edge.
+
+        The edges created by `link_attribute()` are handled internally
+        by `DotGraphUmlClassNode`; they should *not* be added directly
+        to the `DotGraph`.
+
+        :param nodes: A dictionary mapping from `ClassDoc`s to
+            `DotGraphUmlClassNode`s, used to look up the nodes for
+            attribute types.  If the ``add_nodes_for_linked_attributes``
+            option is used, then new nodes will be added to this
+            dictionary for any types that are not already listed.
+            These added nodes must be added to the `DotGraph`.
+        """
+        # Try to convert each attribute var into a graph edge.  If
+        # _link_attribute returns true, then it succeeded, so remove
+        # that var from our attribute list; otherwise, leave that var
+        # in our attribute list.
+        self.attributes = [var for var in self.attributes
+                           if not self._link_attribute(var, nodes)]
+
+    def _link_attribute(self, var, nodes):
+        """
+        Helper for `link_attributes()`: try to convert the attribute
+        variable `var` into an edge, and add that edge to
+        `self.edges`.  Return ``True`` iff the variable was
+        successfully converted to an edge (in which case, it should be
+        removed from the attributes list).
+        """
+        type_descr = self._type_descr(var) or self._type_descr(var.value)
+        
+        # Simple type.
+        m = self.SIMPLE_TYPE_RE.match(type_descr)
+        if m and self._add_attribute_edge(var, nodes, m.group(1)):
+            return True
+
+        # Collection type.
+        m = self.COLLECTION_TYPE_RE.match(type_descr)
+        if m and self._add_attribute_edge(var, nodes, m.group(2),
+                                          headlabel='*'):
+            return True
+
+        # Optional type.
+        m = self.OPTIONAL_TYPE_RE.match(type_descr)
+        if m and self._add_attribute_edge(var, nodes, m.group(2) or m.group(3),
+                                          headlabel='0..1'):
+            return True
+                
+        # Mapping type.
+        m = self.MAPPING_TYPE_RE.match(type_descr)
+        if m:
+            port = 'qualifier_%s' % var.name
+            if self._add_attribute_edge(var, nodes, m.group(3),
+                                        tailport='%s:e' % port):
+                self.qualifiers.append( (m.group(2), port) )
+                return True
+
+        # Mapping to collection type.
+        m = self.MAPPING_TO_COLLECTION_TYPE_RE.match(type_descr)
+        if m:
+            port = 'qualifier_%s' % var.name
+            if self._add_attribute_edge(var, nodes, m.group(4), headlabel='*', 
+                                        tailport='%s:e' % port):
+                self.qualifiers.append( (m.group(2), port) )
+                return True
+
+        # We were unable to link this attribute.
+        return False
+
+    def _add_attribute_edge(self, var, nodes, type_str, **attribs):
+        """
+        Helper for `link_attribute()`: try to add an edge for the
+        given attribute variable `var`.  Return ``True`` if
+        successful.
+        """
+        # Use the type string to look up a corresponding ValueDoc.
+        type_doc = self.linker.docindex.find(type_str, var)
+        if not type_doc: return False
+
+        # Get the type ValueDoc's node.  If it doesn't have one (and
+        # add_nodes_for_linked_attributes=True), then create it.
+        type_node = nodes.get(type_doc)
+        if not type_node:
+            if self.options.get('add_nodes_for_linked_attributes', True):
+                type_node = DotGraphUmlClassNode(type_doc, self.linker,
+                                                 self.context, collapsed=True)
+                nodes[type_doc] = type_node
+            else:
+                return False
+
+        # Add an edge from self to the target type node.
+        # [xx] should I set constraint=false here?
+        attribs.setdefault('headport', 'body')
+        attribs.setdefault('tailport', 'body')
+        url = self.linker.url_for(var) or NOOP_URL
+        self.edges.append(DotGraphEdge(self, type_node, label=var.name,
+                        arrowhead='open', href=url,
+                        tooltip=var.canonical_name, labeldistance=1.5,
+                        **attribs))
+        return True
+                           
+    #/////////////////////////////////////////////////////////////////
+    #{ Helper Methods
+    #/////////////////////////////////////////////////////////////////
+    def _summary(self, api_doc):
+        """Return a plaintext summary for `api_doc`"""
+        if not isinstance(api_doc, APIDoc): return ''
+        if api_doc.summary in (None, UNKNOWN): return ''
+        summary = api_doc.summary.to_plaintext(self.linker).strip()
+        return plaintext_to_html(summary)
+
+    def _type_descr(self, api_doc):
+        """Return a plaintext type description for `api_doc`"""
+        if not hasattr(api_doc, 'type_descr'): return ''
+        if api_doc.type_descr in (None, UNKNOWN): return ''
+        type_descr = api_doc.type_descr.to_plaintext(self.linker).strip()
+        return plaintext_to_html(type_descr)
+
+    def _tooltip(self, var_doc):
+        """Return a tooltip for `var_doc`."""
+        return (self._summary(var_doc) or
+                self._summary(var_doc.value) or
+                var_doc.canonical_name)
+    
+    #/////////////////////////////////////////////////////////////////
+    #{ Rendering
+    #/////////////////////////////////////////////////////////////////
+    
+    def _attribute_cell(self, var_doc):
+        # Construct the label
+        label = var_doc.name
+        type_descr = (self._type_descr(var_doc) or
+                      self._type_descr(var_doc.value))
+        if type_descr: label += ': %s' % type_descr
+        # Get the URL
+        url = self.linker.url_for(var_doc) or NOOP_URL
+        # Construct & return the pseudo-html code
+        return self._ATTRIBUTE_CELL % (url, self._tooltip(var_doc), label)
+
+    def _operation_cell(self, var_doc):
+        """
+        :todo: do 'word wrapping' on the signature, by starting a new
+               row in the table, if necessary.  How to indent the new
+               line?  Maybe use align=right?  I don't think dot has a
+               &nbsp;.
+        :todo: Optionally add return type info?
+        """
+        # Construct the label (aka function signature)
+        func_doc = var_doc.value
+        args = [self._operation_arg(n, d, func_doc) for (n, d)
+                in zip(func_doc.posargs, func_doc.posarg_defaults)]
+        args = [plaintext_to_html(arg) for arg in args]
+        if func_doc.vararg: args.append('*'+func_doc.vararg)
+        if func_doc.kwarg: args.append('**'+func_doc.kwarg)
+        label = '%s(%s)' % (var_doc.name, ', '.join(args))
+        # Get the URL
+        url = self.linker.url_for(var_doc) or NOOP_URL
+        # Construct & return the pseudo-html code
+        return self._OPERATION_CELL % (url, self._tooltip(var_doc), label)
+
+    def _operation_arg(self, name, default, func_doc):
+        """
+        :todo: Handle tuple args better
+        :todo: Optionally add type info?
+        """
+        if default is None:
+            return '%s' % name
+        elif default.parse_repr is not UNKNOWN:
+            return '%s=%s' % (name, default.parse_repr)
+        else:
+            pyval_repr = default.pyval_repr()
+            if pyval_repr is not UNKNOWN:
+                return '%s=%s' % (name, pyval_repr)
+            else:
+                return '%s=??' % name
+
+    def _qualifier_cell(self, key_label, port):
+        return self._QUALIFIER_CELL  % (port, self.bgcolor, key_label)
+
+    #: args: (url, tooltip, label)
+    _ATTRIBUTE_CELL = '''
+    <TR><TD ALIGN="LEFT" HREF="%s" TOOLTIP="%s">%s</TD></TR>
+    '''
+
+    #: args: (url, tooltip, label)
+    _OPERATION_CELL = '''
+    <TR><TD ALIGN="LEFT" HREF="%s" TOOLTIP="%s">%s</TD></TR>
+    '''
+
+    #: args: (port, bgcolor, label)
+    _QUALIFIER_CELL = '''
+    <TR><TD VALIGN="BOTTOM" PORT="%s" BGCOLOR="%s" BORDER="1">%s</TD></TR>
+    '''
+
+    _QUALIFIER_DIV = '''
+    <TR><TD VALIGN="BOTTOM" HEIGHT="10" WIDTH="10" FIXEDSIZE="TRUE"></TD></TR>
+    '''
+    
+    #: Args: (rowspan, bgcolor, classname, attributes, operations, qualifiers)
+    _LABEL = '''
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+      <TR><TD ROWSPAN="%s">
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0"
+               CELLPADDING="0" PORT="body" BGCOLOR="%s">
+          <TR><TD>%s</TD></TR>
+          <TR><TD><TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            %s</TABLE></TD></TR>
+          <TR><TD><TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+            %s</TABLE></TD></TR>
+        </TABLE>
+      </TD></TR>
+      %s
+    </TABLE>'''
+
+    _COLLAPSED_LABEL = '''
+    <TABLE CELLBORDER="0" BGCOLOR="%s" PORT="body">
+      <TR><TD>%s</TD></TR>
+    </TABLE>'''
+
+    def _get_html_label(self):
+        # Get the class name & contextualize it.
+        classname = self.class_doc.canonical_name
+        classname = classname.contextualize(self.context.canonical_name)
+        
+        # If we're collapsed, display the node as a single box.
+        if self.collapsed:
+            return self._COLLAPSED_LABEL % (self.bgcolor, classname)
+        
+        # Construct the attribute list.  (If it's too long, truncate)
+        attrib_cells = [self._attribute_cell(a) for a in self.attributes]
+        if len(attrib_cells) == 0:
+            attrib_cells = ['<TR><TD></TD></TR>']
+        elif len(attrib_cells) > self.options.get('max_attributes', 15):
+            attrib_cells[max_attributes-2:-1] = ['<TR><TD>...</TD></TR>']
+        attributes = ''.join(attrib_cells)
+                      
+        # Construct the operation list.  (If it's too long, truncate)
+        oper_cells = [self._operation_cell(a) for a in self.operations]
+        if len(oper_cells) == 0:
+            oper_cells = ['<TR><TD></TD></TR>']
+        elif len(oper_cells) > self.options.get('max_operations', 15):
+            oper_cells[max_operations-2:-1] = ['<TR><TD>...</TD></TR>']
+        operations = ''.join(oper_cells)
+
+        # Construct the qualifier list & determine the rowspan.
+        if self.qualifiers:
+            rowspan = len(self.qualifiers)*2+2
+            div = self._QUALIFIER_DIV
+            qualifiers = div+div.join([self._qualifier_cell(l,p) for
+                                     (l,p) in self.qualifiers])+div
+        else:
+            rowspan = 1
+            qualifiers = ''
+
+        # Put it all together.
+        return self._LABEL % (rowspan, self.bgcolor, classname,
+                              attributes, operations, qualifiers)
+
+    def to_dotfile(self):
+        attribs = ['%s="%s"' % (k,v) for (k,v) in self._attribs.items()]
+        attribs.append('label=<%s>' % self._get_html_label())
+        s = 'node%d%s' % (self.id, ' [%s]' % (','.join(attribs)))
+        if not self.collapsed:
+            for edge in self.edges:
+                s += '\n' + edge.to_dotfile()
+        return s
+
+# [XX] Not used yet.
+class DotGraphUmlModuleNode(DotGraphNode):
+    """
+    A specialized dot grah node used to display C{ModuleDoc}s using
+    UML notation.  Simple module nodes look like::
+
+        .----.
+        +------------+
+        | modulename |
+        +------------+
+
+    Packages nodes are drawn with their modules & subpackages nested
+    inside::
+        
+        .----.
+        +----------------------------------------+
+        | packagename                            |
+        |                                        |
+        |  .----.       .----.       .----.      |
+        |  +---------+  +---------+  +---------+ |
+        |  | module1 |  | module2 |  | module3 | |
+        |  +---------+  +---------+  +---------+ |
+        |                                        |
+        +----------------------------------------+
+
+    """
+    def __init__(self, module_doc, linker, context, collapsed=False,
+                 **options):
+        self.module_doc = module_doc
+        self.linker = linker
+        self.context = context
+
+    def _nested_package_label(package):
+        """
+        :Return: (label, depth, width) where:
+        
+          - `label` is the HTML label
+          - `depth` is the depth of the package tree (for coloring)
+          - `width` is the max width of the HTML label, roughly in
+             units of characters.
+        """
+        MAX_ROW_WIDTH = 80 # unit is roughly characters.
+        pkg_name = package.canonical_name
+        pkg_url = self.linker.url_for(package) or NOOP_URL
+        
+        if not package.is_package or len(package.submodules) == 0:
+            pkg_color = _nested_uml_package_color(package, self.context, 1)
+            label = MODULE_NODE_HTML % (pkg_color, pkg_color, pkg_url,
+                                        pkg_name, pkg_name[-1])
+            return (label, 1, len(pkg_name[-1])+3)
+                
+        submodule_labels = [self._nested_package_label(submodule, self.linker,
+                                                       self.context)
+                            for submodule in package.submodules]
+    
+        ROW_HDR = '<TABLE BORDER="0" CELLBORDER="0"><TR>'
+        # Build the body of the package's icon.
+        body = '<TABLE BORDER="0" CELLBORDER="0">'
+        body += '<TR><TD ALIGN="LEFT">%s</TD></TR>' % pkg_name[-1]
+        body += '<TR><TD>%s' % ROW_HDR
+        row_width = [0]
+        for i, (label, depth, width) in enumerate(submodule_labels):
+            if row_width[-1] > 0 and width+row_width[-1] > MAX_ROW_WIDTH:
+                body += '</TR></TABLE></TD></TR>'
+                body += '<TR><TD>%s' % ROW_HDR
+                row_width.append(0)
+            #submodule_url = self.linker.url_for(package.submodules[i]) or '#'
+            #submodule_name = package.submodules[i].canonical_name
+            body += '<TD ALIGN="LEFT">%s</TD>' % label
+            row_width [-1] += width
+        body += '</TR></TABLE></TD></TR></TABLE>'
+    
+        # Put together our return value.
+        depth = max([d for (l,d,w) in submodule_labels])+1
+        pkg_color = self._color(package, depth)
+        label = ('<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR>'
+                 '<TD ALIGN="LEFT" HEIGHT="8" WIDTH="16" FIXEDSIZE="true" '
+                 'BORDER="1" VALIGN="BOTTOM" BGCOLOR="%s"></TD></TR><TR>'
+                 '<TD COLSPAN="5" VALIGN="TOP" ALIGN="LEFT" BORDER="1" '
+                 'BGCOLOR="%s" HREF="%s" TOOLTIP="%s">%s</TD></TR></TABLE>' %
+                 (pkg_color, pkg_color, pkg_url, pkg_name, body))
+        width = max(max(row_width), len(pkg_name[-1])+3)
+        return label, depth, width
+    
+    def _color(package, depth):
+        if package == self.context: return SELECTED_BG
+        else: 
+            # Parse the base color.
+            if re.match(MODULE_BG, 'r#[0-9a-fA-F]{6}$'):
+                base = int(MODULE_BG[1:], 16)
+            else:
+                base = int('d8e8ff', 16)
+            red = (base & 0xff0000) >> 16
+            green = (base & 0x00ff00) >> 8
+            blue = (base & 0x0000ff)
+            # Make it darker with each level of depth. (but not *too*
+            # dark -- package name needs to be readable)
+            red = max(64, red-(depth-1)*10)
+            green = max(64, green-(depth-1)*10)
+            blue = max(64, blue-(depth-1)*10)
+            # Convert it back to a color string
+            return '#%06x' % ((red<<16)+(green<<8)+blue)
+        
+
+
+    
 ######################################################################
 #{ Graph Generation Functions
 ######################################################################
@@ -381,7 +943,7 @@ def _nested_package_uml_graph(packages, linker, context=None, **options):
     for package in root_packages:
         html_label, _, _ = _nested_uml_package_label(package, linker, context)
         node = DotGraphNode(html_label=html_label, shape='plaintext',
-                            url=linker.url_for(package),
+                            href=linker.url_for(package) or NOOP_URL,
                             tooltip=package.canonical_name)
         graph.nodes.append(node)
     return graph
@@ -497,6 +1059,88 @@ def class_tree_graph(bases, linker, context=None, **options):
                 edges.add((nodes[cls], nodes[subcls]))
     graph.edges = [DotGraphEdge(src,dst) for (src,dst) in edges]
 
+    return graph
+
+######################################################################
+def uml_class_tree_graph(class_doc, linker, context=None, **options):
+    """
+    Return a `DotGraph` that graphically displays the class hierarchy
+    for the given class, using UML notation.  Options:
+      - max_attributes
+      - max_operations
+      - show_private_vars
+      - show_magic_vars
+      - link_attributes
+    """
+    nodes = {} # ClassDoc -> DotGraphUmlClassNode
+
+    # Create nodes for class_doc and all its bases.
+    for cls in class_doc.mro():
+        if cls.pyval is object: continue # don't include `object`.
+        if cls == class_doc: color = SELECTED_BG
+        else: color = BASECLASS_BG
+        nodes[cls] = DotGraphUmlClassNode(cls, linker, context,
+                                          show_inherited_vars=False,
+                                          collapsed=False, bgcolor=color)
+
+    # Create nodes for all class_doc's subclasses.
+    queue = [class_doc]
+    for cls in queue:
+        if cls.subclasses not in (None, UNKNOWN):
+            queue.extend(cls.subclasses)
+            for cls in cls.subclasses:
+                if cls not in nodes:
+                    nodes[cls] = DotGraphUmlClassNode(cls, linker, context,
+                                                      collapsed=True,
+                                                      bgcolor=SUBCLASS_BG)
+                    
+    # Only show variables in the class where they're defined for
+    # *class_doc*.
+    mro = class_doc.mro()
+    for name, var in class_doc.variables.items():
+        i = mro.index(var.container)
+        for base in mro[i+1:]:
+            if base.pyval is object: continue # don't include `object`.
+            overridden_var = base.variables.get(name)
+            if overridden_var and overridden_var.container == base:
+                try:
+                    if isinstance(overridden_var.value, RoutineDoc):
+                        nodes[base].operations.remove(overridden_var)
+                    else:
+                        nodes[base].attributes.remove(overridden_var)
+                except ValueError:
+                    pass # var is filtered (eg private or magic)
+
+    # Keep track of which nodes are part of the inheritance graph
+    # (since link_attributes might add new nodes)
+    inheritance_nodes = set(nodes.values())
+        
+    # Turn attributes into links.
+    if options.get('link_attributes', True):
+        for node in nodes.values():
+            node.link_attributes(nodes)
+            # Make sure that none of the new attribute edges break the
+            # rank ordering assigned by inheritance.
+            for edge in node.edges:
+                if edge.end in inheritance_nodes:
+                    edge['constraint'] = 'False'
+                
+    # Construct the graph.
+    graph = DotGraph('UML class diagram for %s' % class_doc,
+                     body='ranksep=.2\n;nodesep=.3\n')
+    graph.nodes = nodes.values()
+    
+    # Add inheritance edges.
+    for node in inheritance_nodes:
+        for base in node.class_doc.bases:
+            if base in nodes:
+                graph.edges.append(DotGraphEdge(nodes[base], node,
+                              dir='back', arrowtail='empty',
+                              headport='body', tailport='body',
+                              color=INH_LINK_COLOR, weight=100,
+                              style='bold'))
+
+    # And we're done!
     return graph
 
 ######################################################################
@@ -633,9 +1277,7 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
         specialize_valdoc_node(node, val_doc, context, linker.url_for(val_doc))
     return nodes
 
-NOOP_URL = '#'
-NOOP_URL = 'javascript:;' # this option is more evil.
-
+NOOP_URL = 'javascript: void(0);'
 MODULE_NODE_HTML = '''
   <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"
          CELLPADDING="0" PORT="table" ALIGN="LEFT">
@@ -644,8 +1286,6 @@ MODULE_NODE_HTML = '''
   <TR><TD ALIGN="LEFT" VALIGN="TOP" BGCOLOR="%s" BORDER="1"
           PORT="body" HREF="%s" TOOLTIP="%s">%s</TD></TR>
   </TABLE>'''.strip()
-MODULE_BG = '#d8e8ff'
-SELECTED_BG = '#ffd0d0'
 
 def specialize_valdoc_node(node, val_doc, context, url):
     """

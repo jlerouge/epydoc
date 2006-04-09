@@ -69,7 +69,7 @@ from epydoc.apidoc import UNKNOWN
 import ConfigParser
 
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
-GRAPH_TYPES = ('classtree', 'callgraph')
+GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'
 
