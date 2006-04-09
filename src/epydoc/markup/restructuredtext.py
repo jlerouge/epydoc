@@ -353,6 +353,10 @@ class _SplitFieldsTranslator(NodeVisitor):
         # item should have the form:
         #   - `arg`: description...
         n = 0
+        _BAD_ITEM = ("list item %d is not well formed.  Each item must "
+                     "consist of a single marked identifier (e.g., `x`), "
+                     "optionally followed by a colon or dash and a "
+                     "description.")
         for item in items:
             n += 1
             if item.tagname != 'list_item' or len(item) == 0: 
@@ -363,14 +367,11 @@ class _SplitFieldsTranslator(NodeVisitor):
                                       'list (it\'s probably indented '+
                                       'wrong).') % n)
                 else:
-                    raise ValueError(('list item %d does not begin with '+
-                                      'an identifier.') % n)
+                    raise ValueError(_BAD_ITEM % n)
             if len(item[0]) == 0: 
-                raise ValueError(('list item %d does not begin with '+
-                                  'an identifier.') % n)
+                raise ValueError(_BAD_ITEM % n)
             if item[0][0].tagname != 'title_reference':
-                raise ValueError(('list item %d does not begin with '+
-                                  'an identifier.') % n)
+                raise ValueError(_BAD_ITEM % n)
 
         # Everything looks good; convert to multiple fields.
         for item in items:
@@ -397,21 +398,23 @@ class _SplitFieldsTranslator(NodeVisitor):
     def handle_consolidated_definition_list(self, items, tagname):
         # Check the list contents.
         n = 0
+        _BAD_ITEM = ("item %d is not well formed.  Each item's term must "
+                     "consist of a single marked identifier (e.g., `x`), "
+                     "optionally followed by a space, colon, space, and "
+                     "a type description.")
         for item in items:
             n += 1
             if (item.tagname != 'definition_list_item' or len(item) < 2 or
                 item[0].tagname != 'term' or
                 item[-1].tagname != 'definition'):
-                raise ValueError('bad definition list (bad child).')
+                raise ValueError('bad definition list (bad child %d).' % n)
             if len(item) > 3:
-                raise ValueError('list item %d has multiple classifiers' % n)
+                raise ValueError(_BAD_ITEM % n)
             if item[0][0].tagname != 'title_reference':
-                raise ValueError('list item %d does not begin with an '
-                                 'identifier' % n)
+                raise ValueError(_BAD_ITEM % n)
             for child in item[0][1:]:
                 if child.astext() != '':
-                    raise ValueError('list item %d does not begin with an '
-                                     'identifier' % n)
+                    raise ValueError(_BAD_ITEM % n)
 
         # Extract it.
         for item in items:
@@ -441,8 +444,11 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         LaTeXTranslator.__init__(self, document)
         self._linker = docstring_linker
 
-        # Start at section level 3.
+        # Start at section level 3.  (Unfortunately, we now have to
+        # set a private variable to make this work; perhaps the standard
+        # latex translator should grow an official way to spell this?)
         self.section_level = 3
+        self._section_number = [0]*self.section_level
 
     # Handle interpreted text (crossreferences)
     def visit_title_reference(self, node):
