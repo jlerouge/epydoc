@@ -131,7 +131,7 @@ a.pysrc-toggle     { text-decoration: none; }
                      padding-left: .4em; }
 .lineno            { font-style: italic; font-size: 90%;
                      padding-left: .5em; }
-a.py-name          { text-decoration: none; }
+/*a.py-name          { text-decoration: none; }*/
 
 /* For Graphs */
 .graph-without-title  { border: none; }
