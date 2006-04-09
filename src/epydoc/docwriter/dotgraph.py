@@ -338,7 +338,7 @@ class DotGraphEdge:
 
 class DotGraphUmlClassNode(DotGraphNode):
     """
-    A specialized dot graph node used to display C{ClassDoc}s using
+    A specialized dot graph node used to display `ClassDoc`\s using
     UML notation.  The node is rendered as a table with three cells:
     the top cell contains the class name; the middle cell contains a
     list of attributes; and the bottom cell contains a list of
@@ -354,7 +354,7 @@ class DotGraphUmlClassNode(DotGraphNode):
          |     ...     |
          +-------------+
 
-    `DotGraphUmlClassNode`s may be *collapsed*, in which case they are
+    `DotGraphUmlClassNode`\s may be *collapsed*, in which case they are
     drawn as a simple box containing the class name::
     
          +-------------+
@@ -379,16 +379,16 @@ class DotGraphUmlClassNode(DotGraphNode):
         `class_doc`.
 
         :Parameters:
-            linker: `DocstringLinker<markup.DocstringLinker>`
+            `linker` : `DocstringLinker<markup.DocstringLinker>`
                 Used to look up URLs for classes.
-            context: `APIDoc`
+            `context` : `APIDoc`
                 The context in which this node will be drawn; dotted
                 names will be contextualized to this context.
-            collapsed: ``bool``
+            `collapsed` : ``bool``
                 If true, then display this node as a simple box.
-            bgcolor: ``str``
+            `bgcolor` : ``str``
                 The background color for this node.
-            options: ``dict``
+            `options` : ``dict``
                 A set of options used to control how the node should
                 be displayed.
 
@@ -512,8 +512,8 @@ class DotGraphUmlClassNode(DotGraphNode):
         by `DotGraphUmlClassNode`; they should *not* be added directly
         to the `DotGraph`.
 
-        :param nodes: A dictionary mapping from `ClassDoc`s to
-            `DotGraphUmlClassNode`s, used to look up the nodes for
+        :param nodes: A dictionary mapping from `ClassDoc`\s to
+            `DotGraphUmlClassNode`\s, used to look up the nodes for
             attribute types.  If the ``add_nodes_for_linked_attributes``
             option is used, then new nodes will be added to this
             dictionary for any types that are not already listed.
@@ -776,7 +776,7 @@ class DotGraphUmlClassNode(DotGraphNode):
 
 class DotGraphUmlModuleNode(DotGraphNode):
     """
-    A specialized dot grah node used to display C{ModuleDoc}s using
+    A specialized dot grah node used to display `ModuleDoc`\s using
     UML notation.  Simple module nodes look like::
 
         .----.
@@ -1024,6 +1024,7 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
     """
     Return a `DotGraph` that graphically displays the class hierarchy
     for the given class, using UML notation.  Options:
+    
       - max_attributes
       - max_operations
       - show_private_vars
