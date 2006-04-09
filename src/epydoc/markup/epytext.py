@@ -1325,7 +1325,7 @@ def to_plaintext(tree, indent=0, seclevel=0):
         else: return '%r<%s>' % (variables[0], variables[1])
     elif tree.tagName == 'link':
         if len(variables) != 2: raise ValueError('Bad Link')
-        return '%s' % variables[1]
+        return '%s' % variables[0]
     elif tree.tagName in ('olist', 'ulist'):
         # [xx] always use condensed lists.
         ## Use a condensed list if each list item is 1 line long.
