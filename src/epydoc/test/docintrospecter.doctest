@@ -117,18 +117,18 @@ Unlike the parser, arbitrary computed values can be extracted:
     ...         if x>100: return x
     ...         else: return f((x+2)*8/7)
     ...     x = f(12)
-    ...     """, attribs="variables value repr")
+    ...     """, attribs="variables value pyval")
     ModuleDoc for epydoc_test [0]
-     +- repr = u"<module 'epydoc_test' from ...
+     +- pyval = <module 'epydoc_test' from ...
      +- variables
         +- f => VariableDoc for epydoc_test.f [1]
         |  +- value
         |     +- RoutineDoc for epydoc_test.f [2]
-        |        +- repr = u'<function f at ...>'
+        |        +- pyval = <function f at ...>
         +- x => VariableDoc for epydoc_test.x [3]
            +- value
-              +- ValueDoc [4]
-                 +- repr = u'112'
+              +- GenericValueDoc [4]
+                 +- pyval = 112
 
 The introspecter is unable to determine when variables are aliases for
 other variables, so it always sets `is_alias` to `UNKNOWN`:
@@ -208,10 +208,10 @@ Introspected functions are represented by `RoutineDoc` objects:
      +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = None
+     +- lineno = 2
      +- posarg_defaults = [None]
      +- posargs = ['x']
      +- pyval = <function f at ...>
-     +- repr = u'<function f at ...>'
      +- vararg = None
 
 The function's arguments are described by the properties `posargs`,
@@ -232,10 +232,10 @@ of the variable argument and keyword argument, respectively:
      +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = 'kw'
-     +- posarg_defaults = [None, <ValueDoc 22>, <ValueDoc 1>]
+     +- lineno = 2
+     +- posarg_defaults = [None, <GenericValueDoc 22>, <Generic...
      +- posargs = ['x', 'y', 'z']
      +- pyval = <function f at ...>
-     +- repr = u'<function f at ...>'
      +- vararg = 'v'
 
 Tuple arguments are encoded as a single ArgDoc with a complex name:
@@ -269,10 +269,10 @@ instance method:
      +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring'
      +- kwarg = None
+     +- lineno = 3
      +- posarg_defaults = [None]
      +- posargs = ['x']
      +- pyval = <bound method A.f of <epydoc_test.A i...
-     +- repr = u'<bound method A.f of <epydoc_test.A...
      +- vararg = None
 
 Decorators & Wrapper Assignments
@@ -286,10 +286,10 @@ Decorators & Wrapper Assignments
      +- docs_extracted_by = 'introspecter'
      +- docstring = u'docstring for f'
      +- kwarg = None
+     +- lineno = 2
      +- posarg_defaults = [None, None]
      +- posargs = ['cls', 'x']
      +- pyval = <classmethod object at ...>
-     +- repr = u'<classmethod object at ...>'
      +- vararg = None
 
 Classes
@@ -386,13 +386,11 @@ Deleting variables:
     ...     """,
     ...     attribs='variables value repr is_alias')
     ModuleDoc for epydoc_test [0]
-     +- repr = u"<module 'epydoc_test' from ...
      +- variables
         +- x => VariableDoc for epydoc_test.x [1]
            +- is_alias = <UNKNOWN>
            +- value
-              +- ValueDoc [2]
-                 +- repr = u'12'
+              +- GenericValueDoc [2]
 
 The right-hand side of a `del` statement may contain a nested
 combination of lists, tuples, and parenthases.  All variables found
@@ -447,7 +445,7 @@ namespace.
                  +- variables
                     +- b => VariableDoc for epydoc_test.A.b [3]
                        +- value
-                          +- ValueDoc [4]
+                          +- GenericValueDoc [4]
 
 Slice deletes:
 
@@ -543,7 +541,7 @@ Assignments Into Namespaces
      +- variables
         +- x => VariableDoc for epydoc_test.A.x [1]
            +- value
-              +- ValueDoc [2]
+              +- GenericValueDoc [2]
 
 Recursive objects
 =================
@@ -566,7 +564,6 @@ Recursive objects
      +- docs_extracted_by = 'introspecter'
      +- docstring = u'A base referring to a child'
      +- pyval = <class epydoc_test.A at ...>
-     +- repr = u'<class epydoc_test.A at ...>'
      +- subclasses
      |  +- ClassDoc for epydoc_test.B [1]
      |     +- bases
@@ -575,7 +572,6 @@ Recursive objects
      |     +- docs_extracted_by = 'introspecter'
      |     +- docstring = u'Its child.'
      |     +- pyval = <class epydoc_test.B at ...>
-     |     +- repr = u'<class epydoc_test.B at ...>'
      |     +- subclasses = []
      |     +- variables = {}
      +- variables
