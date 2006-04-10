@@ -457,8 +457,7 @@ def _get_docs_from_submodules(item, pkg_docs, introspect, parse,
 
 def _report_errors(name, introspect_doc, parse_doc,
                    introspect_error, parse_error):
-    if len(name) < 30: hdr = 'In %s: ' % name
-    else: hdr = 'In %s:\n' % name
+    hdr = 'In %s:\n' % name
     if introspect_doc == parse_doc == None:
         log.start_block('%sNo documentation available!' % hdr)
         if introspect_error:
