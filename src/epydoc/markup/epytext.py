@@ -1831,14 +1831,14 @@ class ParsedEpytextDocstring(ParsedDocstring):
             else:
                 return '[??]'
         elif tree.tagName == 'graph':
+            # Generate the graph.
             graph = self._build_graph(variables[0], variables[1:], linker,
                                       docindex, context)
             if not graph: return ''
-            # Write the graph's image to a file
-            path = os.path.join(directory, graph.uid)
-            if not graph.write('%s.gif' % path, 'gif'):
-                return ''
-            return graph.to_html('%s.gif' % graph.uid)
+            # Write the graph.
+            image_url = '%s.gif' % graph.uid
+            image_file = os.path.join(directory, image_url)
+            return graph.to_html(image_file, image_url)
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tagName)
 

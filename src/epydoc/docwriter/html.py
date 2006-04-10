@@ -1334,18 +1334,13 @@ class HTMLWriter:
     #{ 2.10. Graphs
     #////////////////////////////////////////////////////////////
 
+    # [xx] use DotGraph.to_html??
     def render_graph(self, graph, css='graph-without-title'):
         if graph is None: return ''
-        # Write the graph's image to a file
-        path = os.path.join(self._directory, graph.uid)
-        if not graph.write('%s.gif' % path, 'gif'):
-            return ''
-        # Generate the image map.
-        cmapx = graph.render('cmapx') or ''
-        # Display the graph.
-        uid = graph.uid
-        return ('%s\n<img src="%s.gif" alt="%s" usemap="#%s" ismap="ismap" '
-                'class="%s"/>\n' % (cmapx, uid, uid, uid, css))
+        graph.caption = graph.title = None
+        image_url = '%s.gif' % graph.uid
+        image_file = os.path.join(self._directory, image_url)
+        return graph.to_html(image_file, image_url)
     
     def render_callgraph(self, callgraph):
         graph_html = self.render_graph(callgraph, css='graph-with-title')

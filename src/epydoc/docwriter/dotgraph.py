@@ -128,7 +128,7 @@ class DotGraph:
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
 
-    def to_html(self, image_url, center=True):
+    def to_html(self, image_file, image_url, center=True):
         """
         Return the HTML code that should be uesd to display this graph
         (including a client-side image map).
@@ -136,7 +136,17 @@ class DotGraph:
         :param image_url: The URL of the image file for this graph;
             this should be generated separately with the `write()` method.
         """
-        cmapx = self.render('cmapx') or ''
+        # If dotversion >1.8.10, then we can generate the image and
+        # the cmapx with a single call to dot.  Otherwise, we need to
+        # run dot twice.
+        if get_dot_version() > [1,8,10]:
+            cmapx = self._run_dot('-Tgif', '-o%s' % image_file, '-Tcmapx')
+            if cmapx is None: return '' # failed to render
+        else:
+            if not self.write(image_file):
+                return '' # failed to render
+            cmapx = self.render('cmapx') or ''
+            
         title = plaintext_to_html(self.title or '')
         caption = plaintext_to_html(self.caption or '')
         if title or caption:
@@ -209,14 +219,12 @@ class DotGraph:
         
         :return: True if rendering was successful.
         """
-        s = self.render(language)
-        if s is not None:
-            out = open(filename, 'wb')
-            out.write(s)
-            out.close()
-            return True
-        else:
-            return False
+        result = self._run_dot('-T%s' % language,
+                               '-o%s' % filename)
+        # Decode into unicode, if necessary.
+        if language == 'cmapx' and result is not None:
+            result = result.decode('utf-8')
+        return (result is not None)
 
     def render(self, language='gif'):
         """
@@ -224,14 +232,13 @@ class DotGraph:
         format `language`.  Return the result as a string, or `None`
         if the rendering failed.
         """
+        return self._run_dot('-T%s' % language)
+
+    def _run_dot(self, *options):
         try:
-            result, err = run_subprocess([DOT_COMMAND, '-T%s' % language],
+            result, err = run_subprocess((DOT_COMMAND,)+options,
                                          self.to_dotfile())
-            # Decode into unicode, if necessary.
-            if language == 'cmapx' and result is not None:
-                result = result.decode('utf-8')
-            if err:
-                log.warning("Graphviz dot warning(s):\n%s" % err)
+            if err: log.warning("Graphviz dot warning(s):\n%s" % err)
         except OSError, e:
             log.warning("Unable to render Graphviz dot graph:\n%s" % e)
             #log.debug(self.to_dotfile())

@@ -533,11 +533,11 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         # Generate the graph.
         graph = node.graph(self._docindex, self._context, self._linker)
         if graph is None: return
-        # Write the graph's image to a file
-        path = os.path.join(self._directory, graph.uid)
-        if not graph.write('%s.gif' % path, 'gif'):
-            return
-        self.body.append(graph.to_html('%s.gif' % graph.uid))
+        
+        # Write the graph.
+        image_url = '%s.gif' % graph.uid
+        image_file = os.path.join(self._directory, image_url)
+        self.body.append(graph.to_html(image_file, image_url))
 
     def depart_dotgraph(self, node):
         pass # Nothing to do.
