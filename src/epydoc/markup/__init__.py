@@ -77,6 +77,38 @@ from epydoc.compat import *
 ## Dispatcher
 ##################################################
 
+_markup_language_registry = {
+    'restructuredtext': 'epydoc.markup.restructuredtext',
+    'epytext': 'epydoc.markup.epytext',
+    'plaintext': 'epydoc.markup.plaintext',
+    'javadoc': 'epydoc.markup.javadoc',
+    }
+
+def register_markup_language(name, parse_function):
+    """
+    Register a new markup language named C{name}, which can be parsed
+    by the function C{parse_function}.
+
+    @param name: The name of the markup language.  C{name} should be a
+    simple identifier, such as C{'epytext'} or C{'restructuredtext'}.
+    Markup language names are case insensitive.
+
+    @param parse_function: A function which can be used to parse the
+        markup language, and returns a L{ParsedDocstring}.  It should
+        have the following signature:
+
+            >>> def parse(s, errors):
+            ...     'returns a ParsedDocstring'
+
+        Where:
+            - C{s} is the string to parse.  (C{s} will be a unicode
+              string.)
+            - C{errors} is a list; any errors that are generated
+              during docstring parsing should be appended to this
+              list (as L{ParseError} objects).
+    """
+    _markup_language_registry[name.lower()] = parse_function
+
 MARKUP_LANGUAGES_USED = set()
 
 def parse(docstring, markup='plaintext', errors=None, **options):
@@ -115,14 +147,28 @@ def parse(docstring, markup='plaintext', errors=None, **options):
     if not re.match(r'\w+', markup):
         _parse_warn('Bad markup language name %r.  Treating '
                     'docstrings as plaintext.' % markup)
+        import epydoc.markup.plaintext as plaintext
         return plaintext.parse_docstring(docstring, errors, **options)
 
     # Is the markup language supported?
-    try: exec('from epydoc.markup.%s import parse_docstring' % markup)
-    except ImportError:
+    if markup not in _markup_language_registry:
         _parse_warn('Unsupported markup language %r.  Treating '
                     'docstrings as plaintext.' % markup)
+        import epydoc.markup.plaintext as plaintext
         return plaintext.parse_docstring(docstring, errors, **options)
+
+    # Get the parse function.
+    parse_docstring = _markup_language_registry[markup]
+
+    # If it's a string, then it names a function to import.
+    if isinstance(parse_docstring, basestring):
+        try: exec('from %s import parse_docstring' % parse_docstring)
+        except ImportError, e:
+            _parse_warn('Error importing %s for markup language %s: %s' %
+                        (parse_docstring, markup, e))
+            import epydoc.markup.plaintext as plaintext
+            return plaintext.parse_docstring(docstring, errors, **options)
+        _markup_language_registry[markup] = parse_docstring
 
     # Keep track of which markup languages have been used so far.
     MARKUP_LANGUAGES_USED.add(markup)
@@ -134,12 +180,14 @@ def parse(docstring, markup='plaintext', errors=None, **options):
         if epydoc.DEBUG: raise
         log.error('Internal error while parsing a docstring: %s; '
                   'treating docstring as plaintext' % e)
+        import epydoc.markup.plaintext as plaintext
         return plaintext.parse_docstring(docstring, errors, **options)
 
     # Check for fatal errors.
     fatal_errors = [e for e in errors if e.is_fatal()]
     if fatal_errors and raise_on_error: raise fatal_errors[0]
     if fatal_errors:
+        import epydoc.markup.plaintext as plaintext
         return plaintext.parse_docstring(docstring, errors, **options)
 
     return parsed_docstring
@@ -569,11 +617,3 @@ def parse_type_of(obj):
         code.appendChild(doc.createTextNode(type(obj).__name__))
     return ParsedEpytextDocstring(doc)
 
-##################################################
-## Sub-module Imports
-##################################################
-# By default, just import plaintext.  That way we don't have to wait
-# for other modules (esp restructuredtext) to load if we're not going
-# to use them.
-
-import plaintext
