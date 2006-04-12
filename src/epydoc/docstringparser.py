@@ -260,7 +260,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
     # [xx] Don't report markup errors for standard builtins.
     if (isinstance(api_doc, ValueDoc) and api_doc != module and
         (api_doc.pyval in __builtin__.__dict__.values() or
-         (module is not None and 
+         (module not in (None, UNKNOWN) and 
           module.pyval in (__builtin__, exceptions)))):
         return
 
