@@ -29,7 +29,7 @@ import token, tokenize
 # Finding modules:
 import imp
 # File services:
-import os, os.path
+import os, os.path, sys
 # Unicode:
 import codecs
 # API documentation encoding:
@@ -162,7 +162,7 @@ it do to the documentation of the decorated function?
     knowledge about what value the decorator returns.
 """
 
-BASE_HANDLING = 'link'
+BASE_HANDLING = 'parse'#'link'
 """What should C{docparser} do when it encounters a base class that
 was imported from another module?
   - C{'link'}: Create a valuedoc with a C{proxy_for} pointer to the
@@ -381,13 +381,10 @@ def _find(name, package_doc=None):
     # If we're inside a package, then find the package's path.
     if package_doc is None:
         path = None
+    elif package_doc.path is not UNKNOWN:
+        path = package_doc.path
     else:
-        try:
-            # [XXX]
-            path_ast = module_doc.variables['__path__'].value.ast
-            path = extract_string_list(path_ast)
-        except:
-            path = [os.path.split(package_doc.filename)[0]]
+        path = [os.path.split(package_doc.filename)[0]]
 
     # The leftmost identifier in `name` should be a module or
     # package on the given path; find it and parse it.
@@ -552,8 +549,6 @@ def process_file(module_doc):
     tok_iter = tokenize.generate_tokens(module_file.readline)
     for toktype, toktext, (srow,scol), (erow,ecol), line_str in tok_iter:
         # BOM encoding marker: ignore.
-        if toktype == token.ERRORTOKEN:
-            log.debug(type(toktext), `toktext`)
         if (toktype == token.ERRORTOKEN and
             (toktext == u'\ufeff' or
              toktext.encode(encoding) == '\xef\xbb\xbf')):
@@ -650,7 +645,7 @@ def process_file(module_doc):
                     raise ParseError('Error during parsing: invalid '
                                      'syntax (%s, line %d) -- %s' %
                                      (module_doc.filename, lineno, e))
-                except KeyboardError, e: raise
+                except KeyboardInterrupt, e: raise
                 except Exception, e:
                     log.error('Internal error during parsing (%s, line '
                               '%s):\n%s' % (module_doc.filename, lineno, e))
@@ -1521,21 +1516,32 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
 
     return class_doc
 
+def _proxy_base(**attribs):
+    return ClassDoc(variables={}, sort_spec=[], bases=[], subclasses=[], 
+                    docs_extracted_by='parser', **attribs)
+
 def find_base(name, parent_docs):
     assert isinstance(name, DottedName)
 
     # Find the variable containing the base.
     base_var = lookup_variable(name, parent_docs)
     if base_var is None:
-        # If it looks like it's in an external module, then try
-        # "importing" it.
-        if (lookup_name(name[0], parent_docs).imported_from not in
-            (None, UNKNOWN)):
-            _import_var(name, parent_docs)
-            base_var = lookup_variable(name, parent_docs)
-        # If we still don't have a var containing the base, give up.
+        # If we didn't find it, then it must have been imported.
+        # First, check if it looks like it's contained in any
+        # known imported variable:
+        if len(name) > 1:
+            src = lookup_name(name[0], parent_docs)
+            if (src is not None and
+                src.imported_from not in (None, UNKNOWN)):
+                _import_var(name, parent_docs)
+                base_var = lookup_variable(name, parent_docs)
+        # Otherwise, it must have come from an "import *" statement
+        # (or from magic, such as direct manipulation of the module's
+        # dictionary), so we don't know where it came from.  So
+        # there's nothing left but to use an empty proxy.
         if base_var is None:
-            raise ParseError("Could not find %s" % name)
+            return _proxy_base(parse_repr=str(name))
+            #raise ParseError("Could not find %s" % name)
 
     # If the variable has a value, return that value.
     if base_var.value != UNKNOWN:
@@ -1546,20 +1552,24 @@ def find_base(name, parent_docs):
     # just make a proxy object.
     if base_var.imported_from not in (None, UNKNOWN):
         if BASE_HANDLING == 'parse':
+            old_sys_path = sys.path
             try:
-                return parse_docs(name=base_var.imported_from)
-            except ParseError:
-                pass
+                dirname = os.path.split(parent_docs[0].filename)[0]
+                sys.path = [dirname] + sys.path
+                try:
+                    return parse_docs(name=str(base_var.imported_from))
+                except ParseError:
+                    log.info('Unable to parse base', base_var.imported_from)
+                except ImportError:
+                    log.info('Unable to find base', base_var.imported_from)
+            finally:
+                sys.path = old_sys_path
+                
         # Either BASE_HANDLING='link' or parsing the base class failed;
         # return a proxy value for the base class.
-        return ClassDoc(variables={}, sort_spec=[], bases=[],
-                        subclasses=[], proxy_for=base_var.imported_from,
-                        docs_extracted_by='parser')
+        return _proxy_base(proxy_for=base_var.imported_from)
     else:
-        raise ParseError() # no value available for var.
-                    
-                    
-    
+        return _proxy_base(parse_repr=str(name))
 
 #/////////////////////////////////////////////////////////////////
 #{ Parsing
