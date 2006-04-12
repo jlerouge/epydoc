@@ -102,8 +102,7 @@ checkdocs:
 	cp -r $(DOCS) $(WEBDIR)
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
-	@echo "Skipping pdf generation (not implemented yet)"
-#	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
+	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
 	touch .webpage.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
@@ -111,18 +110,17 @@ checkdocs:
 # xml.dom.minidom and a few Docutils modules get plaintext
 # docstrings).
 api-html: .api-html.up2date
-.api-html.up2date: $(PY_SRCFILES)
+.api-html.up2date: $(PY_SRCFILES) #profile.out
 	rm -rf $(HTML_API)
 	mkdir -p $(HTML_API)
 	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
-	       --url http://epydoc.sourceforge.net \
+	       --url http://epydoc.sourceforge.net --pstat profile.out \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
-	       --docformat plaintext -v --graph classtree $(PY_SRC)
+	       --docformat plaintext -v --graph all $(PY_SRC)
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
 .api-pdf.up2date: $(PY_SRCFILES)
-	@echo "Skipping pdf generation (not implemented yet)"
 	rm -rf $(LATEX_API)
 	mkdir -p $(LATEX_API)
 	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
@@ -135,33 +133,36 @@ examples: .examples.up2date
 	mkdir -p $(HTML_EXAMPLES)
 	$(EPYDOC) -o $(HTML_EXAMPLES) --name epydoc \
 	       --url http://epydoc.sourceforge.net \
-	       --css blue --top example --docformat=plaintext \
+	       --css white --top epytext_example --docformat=plaintext \
 	       --navlink 'epydoc examples' doc/epytext_example.py sre
 	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped \
 	       --inheritance=grouped \
 	       --name epydoc --url http://epydoc.sourceforge.net \
-	       --css blue --debug \
+	       --css white --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	$(EPYDOC) -o $(HTML_EXAMPLES)/listed \
 	       --inheritance=listed \
 	       --name epydoc --url http://epydoc.sourceforge.net \
-	       --css blue --debug \
+	       --css white --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	$(EPYDOC) -o $(HTML_EXAMPLES)/included \
 	       --inheritance=included \
 	       --name epydoc --url http://epydoc.sourceforge.net \
-	       --css blue --debug \
+	       --css white --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
 	touch .examples.up2date
 
 # Generate the HTML version of the man page.  Note: The
 # post-processing clean-up that I do is probably *not* very portable.
 doc/epydoc-man.html: man/epydoc.1
-	wget http://localhost/cgi-bin/man2html?epydoc -O - \
-	     2>/dev/null \
-	     | sed 's/<\/HEAD><BODY>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD><BODY>/'\
+	man2html man/epydoc.1 \
+	     | sed 's/<\/HEAD>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD>/' \
+	     | sed 's/<H1>EPYDOC<\/H1>/<H1>epydoc (1)<\/H1>/' \
+	     | sed 's/<BODY>/<BODY><DIV CLASS="BODY">/'\
+	     | sed 's/Content-type:.*//' \
+	     | sed '/Section: User Commands/,/<HR>/{s/.*//;}'\
+	     | sed 's/<\/BODY>/<\/DIV><\/BODY>/'\
 	     | sed '/<DD>/{s/<DD>//; :loop; n; b loop;}'\
-	     | sed '/<H1>/,/<HR>/{s/.*//;}'\
 	     | sed 's/\(<A NAME=".*">\)&nbsp;<\/A>/\1/'\
 	     | sed 's/<\/H2>/<\/H2><\/A>/'\
 	     | sed 's/"\/cgi-bin\/man2html?epydocgui+1"/"epydocgui-man.html"/'\
@@ -169,15 +170,27 @@ doc/epydoc-man.html: man/epydoc.1
 	     > doc/epydoc-man.html
 
 doc/epydocgui-man.html: man/epydocgui.1
-	wget http://localhost/cgi-bin/man2html?epydocgui -O - \
-	     2>/dev/null \
-	     | sed 's/<\/HEAD><BODY>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD><BODY>/'\
-	     | sed '/<H1>/,/<HR>/{s/.*//;}'\
+	man2html man/epydocgui.1 \
+	     | sed 's/<\/HEAD>/<link rel="stylesheet" href="epydoc.css" type="text\/css"\/><\/HEAD>/' \
+	     | sed 's/<H1>EPYDOCGUI<\/H1>/<H1>epydocgui (1)<\/H1>/'\
+	     | sed 's/<BODY>/<BODY><DIV CLASS="BODY">/'\
+	     | sed 's/Content-type:.*//' \
+	     | sed '/Section: User Commands/,/<HR>/{s/.*//;}'\
+	     | sed 's/<\/BODY>/<\/DIV><\/BODY>/'\
+	     | sed '/<DD>/{s/<DD>//; :loop; n; b loop;}'\
 	     | sed 's/\(<A NAME=".*">\)&nbsp;<\/A>/\1/'\
 	     | sed 's/<\/H2>/<\/H2><\/A>/'\
-	     | sed 's/"\/cgi-bin\/man2html?epydoc+1"/"epydoc-man.html"/'\
+	     | sed 's/"\/cgi-bin\/man2html?epydocgui+1"/"epydocgui-man.html"/'\
 	     | sed 's/<A HREF="\/cgi-bin\/man2html">man2html<\/A>/man2html/'\
 	     > doc/epydocgui-man.html
+
+# [XX] A bug in the profiler for py 2.4 prevents this from working!!
+profile.out: $(PY_SRCFILES)
+	$(EPYDOC) -o profile.tmp --name epydoc --css white \
+	       --url http://epydoc.sourceforge.net --profile-epydoc \
+	       --inheritance=listed --navlink "epydoc $(VERSION)"\
+	       --docformat plaintext -v --graph all $(PY_SRC)
+	rm -rf profile.tmp
 
 ##//////////////////////////////////////////////////////////////////////
 ## Standard Library docs
@@ -190,15 +203,18 @@ SLFILES = $(shell find /usr/lib/$(PYTHON)/ -name '*.py' -o -name '*.so' \
 	      |grep -v "/$(PYTHON)/lib-old/" \
 	      |grep -v "/$(PYTHON)/site-packages/" \
               |grep -v "/$(PYTHON)/__phello__\.foo\.py" )
+PY_PRINT_BUILTINS = "import sys; print ' '.join(sys.builtin_module_names)"
+SLBUILTINS = $(shell $(PYTHON) -c $(PY_PRINT_BUILTINS))
+
 export TZ='XXX00XXX;000/00,000/00' # So tzparse won't die.
 stdlib-html: .stdlib-html.up2date
 .stdlib-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML_STDLIB)
 	mkdir -p $(HTML_STDLIB)
 	@echo "Building stdlib html docs..."
-	@$(EPYDOC) -o $(HTML_STDLIB) --css white \
-	       --name $(SLNAME) --url $(SLURL) --debug \
-	       --show-imports __builtin__ $(SLFILES)
+	@$(EPYDOC) -o $(HTML_STDLIB) --css white --name $(SLNAME) \
+	       --url $(SLURL) --debug --graph classtree \
+	       --show-imports $(SLBUILTINS) $(SLFILES)
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
