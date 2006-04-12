@@ -1002,14 +1002,16 @@ def class_tree_graph(bases, linker, context=None, **options):
     classes = set(bases)
     queue = list(bases)
     for cls in queue:
-        if cls.subclasses not in (None, UNKNOWN):
-            queue.extend(cls.subclasses)
-            classes.update(cls.subclasses)
+        if isinstance(cls, ClassDoc):
+            if cls.subclasses not in (None, UNKNOWN):
+                queue.extend(cls.subclasses)
+                classes.update(cls.subclasses)
     queue = list(bases)
     for cls in queue:
-        if cls.bases not in (None, UNKNOWN):
-            queue.extend(cls.bases)
-            classes.update(cls.bases)
+        if isinstance(cls, ClassDoc):
+            if cls.bases not in (None, UNKNOWN):
+                queue.extend(cls.bases)
+                classes.update(cls.bases)
 
     # Add a node for each cls.
     classes = [d for d in classes if isinstance(d, ClassDoc)
@@ -1052,7 +1054,8 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
     # Create nodes for all class_doc's subclasses.
     queue = [class_doc]
     for cls in queue:
-        if cls.subclasses not in (None, UNKNOWN):
+        if (isinstance(cls, ClassDoc) and
+            cls.subclasses not in (None, UNKNOWN)):
             queue.extend(cls.subclasses)
             for cls in cls.subclasses:
                 if cls not in nodes:
