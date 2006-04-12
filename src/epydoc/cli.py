@@ -38,10 +38,14 @@ option names::
 A simple example of a config file is::
 
   [epydoc]
-  modules: sys, os, os.path, re
+  modules: sys, os, os.path, re, %(MYSANDBOXPATH)/utilities.py
   name: Example
   graph: classtree
   introspect: no
+
+All ConfigParser interpolations are done using local values and the
+environment variables.
+
 
 Verbosity Levels
 ================
@@ -300,7 +304,7 @@ def parse_configfiles(configfiles, options, names):
         configparser.readfp(fp, configfile)
         fp.close()
     for optname in configparser.options('epydoc'):
-        val = configparser.get('epydoc', optname).strip()
+        val = configparser.get('epydoc', optname, vars=os.environ).strip()
         optname = optname.lower().strip()
         if optname in ('modules', 'objects', 'values',
                        'module', 'object', 'value'):
