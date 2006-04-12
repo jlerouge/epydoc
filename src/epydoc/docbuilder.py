@@ -254,11 +254,14 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
                     item, introspect, parse, progress_estimator))
             elif os.path.isdir(item):
                 log.error("Directory %r is not a package" % item)
+                continue
             elif os.path.isfile(item):
                 log.error("File %s is not a Python module" % item)
+                continue
             else:
                 log.error("Could not find a file or object named %s" %
                           item)
+                continue
         else:
             doc_pairs.append(_get_docs_from_pyobject(
                 item, introspect, parse, progress_estimator))
