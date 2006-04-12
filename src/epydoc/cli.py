@@ -239,7 +239,11 @@ def parse_arguments():
             parse_configfiles(options.configfiles, options, names)
         except (KeyboardInterrupt,SystemExit): raise
         except Exception, e:
-            optparser.error('Error reading config file:\n    %s' % e)
+            if len(options.configfiles) == 1:
+                cf_name = 'config file %s' % options.configfiles[0]
+            else:
+                cf_name = 'config files %s' % ', '.join(options.configfiles
+            optparser.error('Error reading %s:\n    %s' % (cf_name, e))
     
     # Check to make sure all options are valid.
     if len(names) == 0:
