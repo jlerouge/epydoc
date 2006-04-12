@@ -650,6 +650,11 @@ def process_file(module_doc):
                     raise ParseError('Error during parsing: invalid '
                                      'syntax (%s, line %d) -- %s' %
                                      (module_doc.filename, lineno, e))
+                except KeyboardError, e: raise
+                except Exception, e:
+                    log.error('Internal error during parsing (%s, line '
+                              '%s):\n%s' % (module_doc.filename, lineno, e))
+                    raise
 
                 # grouping...
                 if groups[-1] and prev_line_doc not in (None, 'skip_block'):
