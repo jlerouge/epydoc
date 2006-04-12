@@ -420,7 +420,7 @@ class LatexWriter:
             width = self._find_tree_width(doc)+2
             linespec = []
             s = ('&'*(width-4)+'\\multicolumn{2}{l}{\\textbf{%s}}\n' %
-                   plaintext_to_latex('%s'%doc.canonical_name))
+                   plaintext_to_latex('%s'%self._base_name(doc)))
             s += '\\end{tabular}\n\n'
             top = 1
         else:
@@ -438,6 +438,15 @@ class LatexWriter:
 
         return s
 
+    def _base_name(self, doc):
+        if doc.canonical_name is None:
+            if doc.parse_repr is not None:
+                return doc.parse_repr
+            else:
+                return '??'
+        else:
+            return '%s' % doc.canonical_name
+
     def _find_tree_width(self, doc):
         if not isinstance(doc, ClassDoc): return 2
         width = 2
@@ -446,16 +455,17 @@ class LatexWriter:
         return width
 
     def _base_tree_line(self, doc, width, linespec):
+        base_name = plaintext_to_latex(self._base_name(doc))
+        
         # linespec is a list of booleans.
-        s = '%% Line for %s, linespec=%s\n' % (doc.canonical_name, linespec)
+        s = '%% Line for %s, linespec=%s\n' % (base_name, linespec)
 
         labelwidth = width-2*len(linespec)-2
 
         # The base class name.
-        shortname = plaintext_to_latex('%s'%doc.canonical_name)
         s += ('\\multicolumn{%s}{r}{' % labelwidth)
-        s += '\\settowidth{\\BCL}{%s}' % shortname
-        s += '\\multirow{2}{\\BCL}{%s}}\n' % shortname
+        s += '\\settowidth{\\BCL}{%s}' % base_name
+        s += '\\multirow{2}{\\BCL}{%s}}\n' % base_name
 
         # The vertical bars for other base classes (top half)
         for vbar in linespec:
