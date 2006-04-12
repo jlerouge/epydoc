@@ -63,7 +63,12 @@ class PlaintextWriter:
         s = '('
         class_parent = class_doc.canonical_name.container()
         for i, base in enumerate(class_doc.bases):
-            if base.canonical_name.container() == class_parent:
+            if base.canonical_name is None:
+                if base.parse_repr is not UNKNOWN:
+                    s += base.parse_repr
+                else:
+                    s += '??'
+            elif base.canonical_name.container() == class_parent:
                 s += str(base.canonical_name[-1])
             else:
                 s += str(base.canonical_name)
