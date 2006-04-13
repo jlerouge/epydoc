@@ -41,21 +41,30 @@ import re
 # Should all epydoc css classes start with epydoc-?
 #
 
-# Base stylesheet -- just the layout details
+# Base stylesheet -- just the layout details (no color)
 _LAYOUT = """
 
 /* Tables */ 
 table.help         { margin-left: auto; margin-right: auto; }
-th.summary, th.details, th.index
-                   { text-align: left; font-size: 120%; } 
-th.group           { text-align: left; font-size: 120%;
-                     font-style: italic; } 
+table.summary      { border-collapse: collapse;
+                     border-width: 1px; border-style: solid; }
+table.details      { border-collapse: collapse;
+                     border-width: 1px; border-style: solid;
+                     margin: .2em 0 0 0; }
+table.index        { border-collapse: collapse;
+                     border-width: 1px; border-style: solid; }
+td.summary         { border-width: 1px; border-style: solid; }
+td.details         { border-width: 1px; border-style: solid; }
+td.index           { border-width: 0px; }
+th.group           { text-align: left; font-size: 115%; font-style: italic;
+                     border-width: 1px; border-style: solid; }
 
 /* Documentation page titles */
 h2.module          { margin-top: 0.2em; }
 h2.class           { margin-top: 0.2em; }
 h2.type            { margin-top: 0.2em; }
 h2.py-src          { margin-top: 0.2em; }
+h2.index           { margin-top: 0.2em; margin-bottom: 0; }
 
 /* Headings */
 h1.help            { text-align: center; }
@@ -69,6 +78,8 @@ h1.tocheading      { text-align: center; font-size: 105%; margin: 0;
                      font-weight: bold; padding: 0; }
 h2.tocheading      { font-size: 100%; margin: 0.5em 0 0 -0.3em;
                      font-weight: bold; }
+h3.summary, h3.details, h3.index /* used in table headers */
+                   { font-size: 120%; margin: 0; } 
 
 /* Table of contents */
 p.toc              { margin: 0; padding: 0; }
@@ -82,17 +93,6 @@ p.varlist          { padding: 0 0 0 7em; text-indent: -7em;
 .varlist-header    { font-weight: bold; }
 p.imports          { padding: 0 0 0 7em; text-indent: -7em; }
 .imports-header    { font-weight: bold; }
-
-/* Details Sections */
-table.func-details { border-width: 2px; border-style: groove;
-                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.func-detail     { margin: 0 0 1em 0; }
-table.var-details  { border-width: 2px; border-style: groove;
-                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.var-details     { margin: 0 0 1em 0; }
-table.prop-details  { border-width: 2px; border-style: groove;
-                     padding: 0 1em 0 1em; margin: 0.4em 0 0 0; }
-h3.prop-details     { margin: 0 0 1em 0; }
 
 /* Function signatures */
 .sig               { font-weight: bold; }  
@@ -133,7 +133,7 @@ a.pysrc-toggle     { text-decoration: none; }
                      padding-left: .5em; }
 /*a.py-name          { text-decoration: none; }*/
 
-/* For Graphs */
+/* Graphs */
 .graph-without-title  { border: none; }
 .graph-with-title     { border: 1px solid black; }
 .graph-title          { font-weight: bold; }
@@ -159,25 +159,21 @@ span.codelink { font-size: 85%; font-weight; normal; }
 # javadoc looks.
 _WHITE = _LAYOUT + """
 /* Body color */ 
-body               { background: #ffffff; color: #000000; } 
+body               { background: #ffffff; color: #000000; }
  
 /* Tables */ 
-table.summary, table.details, table.index
-                   { background: #e8f0f8; color: #000000; } 
-tr.summary, tr.details, tr.index
-                   { background: #70b0ff; color: #000000; } 
+table.summary      { background: #e8f0f8; color: #000000;
+                     border-color: #608090; }
+table.details      { background: #e8f0f8; color: #000000;
+                     border-color: #608090; }
+table.index        { background: #e8f0f8; color: #000000;
+                     border-color: #608090; }
+tr.summary         { background: #70b0ff; color: #000000;
+                     border-color: #608090; }
+tr.details         { background: #70b0ff; color: #000000;
+                     border-color: #608090; }
+tr.index           { background: #70b0ff; color: #000000; } 
 th.group           { background: #c0e0f8; color: #000000; } 
-
-/* Details Sections */
-table.func-details { background: #e8f0f8; color: #000000;
-                     border-color: #c0d0d0; }
-h3.func-detail     { background: transparent; color: #000000; }
-table.var-details  { background: #e8f0f8; color: #000000;
-                     border-color: #c0d0d0; }
-h3.var-details     { background: transparent; color: #000000; }
-table.prop-details  { background: #e8f0f8; color: #000000;
-                     border-color: #c0d0d0; }
-h3.prop-details     { background: transparent; color: #000000; }
 
 /* Function signatures */
 .sig               { background: transparent; color: #000000; }

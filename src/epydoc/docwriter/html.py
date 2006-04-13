@@ -390,8 +390,11 @@ class HTMLWriter:
                               if not isinstance(d, GenericValueDoc)]
         for doc in valdocs:
             if isinstance(doc, NamespaceDoc):
-                self.indexed_docs += [doc for doc in doc.variables.values() if
-                                      isinstance(doc.value, GenericValueDoc)]
+                # add any vars with generic vlaues; but don't include
+                # inherited vars.
+                self.indexed_docs += [d for d in doc.variables.values() if
+                                      isinstance(d.value, GenericValueDoc)
+                                      and d.container == doc]
         self.indexed_docs.sort()
 
         # Figure out the url for the top page.
@@ -403,7 +406,7 @@ class HTMLWriter:
         for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = len(self.class_list) + 2*len(self.module_list) + 9
+        self._num_files = len(self.class_list) + 2*len(self.module_list) + 12
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
             
@@ -499,7 +502,27 @@ class HTMLWriter:
         self.write_javascript(directory)
 
         # Write the term & identifier indices
-        self._write(self.write_indices, directory, 'indices.html')
+        indices = {'ident': self.build_identifier_index(),
+                   'term': self.build_term_index(),
+                   'bug': self.build_metadata_index('bug'),
+                   'todo': self.build_metadata_index('todo')}
+        self._write(self.write_identifier_index, directory,
+                    'identifier-index.html', indices)
+        if indices['term']:
+            self._write(self.write_term_index, directory,
+                        'term-index.html', indices)
+        else:
+            self._files_written += 1 # (skipped)
+        if indices['bug']:
+            self._write(self.write_metadata_index, directory,
+                        'bug-index.html', indices, 'bug', 'Bug List')
+        else:
+            self._files_written += 1 # (skipped)
+        if indices['todo']:
+            self._write(self.write_metadata_index, directory,
+                        'todo-index.html', indices, 'todo', 'To Do List')
+        else:
+            self._files_written += 1 # (skipped)
         
         # Write the trees file (package & class hierarchies)
         self._write(self.write_trees, directory, 'trees.html')
@@ -548,6 +571,9 @@ class HTMLWriter:
                 for name in names:
                     estr += '      (from %s)\n' % name
             log.docstring_warning(estr)
+
+        # [xx] testing:
+        assert self._num_files == self._files_written
 
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
@@ -772,8 +798,6 @@ class HTMLWriter:
         """
         Write an HTML page containing the module and class hierarchies
         to the given streams.
-        @param public: The output stream for the public version of the page.
-        @param private: The output stream for the private version of the page.
         """
         # Header material.
         self.write_header(out, 'Trees')
@@ -801,134 +825,158 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    #{ 2.4. Indices page
+    #{ 2.4. Index pages
     #////////////////////////////////////////////////////////////
 
-    def write_indices(self, out):
+    def write_identifier_index(self, out, indices):
         """
-        Write an HTML page containing the term and identifier indices
-        to the given streams.
-        @bug: If there are private indexed terms, but no public
-            indexed terms, then this function will still write a
-            header for the Term Index to the public stream.
-        @param public: The output stream for the public version of the page.
-        @param private: The output stream for the private version of the page.
+        Write an HTML page containing the identifier index.
         """
         # Header material.
-        self.write_header(out, 'Index')
+        self.write_header(out, 'Identifier Index')
         self.write_navbar(out, 'indices')
-        self.write_breadcrumbs(out, 'indices', 'indices.html')
-        out('<br />\n')
+        self.write_breadcrumbs(out, 'indices', 'identifier-index.html')
+        self.write_index_pointers(out, indices)
 
-        terms = self._extract_term_index()
-        if terms:
-            self.write_term_index(out, terms)
+        # Write a header with the page name and links to all available
+        # letters.
+        out('<table border="0" width="100%">\n'
+            '<tr valign="bottom"><td width="100%">\n'
+            '<a name="identifiers"><h2 class="index">'
+            'Identifier Index</h2></a>\n'
+            '</td><td>\n')
+        out('[')
+        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWZYZ_':
+            if letter in indices['ident']:
+                out('&nbsp;<a href="#identifiers-%s">%s</a>' %
+                    (letter, letter))
+            else:
+                out('&nbsp;%s' % letter)
+        out('&nbsp;]\n')
 
-        # [xx] this will only find variables if they have values.
-        # (e.g., it won't list any instance variables.)
-        identifiers = []
-        for doc in self.indexed_docs:
-            name = doc.canonical_name
-            if self.url(doc) is None: continue
-            key = name[-1].lower()
-            key = (key[:1] in 'abcdefghijklmnopqrstuvwxyz', key)
-            identifiers.append( (key, name, doc) )
-            
-        identifiers.sort()
-        if identifiers:
-            self.write_identifier_index(out, identifiers)
+        # Write the identifier index itself.
+        out('</td></table>\n')
+        out('<table border="0" width="100%"><tr valign="top">\n')
+        for letter in sorted(indices['ident'].iterkeys()):
+            out('<td valign="top" width="1%">')
+            out('<a name="identifiers-%s"><h2>%s</h2></a></td>\n' %
+                (letter, letter))
+            out('<td valign="top">\n')
+            section = sorted(indices['ident'][letter])
+            self.write_index_section(out, section, True)
+            out('</td></tr>\n')
+        out('</table>\n</br />')
 
         # Footer material.
+        out('<br />')
         self.write_navbar(out, 'indices')
         self.write_footer(out)
 
-    write_identifier_index_header = compile_template(
+    def write_term_index(self, out, indices):
         """
-        write_identifier_index_header(self, out)
-        """,
-        # /------------------------- Template -------------------------\
-        '''
-        <!-- ==================== IDENTIFIER INDEX ==================== -->
-        <table class="index" border="1" cellpadding="3"
-               cellspacing="0" width="100%" bgcolor="white">
-        <tr bgcolor="#70b0f0" class="index"><th colspan="2">
-          <table border="0" cellpadding="0" cellspacing="0" width="100%">
-            <tr><th class="index">Identifier&nbsp;Index</th>
-              <td width="100%" align="right"> [
-                <a href="#_">_</a>
-        >>> for c in "abcdefghijklmnopqrstuvwxyz":
-                <a href="#$c$">$c$</a>
-        >>> #endfor
-              ] </td>
-            </tr></table>
-        </th></tr>
-        ''')
-        # \------------------------------------------------------------/
-    
-    write_identifier_index = compile_template(
+        Write an HTML page containing the term index.
         """
-        write_identifier_index(self, out, index)
-        """,
-        # /------------------------- Template -------------------------\
-        '''
-        >>> #self.write_table_header(out, "index", "Identifier Index")
-        >>> self.write_identifier_index_header(out)
-        >>> letters = "abcdefghijklmnopqrstuvwxyz"
-          <a name="_"></a>
-        >>> for sortkey, name, doc in index:
-        >>>     if self._doc_or_ancestor_is_private(doc):
-        >>>         if not self._show_private: continue
-          <tr class="private"><td width="15%">
-        >>>     else:
-          <tr><td width="15%">
-        >>>     #endif
-        >>>     while letters and letters[0] <= name[-1][:1].lower():
-                  <a name="$letters[0]$"></a>
-        >>>       letters = letters[1:]
-        >>>     #endif
-                $self.href(doc, name[-1])$
-              </td>
-              <td>$self.doc_kind(doc)$
-        >>>     container_name = name.container()
-        >>>     if container_name is not None:
-        >>>         container = self.docindex.get_valdoc(container_name)
-        >>>         if container is not None:
-                      in $self.doc_kind(container)$ $self.href(container)$
-        >>>         #endif
-        >>>     #endif
-              </td>
-          </tr>
-        >>> #endfor
-        </table>
-        >>> for letter in letters:
-        <a name="$letter$"></a>
-        >>> #endfor
-        <br />
-        ''')
-        # \------------------------------------------------------------/
+        # Header material.
+        self.write_header(out, 'Term Index')
+        self.write_navbar(out, 'indices')
+        self.write_breadcrumbs(out, 'indices', 'term-index.html')
+        self.write_index_pointers(out, indices)
 
-    write_term_index = compile_template(
+        out('<a name="term"><h2 class="index">Term Definition Index</h2></a>')
+        self.write_index_section(out, sorted(indices['term'],
+                                             key=lambda v:v[0].lower()))
+        
+        # Footer material.
+        out('<br />')
+        self.write_navbar(out, 'indices')
+        self.write_footer(out)
+
+    def write_metadata_index(self, out, indices, field, title):
         """
-        write_term_index(self, out, index)
-        """,
-        # /------------------------- Template -------------------------\
-        '''
-        >>> if not index: return
-        >>> self.write_table_header(out, "index", "Term Index")
-        >>> for (key, term, links) in index:
-          <tr><td width="15%">$term.to_plaintext(None)$</td>
-              <td>
-        >>>     for link in links[:-1]:
-                <em>$self.href(link)$</em>,
-        >>>     #endfor
-                <em>$self.href(links[-1])$</em>
-              </td>
-          </tr>
-        >>> #endfor
-        </table>
-        <br />
-        ''')
-        # \------------------------------------------------------------/
+        Write an HTML page containing a metadata index.
+        """
+        # Header material.
+        self.write_header(out, title)
+        self.write_navbar(out, 'indices')
+        self.write_breadcrumbs(out, 'indices', '%s-index.html' % field)
+        self.write_index_pointers(out, indices)
+        index = indices[field]
+
+        # [XX} FIXME
+        out('<a name="%s"><h2 class="index">%s</h2></a>' %
+            (field, title))
+        
+        for arg in sorted(index):
+            # Write a section title.
+            if arg is not None:
+                if len([1 for (doc, descrs) in index[arg] if
+                        not self._doc_or_ancestor_is_private(doc)]) == 0:
+                    out('<div class="private">')
+                else:
+                    out('<div>')
+                self.write_table_header(out, 'index', arg)
+                out('</table>')
+            # List every descr for this arg.
+            for (doc, descrs) in index[arg]:
+                if self._doc_or_ancestor_is_private(doc):
+                    out('<div class="private">\n')
+                else:
+                    out('<div>\n')
+                out('<table width="100%" class="details" '
+                    'bgcolor="#e0e0e0"><tr><td>')
+                out('<b>In %s</b>' % self.href(doc))
+                out('    <ul>\n')
+                for descr in descrs:
+                    out('      <li>%s</li>\n' %
+                        self.docstring_to_html(descr,doc,4))
+                out('    </ul>\n')
+                out('</table></div>\n')
+            out('</dl>\n')
+
+        # Footer material.
+        out('<br />')
+        self.write_navbar(out, 'indices')
+        self.write_footer(out)
+
+    def write_index_pointers(self, out, indices):
+        """
+        A helper for the index page generation functions, which
+        generates a header that can be used to navigate between the
+        different indices.
+        """
+        if len(indices) > 1:
+            out('<center><b>[\n')
+            out(' <a href="identifier-index.html">Identifier Index</a>\n')
+            if indices['term']:
+                out('| <a href="term-index.html">Term Definition Index</a>\n')
+            if indices['bug']:
+                out('| <a href="bug-index.html">Bug List</a>\n')
+            if indices['todo']:
+                out('| <a href="todo-index.html">To Do List</a>\n')
+            out(']</b></center>\n')
+
+    def write_index_section(self, out, items, add_blankline=False):
+        out('<table class="index" width="100%" border="1">\n')
+        num_rows = (len(items)+2)/3
+        for row in range(num_rows):
+            out('  <tr>\n')
+            for col in range(3):
+                out('    <td width="33%" class="index">')
+                i = col*num_rows+row
+                if i < len(items):
+                    name, url, container = items[col*num_rows+row]
+                    out('<a href="%s">%s</a>' % (url, name))
+                    if container is not None:
+                        out('<br />\n      ')
+                        out('<font size="-2">(in&nbsp;%s)</font>' %
+                            self.href(container))
+                else:
+                    out('&nbsp;')
+                out('</td>\n')
+            out('  </tr>\n')
+            if add_blankline and num_rows == 1:
+                out('  <tr>'+3*'<td class="index">&nbsp;</td>'+'</tr>\n')
+        out('</table>\n')
 
     #////////////////////////////////////////////////////////////
     #{ 2.5. Help Page
@@ -940,9 +988,6 @@ class HTMLWriter:
         C{self._helpfile} contains a help file, then use it;
         otherwise, use the default helpfile from
         L{epydoc.docwriter.html_help}.
-        
-        @param public: The output stream for the public version of the page.
-        @param private: The output stream for the private version of the page.
         """
         # todo: optionally parse .rst etc help files?
         
@@ -1085,8 +1130,6 @@ class HTMLWriter:
         the given module to the given streams.  This page lists the
         modules, classes, exceptions, functions, and variables defined
         by the module.
-        @param public: The output stream for the public version of the page.
-        @param private: The output stream for the private version of the page.
         """
         name = doc.canonical_name[-1]
         self.write_header(out, name)
@@ -1454,7 +1497,7 @@ class HTMLWriter:
         <table class="navbar" border="0" width="100%" cellpadding="0"
                bgcolor="#a0c0ff" cellspacing="0">
           <tr valign="middle">
-        >>> if self._top_page_url not in ("trees.html", "indices.html", "help.html"):
+        >>> if self._top_page_url not in ("trees.html", "identifier-index.html", "help.html"):
           <!-- Home link -->
         >>>   if (isinstance(context, ValueDoc) and
         >>>       self._top_page_url == self.url(context.canonical_name)):
@@ -1480,7 +1523,7 @@ class HTMLWriter:
                   >&nbsp;&nbsp;&nbsp;Index&nbsp;&nbsp;&nbsp;</th>
         >>> else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
-                href="indices.html">Index</a>&nbsp;&nbsp;&nbsp;</th>
+                href="identifier-index.html">Index</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Help link -->
@@ -1686,7 +1729,7 @@ class HTMLWriter:
             self.write_inheritance_list(out, doc, listed_inh_vars)
 
     def write_inheritance_list(self, out, doc, listed_inh_vars):
-        out('  <tr>\n    <td colspan="2">\n')
+        out('  <tr>\n    <td colspan="2" class="summary">\n')
         for base in doc.mro():
             if base not in listed_inh_vars: continue
             public_vars = [v for v in listed_inh_vars[base]
@@ -1761,10 +1804,12 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
           <tr$tr_class$>
-            <td width="15%" align="right" valign="top" class="rtype">
-              $self.rtype(var_doc, indent=6) or "&nbsp;"$
+            <td width="15%" align="right" valign="top" class="summary">
+              <span class="rtype">
+                $self.rtype(var_doc, indent=6) or "&nbsp;"$
+              </span>
              </td>
-            <td>
+            <td class="summary">
               $self.function_signature(var_doc, link_name=True)$
               $summary$
             </td>
@@ -1779,9 +1824,9 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
           <tr$tr_class$>
-            <td width="15%">
+            <td width="15%" class="summary">
               <strong>$self.href(var_doc)$</strong></td>
-            <td>$summary or "&nbsp;"$</td>
+            <td class="summary">$summary or "&nbsp;"$</td>
           </tr>
         ''')
         # \------------------------------------------------------------/
@@ -1911,7 +1956,7 @@ class HTMLWriter:
         >>> func_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="func-details" bgcolor="#e0e0e0"><tr><td>
+        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr valign="top"><td>
           <h3>$self.function_signature(var_doc)$
@@ -2017,7 +2062,7 @@ class HTMLWriter:
         >>> prop_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="prop-details" bgcolor="#e0e0e0"><tr><td>
+        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
           <h3>$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
@@ -2047,7 +2092,7 @@ class HTMLWriter:
         '''
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="var-details" bgcolor="#e0e0e0"><tr><td>
+        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
           <h3>$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
@@ -2069,9 +2114,9 @@ class HTMLWriter:
         ''')
         # \------------------------------------------------------------/
 
-    _variable_linelen = 70
+    _variable_linelen = 80
     _variable_maxlines = 3
-    _variable_tooltip_linelen = 70
+    _variable_tooltip_linelen = 80
     def variable_tooltip(self, var_doc):
         if var_doc.value in (None, UNKNOWN):
             return ''
@@ -2094,10 +2139,10 @@ class HTMLWriter:
                                      summary_linelen)
         elif val_doc.parse_repr is not UNKNOWN:
             s = plaintext_to_html(val_doc.parse_repr)
-            return self._linewrap_html(s, self._variable_linelen,
-                                       self._variable_maxlines)
         else:
-            return self.href(val_doc)
+            s = self.href(val_doc)
+        return self._linewrap_html(s, self._variable_linelen,
+                                   self._variable_maxlines)
 
     def pprint_pyval(self, pyval, multiline=True, summary_linelen=0):
         # Handle the most common cases first.  The following types
@@ -2257,7 +2302,7 @@ class HTMLWriter:
         @rtype: C{string}
         """
         if context is None:
-            context = doc
+            context = doc.defining_module
         if width == None: width = self.find_tree_width(doc, context)
         if isinstance(doc, ClassDoc) and doc.bases != UNKNOWN:
             bases = doc.bases
@@ -2278,9 +2323,9 @@ class HTMLWriter:
                    '   |'+postfix+'\n' +
                    s)
             if i != 0:
-                s = (self.base_tree(base, width-4, '   |'+postfix)+s)
+                s = (self.base_tree(base, width-4, '   |'+postfix, context)+s)
             else:
-                s = (self.base_tree(base, width-4, '    '+postfix)+s)
+                s = (self.base_tree(base, width-4, '    '+postfix, context)+s)
         return s
 
     def find_tree_width(self, doc, context):
@@ -2303,11 +2348,14 @@ class HTMLWriter:
         """
         Return the label for L{doc} to be shown in C{context}.
         """
-        context = context.canonical_name
-        if context is not UNKNOWN:
-            context = context.container()
-            
-        return str(doc.canonical_name.contextualize(context))
+        if doc.canonical_name is None:
+            if doc.parse_repr is not None:
+                return doc.parse_repr
+            else:
+                return '??'
+        else:
+            context_name = context.canonical_name
+            return str(doc.canonical_name.contextualize(context_name))
         
     #////////////////////////////////////////////////////////////
     #{ Function Signatures
@@ -2598,9 +2646,71 @@ class HTMLWriter:
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
-    #{ Term index generation
+    #{ Index generation
     #////////////////////////////////////////////////////////////
     
+    def build_identifier_index(self):
+        items = []
+        for doc in self.indexed_docs:
+            name = doc.canonical_name[-1]
+            url = self.url(doc)
+            if not url: continue
+            container = self.docindex.container(doc)
+            items.append( (name, url, container) )
+        return self._group_by_letter(items)
+
+    def _group_by_letter(self, items):
+        index = {}
+        for item in items:
+            first_letter = item[0][0].upper()
+            if not ("A" <= first_letter <= "Z"):
+                first_letter = '_'
+            index.setdefault(first_letter, []).append(item)
+        return index
+    
+    def build_term_index(self):
+        items = []
+        for doc in self.indexed_docs:
+            url = self.url(doc)
+            items += self._terms_from_docstring(url, doc, doc.descr)
+            for (field, arg, descr) in doc.metadata:
+                items += self._terms_from_docstring(url, doc, descr)
+                if hasattr(doc, 'type_descr'):
+                    items += self._terms_from_docstring(url, doc,
+                                                        doc.type_descr)
+                if hasattr(doc, 'return_descr'):
+                    items += self._terms_from_docstring(url, doc,
+                                                        doc.return_descr)
+                if hasattr(doc, 'return_type'):
+                    items += self._terms_from_docstring(url, doc,
+                                                        doc.return_type)
+        return items
+
+    def _terms_from_docstring(self, base_url, container, parsed_docstring):
+        if parsed_docstring in (None, UNKNOWN): return []
+        terms = []
+        for term in parsed_docstring.index_terms():
+            anchor = self._term_index_to_anchor(term)
+            url = '%s#%s' % (base_url, anchor)
+            terms.append( (term.to_plaintext(None), url, container) )
+        return terms
+
+    def build_metadata_index(self, field_name):
+        # Build the index.
+        index = {}
+        for doc in self.indexed_docs:
+            if (not self._show_private and
+                self._doc_or_ancestor_is_private(doc)):
+                continue
+            descrs = {}
+            if doc.metadata is not UNKNOWN:
+                for (field, arg, descr) in doc.metadata:
+                    if field.tags[0] == field_name:
+                        descrs.setdefault(arg, []).append(descr)
+            for (arg, descr_list) in descrs.iteritems():
+                index.setdefault(arg, []).append( (doc, descr_list) )
+        return index
+
     def _get_index_terms(self, parsed_docstring, link, terms, links):
         """
         A helper function for L{_extract_term_index}.
@@ -2629,48 +2739,6 @@ class HTMLWriter:
         s = re.sub(r'\s\s+', '-', term.to_plaintext(None))
         return "index-"+re.sub("[^a-zA-Z0-9]", "_", s)
 
-    def _extract_term_index(self):
-        """
-        Extract the set of terms that should be indexed from all
-        documented docstrings.  Return the extracted set as a
-        list of tuples of the form C{(key, term, [links])}.
-        This list is used by L{write_indices()} to construct the
-        term index.
-        @rtype: C{list} of C{(string, ParsedDocstring, list of ValueDoc)}
-        """
-        terms = {}
-        links = {}
-        for doc in self.valdocs:
-            self._get_index_terms(doc.descr, doc, terms, links)
-            if doc.metadata not in (None, UNKNOWN):
-                for (field, arg, descr) in doc.metadata:
-                    self._get_index_terms(descr, doc, terms, links)
-            # [xx] summary? type_descr? others?
-            if isinstance(doc, NamespaceDoc):
-                for var in doc.variables.values():
-                    self._get_index_terms(var.descr, var, terms, links)
-                    for (field, arg, descr) in var.metadata:
-                        self._get_index_terms(descr, var, terms, links)
-            elif isinstance(doc, RoutineDoc):
-                self._get_index_terms(doc.return_descr, doc, terms, links)
-                self._get_index_terms(doc.return_type, doc, terms, links)
-                if doc.arg_descrs not in (None, UNKNOWN):
-                    for arg, descr in doc.arg_descrs:
-                        self._get_index_terms(descr, doc, terms, links)
-                if doc.arg_types not in (None, UNKNOWN):
-                    for arg, descr in doc.arg_types.items():
-                        self._get_index_terms(descr, doc, terms, links)
-                if doc.exception_descrs not in (None, UNKNOWN):
-                    for excname, descr in doc.exception_descrs:
-                        self._get_index_terms(descr, doc, terms, links)
-            elif isinstance(doc, PropertyDoc):
-                self._get_index_terms(doc.type_descr, doc, terms, links)
-                    
-        # Combine terms & links into one list
-        keys = terms.keys()
-        keys.sort()
-        return [(k, terms[k], links[k]) for k in keys]
-                    
     #////////////////////////////////////////////////////////////
     #{ Helper functions
     #////////////////////////////////////////////////////////////
@@ -2681,7 +2749,7 @@ class HTMLWriter:
     write_table_header = compile_template(
         '''
         write_table_header(self, out, css_class, heading=None, \
-                           private_link=True)
+                           private_link=True, colspan=2)
         ''',
         # /------------------------- Template -------------------------\
         '''
@@ -2695,10 +2763,10 @@ class HTMLWriter:
         >>> if heading is not None:
         <tr bgcolor="#70b0f0" class="$css_class$">
         >>>     if private_link:
-          <td colspan="2">
+          <td colspan="$colspan$" class="$css_class$">
             <table border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr valign="top">
-                <th align="left" class="$css_class$">$heading$</th>
+                <td align="left"><h3 class="$css_class$">$heading$</h3></th>
                 <td align="right" valign="top"
                  ><span class="options">[<a href="#$anchor$"
                  class="privatelink" onclick="toggle_private();"
@@ -2780,7 +2848,7 @@ class HTMLWriter:
             return self.url(val_doc)
         # Special pages:
         elif obj == 'indices':
-            return 'indices.html'
+            return 'identifier-index.html'
         elif obj == 'help':
             return 'help.html'
         elif obj == 'trees':
