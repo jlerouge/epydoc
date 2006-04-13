@@ -1520,10 +1520,10 @@ class HTMLWriter:
           <!-- Index link -->
         >>> if context == "indices":
               <th bgcolor="#70b0f0" class="navselect"
-                  >&nbsp;&nbsp;&nbsp;Index&nbsp;&nbsp;&nbsp;</th>
+                  >&nbsp;&nbsp;&nbsp;Indices&nbsp;&nbsp;&nbsp;</th>
         >>> else:
               <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
-                href="identifier-index.html">Index</a>&nbsp;&nbsp;&nbsp;</th>
+                href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Help link -->
