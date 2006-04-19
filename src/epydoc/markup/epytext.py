@@ -109,7 +109,7 @@ from xml.dom.minidom import Document, Text
 import xml.dom.minidom
 from epydoc.markup import *
 from epydoc.util import wordwrap, plaintext_to_html, plaintext_to_latex
-from epydoc.docwriter.html_colorize import colorize_doctestblock
+from epydoc.markup.doctest import doctest_to_html, doctest_to_latex
 
 ##################################################
 ## Constants
@@ -1817,8 +1817,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif tree.tagName == 'literalblock':
             return '<pre class="literalblock">\n%s\n</pre>\n' % childstr
         elif tree.tagName == 'doctestblock':
-            dtb = colorize_doctestblock(childstr.strip())
-            return '<pre class="doctestblock">\n%s</pre>\n' % dtb
+            return doctest_to_html(tree.childNodes[0].data.strip())
         elif tree.tagName == 'fieldlist':
             raise AssertionError("There should not be any field lists left")
         elif tree.tagName in ('epytext', 'section', 'tag', 'arg',
@@ -1935,7 +1934,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif tree.tagName == 'heading':
             return ' '*(indent-2) + '(section) %s\n\n' % childstr
         elif tree.tagName == 'doctestblock':
-            return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
+            return doctest_to_latex(tree.childNodes[0].data.strip())
         elif tree.tagName == 'literalblock':
             return '\\begin{alltt}\n%s\\end{alltt}\n\n' % childstr
         elif tree.tagName == 'fieldlist':

@@ -84,6 +84,7 @@ from epydoc.compat import * # Backwards compatibility
 from epydoc.markup import *
 from epydoc.apidoc import ModuleDoc, ClassDoc
 from epydoc.docwriter.dotgraph import *
+from epydoc.markup.doctest import doctest_to_html, doctest_to_latex
 
 #: A dictionary whose keys are the "consolidated fields" that are
 #: recognized by epydoc; and whose values are the corresponding epydoc
@@ -455,15 +456,21 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         target = self.encode(node.astext())
         xref = self._linker.translate_identifier_xref(target, target)
         self.body.append(xref)
-        raise SkipNode
+        raise SkipNode()
 
     def visit_document(self, node): pass
     def depart_document(self, node): pass
 
     # For now, just ignore dotgraphs. [XXX]
-    def visit_dotgraph(self, node): pass
-    def depart_dotgraph(self, node): pass
+    def visit_dotgraph(self, node):
+        log.warning("Ignoring dotgraph in latex output (dotgraph "
+                    "rendering for latex not implemented yet).")
+        raise SkipNode()
     
+    def visit_doctest_block(self, node):
+        self.body.append(doctest_to_latex(str(node[0])))
+        raise SkipNode()
+
 class _EpydocHTMLTranslator(HTMLTranslator):
     def __init__(self, document, docstring_linker, directory,
                  docindex, context):
@@ -484,7 +491,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         target = self.encode(node.astext())
         xref = self._linker.translate_identifier_xref(target, target)
         self.body.append(xref)
-        raise SkipNode
+        raise SkipNode()
 
     def should_be_compact_paragraph(self, node):
         if self.document.children == [node]:
@@ -505,24 +512,35 @@ class _EpydocHTMLTranslator(HTMLTranslator):
           - hrefs not starting with C{'#'} are given target='_top'
           - all headings (C{<hM{n}>}) are given the css class C{'heading'}
         """
-        # Prefix all CSS classes with "rst-"
-        if attributes.has_key('class'):
-            attributes['class'] = 'rst-%s' % attributes['class']
-
-        # Prefix all names with "rst-", to avoid conflicts
-        if attributes.has_key('id'):
-            attributes['id'] = 'rst-%s' % attributes['id']
-        if attributes.has_key('name'):
-            attributes['name'] = 'rst-%s' % attributes['name']
-        if attributes.has_key('href'):
-            if attributes['href'][:1]=='#':
-                attributes['href'] = '#rst-%s' % attributes['href'][1:]
-            else:
-                attributes['target'] = '_top'
+        # Get the list of all attribute dictionaries we need to munge.
+        attr_dicts = [attributes]
+        if isinstance(node, docutils.nodes.Node):
+            attr_dicts.append(node.attributes)
+        if isinstance(node, dict):
+            attr_dicts.append(node)
+        # Munge each attribute dictionary.  Unfortunately, we need to
+        # iterate through attributes one at a time because some
+        # versions of docutils don't case-normalize attributes.
+        for attr_dict in attr_dicts:
+            for (key, val) in attr_dict.items():
+                # Prefix all CSS classes with "rst-"; and prefix all
+                # names with "rst-" to avoid conflicts.
+                if key.lower() in ('class', 'id', 'name'):
+                    attr_dict[key] = 'rst-%s' % val
+                elif key.lower() in ('classes', 'ids', 'names'):
+                    attr_dict[key] = ['rst-%s' % cls for cls in val]
+                elif key.lower() == 'href':
+                    if attr_dict[key][:1]=='#':
+                        attr_dict[key] = '#rst-%s' % attr_dict[key][1:]
+                    else:
+                        # If it's an external link, open it in a new
+                        # page.
+                        attr_dict['target'] = '_top'
 
         # For headings, use class="heading"
         if re.match(r'^h\d+$', tagname):
-            attributes['class'] = 'heading'
+            attributes['class'] = ' '.join([attributes.get('class',''),
+                                            'heading']).strip()
         
         return HTMLTranslator.starttag(self, node, tagname, suffix,
                                        **attributes)
@@ -538,9 +556,11 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         image_url = '%s.gif' % graph.uid
         image_file = os.path.join(self._directory, image_url)
         self.body.append(graph.to_html(image_file, image_url))
+        raise SkipNode()
 
-    def depart_dotgraph(self, node):
-        pass # Nothing to do.
+    def visit_doctest_block(self, node):
+        self.body.append(doctest_to_html(str(node[0])))
+        raise SkipNode()
 
 ######################################################################
 #{ Graph Generation Directives
