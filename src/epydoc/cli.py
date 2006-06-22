@@ -254,7 +254,7 @@ def parse_arguments():
         optparser.error("No names specified.")
         
     # perform shell expansion.
-    for i, name in enumerate(names[:]):
+    for i, name in reversed(list(enumerate(names[:]))):
         if '?' in name or '*' in name:
             names[i:i+1] = glob(name)
         
