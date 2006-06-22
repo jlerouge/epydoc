@@ -141,8 +141,8 @@ class PlaintextWriter:
             if pyval_repr is not UNKNOWN:
                 val_repr = pyval_repr.expandtabs()
             else:
-                var_repr = var_doc.value.parse_repr
-            if var_repr is not UNKNOWN:
+                val_repr = var_doc.value.parse_repr
+            if val_repr is not UNKNOWN:
                 if len(val_repr)+len(name) > 75:
                     val_repr = '%s...' % val_repr[:75-len(name)-3]
                 if '\n' in val_repr: val_repr = '%s...' % (val_repr.split()[0])
