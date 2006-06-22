@@ -286,7 +286,8 @@ def parse_arguments():
             optparser.error("Invalid graph type %s." % graph_type)
 
     # Calculate verbosity.
-    options.verbosity = options.verbose - options.quiet
+    verbosity = getattr(options, 'verbosity', 0)
+    options.verbosity = verbosity + options.verbose - options.quiet
 
     # The target default depends on the action.
     if options.target is None:
