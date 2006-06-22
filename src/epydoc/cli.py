@@ -311,10 +311,10 @@ def parse_configfiles(configfiles, options, names):
                        'module', 'object', 'value'):
             names.extend(val.replace(',', ' ').split())
         elif optname == 'output':
-            if optname not in ACTIONS:
+            if val not in ACTIONS:
                 raise ValueError('"%s" expected one of: %s' %
                                  (optname, ', '.join(ACTIONS)))
-            options.action = action
+            options.action = val
         elif optname == 'target':
             options.target = val
         elif optname == 'inheritance':
