@@ -355,8 +355,8 @@ def parse_configfiles(configfiles, options, names):
         elif optname == 'graph':
             graphtypes = val.replace(',', '').split()
             for graphtype in graphtypes:
-                if graphtype not in GRAPH_TYPES:
-                    raise ValueError('"%s" expected one of: %s.' %
+                if graphtype not in GRAPH_TYPES + ('all',):
+                    raise ValueError('"%s" expected one of: all, %s.' %
                                      (optname, ', '.join(GRAPH_TYPES)))
             options.graphs.extend(graphtypes)
         elif optname in ('separate-classes', 'separate_classes'):
