@@ -428,7 +428,7 @@ def main(options, names):
 
     # Set the dot path
     if options.dotpath:
-        from epydoc import dotgraph
+        from epydoc.docwriter import dotgraph
         dotgraph.DOT_PATH = options.dotpath
 
     # Build docs for the named values.
