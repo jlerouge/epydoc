@@ -778,7 +778,10 @@ class PythonSourceColorizer:
             self.cur_line = []
 
     _next_uid = 0
-    
+
+    # [xx] note -- this works with byte strings, not unicode strings!
+    # I may change it to use unicode eventually, but when I do it
+    # needs to be changed all at once.
     def handle_line(self, line):
         """
         Render a single logical line from the module, and write the
@@ -809,6 +812,8 @@ class PythonSourceColorizer:
 
         # Loop through each token, and colorize it appropriately.
         for i, (toktype, toktext) in enumerate(line):
+            assert type(s) is str # *not* unicode!
+
             # For each token, determine its css class and whether it
             # should link to a url.
             css_class = None
@@ -947,15 +952,22 @@ class PythonSourceColorizer:
                       (uid, css_class_html, tooltip_html,
                        css_class_html, onclick))
             elif url:
+                if isinstance(url, unicode):
+                    url = url.encode('ascii', 'xmlcharrefreplace')
                 s += ('<a%s%s href="%s">' %
                       (tooltip_html, css_class_html, url))
+                assert type(s) is str # *not* unicode!
             elif css_class_html or tooltip_html:
                 s += '<span%s%s>' % (tooltip_html, css_class_html)
             if i == len(line)-1:
                 s += ' </span>' # Closes <span class="py-line">
                 s += cgi.escape(toktext)
             else:
-                s += self.add_line_numbers(cgi.escape(toktext), css_class)
+                try:
+                    s += self.add_line_numbers(cgi.escape(toktext), css_class)
+                except Exception, e:
+                    print (toktext, css_class, toktext.encode('ascii'))
+                    raise
 
             if onclick: s += "</a></span>"
             if url: s += '</a>'
