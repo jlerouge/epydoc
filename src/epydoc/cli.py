@@ -70,6 +70,7 @@ import epydoc
 from epydoc import log
 from epydoc.util import wordwrap, run_subprocess, RunSubprocessError
 from epydoc.apidoc import UNKNOWN
+from epydoc.compat import *
 import ConfigParser
 
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
@@ -314,7 +315,7 @@ def parse_configfiles(configfiles, options, names):
             if val not in ACTIONS:
                 raise ValueError('"%s" expected one of: %s' %
                                  (optname, ', '.join(ACTIONS)))
-            options.action = val
+            options.action = val.lower()
         elif optname == 'target':
             options.target = val
         elif optname == 'inheritance':
