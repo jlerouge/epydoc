@@ -17,7 +17,7 @@ __docformat__ = 'epytext en'
 
 # Expects: {'this_project': name}
 HTML_HELP = '''
-<h1 class="help"> API Documentation </h1>
+<h1 class="epydoc"> API Documentation </h1>
 
 <p> This document contains the API (Application Programming Interface)
 documentation for %(this_project)s.  Documentation for the Python
