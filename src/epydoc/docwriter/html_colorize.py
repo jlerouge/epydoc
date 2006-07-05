@@ -302,94 +302,6 @@ def _colorize_re(tree, noparen=0):
     return u''.join(result)
 
 ######################################################################
-## Doctest block colorizer
-######################################################################
-
-# Regular expressions for colorize_doctestblock
-_KEYWORDS = ["del", "from", "lambda", "return", "and", "or", "is", 
-             "global", "not", "try", "break", "else", "if", "elif", 
-             "while", "class", "except", "import", "pass", "raise",
-             "continue", "finally", "in", "print", "def", "for"]
-_KEYWORD = '|'.join([r'(\b%s\b)' % _KW for _KW in _KEYWORDS])
-_STRING = '|'.join([r'("""("""|.*?((?!").)"""))', r'("("|.*?((?!").)"))',
-                    r"('''('''|.*?[^\\']'''))", r"('('|.*?[^\\']'))"])
-_STRING = _STRING.replace('"', '&quot;') # Careful with this!
-_COMMENT = '(#.*?$)'
-_PROMPT = r'(^\s*(&gt;&gt;&gt;|\.\.\.)(\s|$))'
-
-_PROMPT_RE = re.compile(_PROMPT, re.MULTILINE | re.DOTALL)
-'''The regular expression used to find Python prompts (">>>" and
-"...") in doctest blocks.'''
-
-_DOCTEST_RE = re.compile('|'.join([_STRING, _COMMENT, _KEYWORD]),
-                          re.MULTILINE | re.DOTALL)
-'''The regular expression used by L{_doctest_sub} to colorize doctest
-blocks.'''
-
-del _KEYWORDS, _KEYWORD, _STRING, _COMMENT, _PROMPT, _KW
-
-def colorize_doctestblock(str):
-    """
-    @return: The HTML code for a colorized version of a given doctest
-        block.  In particular, this identifies spans with the
-        following css classes:
-          - X{py-src}: The Python source code.
-          - X{py-prompt}: The ">>>" and "..." prompts.
-          - X{py-string}: Strings in the Python source code.
-          - X{py-comment}: Comments in the Python source code.
-          - X{py-keyword}: Keywords in the Python source code.
-          - X{py-output}: Python's output (lines without a prompt).
-        The string that is passed to colorize_doctest should already
-        have HTML characters escaped (e.g., C{">"} should be encoded
-        as C{"&gt;"}).
-    @type str: C{string}
-    @param str: The contents of the doctest block to be colorized.
-    @rtype: C{string}
-    """
-    pysrc = pyout = ''
-    outstr = ''
-    for line in str.split('\n')+['\n']:
-        if _PROMPT_RE.match(line):
-            if pyout:
-                outstr += ('<span class="py-output">%s</span>\n\n' %
-                           pyout.strip())
-                pyout = ''
-            pysrc += line+'\n'
-        else:
-            if pysrc:
-                # Prompt over-rides other colors (incl string)
-                pysrc = _DOCTEST_RE.sub(_doctest_sub, pysrc)
-                pysrc = _PROMPT_RE.sub(r'<span class="py-prompt">'+
-                                       r'\1</span>', pysrc)
-                outstr += ('<span class="py-src">%s</span>\n'
-                           % pysrc.strip())
-                pysrc = ''
-            pyout += line+'\n'
-    if pyout.strip():
-        outstr += ('<span class="py-output">%s</span>\n' %
-                   pyout.strip())
-    return outstr.strip()
-    
-def _doctest_sub(match):
-    """
-    This helper function is used by L{colorize_doctestblock} to
-    add colorization to matching expressions.  It is called by
-    C{_DOCTEST_RE.sub} with an expression that matches
-    C{_DOCTEST_RE}.
-
-    @return: The HTML code for the colorized expression.
-    @rtype: C{string}
-    @see: L{_DOCTEST_RE}
-    """
-    str = match.group()
-    if str[:1] == "'" or str[:6] == '&quot;':
-        return '<span class="py-string">%s</span>' % str
-    elif str[:1] in '#':
-        return '<span class="py-comment">%s</span>' % str
-    else:
-        return '<span class="py-keyword">%s</span>' % str
-
-######################################################################
 ## Python source colorizer
 ######################################################################
 """
@@ -429,7 +341,7 @@ function collapse(id) {
     
     var indent = elt.indent;
     var pad = elt.pad;
-    var s = "<span class=\'lineno\'>";
+    var s = "<span class=\'py-lineno\'>";
     for (var i=0; i<pad.length; i++) { s += "&nbsp;" }
     s += "</span>";
     s += "&nbsp;&nbsp;<span class=\'py-line\'>";
@@ -449,11 +361,11 @@ function toggle(id) {
 }
 function highlight(id) {
   var elt = document.getElementById(id+"-def");
-  if (elt) elt.className = "highlight-hdr";
+  if (elt) elt.className = "py-highlight-hdr";
   var elt = document.getElementById(id+"-expanded");
-  if (elt) elt.className = "highlight";
+  if (elt) elt.className = "py-highlight";
   var elt = document.getElementById(id+"-collapsed");
-  if (elt) elt.className = "highlight";
+  if (elt) elt.className = "py-highlight";
 }
 
 function num_lines(s) {
@@ -779,7 +691,7 @@ class PythonSourceColorizer:
     def lineno_to_html(self):
         template = '%%%ds' % self.linenum_size
         n = template % self.lineno
-        return '<span class="lineno">%s</span>' % n
+        return '<span class="py-lineno">%s</span>' % n
 
     def colorize(self):
         """
@@ -1119,7 +1031,7 @@ class PythonSourceColorizer:
 
     def mark_def(self, s, name):
         replacement = ('<a name="%s"></a><div id="%s-def">\\1'
-                       '<a class="pysrc-toggle" href="#" id="%s-toggle" '
+                       '<a class="py-toggle" href="#" id="%s-toggle" '
                        'onclick="toggle(\'%s\'); return false;">-</a>\\2' %
                        (name, name, name, name))
         return re.sub('(.*) (<span class="py-line">.*)\Z', replacement, s)
