@@ -385,6 +385,10 @@ class HTMLWriter:
         """The list of L{APIDoc}s for variables and values that should
         be included in the index."""
 
+        # URL for 'trees' page
+        if self.module_list: self._trees_url = 'module-tree.html'
+        else: self._trees_url = 'class-tree.html'
+
         # Construct the value for self.indexed_docs.
         self.indexed_docs += [d for d in valdocs
                               if not isinstance(d, GenericValueDoc)]
@@ -406,7 +410,7 @@ class HTMLWriter:
         for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = len(self.class_list) + 2*len(self.module_list) + 12
+        self._num_files = len(self.class_list) + 2*len(self.module_list) + 13
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
             
@@ -438,8 +442,8 @@ class HTMLWriter:
                 pass
 
             # Otherwise, give up.
-            log.warning('Could not find top page %r; using trees.html '
-                        'instead' % pagename)
+            log.warning('Could not find top page %r; using %s '
+                        'instead' % (pagename, self._trees_url))
 
         # If no page name was specified, then try to choose one
         # automatically.
@@ -448,18 +452,18 @@ class HTMLWriter:
                     if isinstance(val_doc, (ClassDoc, ModuleDoc))]
             if len(root) == 0:
                 # No docs??  Try the trees page.
-                return 'trees.html' 
+                return self._trees_url
             elif len(root) == 1:
                 # One item in the root; use that.
                 return self.url(root[0]) 
             else:
                 # Multiple root items; if they're all in one package,
-                # then use that.  Otherwise, use trees.html
+                # then use that.  Otherwise, use self._trees_url
                 root = sorted(root, key=lambda v:len(v.canonical_name))
                 top = root[0]
                 for doc in root[1:]:
                     if not top.canonical_name.dominates(doc.canonical_name):
-                        return 'trees.html'
+                        return self._trees_url
                 else:
                     return self.url(top)
     
@@ -506,11 +510,13 @@ class HTMLWriter:
                    'term': self.build_term_index(),
                    'bug': self.build_metadata_index('bug'),
                    'todo': self.build_metadata_index('todo')}
-        self._write(self.write_identifier_index, directory,
-                    'identifier-index.html', indices)
+        self._write(self.write_link_index, directory,
+                    'identifier-index.html', indices,
+                    'Identifier Index', 'identifier-index.html', 'ident')
         if indices['term']:
-            self._write(self.write_term_index, directory,
-                        'term-index.html', indices)
+            self._write(self.write_link_index, directory, 'term-index.html',
+                        indices, 'Term Definition Index',
+                        'term-index.html', 'term')
         else:
             self._files_written += 1 # (skipped)
         if indices['bug']:
@@ -525,7 +531,14 @@ class HTMLWriter:
             self._files_written += 1 # (skipped)
         
         # Write the trees file (package & class hierarchies)
-        self._write(self.write_trees, directory, 'trees.html')
+        if self.module_list:
+            self._write(self.write_module_tree, directory, 'module-tree.html')
+        else:
+            self._files_written += 1 # (skipped)
+        if self.class_list:
+            self._write(self.write_class_tree, directory, 'class-tree.html')
+        else:
+            self._files_written += 1 # (skipped)
         
         # Write the help file.
         self._write(self.write_help, directory,'help.html')
@@ -623,10 +636,8 @@ class HTMLWriter:
             typ = 'Script'
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
-        out('<h2 class="%s">%s %s' % (typ.lower(), typ, shortname))
-        src_link = self.pysrc_link(doc)
-        if src_link: out('\n<br/>' + src_link)
-        out('</h2>\n')
+        out('<h1 class="epydoc">%s %s</h1>' % (typ, shortname))
+        out(self.pysrc_link(doc) + '<br /><br />\n')
         
         # If the module has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
@@ -674,13 +685,12 @@ class HTMLWriter:
         self.write_breadcrumbs(out, doc, self.pysrc_url(doc))
 
         # Source code listing
-        out('<h2 class="py-src">Source Code for %s</h2>\n' %
+        out('<h1 class="epydoc">Source Code for %s</h1>\n' %
             self.href(doc, label='%s %s' % (self.doc_kind(doc), name)))
-        out('<div class="py-src">\n')
         out('<pre class="py-src">\n')
         out(PythonSourceColorizer(filename, name, self.docindex,
                                   self.indexed_docs, self.url).colorize())
-        out('</pre>\n</div>\n<br />\n')
+        out('</pre>\n<br />\n')
 
         # Footer
         self.write_navbar(out, doc)
@@ -712,11 +722,8 @@ class HTMLWriter:
         else: typ = 'Class'
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
-        out('<h2 class="%s">%s %s' %
-            (typ.lower(), typ, shortname))
-        src_link = self.pysrc_link(doc)
-        if src_link: out('\n<br/>' + src_link)
-        out('</h2>\n')
+        out('<h1 class="epydoc">%s %s</h1>' % (typ, shortname))
+        out(self.pysrc_link(doc) + '<br /><br />\n')
 
         if ((doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0) or
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
@@ -791,101 +798,132 @@ class HTMLWriter:
         self.write_footer(out)
 
     #////////////////////////////////////////////////////////////
-    #{ 2.3. Trees page
+    #{ 2.3. Trees pages
     #////////////////////////////////////////////////////////////
 
-    def write_trees(self, out):
-        """
-        Write an HTML page containing the module and class hierarchies
-        to the given streams.
-        """
-        # Header material.
-        self.write_header(out, 'Trees')
-        self.write_navbar(out, 'trees')
-        self.write_breadcrumbs(out, 'trees', 'trees.html')
+    def write_module_tree(self, out):
+        # Header material
+        self.write_treepage_header(out, 'Module Hierarchy', 'module-tree.html')
+        out('<h1 class="epydoc">Module Hierarchy</h1>\n')
 
-        # Write the module hierarchy
-        out('<!-- ==================== ' 
-            'MODULE HIERARCHY ==================== -->\n')
-        out('<h2>Module Hierarchy</h2>\n')
-        self.write_module_tree(out)
+        # Write entries for all top-level modules/packages.
+        out('<ul class="nomargin-top">\n')
+        for doc in self.module_list:
+            if (doc.package in (None, UNKNOWN) or
+                doc.package not in self.module_set):
+                self.write_module_tree_item(out, doc)
+        out('</ul>\n')
 
-        # Does the project define any classes?
-        defines_classes = len(self.class_list) > 0
-
-        # Write the class hierarchy
-        if defines_classes:
-            out('<!-- ==================== '
-                'CLASS HIERARCHY ==================== -->\n')
-            out('<h2>Class Hierarchy</h2>\n')
-            self.write_class_tree(out)
-
-        # Footer material.
+        # Footer material
         self.write_navbar(out, 'trees')
         self.write_footer(out)
+
+    def write_class_tree(self, out):
+        """
+        Write HTML code for a nested list showing the base/subclass
+        relationships between all documented classes.  Each element of
+        the top-level list is a class with no (documented) bases; and
+        under each class is listed all of its subclasses.  Note that
+        in the case of multiple inheritance, a class may appear
+        multiple times.  This is used by L{write_trees} to write
+        the class hierarchy.
+        
+        @todo: For multiple inheritance, don't repeat subclasses the
+            second time a class is mentioned; instead, link to the
+            first mention.
+        """
+        # [XX] backref for multiple inheritance?
+        # Header material
+        self.write_treepage_header(out, 'Class Hierarchy', 'class-tree.html')
+        out('<h1 class="epydoc">Class Hierarchy</h1>\n')
+
+        # Build a set containing all classes that we should list.
+        # This includes everything in class_list, plus any of those
+        # class' bases, but not undocumented subclasses.
+        class_set = self.class_set.copy()
+        for doc in self.class_list:
+            if doc.bases != UNKNOWN:
+                for base in doc.bases:
+                    if base not in class_set:
+                        if isinstance(base, ClassDoc):
+                            class_set.update(base.mro())
+                        else:
+                            # [XX] need to deal with this -- how?
+                            pass
+                            #class_set.add(base)
+ 
+        out('<ul class="nomargin-top">\n')
+        for doc in sorted(class_set):
+            if doc.bases != UNKNOWN and len(doc.bases)==0:
+                self.write_class_tree_item(out, doc, class_set)
+        out('</ul>\n')
+        
+        # Footer material
+        self.write_navbar(out, 'trees')
+        self.write_footer(out)
+
+    def write_treepage_header(self, out, title, url):
+        # Header material.
+        self.write_header(out, title)
+        self.write_navbar(out, 'trees')
+        self.write_breadcrumbs(out, 'trees', url)
+        if self.class_list and self.module_list:
+            out('<center><b>\n')
+            out(' [ <a href="module-tree.html">Module Hierarchy</a>\n')
+            out(' | <a href="class-tree.html">Class Hierarchy</a> ]\n')
+            out('</b></center><br />\n')
+
 
     #////////////////////////////////////////////////////////////
     #{ 2.4. Index pages
     #////////////////////////////////////////////////////////////
 
-    def write_identifier_index(self, out, indices):
-        """
-        Write an HTML page containing the identifier index.
-        """
-        # Header material.
-        self.write_header(out, 'Identifier Index')
-        self.write_navbar(out, 'indices')
-        self.write_breadcrumbs(out, 'indices', 'identifier-index.html')
-        self.write_index_pointers(out, indices)
+    SPLIT_LINK_INDEX_SIZE = 10
+    """If a link index has more than this number of entries, then it
+    will be split into alphabetical sections.  Use 0 to always split
+    link indexes into alphabetical sections."""
 
-        # Write a header with the page name and links to all available
-        # letters.
-        out('<table border="0" width="100%">\n'
-            '<tr valign="bottom"><td width="100%">\n'
-            '<a name="identifiers"><h2 class="index">'
-            'Identifier Index</h2></a>\n'
-            '</td><td>\n')
-        out('[')
-        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWZYZ_':
-            if letter in indices['ident']:
-                out('&nbsp;<a href="#identifiers-%s">%s</a>' %
-                    (letter, letter))
-            else:
-                out('&nbsp;%s' % letter)
-        out('&nbsp;]\n')
-
-        # Write the identifier index itself.
-        out('</td></table>\n')
-        out('<table border="0" width="100%"><tr valign="top">\n')
-        for letter in sorted(indices['ident'].iterkeys()):
-            out('<td valign="top" width="1%">')
-            out('<a name="identifiers-%s"><h2>%s</h2></a></td>\n' %
-                (letter, letter))
-            out('<td valign="top">\n')
-            section = sorted(indices['ident'][letter])
-            self.write_index_section(out, section, True)
-            out('</td></tr>\n')
-        out('</table>\n</br />')
-
-        # Footer material.
-        out('<br />')
-        self.write_navbar(out, 'indices')
-        self.write_footer(out)
-
-    def write_term_index(self, out, indices):
-        """
-        Write an HTML page containing the term index.
-        """
-        # Header material.
-        self.write_header(out, 'Term Index')
-        self.write_navbar(out, 'indices')
-        self.write_breadcrumbs(out, 'indices', 'term-index.html')
-        self.write_index_pointers(out, indices)
-
-        out('<a name="term"><h2 class="index">Term Definition Index</h2></a>')
-        self.write_index_section(out, sorted(indices['term'],
-                                             key=lambda v:v[0].lower()))
+    def write_link_index(self, out, indices, title, url, index_name):
+        index = indices[index_name]
         
+        # Header material.
+        self.write_indexpage_header(out, indices, title, url)
+
+        # If the index is small enough, then don't bother to make
+        # alphabetical sections; just list it all in one section.
+        if len(index) < self.SPLIT_LINK_INDEX_SIZE:
+            out('<h1 class="epydoc">%s</h1><br />\n' % title)
+            self.write_index_section(out, index)
+
+        # Otherwise, group the index by letter, and write one section
+        # per letter.
+        else:
+            index = self._group_by_letter(index)
+    
+            # Header & links to alphabetical sections.
+            out('<table border="0" width="100%">\n'
+                '<tr valign="bottom"><td>\n')
+            out('<h1 class="epydoc">%s</h1>\n</td><td>\n[\n' % title)
+            for letter in 'ABCDEFGHIJKLMNOPQRSTUVWZYZ_':
+                if letter in index:
+                    out(' <a href="#%s">%s</a>\n' % (letter, letter))
+                else:
+                    out(' %s\n' % letter)
+            out(']\n')
+            out('</td></table>\n')
+    
+            # Alphabetical sections.
+            out('<table border="0" width="100%"><tr valign="top">\n')
+            for letter in sorted(index.iterkeys()):
+                out('<td valign="top" width="1%">')
+                out('<a name="%s"><h2 class="epydoc">%s</h2></a></td>\n' %
+                    (letter, letter))
+                out('<td valign="top">\n')
+                section = index[letter]
+                self.write_index_section(out, section, True)
+                out('</td></tr>\n')
+            out('</table>\n</br />')
+    
         # Footer material.
         out('<br />')
         self.write_navbar(out, 'indices')
@@ -895,17 +933,17 @@ class HTMLWriter:
         """
         Write an HTML page containing a metadata index.
         """
-        # Header material.
-        self.write_header(out, title)
-        self.write_navbar(out, 'indices')
-        self.write_breadcrumbs(out, 'indices', '%s-index.html' % field)
-        self.write_index_pointers(out, indices)
         index = indices[field]
-
-        # [XX} FIXME
-        out('<a name="%s"><h2 class="index">%s</h2></a>' %
-            (field, title))
         
+        # Header material.
+        self.write_indexpage_header(out, indices, title,
+                                    '%s-index.html' % field)
+
+        # Page title.
+        out('<a name="%s"><h1 class="epydoc">%s</h1></a>\n<br />\n' %
+            (field, title))
+
+        # Index (one section per arg)
         for arg in sorted(index):
             # Write a section title.
             if arg is not None:
@@ -914,7 +952,7 @@ class HTMLWriter:
                     out('<div class="private">')
                 else:
                     out('<div>')
-                self.write_table_header(out, 'index', arg)
+                self.write_table_header(out, 'metadata-index', arg)
                 out('</table>')
             # List every descr for this arg.
             for (doc, descrs) in index[arg]:
@@ -922,10 +960,10 @@ class HTMLWriter:
                     out('<div class="private">\n')
                 else:
                     out('<div>\n')
-                out('<table width="100%" class="details" '
-                    'bgcolor="#e0e0e0"><tr><td>')
+                out('<table width="100%" class="metadata-index" '
+                    'bgcolor="#e0e0e0"><tr><td class="metadata-index">')
                 out('<b>In %s</b>' % self.href(doc))
-                out('    <ul>\n')
+                out('    <ul class="nomargin">\n')
                 for descr in descrs:
                     out('      <li>%s</li>\n' %
                         self.docstring_to_html(descr,doc,4))
@@ -938,13 +976,17 @@ class HTMLWriter:
         self.write_navbar(out, 'indices')
         self.write_footer(out)
 
-    def write_index_pointers(self, out, indices):
+    def write_indexpage_header(self, out, indices, title, url):
         """
         A helper for the index page generation functions, which
         generates a header that can be used to navigate between the
         different indices.
         """
-        if len(indices) > 1:
+        self.write_header(out, title)
+        self.write_navbar(out, 'indices')
+        self.write_breadcrumbs(out, 'indices', url)
+        
+        if indices['term'] or indices['bug'] or indices['todo']:
             out('<center><b>[\n')
             out(' <a href="identifier-index.html">Identifier Index</a>\n')
             if indices['term']:
@@ -953,29 +995,34 @@ class HTMLWriter:
                 out('| <a href="bug-index.html">Bug List</a>\n')
             if indices['todo']:
                 out('| <a href="todo-index.html">To Do List</a>\n')
-            out(']</b></center>\n')
+            out(']</b></center><br />\n')
 
     def write_index_section(self, out, items, add_blankline=False):
-        out('<table class="index" width="100%" border="1">\n')
+        out('<table class="link-index" width="100%" border="1">\n')
         num_rows = (len(items)+2)/3
         for row in range(num_rows):
             out('  <tr>\n')
             for col in range(3):
-                out('    <td width="33%" class="index">')
+                out('    <td width="33%" class="link-index">')
                 i = col*num_rows+row
                 if i < len(items):
                     name, url, container = items[col*num_rows+row]
                     out('<a href="%s">%s</a>' % (url, name))
                     if container is not None:
                         out('<br />\n      ')
-                        out('<font size="-2">(in&nbsp;%s)</font>' %
-                            self.href(container))
+                        if isinstance(container, ModuleDoc):
+                            label = container.canonical_name
+                        else:
+                            label = container.canonical_name[-1]
+                        out('<span class="index-where">(in&nbsp;%s)'
+                            '</font>' % self.href(container, label))
                 else:
                     out('&nbsp;')
                 out('</td>\n')
             out('  </tr>\n')
             if add_blankline and num_rows == 1:
-                out('  <tr>'+3*'<td class="index">&nbsp;</td>'+'</tr>\n')
+                blank_cell = '<td class="link-index">&nbsp;</td>'
+                out('  <tr>'+3*blank_cell+'</tr>\n')
         out('</table>\n')
 
     #////////////////////////////////////////////////////////////
@@ -1052,11 +1099,10 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
         >>> self.write_header(out, "Table of Contents")
-        <h1 class="tocheading">Table&nbsp;of&nbsp;Contents</h1>
+        <h1 class="toc">Table&nbsp;of&nbsp;Contents</h1>
         <hr />
-        <p class="toc">
           <a target="moduleFrame" href="toc-everything.html">Everything</a>
-        </p>
+          <br />
         >>> self.write_toc_section(out, "Modules", self.module_list)
         <hr />
         >>> if self._show_private:
@@ -1076,7 +1122,7 @@ class HTMLWriter:
             docs = [(str(d.canonical_name[-1]), d) for d in docs]
         docs.sort()
 
-        out('  <h2 class="tocheading">%s</h2>\n' % name)
+        out('  <h2 class="toc">%s</h2>\n' % name)
         for label, doc in docs:
             doc_url = self.url(doc)
             toc_url = 'toc-%s' % doc_url
@@ -1085,20 +1131,19 @@ class HTMLWriter:
                 if not self._show_private: continue
                 out('  <div class="private">\n')
                 
-            out('  <p class="toc">\n')
             if isinstance(doc, ModuleDoc):
                 out('    <a target="moduleFrame" href="%s"\n'
                     '     onclick="setFrame(\'%s\',\'%s\');"'
-                    '     >%s</a></p>' % (toc_url, toc_url, doc_url, label))
+                    '     >%s</a><br />' % (toc_url, toc_url, doc_url, label))
             else:
                 out('    <a target="mainFrame" href="%s"\n'
-                    '     >%s</a></p>' % (doc_url, label))
+                    '     >%s</a><br />' % (doc_url, label))
             if is_private:
                 out('  </div>\n')
 
     def write_project_toc(self, out):
         self.write_header(out, "Everything")
-        out('<h1 class="tocheading">Everything</h1>\n')
+        out('<h1 class="toc">Everything</h1>\n')
         out('<hr />\n')
 
         # List the classes.
@@ -1133,7 +1178,7 @@ class HTMLWriter:
         """
         name = doc.canonical_name[-1]
         self.write_header(out, name)
-        out('<h1 class="tocheading">Module %s</h1>\n' % name)
+        out('<h1 class="toc">Module %s</h1>\n' % name)
         out('<hr />\n')
 
 
@@ -1396,6 +1441,7 @@ class HTMLWriter:
                 (callgraph.uid, graph_html))
 
     def callgraph_link(self, callgraph):
+        # Use class=codelink, to match style w/ the source code link.
         if callgraph is None: return ''
         return ('<br /><span class="codelink"><a href="javascript: void(0);" '
                 'onclick="toggleCallGraph(\'%s-div\');return false;">'
@@ -1449,7 +1495,7 @@ class HTMLWriter:
             <td align="left" class="footer">Generated by Epydoc
                 $epydoc.__version__$ on $time.asctime()$</td>
             <td align="right" class="footer">
-              <a href="http://epydoc.sourceforge.net">http://epydoc.sf.net</a>
+              <a href="http://epydoc.sourceforge.net">http://epydoc.sourceforge.net</a>
             </td>
           </tr>
         </table>
@@ -1497,41 +1543,41 @@ class HTMLWriter:
         <table class="navbar" border="0" width="100%" cellpadding="0"
                bgcolor="#a0c0ff" cellspacing="0">
           <tr valign="middle">
-        >>> if self._top_page_url not in ("trees.html", "identifier-index.html", "help.html"):
+        >>> if self._top_page_url not in (self._trees_url, "identifier-index.html", "help.html"):
           <!-- Home link -->
         >>>   if (isinstance(context, ValueDoc) and
         >>>       self._top_page_url == self.url(context.canonical_name)):
-              <th bgcolor="#70b0f0" class="navselect"
+              <th bgcolor="#70b0f0" class="navbar-select"
                   >&nbsp;&nbsp;&nbsp;Home&nbsp;&nbsp;&nbsp;</th>
         >>>   else:
-              <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
+              <th>&nbsp;&nbsp;&nbsp;<a
                 href="$self._top_page_url$">Home</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Tree link -->
         >>> if context == "trees":
-              <th bgcolor="#70b0f0" class="navselect"
+              <th bgcolor="#70b0f0" class="navbar-select"
                   >&nbsp;&nbsp;&nbsp;Trees&nbsp;&nbsp;&nbsp;</th>
         >>> else:
-              <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
-                href="trees.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+              <th>&nbsp;&nbsp;&nbsp;<a
+                href="$self._trees_url$">Trees</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Index link -->
         >>> if context == "indices":
-              <th bgcolor="#70b0f0" class="navselect"
+              <th bgcolor="#70b0f0" class="navbar-select"
                   >&nbsp;&nbsp;&nbsp;Indices&nbsp;&nbsp;&nbsp;</th>
         >>> else:
-              <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
+              <th>&nbsp;&nbsp;&nbsp;<a
                 href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
           <!-- Help link -->
         >>> if context == "help":
-              <th bgcolor="#70b0f0" class="navselect"
+              <th bgcolor="#70b0f0" class="navbar-select"
                   >&nbsp;&nbsp;&nbsp;Help&nbsp;&nbsp;&nbsp;</th>
         >>> else:
-              <th class="navbar">&nbsp;&nbsp;&nbsp;<a class="navbar"
+              <th>&nbsp;&nbsp;&nbsp;<a
                 href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
         >>> #endif
         
@@ -1539,10 +1585,9 @@ class HTMLWriter:
           <!-- Project homepage -->
               <th class="navbar" align="right" width="100%">
                 <table border="0" cellpadding="0" cellspacing="0">
-                  <tr><th class="navbar" align="center">
-                    <p class="nomargin">
-                      $self._prj_link$
-              </p></th></tr></table></th>
+                  <tr><th class="navbar" align="center"
+                    >$self._prj_link.strip()$</th>
+                  </tr></table></th>
         >>> else:
               <th class="navbar" width="100%"></th>
         >>> #endif
@@ -1737,17 +1782,15 @@ class HTMLWriter:
             private_vars = [v for v in listed_inh_vars[base]
                             if not v.is_public]
             if public_vars:
-                out('    <p class="varlist">'
-                    '<span class="varlist-header">Inherited '
-                    'from <code>%s</code></span>:\n' %
+                out('    <p class="indent-wrapped-lines">'
+                    '<b>Inherited from <code>%s</code></b>:\n' %
                     self.href(base, context=doc))
                 self.write_var_list(out, public_vars)
                 out('      </p>\n')
             if private_vars and self._show_private:
                 out('    <div class="private">')
-                out('    <p class="varlist">'
-                    '<span class="varlist-header">Inherited '
-                    'from <code>%s</code></span> (private):\n' %
+                out('    <p class="indent-wrapped-lines">'
+                    '<b>Inherited from <code>%s</code></b> (private):\n' %
                     self.href(base, context=doc))
                 self.write_var_list(out, private_vars)
                 out('      </p></div>\n')
@@ -1773,60 +1816,54 @@ class HTMLWriter:
         if var_doc.is_public: tr_class = ''
         else: tr_class = ' class="private"'
 
-        # Convert the summary to HTML.
-        summary = self.summary(var_doc, indent=6)
-
-        # If it's inherited, then add a note to the summary.
-        if var_doc.container != container and self._inheritance=="included":
-            summary += ("\n      <em>(Inherited from " +
-                        self.href(var_doc.container) + ")</em>")
-            
+        # Construct the HTML code for the type (cell 1) & description
+        # (cell 2).
         if isinstance(var_doc.value, RoutineDoc):
-            if summary: summary = '<br />'+summary
-            self.write_function_summary_line(out, var_doc, tr_class, summary)
+            typ = self.return_type(var_doc, indent=6)
+            description = self.function_signature(var_doc, True, True)
         else:
-            # This is used for nested classes, properties, & variables
-            self.write_variable_summary_line(out, var_doc, tr_class, summary)
+            typ = self.type_descr(var_doc, indent=6)
+            description = self.href(var_doc)
+            if isinstance(var_doc.value, GenericValueDoc):
+                pyval_repr = var_doc.value.pyval_repr()
+                if pyval_repr is not UNKNOWN:
+                    val_repr = pyval_repr
+                else:
+                    val_repr = var_doc.value.parse_repr
+                if val_repr is not UNKNOWN:
+                    val_repr = ' '.join(val_repr.strip().split())
+                    maxlen = self._variable_summary_linelen
+                    if len(val_repr) > maxlen:
+                        val_repr = val_repr[:maxlen-3]+'...'
+                    val_repr = plaintext_to_html(val_repr)
+                    tooltip = self.variable_tooltip(var_doc)
+                    description += (' = <code%s>%s</code>' %
+                                    (tooltip, val_repr))
 
-    write_function_summary_line = compile_template(
-        """
-        write_function_summary_line(self, out, var_doc, tr_class, summary)
-
-        Generate HTML code for a single line of a summary table,
-        describing a variable whose value is a function, and write
-        it to C{out}.
+        # Add the summary to the description (if there is one).
+        summary = self.summary(var_doc, indent=6)
+        if summary: description += '<br />\n      %s' % summary
         
-        @param var_doc: The API documentation for the variable that
-            should be described by this line of the summary table.
-        @param container: The API documentation for the class or
-            module whose summary table we're writing.
+        # If it's inherited, then add a note to the description.
+        if var_doc.container != container and self._inheritance=="included":
+            description += ("\n      <em>(Inherited from " +
+                        self.href(var_doc.container) + ")</em>")
+
+        # Write the summary line.
+        self._write_summary_line(out, typ, description, tr_class)
+
+    _write_summary_line = compile_template(
+        """
+        _write_summary_line(self, out, typ, description, tr_class)
         """,
         # /------------------------- Template -------------------------\
         '''
           <tr$tr_class$>
             <td width="15%" align="right" valign="top" class="summary">
-              <span class="rtype">
-                $self.rtype(var_doc, indent=6) or "&nbsp;"$
-              </span>
-             </td>
-            <td class="summary">
-              $self.function_signature(var_doc, link_name=True)$
-              $summary$
+              <code class="summary-type">$typ or "&nbsp;"$</code>
+            </td><td class="summary">
+              $description$
             </td>
-          </tr>
-        ''')
-        # \------------------------------------------------------------/
-
-    write_variable_summary_line = compile_template(
-        '''
-        write_variable_summary_line(self, out, var_doc, tr_class, summary)
-        ''',
-        # /------------------------- Template -------------------------\
-        '''
-          <tr$tr_class$>
-            <td width="15%" class="summary">
-              <strong>$self.href(var_doc)$</strong></td>
-            <td class="summary">$summary or "&nbsp;"$</td>
           </tr>
         ''')
         # \------------------------------------------------------------/
@@ -1848,7 +1885,7 @@ class HTMLWriter:
         if not var_docs: return
 
         # Write a header
-        self.write_table_header(out, "details", heading)
+        self.write_table_header(out, "summary", heading)
         out(self.TABLE_FOOTER)
 
         for var_doc in var_docs:
@@ -1863,7 +1900,7 @@ class HTMLWriter:
 
         # Functions
         if isinstance(var_doc.value, RoutineDoc):
-            rtype = self.rtype(var_doc, indent=10)
+            rtype = self.return_type(var_doc, indent=10)
             rdescr = self.return_descr(var_doc, indent=10)
             arg_descrs = []
             # [xx] if we have a @type but no @param, this won't list it!
@@ -1915,17 +1952,11 @@ class HTMLWriter:
     def property_accessor_to_html(self, val_doc):
         if val_doc not in (None, UNKNOWN):
             if isinstance(val_doc, RoutineDoc):
-                return self.function_signature(val_doc, css_class=
-                                               "summary-sig")
+                return self.function_signature(val_doc, True, True)
             elif isinstance(val_doc, GenericValueDoc):
-                if val_doc.parse_repr is not UNKNOWN:
-                    return plaintext_to_html(val_doc.parse_repr)
-                else:
-                    pyval_repr = val_doc.pyval_repr()
-                    if pyval_repr is not UNKNOWN:
-                        return plaintext_to_html(pyval_repr)
-                    else:
-                        return self.href(val_doc)
+                return ('<table><tr><td><pre class="variable">\n' +
+                        self.pprint_value(val_doc) +
+                        '\n</pre></td></tr></table>\n')
             else:
                 return self.href(val_doc)
         else:
@@ -1956,10 +1987,11 @@ class HTMLWriter:
         >>> func_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
+        >>> self.write_table_header(out, "details")
+        <tr><td>
           <table width="100%" cellpadding="0" cellspacing="0" border="0">
           <tr valign="top"><td>
-          <h3>$self.function_signature(var_doc)$
+          <h3 class="epydoc">$self.function_signature(var_doc)$
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
         >>> #endif
@@ -1974,7 +2006,7 @@ class HTMLWriter:
         >>> # === parameters ===
         >>> if arg_descrs:
             <dl><dt>Parameters:</dt></dl>
-            <ul>
+            <ul class="nomargin">
         >>>   for lhs, rhs in arg_descrs:
                 $self.labelled_list_item(lhs, rhs)$
         >>>   #endfor
@@ -1993,7 +2025,7 @@ class HTMLWriter:
         >>> # === exceptions ===
         >>> if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
             <dl><dt>Raises:</dt></dl>
-            <ul>
+            <ul class="nomargin">
         >>>   for name, descr in func_doc.exception_descrs:
                 $self.labelled_list_item(
                     "<code><strong class=\'fraise\'>" +
@@ -2062,8 +2094,9 @@ class HTMLWriter:
         >>> prop_doc = var_doc.value
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
-          <h3>$var_doc.name$</h3>
+        >>> self.write_table_header(out, "details")
+        <tr><td>
+          <h3 class="epydoc">$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
         >>> if prop_doc.type_descr not in (None, UNKNOWN):
@@ -2092,17 +2125,17 @@ class HTMLWriter:
         '''
         <a name="$var_doc.name$"></a>
         <div$div_class$>
-        <table width="100%" class="details" bgcolor="#e0e0e0"><tr><td>
-          <h3>$var_doc.name$</h3>
+        >>> self.write_table_header(out, "details")
+        <tr><td>
+          <h3 class="epydoc">$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
         >>> if var_doc.type_descr not in (None, UNKNOWN):
             <dl><dt>Type:</dt>
               <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
         >>> #endif
-        >>> tooltip = self.variable_tooltip(var_doc)
         >>> if var_doc.value is not UNKNOWN:
-            <dl$tooltip$><dt>Value:</dt>
+            <dl><dt>Value:</dt>
               <dd><table><tr><td><pre class="variable">
         $self.pprint_value(var_doc.value)$
               </pre></td></tr></table></dd>
@@ -2114,9 +2147,6 @@ class HTMLWriter:
         ''')
         # \------------------------------------------------------------/
 
-    _variable_linelen = 80
-    _variable_maxlines = 3
-    _variable_tooltip_linelen = 80
     def variable_tooltip(self, var_doc):
         if var_doc.value in (None, UNKNOWN):
             return ''
@@ -2133,10 +2163,10 @@ class HTMLWriter:
             s = s[:self._variable_tooltip_linelen-3]+'...'
         return ' title="%s"' % plaintext_to_html(s)
 
-    def pprint_value(self, val_doc, multiline=True, summary_linelen=0):
+    def pprint_value(self, val_doc):
+        if val_doc is UNKNOWN: return ''
         if val_doc.pyval is not UNKNOWN:
-            return self.pprint_pyval(val_doc.pyval, multiline,
-                                     summary_linelen)
+            return self.pprint_pyval(val_doc.pyval)
         elif val_doc.parse_repr is not UNKNOWN:
             s = plaintext_to_html(val_doc.parse_repr)
         else:
@@ -2144,7 +2174,7 @@ class HTMLWriter:
         return self._linewrap_html(s, self._variable_linelen,
                                    self._variable_maxlines)
 
-    def pprint_pyval(self, pyval, multiline=True, summary_linelen=0):
+    def pprint_pyval(self, pyval):
         # Handle the most common cases first.  The following types
         # will never need any line wrapping, etc; and they cover most
         # variable values (esp int, for constants).  I leave out
@@ -2160,7 +2190,7 @@ class HTMLWriter:
         # appropriate.
         elif type(pyval) is types.StringType:
             vstr = repr(pyval)
-            if vstr.find(r'\n') >= 0 and multiline:
+            if vstr.find(r'\n') >= 0:
                 body = vstr[1:-1].replace(r'\n', '\n')
                 vstr = ('<span class="variable-quote">'+vstr[0]*3+'</span>'+
                         plaintext_to_html(body) +
@@ -2177,13 +2207,13 @@ class HTMLWriter:
         elif type(pyval) is types.TupleType or type(pyval) is types.ListType:
             try: vstr = repr(pyval)
             except: vstr = '...'
-            if multiline and len(vstr) > self._variable_linelen:
+            if len(vstr) > self._variable_linelen:
                 vstr = pprint.pformat(pyval[:self._variable_maxlines+1])
             vstr = plaintext_to_html(vstr)
         elif type(pyval) is type({}):
             try: vstr = repr(pyval)
             except: vstr = '...'
-            if multiline and len(vstr) > self._variable_linelen:
+            if len(vstr) > self._variable_linelen:
                 if len(pyval) < self._variable_maxlines+50:
                     vstr = pprint.pformat(pyval)
                 else:
@@ -2204,16 +2234,6 @@ class HTMLWriter:
         else:
             try: vstr = plaintext_to_html(repr(pyval))
             except: vstr = '...'
-
-        # For the summary table, just return the value; don't
-        # bother to word-wrap.
-        if not multiline:
-            vstr = vstr.replace('\n', '')
-            # Change spaces to &nbsp; (except spaces in html tags)
-            vstr = vstr.replace(' ', '&nbsp;')
-            vstr = vstr.replace('<span&nbsp;', '<span ')
-            vstr = self._linewrap_html(vstr, summary_linelen, 1)
-            return '<code>%s</code>\n' % vstr
 
         # Do line-wrapping.
         return self._linewrap_html(vstr, self._variable_linelen,
@@ -2361,8 +2381,11 @@ class HTMLWriter:
     #{ Function Signatures
     #////////////////////////////////////////////////////////////
 
-    def function_signature(self, api_doc, css_class='sig',
+    def function_signature(self, api_doc, is_summary=False, 
                            link_name=False):
+        if is_summary: css_class = 'summary-sig'
+        else: css_class = 'sig'
+        
         # [XX] clean this up!
         if isinstance(api_doc, VariableDoc):
             func_doc = api_doc.value
@@ -2437,10 +2460,10 @@ class HTMLWriter:
                                        public=self._public_filter)
         if not imports: return
 
-        out('<p class="imports">')
-        out('<span class="varlist-header">Imports:</span>\n  ')
+        out('<p class="indent-wrapped-lines">')
+        out('<b>Imports:</b>\n  ')
         out(',\n  '.join([self._import(v, doc) for v in imports]))
-        out('\n</p>\n')
+        out('\n</p><br />\n')
 
     def _import(self, var_doc, context):
         if var_doc.imported_from not in (None, UNKNOWN):
@@ -2459,26 +2482,16 @@ class HTMLWriter:
     #{ Module Trees
     #////////////////////////////////////////////////////////////
 
-    def write_module_tree(self, out):
-        if not self.module_list: return
-
-        # Write entries for all top-level modules/packages.
-        out('<ul>\n')
-        for doc in self.module_list:
-            if (doc.package in (None, UNKNOWN) or
-                doc.package not in self.module_set):
-                self.write_module_tree_item(out, doc)
-        out('</ul>\n')
-    
     def write_module_list(self, out, doc):
         if len(doc.submodules) == 0: return
-        self.write_table_header(out, "details", "Submodules")
+        self.write_table_header(out, "summary", "Submodules")
 
         for group_name in doc.group_names():
             if not doc.submodule_groups[group_name]: continue
             if group_name:
                 self.write_group_header(out, group_name)
-            out('  <tr><td><ul>\n')
+            out('  <tr><td class="summary">\n'
+                '  <ul class="nomargin">\n')
             for submodule in doc.submodule_groups[group_name]:
                 self.write_module_tree_item(out, submodule, package=doc)
             out('  </ul></td></tr>\n')
@@ -2488,11 +2501,8 @@ class HTMLWriter:
     def write_module_tree_item(self, out, doc, package=None):
         # If it's a private variable, then mark its <li>.
         var = package and package.variables.get(doc.canonical_name[-1])
-        if var is not None:
-            priv = var.is_public is False
-        else:
-            priv = doc.canonical_name[-1].startswith('_')
-                
+        priv = ((var is not None and var.is_public is False) or
+                (var is None and doc.canonical_name[-1].startswith('_')))
         out('    <li%s> <strong class="uidlink">%s</strong>'
             % (priv and ' class="private"' or '', self.href(doc)))
         if doc.summary not in (None, UNKNOWN):
@@ -2500,7 +2510,8 @@ class HTMLWriter:
                 self.description(doc.summary, doc, 8)+'</em>')
         out('</li>\n')
         if doc.submodules != UNKNOWN and doc.submodules:
-            out('    <ul%s>\n' % (priv and ' class="private"' or ''))
+            if priv: out('    <ul class="private">\n')
+            else: out('    <ul>\n')
             for submodule in doc.submodules:
                 self.write_module_tree_item(out, submodule, package=doc)
             out('    </ul>\n    </li>\n')
@@ -2508,45 +2519,6 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     #{ Class trees
     #////////////////////////////////////////////////////////////
-
-
-    def write_class_tree(self, out):
-        """
-        Write HTML code for a nested list showing the base/subclass
-        relationships between all documented classes.  Each element of
-        the top-level list is a class with no (documented) bases; and
-        under each class is listed all of its subclasses.  Note that
-        in the case of multiple inheritance, a class may appear
-        multiple times.  This is used by L{write_trees} to write
-        the class hierarchy.
-        
-        @todo: For multiple inheritance, don't repeat subclasses the
-            second time a class is mentioned; instead, link to the
-            first mention.
-        """
-        # [XX] backref for multiple inheritance?
-        if not self.class_list: return
-        
-        # Build a set containing all classes that we should list.
-        # This includes everything in class_list, plus any of those
-        # class' bases, but not undocumented subclasses.
-        class_set = self.class_set.copy()
-        for doc in self.class_list:
-            if doc.bases != UNKNOWN:
-                for base in doc.bases:
-                    if base not in class_set:
-                        if isinstance(base, ClassDoc):
-                            class_set.update(base.mro())
-                        else:
-                            # [XX] need to deal with this -- how?
-                            pass
-                            #class_set.add(base)
- 
-        out('<ul>\n')
-        for doc in sorted(class_set):
-            if doc.bases != UNKNOWN and len(doc.bases)==0:
-                self.write_class_tree_item(out, doc, class_set)
-        out('</ul>\n')
 
     write_class_tree_item = compile_template(
         '''
@@ -2615,9 +2587,9 @@ class HTMLWriter:
         
         """,
         # /------------------------- Template -------------------------\
-        """
-        >>> if arg: arglabel = ' (%s)' % arg
-        >>> else: arglabel = ''
+        '''
+        >>> if arg: arglabel = " (%s)" % arg
+        >>> else: arglabel = ""
         >>>   if len(descrs) == 1:
               <p><strong>$field.singular+arglabel$:</strong>
                 $self.description(descrs[0], doc, 8)$
@@ -2633,7 +2605,7 @@ class HTMLWriter:
               </dl>
         >>>   else:
               <p><strong>$field.plural+arglabel$:</strong>
-              <ul>
+              <ul class="nomargin-top">
         >>>     for descr in descrs:
                 <li>
                 $self.description(descr, doc, 8)$
@@ -2642,7 +2614,7 @@ class HTMLWriter:
               </ul>
         >>>   # end else
         >>> # end for
-        """)
+        ''')
         # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
@@ -2652,14 +2624,16 @@ class HTMLWriter:
     def build_identifier_index(self):
         items = []
         for doc in self.indexed_docs:
-            name = doc.canonical_name[-1]
+            name = plaintext_to_html(doc.canonical_name[-1])
+            if isinstance(doc, RoutineDoc): name += '()'
             url = self.url(doc)
             if not url: continue
             container = self.docindex.container(doc)
             items.append( (name, url, container) )
-        return self._group_by_letter(items)
+        return sorted(items, key=lambda v:v[0].lower())
 
     def _group_by_letter(self, items):
+        """Preserves sort order of the input."""
         index = {}
         for item in items:
             first_letter = item[0][0].upper()
@@ -2684,7 +2658,7 @@ class HTMLWriter:
                 if hasattr(doc, 'return_type'):
                     items += self._terms_from_docstring(url, doc,
                                                         doc.return_type)
-        return items
+        return sorted(items, key=lambda v:v[0].lower())
 
     def _terms_from_docstring(self, base_url, container, parsed_docstring):
         if parsed_docstring in (None, UNKNOWN): return []
@@ -2761,12 +2735,12 @@ class HTMLWriter:
         <table class="$css_class$" border="1" cellpadding="3"
                cellspacing="0" width="100%" bgcolor="white">
         >>> if heading is not None:
-        <tr bgcolor="#70b0f0" class="$css_class$">
+        <tr bgcolor="#70b0f0" class="table-header">
         >>>     if private_link:
-          <td colspan="$colspan$" class="$css_class$">
+          <td colspan="$colspan$" class="table-header">
             <table border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr valign="top">
-                <td align="left"><h3 class="$css_class$">$heading$</h3></th>
+                <td align="left"><span class="table-header">$heading$</span></td>
                 <td align="right" valign="top"
                  ><span class="options">[<a href="#$anchor$"
                  class="privatelink" onclick="toggle_private();"
@@ -2775,7 +2749,8 @@ class HTMLWriter:
             </table>
           </td>
         >>>     else:
-          <th align="left" colspan="2" class="$css_class$">$heading$</th>
+          <td align="left" colspan="2" class="table-header">
+            <span class="table-header">$heading$</span></td>
         >>>     #endif
         </tr>
         >>> #endif
@@ -2796,7 +2771,7 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
         <tr bgcolor="#e8f0f8" $tr_class$>
-          <th colspan="2" class="group"
+          <th colspan="2" class="group-header"
             >&nbsp;&nbsp;&nbsp;&nbsp;$group$</th></tr>
         ''')
         # \------------------------------------------------------------/
@@ -2852,7 +2827,7 @@ class HTMLWriter:
         elif obj == 'help':
             return 'help.html'
         elif obj == 'trees':
-            return 'trees.html'
+            return self._trees_url
         else:
             raise ValueError, "Don't know what to do with %r" % obj
 
@@ -2869,7 +2844,7 @@ class HTMLWriter:
     def pysrc_url(self, api_doc):
         if isinstance(api_doc, VariableDoc):
             if api_doc.value not in (None, UNKNOWN):
-                return pysrc_link(api_doc.value)
+                return pysrc_url(api_doc.value)
             else:
                 return None
         elif isinstance(api_doc, ModuleDoc):
@@ -2942,48 +2917,29 @@ class HTMLWriter:
 
         return '<a href="%s"%s>%s</a>' % (url, css, label)
 
+    def _attr_to_html(self, attr, api_doc, indent):
+        if api_doc in (None, UNKNOWN):
+            return ''
+        pds = getattr(api_doc, attr, None) # pds = ParsedDocstring.
+        if pds not in (None, UNKNOWN):
+            return self.docstring_to_html(pds, api_doc, indent)
+        elif isinstance(api_doc, VariableDoc):
+            return self._attr_to_html(attr, api_doc.value, indent)
+        
     def summary(self, api_doc, indent=0):
-        assert isinstance(api_doc, APIDoc)
-        if (isinstance(api_doc, VariableDoc) and
-            api_doc.summary in (None, UNKNOWN)):
-            if api_doc.value in (None, UNKNOWN): return ''
-            api_doc = api_doc.value
-        if api_doc.summary in (None, UNKNOWN): return ''
-        return self.docstring_to_html(api_doc.summary, api_doc, indent)
+        return self._attr_to_html('summary', api_doc, indent)
         
     def descr(self, api_doc, indent=0):
-        assert isinstance(api_doc, APIDoc)
-        if (isinstance(api_doc, VariableDoc) and
-            api_doc.descr in (None, UNKNOWN)):
-            if api_doc.value in (None, UNKNOWN): return ''
-            api_doc = api_doc.value
-        if api_doc.descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(api_doc.descr, api_doc, indent)
+        return self._attr_to_html('descr', api_doc, indent)
 
     def type_descr(self, api_doc, indent=0):
-        assert isinstance(api_doc, APIDoc)
-        if (isinstance(api_doc, VariableDoc) and
-            api_doc.type_descr in (None, UNKNOWN)):
-            if api_doc.value in (None, UNKNOWN): return ''
-            api_doc = api_doc.value
-        if api_doc.type_descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(api_doc.type_descr, api_doc, indent)
+        return self._attr_to_html('type_descr', api_doc, indent)
 
-    def rtype(self, api_doc, indent=0):
-        if isinstance(api_doc, VariableDoc):
-            if api_doc.value in (None, UNKNOWN): return ''
-            api_doc = api_doc.value
-        assert isinstance(api_doc, RoutineDoc)
-        if api_doc.return_type in (None, UNKNOWN): return ''
-        return self.docstring_to_html(api_doc.return_type, api_doc, indent)
+    def return_type(self, api_doc, indent=0):
+        return self._attr_to_html('return_type', api_doc, indent)
 
     def return_descr(self, api_doc, indent=0):
-        if isinstance(api_doc, VariableDoc):
-            if api_doc.value in (None, UNKNOWN): return ''
-            api_doc = api_doc.value
-        assert isinstance(api_doc, RoutineDoc)
-        if api_doc.return_descr in (None, UNKNOWN): return ''
-        return self.docstring_to_html(api_doc.return_descr, api_doc, indent)
+        return self._attr_to_html('return_descr', api_doc, indent)
 
     def docstring_to_html(self, parsed_docstring, where=None, indent=0):
         if parsed_docstring in (None, UNKNOWN): return ''
