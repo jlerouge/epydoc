@@ -30,6 +30,7 @@ class LatexWriter:
         "\\usepackage{alltt, parskip, fancyheadings, boxedminipage}",
         "\\usepackage{makeidx, multirow, longtable, tocbibind, amssymb}",
         "\\usepackage{fullpage}",
+        "\\usepackage[usenames]{color}",
         # Fix the heading position -- without this, the headings generated
         # by the fancyheadings package sometimes overlap the text.
         "\\setlength{\\headheight}{16pt}",
@@ -45,6 +46,41 @@ class LatexWriter:
         "\\pagestyle{fancy}",
         "\\renewcommand{\\sectionmark}[1]{\\markboth{#1}{}}",
         "\\renewcommand{\\subsectionmark}[1]{\\markright{#1}}",
+        # Colorization for python source code
+        "\\definecolor{py@keywordcolour}{rgb}{1,0.45882,0}",
+        "\\definecolor{py@stringcolour}{rgb}{0,0.666666,0}",
+        "\\definecolor{py@commentcolour}{rgb}{1,0,0}",
+        "\\definecolor{py@ps1colour}{rgb}{0.60784,0,0}",
+        "\\definecolor{py@ps2colour}{rgb}{0.60784,0,1}",
+        "\\definecolor{py@inputcolour}{rgb}{0,0,0}",
+        "\\definecolor{py@outputcolour}{rgb}{0,0,1}",
+        "\\definecolor{py@exceptcolour}{rgb}{1,0,0}",
+        "\\definecolor{py@builtincolour}{rgb}{0.58039,0,0.58039}",
+        "\\definecolor{py@identifiercolour}{rgb}{0,0,0}",
+        "\\definecolor{py@linenumcolour}{rgb}{0.4,0.4,0.4}",
+        "\\definecolor{py@inputcolour}{rgb}{0,0,0}",
+        "% Prompt",
+        "\\newcommand{\\pysrcprompt}[1]{\\textcolor{py@ps1colour}"
+            "{\\small\\textbf{#1}}}",
+        "\\newcommand{\\pysrcmore}[1]{\\textcolor{py@ps2colour}"
+            "{\\small\\textbf{#1}}}",
+        "% Source code",
+        "\\newcommand{\\pysrckeyword}[1]{\\textcolor{py@keywordcolour}"
+            "{\\small\\textbf{#1}}}",
+        "\\newcommand{\\pysrcbuiltin}[1]{\\textcolor{py@builtincolour}"
+            "{\\small\\textbf{#1}}}",
+        "\\newcommand{\\pysrcstring}[1]{\\textcolor{py@stringcolour}"
+            "{\\small\\textbf{#1}}}",
+        "\\newcommand{\\pysrcother}[1]{\\small\\textbf{#1}}",
+        "% Comments",
+        "\\newcommand{\\pysrccomment}[1]{\\textcolor{py@commentcolour}"
+            "{\\small\\textbf{#1}}}",
+        "% Output",
+        "\\newcommand{\\pysrcoutput}[1]{\\textcolor{py@outputcolour}"
+            "{\\small\\textbf{#1}}}",
+        "% Exceptions",
+        "\\newcommand{\\pysrcexcept}[1]{\\textcolor{py@exceptcolour}"
+            "{\\small\\textbf{#1}}}",
         # Define new environment for displaying parameter lists.
         textwrap.dedent("""\
         \\newenvironment{Ventry}[1]%
@@ -226,7 +262,6 @@ class LatexWriter:
 
         # If we're generating hyperrefs, add the appropriate packages.
         if self._hyperref:
-            out('\\usepackage[usenames]{color}\n')
             out('\\definecolor{UrlColor}{rgb}{0,0.08,0.45}\n')
             out('\\usepackage[dvips, pagebackref, pdftitle={%s}, '
                 'pdfcreator={epydoc %s}, bookmarks=true, '
