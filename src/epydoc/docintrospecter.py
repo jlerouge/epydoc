@@ -475,10 +475,11 @@ def introspect_property(prop, prop_doc):
     prop_doc.docstring = get_docstring(prop)
 
     # Record the property's access functions.
-    prop_doc.fget = introspect_docs(prop.fget)
-    prop_doc.fset = introspect_docs(prop.fset)
-    prop_doc.fdel = introspect_docs(prop.fdel)
-
+    if hasattr(prop, 'fget'):
+        prop_doc.fget = introspect_docs(prop.fget)
+        prop_doc.fset = introspect_docs(prop.fset)
+        prop_doc.fdel = introspect_docs(prop.fdel)
+    
     return prop_doc
 
 #////////////////////////////////////////////////////////////
@@ -695,6 +696,15 @@ register_introspecter(inspect.ismodule, introspect_module, priority=20)
 register_introspecter(inspect.isclass, introspect_class, priority=24)
 register_introspecter(inspect.isroutine, introspect_routine, priority=28)
 register_introspecter(is_property, introspect_property, priority=30)
+
+try:
+    import array
+    attribute = type(array.array.typecode)
+    del array
+    def is_attribute(v): return isinstance(v, attribute)
+    register_introspecter(is_attribute, introspect_property, priority=32)
+except:
+    pass
 
 #////////////////////////////////////////////////////////////
 # Import support

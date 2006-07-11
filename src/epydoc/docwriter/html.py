@@ -1930,7 +1930,8 @@ class HTMLWriter:
             accessors = [(name, self.property_accessor_to_html(val_doc),
                           self.summary(val_doc)) for (name, val_doc) in
                          [('Get', prop_doc.fget), ('Set', prop_doc.fset),
-                          ('Delete', prop_doc.fdel)]]
+                          ('Delete', prop_doc.fdel)]
+                            if val_doc is not UNKNOWN ]
             self.write_property_details_entry(out, var_doc, descr,
                                               accessors, div_class)
         
