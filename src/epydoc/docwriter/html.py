@@ -2044,7 +2044,7 @@ class HTMLWriter:
         >>>     #endif
                 $self.labelled_list_item(
                     "<code><strong class=\'fraise\'>" +
-                    name + "</strong></code>",
+                    str(name) + "</strong></code>",
                     self.docstring_to_html(descr, func_doc, 8))$
         >>>   #endfor
             </ul>
