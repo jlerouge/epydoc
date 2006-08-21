@@ -73,7 +73,7 @@ def py_src_filename(filename):
                 return '%s%s' % (basefile, ext)
         else:
             raise ValueError('Could not find a corresponding '
-                             'Python source file.')
+                             'Python source file for %r.' % filename)
 
 def munge_script_name(filename):
     name = os.path.split(filename)[1]
