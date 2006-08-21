@@ -45,6 +45,7 @@ def is_package_dir(dirname):
     # Make sure it's a directory.
     if not os.path.isdir(dirname):
         return False
+    dirname = os.path.abspath(dirname)
     # Make sure it's a valid identifier.  (Special case for
     # "foo/", where os.path.split -> ("foo", "").)
     (parent, dir) = os.path.split(dirname)
