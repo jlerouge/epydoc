@@ -3005,8 +3005,14 @@ class HTMLWriter:
     def _doc_or_ancestor_is_private(self, api_doc):
         name = api_doc.canonical_name
         for i in range(len(name), 0, -1):
+            # Is it (or an ancestor) a private var?
             var_doc = self.docindex.get_vardoc(name[:i])
             if var_doc is not None and var_doc.is_public == False:
+                return True
+            # Is it (or an ancestor) a private module?
+            val_doc = self.docindex.get_valdoc(name[:i])
+            if (val_doc is not None and isinstance(val_doc, ModuleDoc) and
+                val_doc.canonical_name[-1].startswith('_')):
                 return True
         return False
 
