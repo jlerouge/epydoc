@@ -822,7 +822,9 @@ def _import(name, filename=None):
 
     # Add the current directory to sys.path, in case they're trying to
     # import a module by name that resides in the current directory.
-    sys.path.insert(0, '')
+    # But add it to the end -- otherwise, the explicit directory added
+    # in get_value_from_filename might get overwritten
+    sys.path.append('')
 
     # Supress input and output.  (These get restored when we restore
     # sys to old_sys).  
