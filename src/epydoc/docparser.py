@@ -1922,7 +1922,6 @@ def _pp_toktree_add_piece(spacing, pieces, piece):
 def pp_toktree(elts, spacing='normal', indent=0):
     pieces = ['']
     _pp_toktree(elts, spacing, indent, pieces)
-    log.debug(''.join(pieces))
     return ''.join(pieces)
     
 def _pp_toktree(elts, spacing, indent, pieces):
