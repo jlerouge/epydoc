@@ -420,6 +420,9 @@ class DotGraphUmlClassNode(DotGraphNode):
             the types of a linked attributes if no node yet exists for
             that type.
         """
+        if not isinstance(class_doc, ClassDoc):
+            raise TypeError('Expected a ClassDoc as 1st argument')
+        
         self.class_doc = class_doc
         """The class represented by this node."""
         
@@ -590,6 +593,9 @@ class DotGraphUmlClassNode(DotGraphNode):
         # Use the type string to look up a corresponding ValueDoc.
         type_doc = self.linker.docindex.find(type_str, var)
         if not type_doc: return False
+
+        # Make sure the type is a class.
+        if not isinstance(type_doc, ClassDoc): return False
 
         # Get the type ValueDoc's node.  If it doesn't have one (and
         # add_nodes_for_linked_attributes=True), then create it.
