@@ -208,7 +208,7 @@ def document(options, cancel, done):
 
     @param options: The options to use for generating documentation.
         This includes keyword options that can be given to
-        L{html.HTMLFormatter}, as well as the option C{outdir}, which
+        L{html.HTMLFormatter}, as well as the option C{target}, which
         controls where the output is written to.
     @type options: C{dictionary}
     """
@@ -1037,7 +1037,7 @@ class EpydocGUI:
                 self._help_entry.insert(0, opts.get('help'))
                 
             self._out_entry.delete(0, 'end')
-            self._out_entry.insert(0, opts.get('outdir', 'html'))
+            self._out_entry.insert(0, opts.get('target', 'html'))
 
             self._frames_var.set(opts.get('frames', 1))
             self._private_var.set(opts.get('private', 1))
