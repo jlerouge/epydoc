@@ -239,7 +239,7 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
                 doc_pairs.append(_get_docs_from_module_file(
                     item, introspect, parse, progress_estimator))
             elif is_package_dir(item):
-                pkgfile = os.path.join(item, '__init__')
+                pkgfile = os.path.abspath(os.path.join(item, '__init__'))
                 doc_pairs.append(_get_docs_from_module_file(
                     pkgfile, introspect, parse, progress_estimator))
             elif os.path.isfile(item):
