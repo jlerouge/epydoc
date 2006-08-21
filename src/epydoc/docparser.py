@@ -1889,42 +1889,68 @@ def add_docstring_from_comments(api_doc, comments):
 #{ Tree tokens
 #/////////////////////////////////////////////////////////////////
 
+def _join_toktree(s1, s2):
+    # Join them.  s1 = left side; s2 = right side.
+    if (s2=='' or s1=='' or
+        s1 in ('-','`') or s2 in ('}',']',')','`',':') or
+        s2[0] in ('.',',') or s1[-1] in ('(','[','{','.','\n',' ') or
+        (s2[0] == '(' and s1[-1] not in (',','='))):
+        return '%s%s' % (s1,s2)
+    elif (spacing=='tight' and
+          s1[-1] in '+-*/=,' or s2[0] in '+-*/=,'):
+        return '%s%s' % (s1, s2)
+    else:
+        return '%s %s' % (s1, s2)
+
+def _pp_toktree_add_piece(spacing, pieces, piece):
+    s1 = pieces[-1]
+    s2 = piece
+    
+    if (s2=='' or s1=='' or
+        s1 in ('-','`') or s2 in ('}',']',')','`',':') or
+        s2[0] in ('.',',') or s1[-1] in ('(','[','{','.','\n',' ') or
+        (s2[0] == '(' and s1[-1] not in (',','='))):
+        pass
+    elif (spacing=='tight' and
+          s1[-1] in '+-*/=,' or s2[0] in '+-*/=,'):
+        pass
+    else:
+        pieces.append(' ')
+        
+    pieces.append(piece)
+
 def pp_toktree(elts, spacing='normal', indent=0):
-    s = u''
+    pieces = ['']
+    _pp_toktree(elts, spacing, indent, pieces)
+    log.debug(''.join(pieces))
+    return ''.join(pieces)
+    
+def _pp_toktree(elts, spacing, indent, pieces):
+    add_piece = _pp_toktree_add_piece
+    
     for elt in elts:
         # Put a blank line before class & def statements.
         if elt == (token.NAME, 'class') or elt == (token.NAME, 'def'):
-            s += '\n%s' % ('    '*indent)
+            add_piece(spacing, pieces, '\n%s' % ('    '*indent))
 
         if isinstance(elt, tuple):
             if elt[0] == token.NEWLINE:
-                s += '    '+elt[1]
-                s += '\n%s' % ('    '*indent)
+                add_piece(spacing, pieces, '    '+elt[1])
+                add_piece(spacing, pieces, '\n%s' % ('    '*indent))
             elif elt[0] == token.INDENT:
-                s += '    '
+                add_piece(spacing, pieces, '    ')
                 indent += 1
             elif elt[0] == token.DEDENT:
-                assert s[-4:] == '    '
-                s = s[:-4]
+                assert pieces[-1] == '    '
+                pieces.pop()
                 indent -= 1
             elif elt[0] == tokenize.COMMENT:
-                s += elt[1].rstrip() + '\n' + '    '*indent
+                add_piece(spacing, pieces, elt[1].rstrip() + '\n')
+                add_piece('    '*indent)
             else:
-                s += elt[1]
+                add_piece(spacing, pieces, elt[1])
         else:
-            elt_s = pp_toktree(elt, spacing, indent)
-            # Join them.  s = left side; elt_s = right side.
-            if (elt_s=='' or s=='' or
-                s in ('-','`') or elt_s in ('}',']',')','`',':') or
-                elt_s[0] in ('.',',') or s[-1] in ('(','[','{','.','\n',' ') or
-                (elt_s[0] == '(' and s[-1] not in (',','='))):
-                s = '%s%s' % (s, elt_s)
-            elif (spacing=='tight' and
-                  s[-1] in '+-*/=,' or elt_s[0] in '+-*/=,'):
-                s = '%s%s' % (s, elt_s)
-            else:
-                s = '%s %s' % (s, elt_s)
-    return s
+            _pp_toktree(elt, spacing, indent, pieces)
         
 #/////////////////////////////////////////////////////////////////
 #{ Helper Functions
