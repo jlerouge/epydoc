@@ -2023,6 +2023,15 @@ class HTMLWriter:
         >>> elif rtype:
             <dl><dt>Returns: <code>$rtype$</code></dt></dl>
         >>> #endif
+        >>> # === decorators ===
+        >>> if func_doc.decorators not in (None, UNKNOWN, (), []):
+            <dl><dt>Decorators:</dt></dl>
+            <ul class="nomargin">
+        >>>   for deco in func_doc.decorators:
+                <li>$deco$</li>
+        >>>   #endfor
+            </ul>
+        >>> #endif
         >>> # === exceptions ===
         >>> if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
             <dl><dt>Raises:</dt></dl>
