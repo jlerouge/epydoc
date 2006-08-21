@@ -2038,8 +2038,10 @@ class HTMLWriter:
             <dl><dt>Raises:</dt></dl>
             <ul class="nomargin">
         >>>   for name, descr in func_doc.exception_descrs:
-        >>>     name = self.href(self.docindex.find(name, func_doc),
-        >>>                      label=str(name))
+        >>>     exc_name = self.docindex.find(name, func_doc)
+        >>>     if exc_name is not None:
+        >>>       name = self.href(exc_name, label=str(name))
+        >>>     #endif
                 $self.labelled_list_item(
                     "<code><strong class=\'fraise\'>" +
                     name + "</strong></code>",
