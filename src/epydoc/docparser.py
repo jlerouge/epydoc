@@ -669,6 +669,7 @@ def process_file(module_doc):
             line_toks = []
             lineno = None
             comments = []
+            decorators = []
             
 def add_to_group(container, api_doc, group_name):
     if container.group_specs == UNKNOWN:
