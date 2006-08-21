@@ -149,7 +149,7 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     introspect_func(value, val_doc)
 
     # Set canonical name, if it was given
-    if val_doc.canonical_name == UNKNOWN and name is not None:
+    if val_doc.canonical_name is UNKNOWN and name is not None:
         val_doc.canonical_name = DottedName(name)
 
     # If we were given a filename, but didn't manage to get a
@@ -160,7 +160,7 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     if is_script and filename is not None:
         val_doc.canonical_name = DottedName(munge_script_name(str(filename)))
         
-    if val_doc.canonical_name == UNKNOWN and filename is not None:
+    if val_doc.canonical_name is UNKNOWN and filename is not None:
         shadowed_name = DottedName(value.__name__)
         log.warning("Module %s is shadowed by a variable with "
                     "the same name." % shadowed_name)
@@ -583,7 +583,7 @@ def verify_name(value, dotted_name):
     Verify the name.  E.g., if it's a nested class, then we won't be
     able to find it with the name we constructed.
     """
-    if dotted_name == UNKNOWN: return UNKNOWN
+    if dotted_name is UNKNOWN: return UNKNOWN
     if len(dotted_name) == 1 and hasattr(__builtin__, dotted_name[0]):
         return dotted_name
     named_value = sys.modules.get(dotted_name[0])
@@ -864,7 +864,7 @@ def introspect_docstring_lineno(api_doc):
     """
     if api_doc.docstring_lineno is not UNKNOWN:
         return api_doc.docstring_lineno
-    if isinstance(api_doc, ValueDoc) and api_doc.pyval != UNKNOWN:
+    if isinstance(api_doc, ValueDoc) and api_doc.pyval is not UNKNOWN:
         try:
             lines, lineno = inspect.findsource(api_doc.pyval)
             if not isinstance(api_doc, ModuleDoc): lineno += 1

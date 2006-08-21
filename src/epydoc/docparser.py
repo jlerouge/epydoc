@@ -234,7 +234,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
                              "with filename, not with name.")
         name = DottedName(name)
         val_doc = _find(name)
-        if val_doc.canonical_name == UNKNOWN:
+        if val_doc.canonical_name is UNKNOWN:
             val_doc.canonical_name = name
         return val_doc
 
@@ -451,7 +451,7 @@ def _find_in_namespace(name, namespace_doc):
         raise ImportError('Could not find value')
     
 def _get_filename(identifier, path=None):
-    if path == UNKNOWN: path = None
+    if path is UNKNOWN: path = None
     try:
         fp, filename, (s,m,typ) = imp.find_module(identifier, path)
         if fp is not None: fp.close()
@@ -672,7 +672,7 @@ def process_file(module_doc):
             decorators = []
             
 def add_to_group(container, api_doc, group_name):
-    if container.group_specs == UNKNOWN:
+    if container.group_specs is UNKNOWN:
         container.group_specs = []
 
     if isinstance(api_doc, VariableDoc):
@@ -1545,7 +1545,7 @@ def find_base(name, parent_docs):
             #raise ParseError("Could not find %s" % name)
 
     # If the variable has a value, return that value.
-    if base_var.value != UNKNOWN:
+    if base_var.value is not UNKNOWN:
         return base_var.value
 
     # Otherwise, if BASE_HANDLING is 'parse', try parsing the docs for
@@ -1766,7 +1766,7 @@ def set_variable(namespace, var_doc, preserve_docstring=False):
         namespace.sort_spec.remove(var_doc.name)
         old_var_doc = namespace.variables[var_doc.name]
         if (old_var_doc.is_alias == False and
-            old_var_doc.value != UNKNOWN):
+            old_var_doc.value is not UNKNOWN):
             old_var_doc.value.canonical_name = UNKNOWN
         if (preserve_docstring and var_doc.docstring in (None, UNKNOWN) and
             old_var_doc.docstring not in (None, UNKNOWN)):
@@ -1860,7 +1860,7 @@ def lookup_value(dotted_name, parent_docs):
 
         if isinstance(var_doc.value, NamespaceDoc):
             var_dict = var_doc.value.variables
-        elif (var_doc.value == UNKNOWN and
+        elif (var_doc.value is UNKNOWN and
             var_doc.imported_from not in (None, UNKNOWN)):
             src_name = var_doc.imported_from + dotted_name[i:]
             # [xx] do I want to create a proxy here??

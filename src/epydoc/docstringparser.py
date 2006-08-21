@@ -251,7 +251,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
     # filename of its containing module.
     name = api_doc.canonical_name
     module = api_doc.defining_module
-    if module != UNKNOWN and module.filename not in (None, UNKNOWN):
+    if module is not UNKNOWN and module.filename not in (None, UNKNOWN):
         try: filename = py_src_filename(module.filename)
         except: filename = module.filename
     else:
@@ -629,7 +629,7 @@ def get_docformat(api_doc, docindex):
     # Find the module that defines api_doc.
     module = api_doc.defining_module
     # Look up its docformat.
-    if module != UNKNOWN and module.docformat not in (None, UNKNOWN):
+    if module is not UNKNOWN and module.docformat not in (None, UNKNOWN):
         docformat = module.docformat
     else:
         docformat = DEFAULT_DOCFORMAT

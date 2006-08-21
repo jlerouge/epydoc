@@ -722,7 +722,7 @@ class ValueDoc(APIDoc):
         or UNKNOWN if we don't succeed.  This should probably eventually
         be replaced by more of a safe-repr variant.
         """
-        if self.pyval == UNKNOWN:
+        if self.pyval is UNKNOWN:
             return UNKNOWN
         try:
             s = '%r' % self.pyval
@@ -798,7 +798,7 @@ class NamespaceDoc(ValueDoc):
     def __init__(self, **kwargs):
         kwargs.setdefault('variables', {})
         APIDoc.__init__(self, **kwargs)
-        assert self.variables != UNKNOWN
+        assert self.variables is not UNKNOWN
 
     def apidoc_links(self, **filters):
         variables = filters.get('variables', True)
@@ -854,7 +854,7 @@ class NamespaceDoc(ValueDoc):
         Initialize the L{variable_groups} attribute, based on the
         L{sorted_variables} and L{group_specs} attributes.
         """
-        if self.sorted_variables == UNKNOWN:
+        if self.sorted_variables is UNKNOWN:
             self.init_sorted_variables
         assert len(self.sorted_variables) == len(self.variables)
 
@@ -1008,8 +1008,8 @@ class ModuleDoc(NamespaceDoc):
             variables that do not belong to any group.
         @type group: C{string}
         """
-        if (self.sorted_variables == UNKNOWN or 
-            self.variable_groups == UNKNOWN):
+        if (self.sorted_variables is UNKNOWN or 
+            self.variable_groups is UNKNOWN):
             raise ValueError('sorted_variables and variable_groups '
                              'must be initialized first.')
         
@@ -1199,8 +1199,8 @@ class ClassDoc(NamespaceDoc):
             local variables; if C{True}, then return only inherited
             variables; if C{False}, then return only local variables.
         """
-        if (self.sorted_variables == UNKNOWN or 
-            self.variable_groups == UNKNOWN):
+        if (self.sorted_variables is UNKNOWN or 
+            self.variable_groups is UNKNOWN):
             raise ValueError('sorted_variables and variable_groups '
                              'must be initialized first.')
         
@@ -1528,7 +1528,7 @@ class DocIndex:
             child_var = val_doc.variables.get(identifier)
             if child_var is not None:
                 child_val = child_var.value
-                if child_val == UNKNOWN: child_val = None
+                if child_val is UNKNOWN: child_val = None
                 return child_var, child_val
 
         # If that fails, then see if it's a submodule.
@@ -1627,7 +1627,7 @@ class DocIndex:
             return api_doc.container
         if len(api_doc.canonical_name) == 1:
             return None
-        elif isinstance(api_doc, ModuleDoc) and api_doc.package != UNKNOWN:
+        elif isinstance(api_doc, ModuleDoc) and api_doc.package is not UNKNOWN:
             return api_doc.package
         else:
             parent = api_doc.canonical_name.container()

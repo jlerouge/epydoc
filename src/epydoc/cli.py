@@ -939,7 +939,7 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         p = ((sum(self.stages[:i]) + percent*self.stages[i]) /
              float(sum(self.stages)))
 
-        if message == UNKNOWN: message = None
+        if message is UNKNOWN: message = None
         if message: message = '%s: %s' % (self.task, message)
         ConsoleLogger.progress(self, p, message)
 

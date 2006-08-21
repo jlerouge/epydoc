@@ -218,7 +218,7 @@ def build_doc_index(items, introspect=True, parse=True,
 
 def _report_valdoc_progress(i, val_doc, val_docs):
     if (isinstance(val_doc, (ModuleDoc, ClassDoc)) and
-        val_doc.canonical_name != UNKNOWN and
+        val_doc.canonical_name is not UNKNOWN and
         not val_doc.canonical_name[0].startswith('??')):
         log.progress(float(i)/len(val_docs), val_doc.canonical_name)
 
@@ -731,7 +731,7 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
 
 def _merge_posargs_and_defaults(introspect_doc, parse_doc, path):
     # If either is unknown, then let merge_attrib handle it.
-    if introspect_doc.posargs == UNKNOWN or parse_doc.posargs == UNKNOWN:
+    if introspect_doc.posargs is UNKNOWN or parse_doc.posargs is UNKNOWN:
         return 
         
     # If the introspected doc just has '...', then trust the parsed doc.
@@ -877,7 +877,7 @@ def merge_posarg_defaults(defaults1, defaults2, precedence, cyclecheck, path):
     return defaults
 
 def merge_docstring(docstring1, docstring2, precedence, cyclecheck, path):
-    if docstring1 in (None, UNKNOWN) or precedence=='parse':
+    if docstring1 is None or docstring1 is UNKNOWN or precedence=='parse':
         return docstring2
     else:
         return docstring1
@@ -1116,7 +1116,7 @@ def inherit_docs(class_doc):
             # local, then record the fact that it overrides
             # var_doc.
             elif (class_doc.variables[name].container==class_doc and
-                  class_doc.variables[name].overrides==UNKNOWN):
+                  class_doc.variables[name].overrides is UNKNOWN):
                 class_doc.variables[name].overrides = var_doc
                 _inherit_info(class_doc.variables[name])
 
