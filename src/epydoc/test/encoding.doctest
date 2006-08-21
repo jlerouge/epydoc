@@ -6,16 +6,27 @@ The following function is used as an end-to-end test for unicode
 encodings.  It takes a given string, writes it to a python file, and
 processes that file's documentation.  It then generates HTML output
 from the documentation, extracts all docstrings from the generated
-HTML output, and displays them.
+HTML output, and displays them.  (In order to extract & display all
+docstrings, it monkey-patches the HMTLwriter.docstring_to_html()
+method.)
 
     >>> # Display warninings & errors:
     >>> from epydoc import log
     >>> log.register_logger(log.SimpleLogger())
+
     >>> # Other imports:
     >>> import tempfile, os, re, textwrap, sys
     >>> from epydoc.docbuilder import build_doc_index
     >>> from epydoc.docwriter.html import HTMLWriter
-    >>> # Test function:
+
+    >>> # Monkey-patch the write function:
+    >>> def docstring_to_html(self, parsed_docstring, w=None, i=0):
+    ...     s = parsed_docstring.to_html(None).strip()
+    ...     print s.encode('ascii', 'xmlcharrefreplace')
+    ...     return ''
+    >>> HTMLWriter.docstring_to_html = docstring_to_html
+
+    >>> # The actual test function:
     >>> def test(s, introspect=True, parse=True, debug=False):
     ...     # Write s to a temporary file.
     ...     tmp_dir = tempfile.mkdtemp()
@@ -28,22 +39,10 @@ HTML output, and displays them.
     ...     if docindex is None: return
     ...     try: del sys.modules['enc_test']
     ...     except: pass
-    ...     # Write html output
+    ...     # Write html output.  
     ...     writer = HTMLWriter(docindex, mark_docstrings=True)
     ...     writer.write(tmp_dir)
-    ...     files = os.listdir(tmp_dir)
-    ...     files.sort()
-    ...     for file in files:
-    ...         if re.match(r'enc_test.*-(module|class)\.html', file):
-    ...             print '='*75
-    ...             print 'In %s:' % file
-    ...             s = open(os.path.join(tmp_dir,file)).read()
-    ...             if debug: print s
-    ...             for m in re.finditer(r'<span class="docstring">([\s\S]*?)'
-    ...                                  r'</span><!--end docstring-->',
-    ...                                  s):
-    ...                 docstr = remove_surrogates(m.group(1).strip())
-    ...                 if docstr: print '-'*75+'\n'+docstr
+    ...     for file in os.listdir(tmp_dir):
     ...         os.unlink(os.path.join(tmp_dir,file))
     ...     os.rmdir(tmp_dir)
 
@@ -74,41 +73,26 @@ Tests for several Microsoft codepges:
     >>> test('''# -*- coding: cp874 -*-
     ... """abc ABC 123 \x80 \x85"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8230;
 
     >>> test('''# -*- coding: cp1250 -*-
     ... """abc ABC 123 \x80 \x82 \x84 \x85 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8218; &#8222; &#8230; &#729;
 
     >>> test('''# -*- coding: cp1251 -*-
     ... """abc ABC 123 \x80 \x81 \x82 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#1026; &#1027; &#8218; &#1103;
 
     >>> test('''# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8218; &#402; &#255;
 
     >>> test('''# -*- coding: cp1253 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xfe"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8218; &#402; &#974;
 
 Unicode tests:
@@ -130,9 +114,6 @@ Unicode tests:
 
     >>> # UTF-8 with a coding directive:
     >>> test("# -*- coding: utf-8 -*-\n"+utf8_test)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -140,9 +121,6 @@ Unicode tests:
 
     >>> # UTF-8 with a BOM & a coding directive:
     >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -150,9 +128,6 @@ Unicode tests:
 
     >>> # UTF-8 with a BOM & no coding directive:
     >>> test(utf8_bom+utf8_test)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -163,9 +138,6 @@ Tests for KOI8-R:
     >>> test('''# -*- coding: koi8-r -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#9472; &#9484; &#9488; &#1066;
 
 Tests for 'coding' directive on the second line:
@@ -173,32 +145,20 @@ Tests for 'coding' directive on the second line:
     >>> test('''\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8218; &#402; &#255;
     
     >>> test('''# comment on the first line.\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#8364; &#8218; &#402; &#255;
 
     >>> test("\n# -*- coding: utf-8 -*-\n"+utf8_test)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
     >>> test("# comment\n# -*- coding: utf-8 -*-\n"+utf8_test)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -209,9 +169,6 @@ Tests for shift-jis
     >>> test('''# -*- coding: shift_jis -*-
     ... """abc ABC 123 \xA1 \xA2 \xA3"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#65377; &#65378; &#65379;
 
 Str/Unicode Test
@@ -221,17 +178,11 @@ Make sure that we use the coding for both str and unicode docstrings.
     >>> test('''# -*- coding: utf-8 -*-
     ... """abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
 
     >>> test('''# -*- coding: utf-8 -*-
     ... u"""abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
 
 Under special circumstances, we may not be able to tell what the
@@ -249,11 +200,7 @@ properties:
     ... p=property(doc="""\xc2\x80""")
     ... ''') # doctest: +ELLIPSIS
     <property object at ...>'s docstring is not a unicode string, but it contains non-ascii data -- treating it as latin-1.
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     &#194;&#128;
-    ---------------------------------------------------------------------------
     &#194;&#128;
 
 Introspection/Parsing Tests
@@ -262,50 +209,32 @@ This section checks to make sure that both introspection & parsing are
 getting the right results.
 
     >>> test("# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
     >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
     >>> test(utf8_bom+utf8_test, introspect=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
     >>> test("# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
     >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
       0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
     >>> test(utf8_bom+utf8_test, parse=False)
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     <p>abc ABC 123</p>
       <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
       <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -321,11 +250,8 @@ Make sure that docstrings are rendered correctly in different contexts.
     ... @group \xc2\x80: x
     ... """
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
+    <BLANKLINE>
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
 
     >>> test('''# -*- coding: utf-8 -*-
@@ -339,23 +265,13 @@ Make sure that docstrings are rendered correctly in different contexts.
     ...     @except X: abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80
     ...     """
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
 
     >>> test('''# -*- coding: utf-8 -*-
@@ -369,29 +285,15 @@ Make sure that docstrings are rendered correctly in different contexts.
     ...     
     ...     z = property(doc=u"abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80")
     ... ''')
-    ===========================================================================
-    In enc_test-module.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ===========================================================================
-    In enc_test.A-class.html:
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
-    ---------------------------------------------------------------------------
     abc ABC 123 &#128; &#2047; &#2048;
 
 
