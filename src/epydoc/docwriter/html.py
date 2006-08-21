@@ -1654,6 +1654,7 @@ class HTMLWriter:
         # Generate the crumbs for uid's ancestors.
         while True:
             container = self.docindex.container(doc)
+            assert doc != container, 'object is its own container?'
             if container is None:
                 if doc.canonical_name is UNKNOWN:
                     return ['??']+crumbs
