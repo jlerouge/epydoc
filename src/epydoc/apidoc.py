@@ -725,7 +725,7 @@ class ValueDoc(APIDoc):
         if self.pyval is UNKNOWN:
             return UNKNOWN
         try:
-            s = '%r' % self.pyval
+            s = '%r' % (self.pyval,)
             if isinstance(s, str):
                 s = decode_with_backslashreplace(s)
             return s
