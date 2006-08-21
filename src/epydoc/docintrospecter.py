@@ -367,17 +367,23 @@ def introspect_class(cls, class_doc):
     # Record the class's base classes; and add the class to its
     # base class's subclass lists.
     if hasattr(cls, '__bases__'):
-        class_doc.bases = []
-        for base in cls.__bases__:
-            basedoc = introspect_docs(base)
-            class_doc.bases.append(basedoc)
-            basedoc.subclasses.append(class_doc)
+        try: bases = list(cls.__bases__)
+        except:
+            bases = None
+            log.warning("Class '%s' defines __bases__, but it does not "
+                        "contain an iterable; ignoring base list."
+                        % cls.__name__)
+        if bases is not None:
+            class_doc.bases = []
+            for base in bases:
+                basedoc = introspect_docs(base)
+                class_doc.bases.append(basedoc)
+                basedoc.subclasses.append(class_doc)
             
-        bases = list(cls.__bases__)
-        bases.reverse()
-        for base in bases:
-            if hasattr(base, '__dict__'):
-                base_children.update(base.__dict__)
+            bases.reverse()
+            for base in bases:
+                if hasattr(base, '__dict__'):
+                    base_children.update(base.__dict__)
 
     # Record the class's local variables.
     class_doc.variables = {}
