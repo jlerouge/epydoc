@@ -153,7 +153,7 @@ should it determine the list of identifiers expored by C{M{m}}?
     be parsed, e.g., if it's a builtin.)
 """
 
-DEFAULT_DECORATOR_BEHAVIOR = 'opaque'
+DEFAULT_DECORATOR_BEHAVIOR = 'transparent'
 """When C{DocParse} encounters an unknown decorator, what should
 it do to the documentation of the decorated function?
   - C{'transparent'}: leave the function's documentation as-is.
@@ -1370,6 +1370,7 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     add_docstring_from_comments(func_doc, comments)
     
     # Apply any decorators.
+    func_doc.decorators = [pp_toktree(deco[1:]) for deco in decorators]
     decorators.reverse()
     for decorator in decorators:
         try:
