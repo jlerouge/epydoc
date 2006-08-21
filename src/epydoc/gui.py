@@ -368,6 +368,10 @@ class EpydocGUI:
         self._module_entry = Entry(mframe3, **ENTRY_CONFIG)
         self._module_entry.pack(side='left', fill='x', expand=1)
         self._module_entry.bind('<Return>', self._entry_module)
+        self._module_delete = Button(mframe3, text="Remove",
+                                     command=self._delete_module,
+                                     **BUTTON_CONFIG) 
+        self._module_delete.pack(side='right', expand=0, padx=2)
         self._module_browse = Button(mframe3, text="Browse",
                                      command=self._browse_module,
                                      **BUTTON_CONFIG) 
