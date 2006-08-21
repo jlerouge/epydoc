@@ -963,7 +963,6 @@ class PythonSourceColorizer:
                     url = url.encode('ascii', 'xmlcharrefreplace')
                 s += ('<a%s%s href="%s">' %
                       (tooltip_html, css_class_html, url))
-                assert type(s) is str # *not* unicode!
             elif css_class_html or tooltip_html:
                 s += '<span%s%s>' % (tooltip_html, css_class_html)
             if i == len(line)-1:
@@ -1011,7 +1010,8 @@ class PythonSourceColorizer:
             container = DottedName(self.module_name, *self.context)
         else:
             container = None
-        targets = ['%s=%s' % (self.doc_descr(d,container), self.url_func(d))
+        targets = ['%s=%s' % (str(self.doc_descr(d,container)),
+                              str(self.url_func(d)))
                    for d in docs]
         onclick = ("doclink('%s', '%s', '%s'); return false;" %
                    (uid, name, ','.join(targets)))
