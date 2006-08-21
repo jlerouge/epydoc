@@ -226,7 +226,8 @@ def introspect_module(module, module_doc, preliminary=False):
         except KeyboardInterrupt: raise
         except: pass
         if module_doc.filename is not UNKNOWN:
-            module_doc.filename = py_src_filename(module_doc.filename)
+            try: module_doc.filename = py_src_filename(module_doc.filename)
+            except ValueError: pass
 
     # If this is just a preliminary introspection, then don't do
     # anything else.  (Typically this is true if this module was
