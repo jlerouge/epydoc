@@ -339,8 +339,8 @@ function collapse(id) {
   if (elt) {
     elt.style.display = "block";
     
-    var indent = elt.indent;
-    var pad = elt.pad;
+    var indent = elt.getAttribute("indent");
+    var pad = elt.getAttribute("pad");
     var s = "<span class=\'py-lineno\'>";
     for (var i=0; i<pad.length; i++) { s += "&nbsp;" }
     s += "</span>";
@@ -393,7 +393,7 @@ function collapse_all(min_lines) {
 
 function expandto(href) {
   var start = href.indexOf("#")+1;
-  if (start != 0) {
+  if (start != 0 && start != href.length) {
     if (href.substring(start, href.length) != "-") {
       collapse_all(4);
       pos = href.indexOf(".", start);
