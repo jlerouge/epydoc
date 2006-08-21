@@ -1971,9 +1971,9 @@ def _get_module_name(filename, package_doc):
     # If so, then add a "'" to the end of its canonical name, to
     # distinguish it from the variable.
     if package_doc is not None and name in package_doc.variables:
-        valdoc = package_doc.variables[name].value
-        if (valdoc not in (None, UNKNOWN) and
-            valdoc.imported_from != dotted_name):
+        vardoc = package_doc.variables[name]
+        if (vardoc.value not in (None, UNKNOWN) and
+            vardoc.imported_from != dotted_name):
             log.warning("Module %s might be shadowed by a variable with "
                         "the same name." % dotted_name)
             dotted_name = DottedName(str(dotted_name)+"'")
