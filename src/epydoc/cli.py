@@ -312,7 +312,7 @@ def parse_configfiles(configfiles, options, names):
                        'module', 'object', 'value'):
             names.extend(val.replace(',', ' ').split())
         elif optname == 'output':
-            if val not in ACTIONS:
+            if val.lower() not in ACTIONS:
                 raise ValueError('"%s" expected one of: %s' %
                                  (optname, ', '.join(ACTIONS)))
             options.action = val.lower()
