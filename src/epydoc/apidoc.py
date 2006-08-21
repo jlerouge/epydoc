@@ -1300,6 +1300,14 @@ class RoutineDoc(ValueDoc):
        @type: C{int}"""
     #} end of "signature" group
 
+    #{ Decorators
+    decorators = UNKNOWN
+    """@ivar: A list of names of decorators that were applied to this
+       routine, in the order that they are listed in the source code.
+       (I.e., in the reverse of the order that they were applied in.)
+       @type: C{list} of L{string}"""
+    #} end of "decorators" group
+
     #{ Information Extracted from Docstrings
     arg_descrs = UNKNOWN
     """@ivar: A list of descriptions of the routine's
