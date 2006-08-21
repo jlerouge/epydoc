@@ -812,7 +812,14 @@ class PythonSourceColorizer:
 
         # Loop through each token, and colorize it appropriately.
         for i, (toktype, toktext) in enumerate(line):
-            assert type(s) is str # *not* unicode!
+            if type(s) is not str:
+                if type(s) is unicode:
+                    log.error('While colorizing %s -- got unexpected '
+                              'unicode string' % self.module_name)
+                    s = s.encode('ascii', 'xmlcharrefreplace')
+                else:
+                    raise ValueError('Unexpected value for s -- %s' % 
+                                     type(s).__name__)
 
             # For each token, determine its css class and whether it
             # should link to a url.
@@ -912,7 +919,7 @@ class PythonSourceColorizer:
                 if url is None:
                     docs = sorted(self.name_to_docs.get(toktext, []))
                     if docs:
-                        tooltip='\n'.join(['%s'%d.canonical_name
+                        tooltip='\n'.join([str(d.canonical_name)
                                            for d in docs])
                         if len(docs) == 1 and self.GUESS_LINK_TARGETS:
                             url = self.url_func(docs[0])
@@ -1011,7 +1018,7 @@ class PythonSourceColorizer:
         return uid, onclick
 
     def doc_descr(self, doc, context):
-        name = doc.canonical_name.contextualize(context)
+        name = str(doc.canonical_name.contextualize(context))
         descr = '%s %s' % (self.doc_kind(doc), name)
         if isinstance(doc, RoutineDoc):
             descr += '()'
