@@ -338,7 +338,7 @@ def parse_configfiles(configfiles, options, names):
         elif optname == 'help':
             options.help_file = val
         elif optname =='frames':
-            options.frames = _str_to_bool(val, optname)
+            options.show_frames = _str_to_bool(val, optname)
         elif optname =='private':
             options.private = _str_to_bool(val, optname)
         elif optname =='imports':
