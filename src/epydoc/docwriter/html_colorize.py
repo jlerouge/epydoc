@@ -659,6 +659,11 @@ class PythonSourceColorizer:
         #: class or function definition.
         self.context = []
 
+        #: A list, corresponding one-to-one with L{self.context},
+        #: indicating the type of each entry.  Each element of
+        #: C{context_types} is one of: C{'func'}, C{'class'}, C{None}.
+        self.context_types = []
+
         #: A list of indentation strings for each of the current
         #: block's indents.  I.e., the current total indentation can
         #: be found by taking C{''.join(self.indents)}.
@@ -671,6 +676,12 @@ class PythonSourceColorizer:
         #: on the previous logical line, or C{None} if the previous
         #: logical line was not a class or function definition.
         self.def_name = None
+
+        #: The type of the class or function whose definition started
+        #: on the previous logical line, or C{None} if the previous
+        #: logical line was not a class or function definition.
+        #: Can be C{'func'}, C{'class'}, C{None}.
+        self.def_type = None
 
         
     def find_line_offsets(self):
@@ -702,9 +713,11 @@ class PythonSourceColorizer:
         self.pos = 0
         self.cur_line = []
         self.context = []
+        self.context_types = []
         self.indents = []
         self.lineno = 1
         self.def_name = None
+        self.def_type = None
 
         # Load the module's text.
         self.text = open(self.module_filename).read()
@@ -795,6 +808,13 @@ class PythonSourceColorizer:
         # this line; or None if no funciton or class is defined.
         def_name = None
 
+        # def_type is the type of the function or class defined by
+        # this line; or None if no funciton or class is defined.
+        def_type = None
+
+        # does this line start a class/func def?
+        starting_def_block = False 
+
         in_base_list = False
         in_param_list = False
         in_param_default = 0
@@ -834,10 +854,12 @@ class PythonSourceColorizer:
                 in_base_list = True
                 css_class = self.CSS_CLASSES['DEFNAME']
                 def_name = toktext
-                if None not in self.context:
-                    cls_name = '.'.join(self.context+[def_name])
+                def_type = 'class'
+                if 'func' not in self.context_types:
+                    cls_name = self.context_name(def_name)
                     url = self.name2url(cls_name)
                     s = self.mark_def(s, cls_name)
+                    starting_def_block = True
 
             # Is this token the function name in a function def?  If
             # so, then make it a link back into the API docs.
@@ -845,11 +867,13 @@ class PythonSourceColorizer:
                 in_param_list = True
                 css_class = self.CSS_CLASSES['DEFNAME']
                 def_name = toktext
-                if None not in self.context:
-                    cls_name = '.'.join(self.context)
-                    func_name = '.'.join(self.context+[def_name])
+                def_type = 'func'
+                if 'func' not in self.context_types:
+                    cls_name = self.context_name()
+                    func_name = self.context_name(def_name)
                     url = self.name2url(cls_name, def_name)
                     s = self.mark_def(s, func_name)
+                    starting_def_block = True
 
             # For each indent, update the indents list (which we use
             # to keep track of indentation strings) and the context
@@ -859,6 +883,7 @@ class PythonSourceColorizer:
             elif toktype == token.INDENT:
                 self.indents.append(toktext)
                 self.context.append(self.def_name)
+                self.context_types.append(self.def_type)
 
             # When we dedent, pop the last elements off the indents
             # list and the context list.  If the last context element
@@ -866,6 +891,7 @@ class PythonSourceColorizer:
             # block; so write an end-div tag.
             elif toktype == token.DEDENT:
                 self.indents.pop()
+                self.context_types.pop()
                 if self.context.pop():
                     ended_def_blocks += 1
 
@@ -909,8 +935,9 @@ class PythonSourceColorizer:
                 # a function, then that function is our context, not
                 # the namespace that contains it. [xx] this isn't always
                 # the right thing to do.
-                if None not in self.context and self.GUESS_LINK_TARGETS:
-                    container = DottedName(self.module_name, *self.context)
+                if self.GUESS_LINK_TARGETS:
+                    context = [n for n in self.context if n is not None]
+                    container = DottedName(self.module_name, *context)
                     doc = self.docindex.get_vardoc(container+toktext)
                     if doc is not None:
                         url = self.url_func(doc)
@@ -989,27 +1016,33 @@ class PythonSourceColorizer:
         # Write the line.
         self.out(s)
 
-        if def_name and None not in self.context:
+        if def_name and starting_def_block:
             self.out('</div>')
 
         # Add div's if we're starting a def block.
-        if (self.ADD_DEF_BLOCKS and def_name and
-            (line[-2][1] == ':') and None not in self.context):
+        if (self.ADD_DEF_BLOCKS and def_name and starting_def_block and
+            (line[-2][1] == ':')):
             indentation = (''.join(self.indents)+'    ').replace(' ', '+')
             linenum_padding = '+'*self.linenum_size
-            name='.'.join(self.context+[def_name])
+            name=self.context_name(def_name)
             self.out(self.START_DEF_BLOCK % (name, linenum_padding,
                                              indentation, name))
             
         self.def_name = def_name
+        self.def_type = def_type
+
+    def context_name(self, extra=None):
+        pieces = [n for n in self.context if n is not None]
+        if extra is not None: pieces.append(extra)
+        return '.'.join(pieces)
 
     def doclink(self, name, docs):
         uid = 'link-%s' % self._next_uid
         self._next_uid += 1
-        if None not in self.context:
-            container = DottedName(self.module_name, *self.context)
-        else:
-            container = None
+        context = [n for n in self.context if n is not None]
+        container = DottedName(self.module_name, *context)
+        #else:
+        #    container = None
         targets = ['%s=%s' % (str(self.doc_descr(d,container)),
                               str(self.url_func(d)))
                    for d in docs]
@@ -1018,7 +1051,7 @@ class PythonSourceColorizer:
         return uid, onclick
 
     def doc_descr(self, doc, context):
-        name = str(doc.canonical_name.contextualize(context))
+        name = str(doc.canonical_name)
         descr = '%s %s' % (self.doc_kind(doc), name)
         if isinstance(doc, RoutineDoc):
             descr += '()'
