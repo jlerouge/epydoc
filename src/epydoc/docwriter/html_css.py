@@ -202,7 +202,7 @@ pre.variable                { padding: .5em; margin: 0;
                               background: #dce4ec; color: #000000;
                               border: 1px solid #708890; }
 .variable-linewrap          { color: #604000; font-weight: bold; }
-.variable-ellipsis          { color: #604000; font-weight; bold; }
+.variable-ellipsis          { color: #604000; font-weight: bold; }
 .variable-quote             { color: #604000; font-weight: bold; }
 .re                         { color: #000000; }
 .re-char                    { color: #006030; }
