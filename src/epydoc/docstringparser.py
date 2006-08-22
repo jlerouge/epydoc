@@ -441,6 +441,22 @@ def process_undocumented_field(api_doc, docindex, tag, arg, descr):
             if var_name_re.match(var_name):
                 # Remove the variable from `variables`.
                 api_doc.variables.pop(var_name, None)
+        # For modules, remove any submodules that match var_name_re.
+        if isinstance(api_doc, ModuleDoc):
+            removed = set([m for m in api_doc.submodules
+                           if var_name_re.match(m.canonical_name[-1])])
+            if removed:
+                # Remove the indicated submodules from this module.
+                api_doc.submodules = [m for m in api_doc.submodules
+                                      if m not in removed]
+                # Remove all ancestors of the indicated submodules
+                # from the docindex root.  E.g., if module x
+                # declares y to be undocumented, then x.y.z should
+                # also be undocumented.
+                for elt in docindex.root[:]:
+                    for m in removed:
+                        if m.canonical_name.dominates(elt.canonical_name):
+                            docindex.root.remove(elt)
 
 def process_group_field(api_doc, docindex, tag, arg, descr):
     """Define a group named C{arg} containing the variables whose
