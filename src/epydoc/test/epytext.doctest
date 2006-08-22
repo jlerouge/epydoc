@@ -1,5 +1,5 @@
-                    Regression Testing for epytext
-                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regression Testing for epytext
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 These tests were taken pretty much verbatim out of the old unittests
 from epydoc 2.1.  They could use some serious updating, when I get the
 time, esp. given that it's so much easier to write tests with doctest

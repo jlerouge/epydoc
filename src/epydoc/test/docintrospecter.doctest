@@ -1,5 +1,5 @@
-                 Regression Testing for epydoc.docintrospecter
-                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regression Testing for epydoc.docintrospecter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `epydoc.docintrospecter` module is used to extract API documentation
 by introspecting Python objects directy.  Its primary interface is
 `introspect_docs()`, which takes a Python object, and returns a

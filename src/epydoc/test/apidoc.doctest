@@ -1,5 +1,5 @@
-                    Regression Testing for epydoc.apidoc
-                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regression Testing for epydoc.apidoc
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This file serves to provide both documentation and regression tests
 for the epydoc.apidoc module.  The main purpose of this module is to
 define the `APIDoc` class hierarchy, which is used to encode API

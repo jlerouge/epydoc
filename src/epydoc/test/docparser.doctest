@@ -1,5 +1,5 @@
-                   Regression Testing for epydoc.docparser
-                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regression Testing for epydoc.docparser
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `epydoc.docparser` module is used to extract API documentation by
 parsing the source code of Python files.  Its primary interface is
 `parse_docs()`, which takes a module's filename, and returns a
@@ -101,7 +101,7 @@ assignments, is_imported and is_instvar will always be False.)
         |        +- defining_module
         |        |  +- ModuleDoc for test [0] (defined above)
         |        +- docs_extracted_by = 'parser'
-        |        +- parse_repr = u'[1,2,3]+ [4,5]'
+        |        +- parse_repr = u'[1, 2, 3]+ [4, 5]'
         |        +- toktree = [[(51, u'['), (2, u'1'), (51, u','), ...
         +- z => VariableDoc for test.z [5]
            +- container
@@ -117,7 +117,7 @@ assignments, is_imported and is_instvar will always be False.)
                  +- defining_module
                  |  +- ModuleDoc for test [0] (defined above)
                  +- docs_extracted_by = 'parser'
-                 +- parse_repr = u'f(x,y)'
+                 +- parse_repr = u'f(x, y)'
                  +- toktree = [(1, u'f'), [(51, u'('), (1, u'x'), (...
 
 In this example, DocParser decides that the assignment to y is
@@ -136,7 +136,7 @@ creating an alias.  The same `ValueDoc` is shared by both variables.
         |  +- name = u'x'
         |  +- value
         |     +- GenericValueDoc [2]
-        |        +- parse_repr = u'[1,2]'
+        |        +- parse_repr = u'[1, 2]'
         +- y => VariableDoc for test.y [3]
            +- is_alias = True
            +- name = u'y'
@@ -233,16 +233,18 @@ Module Control Blocks
 =====================
 DocParser will look inside certain types of module-level control
 blocks.  By default, DocParser looks inside the following block types:
-  - if blocks
-  - elif blocks
-  - else blocks
-  - try blocks
-  - except blocks
-  - finally blocks
+
+- if blocks
+- elif blocks
+- else blocks
+- try blocks
+- except blocks
+- finally blocks
 
 By default, DocParse does not look inside the following block types:
-  - while blocks
-  - for blocks
+
+- while blocks
+- for blocks
 
     >>> # DocParser looks inside if/elif/else blocks.
     >>> runparser(s="""
@@ -409,6 +411,7 @@ VariableDoc object in the module's children list).
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- decorators = []
      +- docs_extracted_by = 'parser'
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
@@ -433,6 +436,7 @@ of the variable argument and keyword argument, respectively:
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- decorators = []
      +- docs_extracted_by = 'parser'
      +- docstring = u'docstring for f'
      +- docstring_lineno = 3
@@ -448,6 +452,7 @@ Tuple arguments are encoded as a single ArgDoc with a complex name:
     ...     """, show="f", exclude='defining_module')
     RoutineDoc for test.f [0]
      +- canonical_name = DottedName('test', u'f')
+     +- decorators = []
      +- docs_extracted_by = 'parser'
      +- kwarg = None
      +- lineno = 2
