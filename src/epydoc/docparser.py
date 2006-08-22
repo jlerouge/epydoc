@@ -1449,7 +1449,8 @@ def init_arglist(func_doc, arglist):
         elif arg[1] != (token.OP, '=') or len(arg) == 2:
             raise ParseError("Bad argument list")
         else:
-            default_val = GenericValueDoc(parse_repr=pp_toktree(arg[2:]),
+            default_repr = pp_toktree(arg[2:], 'tight')
+            default_val = GenericValueDoc(parse_repr=default_repr,
                                           docs_extracted_by='parser')
             func_doc.posarg_defaults.append(default_val)
 
