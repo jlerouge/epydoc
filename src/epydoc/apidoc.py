@@ -192,9 +192,15 @@ class DottedName:
             >>> DottedName('a.b').dominates(DottedName('a.b.c.d'))
             True
         """
-        if strict and len(self._identifiers)==len(name._identifiers):
+        len_self = len(self._identifiers)
+        len_name = len(name._identifiers)
+
+        if (len_self > len_name) or (strict and len_self == len_name):
             return False
-        return self._identifiers == name._identifiers[:len(self)]
+        # The following is redundant (the first clause is implied by
+        # the second), but is done as an optimization.
+        return ((self._identifiers[0] == name._identifiers[0]) and
+                self._identifiers == name._identifiers[:len_self])
 
     def contextualize(self, context):
         """
@@ -216,6 +222,22 @@ class DottedName:
             return self[1:].contextualize(context[1:])
         else:
             return self
+
+        # Find the first index where self & context differ.
+        for i in range(min(len(context), len(self))):
+            if self._identifiers[i] != context._identifiers[i]:
+                first_difference = i
+                break
+        else:
+            first_difference = i+1
+            
+        # Strip off anything before that index.
+        if first_difference == 0:
+            return self
+        elif first_difference == len(self):
+            return self[-1:]
+        else:
+            return self[first_difference:]
 
 ######################################################################
 # UNKNOWN Value
