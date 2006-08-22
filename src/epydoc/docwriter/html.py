@@ -412,7 +412,8 @@ class HTMLWriter:
         for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = len(self.class_list) + 2*len(self.module_list) + 14
+        self._num_files = (len(self.class_list) + 2*len(self.module_list) +
+                           11 + len(self.METADATA_INDICES))
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
             
@@ -512,10 +513,9 @@ class HTMLWriter:
 
         # Write the term & identifier indices
         indices = {'ident': self.build_identifier_index(),
-                   'term': self.build_term_index(),
-                   'bug': self.build_metadata_index('bug'),
-                   'todo': self.build_metadata_index('todo'),
-                   'change': self.build_metadata_index('change')}
+                   'term': self.build_term_index()}
+        for (name, label, label2) in self.METADATA_INDICES:
+            indices[name] = self.build_metadata_index(name)
         self._write(self.write_link_index, directory,
                     'identifier-index.html', indices,
                     'Identifier Index', 'identifier-index.html', 'ident')
@@ -525,21 +525,14 @@ class HTMLWriter:
                         'term-index.html', 'term')
         else:
             self._files_written += 1 # (skipped)
-        if indices['bug']:
-            self._write(self.write_metadata_index, directory,
-                        'bug-index.html', indices, 'bug', 'Bug List')
-        else:
-            self._files_written += 1 # (skipped)
-        if indices['todo']:
-            self._write(self.write_metadata_index, directory,
-                        'todo-index.html', indices, 'todo', 'To Do List')
-        else:
-            self._files_written += 1 # (skipped)
-        if indices['change']:
-            self._write(self.write_metadata_index, directory,
-                        'change-index.html', indices, 'change', 'Change Log')
-        else:
-            self._files_written += 1 # (skipped)
+        for (name, label, label2) in self.METADATA_INDICES:
+            if indices[name]:
+                self._write(self.write_metadata_index, directory,
+                            '%s-index.html' % name, indices, name,
+                            label, label2)
+            else:
+                self._files_written += 1 # (skipped)
+
         
         # Write the trees file (package & class hierarchies)
         if self.module_list:
@@ -597,7 +590,10 @@ class HTMLWriter:
             log.docstring_warning(estr)
 
         # [xx] testing:
-        assert self._num_files == self._files_written
+        if self._num_files != int(self._files_written):
+            log.debug("Expected to write %d files, but actually "
+                      "wrote %d files" %
+                      (self._num_files, int(self._files_written)))
 
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
@@ -940,7 +936,7 @@ class HTMLWriter:
         self.write_navbar(out, 'indices')
         self.write_footer(out)
 
-    def write_metadata_index(self, out, indices, field, title):
+    def write_metadata_index(self, out, indices, field, title, typ):
         """
         Write an HTML page containing a metadata index.
         """
@@ -973,7 +969,8 @@ class HTMLWriter:
                     out('<div>\n')
                 out('<table width="100%" class="metadata-index" '
                     'bgcolor="#e0e0e0"><tr><td class="metadata-index">')
-                out('<b>In %s</b>' % self.href(doc, label=doc.canonical_name))
+                out('<b>%s in %s</b>' %
+                    (typ, self.href(doc, label=doc.canonical_name)))
                 out('    <ul class="nomargin">\n')
                 for descr in descrs:
                     out('      <li>%s</li>\n' %
@@ -996,19 +993,17 @@ class HTMLWriter:
         self.write_header(out, title)
         self.write_navbar(out, 'indices')
         self.write_breadcrumbs(out, 'indices', url)
-        
-        if (indices['term'] or indices['bug'] or
-            indices['todo'] or indices['change']):
+
+        if (indices['term'] or
+            [1 for (name,l,l2) in self.METADATA_INDICES if indices[name]]):
             out('<center><b>[\n')
-            out(' <a href="identifier-index.html">Identifier Index</a>\n')
+            out(' <a href="identifier-index.html">Identifiers</a>\n')
             if indices['term']:
-                out('| <a href="term-index.html">Term Definition Index</a>\n')
-            if indices['bug']:
-                out('| <a href="bug-index.html">Bug List</a>\n')
-            if indices['todo']:
-                out('| <a href="todo-index.html">To Do List</a>\n')
-            if indices['change']:
-                out('| <a href="change-index.html">Change Log</a>\n')
+                out('| <a href="term-index.html">Term Definitions</a>\n')
+            for (name, label, label2) in self.METADATA_INDICES:
+                if indices[name]:
+                    out('| <a href="%s-index.html">%s</a>\n' %
+                        (name, label2))
             out(']</b></center><br />\n')
 
     def write_index_section(self, out, items, add_blankline=False):
@@ -2685,6 +2680,18 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     #{ Index generation
     #////////////////////////////////////////////////////////////
+
+    #: A list of metadata indices that should be generated.  Each
+    #: entry in this list is a tuple C{(tag, label, short_label)},
+    #: where C{tag} is the cannonical tag of a metadata field;
+    #: C{label} is a label for the index page; and C{short_label}
+    #: is a shorter label, used in the index selector.
+    METADATA_INDICES = [('bug', 'Bug List', 'Bugs'),
+                        ('todo', 'To Do List', 'To Do'),
+                        ('change', 'Change Log', 'Changes'),
+                        ('deprecated', 'Deprecation List', 'Deprecations'),
+                        ('since', 'Introductions List', 'Introductions'),
+                        ]
     
     def build_identifier_index(self):
         items = []
