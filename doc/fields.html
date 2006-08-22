@@ -224,6 +224,10 @@ accordingly. </p>
   <code>@<b>status</b>:</code>&nbsp;... </td><td> 
     The current status of an object.</td></tr>
     
+  <tr><td width="10%" align="left" valign="top">
+  <code>@<b>change</b>:</code>&nbsp;... </td><td> 
+    A change log entry for this object.</td></tr>
+    
   <!-- ========== Formal Conditions ========== -->
   <tr><th colspan="2" align="left">Formal Conditions</th></tr>
   <tr><td width="10%" align="left" valign="top">
@@ -426,6 +430,10 @@ adjust the markup accordingly. </p>
     <tr><td align="left" valign="top">
       <b><code>@copyright:</code>&nbsp;...</b> </td><td>
       <code>@(c):</code>&nbsp;... </td></tr>
+    
+    <tr><td align="left" valign="top">
+      <b><code>@change:</code>&nbsp;...</b> </td><td>
+      <code>@changed:</code>&nbsp;... </td></tr>
   </table>
 </td></tr></table>
 </center>
@@ -433,34 +441,27 @@ adjust the markup accordingly. </p>
 <a name="newfield">
 <h2> 4. Adding New Fields</h2></a>
 
-<p> New fields can be defined for the docstrings in a module with the
-special module-level variable "<code>__extra_epydoc_fields__</code>".
-This variable should contain a list of field specifications, where
-each field specification is one of the following: </p>
+<p> New fields can be defined for the docstrings in a module using the
+special <code>@newfield</code> tag (or its synonym,
+<code>@deffield</code>).  This tag has the following syntax:</p>
 
-<ul>
-  <li> A single string, which defines both the tag and the label for
-  the field. </li>
-  
-  <li> A tuple <code>(tag, label)</code>, where <code>tag</code> is
-  the field's tag, and <code>label</code> is its label.
-  
-  <li> A tuple <code>(tag, singular, plural)</code>, where
-  <code>tag</code> is the field's tag, <code>singular</code> is the
-  label that is used when the field has one entry, and
-  <code>plural</code> is the label that is used when the field has
-  multiple entries. </li>
-</ul>
+<div class="screen"><pre>
+<b>@newfield <i>tag</i>:</b> <i>label</i> [, <i>plural</i>]
+</pre></div>
 
-<p> The following example illustrates how the special variable
-"<code>__extra_epydoc_fields__"</code> can be used: </p>
+<p>Where <code><i>tag</i></code> is the new tag that's being defined;
+<code><i>label</i></code> is a string that will be used to mark this
+field in the generated output; and <code><i>plural</i></code> is the
+plural form of <code><i>label</i></code>, if different.  The following
+example illustrates how the <code>@newfield</code> can be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="95%">
   <tr><th width="50%">Docstring Input</th><th width="50%">Rendered Output</th>
   <tr valign="top"><td>
 <pre>
-__extra_epydoc_fields__ = [
-    ('corpus', 'Corpus', 'Corpora')]
+"""
+@newfield corpus: Corpus, Corpora
+"""
 
 <code class="keyword">def</code> <code class="function">example</code>():
     <code class="string">"""
@@ -479,13 +480,9 @@ __extra_epydoc_fields__ = [
 </td></tr>
 </table>
 
-<p> New fields can also be defined for an individual docstring, using
-the special <code>@newfield</code> field.  In particular,
-"<code>@newfield <i>tag</i>: <i>label</i> [, <i>plural</i>]</code>" will
-define a new field, whose tag is <code><i>tag</i></code>; and which is
-labeled in output documentation as <code><i>label</i></code>.  The
-optional argument <code><i>plural</i></code> specifies the label that
-should be used if the field has multiple entries. </p>
+<p><b>Note:</b> The module-level variable
+<code>__extra_epydoc_fields__</code> is deprecated; use
+<code>@newfield</code> instead.</p>
 
 <h2> 5. Markup-Specific Notes </h2>
 
