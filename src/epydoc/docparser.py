@@ -1151,6 +1151,7 @@ def lhs_is_instvar(lhs_pieces, parent_docs):
     # the name of the first arg to the containing routinedoc, and
     # <name> is a simple name.
     posargs = parent_docs[-1].posargs
+    if posargs is UNKNOWN: return False
     if not (len(lhs_pieces)==1 and len(posargs) > 0 and 
             len(lhs_pieces[0]) == 3 and
             lhs_pieces[0][0] == (token.NAME, posargs[0]) and

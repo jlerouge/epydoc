@@ -2424,13 +2424,13 @@ class HTMLWriter:
         else:
             args = [self.func_arg(n, d, css_class) for (n, d)
                     in zip(func_doc.posargs, func_doc.posarg_defaults)]
-        if func_doc.vararg:
+        if func_doc.vararg not in (None, UNKNOWN):
             if func_doc.vararg == '...':
                 args.append('<span class="%s-arg">...</span>' % css_class)
             else:
                 args.append('<span class="%s-arg">*%s</span>' %
                             (css_class, func_doc.vararg))
-        if func_doc.kwarg:
+        if func_doc.kwarg not in (None, UNKNOWN):
             args.append('<span class="%s-arg">**%s</span>' %
                         (css_class, func_doc.kwarg))
 

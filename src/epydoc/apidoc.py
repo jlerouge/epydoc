@@ -1347,6 +1347,9 @@ class RoutineDoc(ValueDoc):
         consists of a tuple of names, then that tuple will be
         flattened.
         """
+        if self.posargs is UNKNOWN:
+            return UNKNOWN
+            
         all_args = _flatten(self.posargs)
         if self.vararg not in (None, UNKNOWN):
             all_args.append(self.vararg)
@@ -1603,9 +1606,10 @@ class DocIndex:
             return None
         
         # Is it a parameter's name or an attribute of a parameter?
-        if (isinstance(context, RoutineDoc) and
-            name[0] in context.all_args()):
-            return None
+        if isinstance(context, RoutineDoc):
+            all_args = context.all_args()
+            if all_args is not UNKNOWN and name[0] in all_args:
+                return None
 
     #////////////////////////////////////////////////////////////
     # etc
