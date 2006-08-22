@@ -12,7 +12,7 @@ this module is the L{HTMLWriter} class.
 """
 __docformat__ = 'epytext en'
 
-import re, os, sys, codecs, sre_constants, pprint
+import re, os, sys, codecs, sre_constants, pprint, base64
 import urllib
 from epydoc.apidoc import *
 import epydoc.docstringparser
@@ -188,6 +188,8 @@ class HTMLWriter:
     #   2.7. Homepage (index.html)
     #   2.8. CSS Stylesheet
     #   2.9. Javascript file
+    #   2.10. Graphs
+    #   2.11. Images
     #
     # 3. Page Element Generation -- write pieces of a web page file
     #   3.1. Page Header
@@ -504,6 +506,9 @@ class HTMLWriter:
         self._files_written += 1
         log.progress(self._files_written/self._num_files, 'epydoc.js')
         self.write_javascript(directory)
+
+        # Write images.
+        self.write_images(directory)
 
         # Write the term & identifier indices
         indices = {'ident': self.build_identifier_index(),
@@ -1448,6 +1453,28 @@ class HTMLWriter:
                 'call&nbsp;graph</a></span>&nbsp;' % callgraph.uid)
 
     #////////////////////////////////////////////////////////////
+    #{ 2.11. Images
+    #////////////////////////////////////////////////////////////
+
+    IMAGES = {'crarr.png': # Carriage-return arrow, used for LINEWRAP.
+              'iVBORw0KGgoAAAANSUhEUgAAABEAAAAKCAMAAABlokWQAAAALHRFWHRD'
+              'cmVhdGlvbiBUaW1lAFR1\nZSAyMiBBdWcgMjAwNiAwMDo0MzoxMCAtMD'
+              'UwMGAMEFgAAAAHdElNRQfWCBYFASkQ033WAAAACXBI\nWXMAAB7CAAAe'
+              'wgFu0HU+AAAABGdBTUEAALGPC/xhBQAAAEVQTFRF////zcOw18/AgGY0'
+              'c1cg4dvQ\ninJEYEAAYkME3NXI6eTcloFYe2Asr5+AbE4Uh29A9fPwqp'
+              'l4ZEUI8O3onopk0Ma0lH5U1nfFdgAA\nAAF0Uk5TAEDm2GYAAABNSURB'
+              'VHjaY2BAAbzsvDAmK5oIlxgfioiwCAe7KJKIgKAQOzsLLwTwA0VY\n+d'
+              'iRAT8T0AxuIIMHqoaXCWIPGzsHJ6orGJiYWRjQASOcBQAocgMSPKMTIg'
+              'AAAABJRU5ErkJggg==\n',
+              }
+
+    def write_images(self, directory):
+        for (name, data) in self.IMAGES.items():
+            f = open(os.path.join(directory, name), 'w')
+            f.write(base64.decodestring(data))
+            f.close()
+
+    #////////////////////////////////////////////////////////////
     #{ 3.1. Page Header
     #////////////////////////////////////////////////////////////
 
@@ -2273,7 +2300,8 @@ class HTMLWriter:
         function treats HTML entities (e.g., C{&amp;}) as single
         characters; and ignores HTML tags (e.g., C{<p>}).
         """
-        LINEWRAP_MARKER = r'<span class="variable-linewrap">\</span>'
+        LINEWRAP_MARKER = (r'<span class="variable-linewrap">'
+                           '<img src="crarr.png" alt="\" /></span>')
         ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
        
         open_elements = [] # tag stack
