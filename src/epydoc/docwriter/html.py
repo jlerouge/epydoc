@@ -2152,18 +2152,19 @@ class HTMLWriter:
           <h3 class="epydoc">$var_doc.name$</h3>
           $descr$
           <dl><dt></dt><dd>
-        >>> if prop_doc.type_descr not in (None, UNKNOWN):
-            <dl><dt>Type:</dt>
-              <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
-        >>> #endif
         >>> for (name, val, summary) in accessors:
-            <dt>$name$ Method:</dt>
+            <dl><dt>$name$ Method:</dt>
             <dd>$val$
         >>>     if summary:
                 - $summary$
         >>>     #endif
-            </dd>
+            </dd></dl>
         >>> #endfor
+        >>> if prop_doc.type_descr not in (None, UNKNOWN):
+            <dl><dt>Type:</dt>
+              <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
+        >>> #endif
+        >>> self.write_standard_fields(out, prop_doc)
           </dd></dl>
         </td></tr></table>
         </div>
@@ -2187,6 +2188,7 @@ class HTMLWriter:
             <dl><dt>Type:</dt>
               <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
         >>> #endif
+        >>> self.write_standard_fields(out, var_doc)
         >>> if var_doc.value is not UNKNOWN:
             <dl><dt>Value:</dt>
               <dd><table><tr><td><pre class="variable">
