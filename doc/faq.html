@@ -28,6 +28,8 @@
   introspection and parsing?</a></li>
   <li><a href="#parse_only">When should I use <code>--parse-only</code>?
   </a></li>
+  <li><a href="#is_epydoc_running">How can I test whether
+  epydoc is currently running?</a></li>
 </ul></p>
 <p><b>Generated Output</b>
 <ul class="nomargin">
@@ -175,9 +177,26 @@
     non-windows machine). </li>
     <li>You wish to document a module where importing the module
     would have undesired side effects.</li>
-  </ul>
+  </ul></dd>
 
-            
+  <!-- QUESTION --><a name="is_epydoc_running" />
+  <dt> <p><b>Q:</b> How can I test whether my program is
+  being documented by epydoc?
+  </p></dt>
+
+  <dd> <p>Some programs or libraries need to take special actions when
+  being documented by epydoc.  E.g., you might want your code to skip
+  certain set-up actions if it's just being imported to be documented.
+  You can test whether epydoc is currently running by testing whether
+  <code>'epydoc'</code> is in <code>sys.modules</code>:</p>
+
+<div class="screen"><pre>
+  >>> import sys.modules
+  >>> if 'epydoc' in sys.modules:
+  ...     print 'Epydoc is running'
+</pre></div>
+  </dd>
+
 </dl>
 
 <!-- ==================== GENERATED OUTPUT ========================= -->
