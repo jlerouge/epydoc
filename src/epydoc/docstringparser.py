@@ -133,6 +133,9 @@ STANDARD_FIELDS = [
     # When was it introduced (version # or date)
     DocstringField(['since'], 'Since', multivalue=0),
 
+    # Changes made
+    DocstringField(['change', 'changed'], 'Change Log'),
+                   
     # Crossreferences
     DocstringField(['see', 'seealso'], 'See Also', short=1),
 
