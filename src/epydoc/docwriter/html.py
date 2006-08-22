@@ -1997,6 +1997,12 @@ class HTMLWriter:
         >>> if var_doc.name in self.SPECIAL_METHODS:
             <br /><em class="fname">($self.SPECIAL_METHODS[var_doc.name]$)</em>
         >>> #endif
+        >>> if isinstance(func_doc, ClassMethodDoc):
+            <br /><em class="fname">Class Method</em>
+        >>> #endif
+        >>> if isinstance(func_doc, StaticMethodDoc):
+            <br /><em class="fname">Static Method</em>
+        >>> #endif
           </h3>
           </td><td align="right" valign="top"
             >$self.pysrc_link(func_doc)$&nbsp;</span
@@ -2029,7 +2035,12 @@ class HTMLWriter:
             <dl><dt>Decorators:</dt></dl>
             <ul class="nomargin">
         >>>   for deco in func_doc.decorators:
-                <li>$deco$</li>
+        >>>     # (staticmethod & classmethod are already shown, above)
+        >>>     if not ((deco=="staticmethod" and
+        >>>              isinstance(func_doc, StaticMethodDoc)) or
+        >>>             (deco=="classmethod" and
+        >>>              isinstance(func_doc, ClassMethodDoc))):
+                <li><code>@$deco$</code></li>
         >>>   #endfor
             </ul>
         >>> #endif
