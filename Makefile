@@ -13,6 +13,7 @@ PY_SRC = src/epydoc/
 PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*)
+DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
 
 # What version of python to use?
 PYTHON = python2.4
@@ -33,8 +34,10 @@ HTML          = html
 HTML_API      = $(HTML)/api
 HTML_EXAMPLES = $(HTML)/examples
 HTML_STDLIB   = $(HTML)/stdlib
+HTML_DOCTEST  = $(HTML)/doctest
 LATEX_API     = $(LATEX)/api
 LATEX_STDLIB  = $(LATEX)/stdlib
+
 
 EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
@@ -53,6 +56,7 @@ usage:
 	@echo "  make webpage -- build the webpage and copy it to sourceforge"
 	@echo "    make api-html -- build the HTML docs for epydoc"
 	@echo "    make api-pdf -- build the PDF docs for epydoc"
+	@echo "    make doctest-html -- convert doctests to HTML"
 	@echo "    make examples -- build example API docs for the webpage"
 	@echo "    make stdlib-html -- build HTML docs for the Python Standard Library"
 	@echo "  make checkdocs -- check the documentation completeness"
@@ -96,12 +100,14 @@ checkdocs:
 	epydoc --check --tests=vars,types $(PY_SRC)
 
 .webpage.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
-		doc/epydoc-man.html doc/epydocgui-man.html $(DOCS)
+		.doctest-html.up2date doc/epydoc-man.html \
+		doc/epydocgui-man.html $(DOCS)
 	rm -rf $(WEBDIR)
 	mkdir -p $(WEBDIR)
 	cp -r $(DOCS) $(WEBDIR)
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
+	cp -r $(HTML_DOCTEST) $(WEBDIR)/doctest
 	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
 	touch .webpage.up2date
 
@@ -126,6 +132,18 @@ api-pdf: .api-pdf.up2date
 	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
 	       --name "Epydoc $(VERSION)" $(PY_SRC) -v
 	touch .api-pdf.up2date
+
+doctest-html: .doctests.up2date
+.doctest-html.up2date: $(DOCTESTS)
+	rm -rf $(HTML_DOCTEST)
+	mkdir -p $(HTML_DOCTEST)
+	@for doctest in $(DOCTESTS); do \
+	    out_file=$(HTML_DOCTEST)/`basename $$doctest .doctest`.html; \
+	    echo rst2html $$doctest $$out_file; \
+	    if rst2html $$doctest $$out_file; then true; \
+	    else exit 1; fi\
+	done
+	touch .doctest-html.up2date
 
 examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)
