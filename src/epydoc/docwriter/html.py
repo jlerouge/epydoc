@@ -412,7 +412,7 @@ class HTMLWriter:
         for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = len(self.class_list) + 2*len(self.module_list) + 13
+        self._num_files = len(self.class_list) + 2*len(self.module_list) + 14
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
             
@@ -514,7 +514,8 @@ class HTMLWriter:
         indices = {'ident': self.build_identifier_index(),
                    'term': self.build_term_index(),
                    'bug': self.build_metadata_index('bug'),
-                   'todo': self.build_metadata_index('todo')}
+                   'todo': self.build_metadata_index('todo'),
+                   'change': self.build_metadata_index('change')}
         self._write(self.write_link_index, directory,
                     'identifier-index.html', indices,
                     'Identifier Index', 'identifier-index.html', 'ident')
@@ -532,6 +533,11 @@ class HTMLWriter:
         if indices['todo']:
             self._write(self.write_metadata_index, directory,
                         'todo-index.html', indices, 'todo', 'To Do List')
+        else:
+            self._files_written += 1 # (skipped)
+        if indices['change']:
+            self._write(self.write_metadata_index, directory,
+                        'change-index.html', indices, 'change', 'Change Log')
         else:
             self._files_written += 1 # (skipped)
         
@@ -967,7 +973,7 @@ class HTMLWriter:
                     out('<div>\n')
                 out('<table width="100%" class="metadata-index" '
                     'bgcolor="#e0e0e0"><tr><td class="metadata-index">')
-                out('<b>In %s</b>' % self.href(doc))
+                out('<b>In %s</b>' % self.href(doc, label=doc.canonical_name))
                 out('    <ul class="nomargin">\n')
                 for descr in descrs:
                     out('      <li>%s</li>\n' %
@@ -991,7 +997,8 @@ class HTMLWriter:
         self.write_navbar(out, 'indices')
         self.write_breadcrumbs(out, 'indices', url)
         
-        if indices['term'] or indices['bug'] or indices['todo']:
+        if (indices['term'] or indices['bug'] or
+            indices['todo'] or indices['change']):
             out('<center><b>[\n')
             out(' <a href="identifier-index.html">Identifier Index</a>\n')
             if indices['term']:
@@ -1000,6 +1007,8 @@ class HTMLWriter:
                 out('| <a href="bug-index.html">Bug List</a>\n')
             if indices['todo']:
                 out('| <a href="todo-index.html">To Do List</a>\n')
+            if indices['change']:
+                out('| <a href="change-index.html">Change Log</a>\n')
             out(']</b></center><br />\n')
 
     def write_index_section(self, out, items, add_blankline=False):
