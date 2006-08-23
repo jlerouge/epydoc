@@ -598,7 +598,7 @@ class PythonSourceColorizer:
     #: If true, then try to guess which target is appropriate for
     #: linked names; if false, then always open a div asking the
     #: user which one they want.
-    GUESS_LINK_TARGETS = True
+    GUESS_LINK_TARGETS = False
 
     def __init__(self, module_filename, module_name,
                  docindex=None, url_func=None, name_to_docs=None):
@@ -938,15 +938,18 @@ class PythonSourceColorizer:
                 if (self.GUESS_LINK_TARGETS and self.docindex is not None
                     and self.url_func is not None):
                     context = [n for n in self.context if n is not None]
-                    container = DottedName(self.module_name, *context)
-                    doc = self.docindex.get_vardoc(container+toktext)
-                    if doc is not None:
-                        url = self.url_func(doc)
+                    container = self.docindex.get_vardoc(
+                        DottedName(self.module_name, *context))
+                    if isinstance(container, NamespaceDoc):
+                        doc = container.variables.get(toktext)
+                        if doc is not None:
+                            url = self.url_func(doc)
+                            tooltip = str(doc.canonical_name)
                 # Otherwise, check the name_to_docs index to see what
                 # else this name might refer to.
                 if (url is None and self.name_to_docs is not None
                     and self.url_func is not None):
-                    docs = self.name_to_docs.get(toktext, [])
+                    docs = self.name_to_docs.get(toktext)
                     if docs:
                         tooltip='\n'.join([str(d.canonical_name)
                                            for d in docs])
