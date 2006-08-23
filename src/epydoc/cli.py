@@ -63,7 +63,7 @@ levels are currently defined as follows::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time, re, pstats, pickle
+import sys, os, time, re, pickle
 from glob import glob
 from optparse import OptionParser, OptionGroup
 import epydoc
@@ -470,6 +470,9 @@ def main(options, names):
 
     # Load profile information, if it was given.
     if options.pstat_files:
+        try: import pstats
+        except ImportError:
+            log.error("Could not import pstats -- ignoring pstat files.")
         try:
             profile_stats = pstats.Stats(options.pstat_files[0])
             for filename in options.pstat_files[1:]:
@@ -672,7 +675,10 @@ def cli():
         print >>sys.stderr, 'Use --debug to see trace information.'
 
 def _profile():
-    import profile, pstats
+    try: import profile
+    except ImportError:
+        print >>sys.stderr, "Could not import profile module!"
+        return
     try:
         prof = profile.Profile()
         prof = prof.runctx('main(*parse_arguments())', globals(), {})
@@ -680,9 +686,13 @@ def _profile():
         pass
     prof.dump_stats('profile.out')
     return
+
     # Use the pstats statistical browser.  This is made unnecessarily
     # difficult because the whole browser is wrapped in an
     # if __name__=='__main__' clause.
+    try: import pstats
+    except ImportError:
+        log.error("Could not import pstats -- skipping browser")
     try:
         pstats_pyfile = os.path.splitext(pstats.__file__)[0]+'.py'
         sys.argv = ['pstats.py', 'profile.out']
