@@ -36,7 +36,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import types, re, os.path
+import types, re, os.path, pickle
 from epydoc import log
 import epydoc
 import __builtin__
@@ -735,8 +735,30 @@ class ValueDoc(APIDoc):
             return '<%s %s>' % (self.__class__.__name__, self.pyval_repr())
         elif self.parse_repr is not UNKNOWN:
             return '<%s %s>' % (self.__class__.__name__, self.parse_repr)
-        else:                     
+        else:
             return '<%s>' % self.__class__.__name__
+
+    def __setstate__(self, state):
+        self.__dict__ = state
+
+    def __getstate__(self):
+        """
+        State serializer for the pickle module.  This is necessary
+        because sometimes the C{pyval} attribute contains an
+        un-pickleable value.
+        """
+        # Construct our pickled dictionary.  Maintain this dictionary
+        # as a private attribute, so we can reuse it later, since
+        # merged objects need to share a single dictionary.
+        if not hasattr(self, '_ValueDoc__pickle_state'):
+            self.__pickle_state = self.__dict__.copy()
+            self.__pickle_state['pyval'] = UNKNOWN
+            self.__pickle_state['_ValueDoc__pyval_repr'] = self.pyval_repr()
+
+        if not isinstance(self, GenericValueDoc):
+            assert self.__pickle_state != {}
+        # Return the pickle state.
+        return self.__pickle_state
 
     def pyval_repr(self):
         """
@@ -745,6 +767,8 @@ class ValueDoc(APIDoc):
         be replaced by more of a safe-repr variant.
         """
         if self.pyval is UNKNOWN:
+            if hasattr(self, '_ValueDoc__pyval_repr'):
+                return self.__pyval_repr # used after unpickling.
             return UNKNOWN
         try:
             s = '%r' % (self.pyval,)
@@ -1502,6 +1526,17 @@ class DocIndex:
            @type: C{list} of L{RoutineDoc}"""
 
         self._funcid_to_doc = {}
+        """A mapping from C{profile} function ids to corresponding
+           C{APIDoc} objects.  A function id is a tuple of the form
+           C{(filename, lineno, funcname)}.  This is used to update
+           the L{callers} and L{calleeds} variables."""
+
+        self._container_cache = {}
+        """A cache for the L{container()} method, to increase speed."""
+
+        self._get_cache = {}
+        """A cache for the L{get_vardoc()} and L{get_valdoc()} methods,
+        to increase speed."""
 
     #////////////////////////////////////////////////////////////
     # Lookup methods
@@ -1535,7 +1570,12 @@ class DocIndex:
         and L{get_valdoc()}.
         """
         # Convert name to a DottedName, if necessary.
-        name = DottedName(name)
+        if not isinstance(name, DottedName):
+            name = DottedName(name)
+
+        # Check if the result is cached.
+        val = self._get_cache.get(name)
+        if val is not None: return val
 
         # Look for an element in the root set whose name is a prefix
         # of `name`.  If we can't find one, then return None.
@@ -1551,9 +1591,11 @@ class DocIndex:
                 else:
                     # If we found it, then return.
                     if var_doc is not None or val_doc is not None:
+                        self._get_cache[name] = (var_doc, val_doc)
                         return var_doc, val_doc
 
         # We didn't find it.
+        self._get_cache[name] = (None, None)
         return None, None
 
     def _get_from(self, val_doc, identifier):
@@ -1655,17 +1697,26 @@ class DocIndex:
         Return the C{ValueDoc} that contains the given C{APIDoc}, or
         C{None} if its container is not in the index.
         """
+        # Check if the result is cached.
+        val = self._container_cache.get(api_doc)
+        if val is not None: return val
+        
         if isinstance(api_doc, GenericValueDoc):
+            self._container_cache[api_doc] = None
             return None # [xx] unknown.
         if isinstance(api_doc, VariableDoc):
+            self._container_cache[api_doc] = api_doc.container
             return api_doc.container
         if len(api_doc.canonical_name) == 1:
+            self._container_cache[api_doc] = None
             return None
         elif isinstance(api_doc, ModuleDoc) and api_doc.package is not UNKNOWN:
+            self._container_cache[api_doc] = api_doc.package
             return api_doc.package
         else:
-            parent = api_doc.canonical_name.container()
-            return self.get_valdoc(parent)
+            parent = self.get_valdoc(api_doc.canonical_name.container())
+            self._container_cache[api_doc] = parent
+            return parent
 
     #////////////////////////////////////////////////////////////
     # Profiling information
