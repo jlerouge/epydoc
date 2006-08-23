@@ -29,6 +29,8 @@ containing namespace) from information about the value it contains
 because several variables can contain the same value: each variable
 should be described by a separate C{VariableDoc}; but we only need one
 C{ValueDoc}, since they share a single value.
+
+@todo: Add a cache to canonical name lookup?
 """
 __docformat__ = 'epytext en'
 
@@ -1621,8 +1623,8 @@ class DocIndex:
 
     def find(self, name, context):
         """
-        Look for a C{ValueDoc} named C{name}, relative to C{context}.
-        Return the C{ValueDoc} if one is found; otherwise, return
+        Look for an C{APIDoc} named C{name}, relative to C{context}.
+        Return the C{APIDoc} if one is found; otherwise, return
         C{None}.  C{find} looks in the following places, in order:
           - Function parameters (if one matches, return C{None})
           - All enclosing namespaces, from closest to furthest.
@@ -1632,7 +1634,7 @@ class DocIndex:
           - Parameter attributes
         
         @type name: C{str} or L{DottedName}
-        @type context: L{ValueDoc}
+        @type context: L{APIDoc}
         """
         if isinstance(name, basestring):
             name = re.sub(r'\(.*\)$', '', name.strip())
@@ -1653,8 +1655,11 @@ class DocIndex:
         for i in range(len(container_name), -1, -1):
             relative_name = container_name[:i]+name
             # Is `name` the absolute name of a documented value?
+            # (excepting GenericValueDoc values.)
             val_doc = self.get_valdoc(relative_name)
-            if val_doc is not None: return val_doc
+            if (val_doc is not None and
+                not isinstance(val_doc, GenericValueDoc)):
+                return val_doc
             # Is `name` the absolute name of a documented variable?
             var_doc = self.get_vardoc(relative_name)
             if var_doc is not None: return var_doc
