@@ -2692,7 +2692,7 @@ class HTMLWriter:
                 <li>
                 $self.description(descr, doc, 8)$
                 </li>
-        >>>   # end for
+        >>>     # end for
               </ul>
         >>>   # end else
         >>> # end for
