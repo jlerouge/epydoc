@@ -565,9 +565,22 @@ class HTMLWriter:
 
         # Write source code files.
         if self._incl_sourcecode:
+            # Build a map from short names to APIDocs, used when
+            # linking names in the source code.
+            name_to_docs = {}
+            for api_doc in self.indexed_docs:
+                if (api_doc.canonical_name is not None and
+                    self.url(api_doc) is not None):
+                    name = api_doc.canonical_name[-1]
+                    name_to_docs.setdefault(name, []).append(api_doc)
+            # Sort each entry of the name_to_docs list.
+            for doc_list in name_to_docs.values():
+                doc_list.sort()
+            # Write the source code for each module.
             for doc in self.modules_with_sourcecode:
                 filename = urllib.unquote(self.pysrc_url(doc))
-                self._write(self.write_sourcecode, directory, filename, doc)
+                self._write(self.write_sourcecode, directory, filename, doc,
+                            name_to_docs)
 
         # Write the index.html files.
         # (this must be done last, since it might copy another file)
@@ -682,7 +695,7 @@ class HTMLWriter:
     #{ 2.??. Source Code Pages
     #////////////////////////////////////////////////////////////
 
-    def write_sourcecode(self, out, doc):
+    def write_sourcecode(self, out, doc, name_to_docs):
         filename = doc.filename
         name = str(doc.canonical_name)
         
@@ -696,7 +709,7 @@ class HTMLWriter:
             self.href(doc, label='%s %s' % (self.doc_kind(doc), name)))
         out('<pre class="py-src">\n')
         out(PythonSourceColorizer(filename, name, self.docindex,
-                                  self.indexed_docs, self.url).colorize())
+                                  self.url, name_to_docs).colorize())
         out('</pre>\n<br />\n')
 
         # Footer

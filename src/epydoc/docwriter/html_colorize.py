@@ -488,7 +488,6 @@ expandto(location.href);
 </script>
 '''
 
-
 import tokenize, sys, token, cgi, keyword
 try: from cStringIO import StringIO
 except: from StringIO import StringIO
@@ -602,7 +601,7 @@ class PythonSourceColorizer:
     GUESS_LINK_TARGETS = True
 
     def __init__(self, module_filename, module_name,
-                 docindex=None, api_docs=None, url_func=None):
+                 docindex=None, url_func=None, name_to_docs=None):
         """
         Create a new HTML colorizer for the specified module.
 
@@ -622,17 +621,18 @@ class PythonSourceColorizer:
         #: The dotted name of the module we're colorizing.
         self.module_name = module_name
 
+        #: A docindex, used to create href links from identifiers to
+        #: the API documentation for their values.
         self.docindex = docindex
 
-        #: A mapping from short names to lists of ValueDoc.
-        self.name_to_docs = {}
-        for api_doc in api_docs:
-            if (api_doc.canonical_name is not None and
-                url_func(api_doc) is not None):
-                name = api_doc.canonical_name[-1]
-                self.name_to_docs.setdefault(name,set()).add(api_doc)
+        #: A mapping from short names to lists of ValueDoc, used to
+        #: decide which values an identifier might map to when creating
+        #: href links from identifiers to the API docs for their values.
+        self.name_to_docs = name_to_docs
             
-        #: A function that maps APIDoc -> URL
+        #: A function that maps APIDoc -> URL, used to create href
+        #: links from identifiers to the API documentation for their
+        #: values.
         self.url_func = url_func
 
         #: The index in C{text} of the last character of the last
@@ -935,7 +935,8 @@ class PythonSourceColorizer:
                 # a function, then that function is our context, not
                 # the namespace that contains it. [xx] this isn't always
                 # the right thing to do.
-                if self.GUESS_LINK_TARGETS:
+                if (self.GUESS_LINK_TARGETS and self.docindex is not None
+                    and self.url_func is not None):
                     context = [n for n in self.context if n is not None]
                     container = DottedName(self.module_name, *context)
                     doc = self.docindex.get_vardoc(container+toktext)
@@ -943,8 +944,9 @@ class PythonSourceColorizer:
                         url = self.url_func(doc)
                 # Otherwise, check the name_to_docs index to see what
                 # else this name might refer to.
-                if url is None:
-                    docs = sorted(self.name_to_docs.get(toktext, []))
+                if (url is None and self.name_to_docs is not None
+                    and self.url_func is not None):
+                    docs = self.name_to_docs.get(toktext, [])
                     if docs:
                         tooltip='\n'.join([str(d.canonical_name)
                                            for d in docs])
@@ -1074,7 +1076,8 @@ class PythonSourceColorizer:
         elif isinstance(doc, StaticMethodDoc):
             return 'Static Method'
         elif isinstance(doc, RoutineDoc):
-            if isinstance(self.docindex.container(doc), ClassDoc):
+            if (self.docindex is not None and
+                isinstance(self.docindex.container(doc), ClassDoc)):
                 return 'Method'
             else:
                 return 'Function'
