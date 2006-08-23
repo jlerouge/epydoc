@@ -282,8 +282,8 @@ class HTMLWriter:
               end of their group; if C{inheritance='included'}, then
               inherited objects are mixed in with non-inherited
               objects.  The default is 'grouped'.
-        @type include_sourcecode: C{boolean}
-        @param include_sourcecode: If true, then generate colorized
+        @type include_source_code: C{boolean}
+        @param include_sourc_ecode: If true, then generate colorized
               source code files for each python module.
         """
         self.docindex = docindex
@@ -696,6 +696,8 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
 
     def write_sourcecode(self, out, doc, name_to_docs):
+        t0 = time.time()
+        
         filename = doc.filename
         name = str(doc.canonical_name)
         
@@ -715,6 +717,9 @@ class HTMLWriter:
         # Footer
         self.write_navbar(out, doc)
         self.write_footer(out)
+        
+        #log.debug('[%6.2f sec] Wrote pysrc for %s' %
+        #          (time.time()-t0, name))
 
     #////////////////////////////////////////////////////////////
     #{ 2.2. Class Pages
@@ -2239,6 +2244,8 @@ class HTMLWriter:
         if val_doc is UNKNOWN: return ''
         if val_doc.pyval is not UNKNOWN:
             return self.pprint_pyval(val_doc.pyval)
+        elif val_doc.pyval_repr() is not UNKNOWN:
+            s = plaintext_to_html(val_doc.pyval_repr())
         elif val_doc.parse_repr is not UNKNOWN:
             s = plaintext_to_html(val_doc.parse_repr)
         else:
