@@ -9,6 +9,8 @@
 """
 The HTML output generator for epydoc.  The main interface provided by
 this module is the L{HTMLWriter} class.
+
+@todo: Add a cache to L{HTMLWriter.url()}?
 """
 __docformat__ = 'epytext en'
 
@@ -696,7 +698,7 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
 
     def write_sourcecode(self, out, doc, name_to_docs):
-        t0 = time.time()
+        #t0 = time.time()
         
         filename = doc.filename
         name = str(doc.canonical_name)
@@ -3113,22 +3115,20 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
 
         # Translate it into HTML.
         if doc is None:
+            self._failed_xref(identifier)
             return '<code class="link">%s</code>' % label
         else:
             return self.htmlwriter.href(doc, label, 'link')
 
     # [xx] Should this be added to the DocstringLinker interface???
+    # Currently, this is *only* used by dotgraph.
     def url_for(self, identifier):
         if isinstance(identifier, (basestring, DottedName)):
             doc = self.docindex.find(identifier, self.container)
             if doc:
                 return self.htmlwriter.url(doc)
             else:
-                # [xx] ignore if it's inside an import??
-                # Record that we failed to find it.
-                failed_xrefs = self.htmlwriter._failed_xrefs
-                context = self.container.canonical_name
-                failed_xrefs.setdefault(identifier,{})[context] = 1
+                return None
             
         elif isinstance(identifier, APIDoc):
             return self.htmlwriter.url(identifier)
@@ -3137,3 +3137,9 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         else:
             raise TypeError('Expected string or APIDoc')
 
+    def _failed_xref(self, identifier):
+        """Add an identifier to the htmlwriter's failed crossreference
+        list."""
+        failed_xrefs = self.htmlwriter._failed_xrefs
+        context = self.container.canonical_name
+        failed_xrefs.setdefault(identifier,{})[context] = 1
