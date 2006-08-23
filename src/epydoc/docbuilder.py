@@ -952,9 +952,13 @@ been assigned to its current cannonical name.  If
 L{assign_canonical_names()} finds a canonical name with a better
 score, then it will replace the old name."""
 
-_unreachable_names = set(DottedName(DottedName.UNREACHABLE))
+_unreachable_names = {DottedName(DottedName.UNREACHABLE):2}
 """The set of names that have been used for unreachable objects.  This
-is used to ensure there are no duplicate cannonical names assigned."""
+is used to ensure there are no duplicate cannonical names assigned.
+C{_unreachable_names} is a dictionary mapping from dotted names to
+integer ids, where the next unused unreachable name derived from
+dotted name C{n} is
+C{DottedName('%s-%s' % (n, str(_unreachable_names[n]))}"""
 
 def assign_canonical_names(val_doc, name, docindex, score=0):
     """
@@ -1070,11 +1074,10 @@ def _unreachable_name_for(val_doc, docindex):
 
     # Uniquify the name.
     if name in _unreachable_names:
-        n = 2
-        while DottedName('%s-%s' % (name,n)) in _unreachable_names:
-            n += 1
-        name = DottedName('%s-%s' % (name,n))
-    _unreachable_names.add(name)
+        name = DottedName('%s-%s' % (name, _unreachable_names[name]))
+        _unreachable_names[name] += 1
+    else:
+        _unreachable_names[name] = 2
     
     return name, -10000
 
