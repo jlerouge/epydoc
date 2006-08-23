@@ -26,6 +26,9 @@ PY_SRC_EXTENSIONS = ['.py', '.pyw']
 PY_BIN_EXTENSIONS = ['.pyc', '.so', '.pyd']
 
 def is_module_file(path):
+    # Make sure it's a file name.
+    if not isinstance(path, basestring):
+        return False
     (dir, filename) = os.path.split(path)
     (basename, extension) = os.path.splitext(filename)
     return (os.path.isfile(path) and
@@ -42,7 +45,9 @@ def is_package_dir(dirname):
     (i.e., it names a directory that contsains a valid __init__ file,
     and its name is a valid identifier).
     """
-    # Make sure it's a directory.
+    # Make sure it's a directory name.
+    if not isinstance(dirname, basestring):
+        return False
     if not os.path.isdir(dirname):
         return False
     dirname = os.path.abspath(dirname)
