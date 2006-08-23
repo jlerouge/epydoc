@@ -63,7 +63,7 @@ levels are currently defined as follows::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time, re, pstats
+import sys, os, time, re, pstats, pickle
 from glob import glob
 from optparse import OptionParser, OptionGroup
 import epydoc
@@ -112,6 +112,9 @@ def parse_arguments():
     action_group.add_option(                               # --check
         "--check", action="store_const", dest="action", const="check",
         help="Check completeness of docs.")
+    action_group.add_option(
+        "--pickle", action="store_const", dest="action", const="pickle",
+        help="Write the documentation to a pickle file.")
 
     # Add options -- Options
     options_group.add_option(                               # --output
@@ -229,7 +232,7 @@ def parse_arguments():
                            docformat=DEFAULT_DOCFORMAT, 
                            show_private=True, show_imports=False,
                            inheritance="listed",
-                           verbose=0, quiet=0,
+                           verbose=0, quiet=0, load_pickle=False,
                            parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False,
                            graphs=[], list_classes_separately=False,
@@ -249,6 +252,14 @@ def parse_arguments():
             else:
                 cf_name = 'config files %s' % ', '.join(options.configfiles)
             optparser.error('Error reading %s:\n    %s' % (cf_name, e))
+
+    # Check if the input file is a pickle file.
+    for name in names:
+        if name.endswith('.pickle'):
+            if len(names) != 1:
+                optparse.error("When a pickle file is specified, no other "
+                               "input files may be specified.")
+            options.load_pickle = True
     
     # Check to make sure all options are valid.
     if len(names) == 0:
@@ -403,6 +414,8 @@ def main(options, names):
                   30,  # Parsing Docstrings
                   1,   # Inheriting documentation
                   2]   # Sorting & Grouping
+        if options.load_pickle:
+            stages = [30] # Loading pickled documentation
         if options.action == 'html': stages += [100]
         elif options.action == 'text': stages += [30]
         elif options.action == 'latex': stages += [60]
@@ -410,6 +423,7 @@ def main(options, names):
         elif options.action == 'ps': stages += [60,40]
         elif options.action == 'pdf': stages += [60,50]
         elif options.action == 'check': stages += [10]
+        elif options.action == 'pickle': stages += [10]
         else: raise ValueError, '%r not supported' % options.action
         if options.parse and not options.introspect:
             del stages[1] # no merging
@@ -419,7 +433,7 @@ def main(options, names):
         log.register_logger(logger)
 
     # check the output directory.
-    if options.action != 'text':
+    if options.action not in ('text', 'check', 'pickle'):
         if os.path.exists(options.target):
             if not os.path.isdir(options.target):
                 return log.error("%s is not a directory" % options.target)
@@ -433,10 +447,23 @@ def main(options, names):
         from epydoc.docwriter import dotgraph
         dotgraph.DOT_PATH = options.dotpath
 
-    # Build docs for the named values.
-    from epydoc.docbuilder import build_doc_index
-    docindex = build_doc_index(names, options.introspect, options.parse,
-                               add_submodules=(options.action!='text'))
+    # If the input name is a pickle file, then read the docindex that
+    # it contains.  Otherwise, build the docs for the input names.
+    if options.load_pickle:
+        assert len(names) == 1
+        log.start_progress('Deserializing')
+        log.progress(0.1, 'Loading %r' % names[0])
+        t0 = time.time()
+        unpickler = pickle.Unpickler(open(names[0], 'rb'))
+        unpickler.persistent_load = pickle_persistent_load
+        docindex = unpickler.load()
+        log.debug('deserialization time: %.1f sec' % (time.time()-t0))
+        log.end_progress()
+    else:
+        # Build docs for the named values.
+        from epydoc.docbuilder import build_doc_index
+        docindex = build_doc_index(names, options.introspect, options.parse,
+                                   add_submodules=(options.action!='text'))
 
     if docindex is None:
         return # docbuilder already logged an error.
@@ -463,6 +490,8 @@ def main(options, names):
         write_text(docindex, options)
     elif options.action == 'check':
         check_docs(docindex, options)
+    elif options.action == 'pickle':
+        write_pickle(docindex, options)
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
@@ -489,6 +518,37 @@ def write_html(docindex, options):
         log.start_progress('Writing HTML docs')
     html_writer.write(options.target)
     log.end_progress()
+
+def write_pickle(docindex, options):
+    """Helper for writing output to a pickle file, which can then be
+    read in at a later time.  But loading the pickle is only marginally
+    faster than building the docs from scratch, so this has pretty
+    limited application."""
+    if options.target == 'pickle':
+        options.target = 'api.pickle'
+    elif not options.target.endswith('.pickle'):
+        options.target += '.pickle'
+
+    log.start_progress('Serializing output')
+    log.progress(0.2, 'Writing %r' % options.target)
+    outfile = open(options.target, 'wb')
+    pickler = pickle.Pickler(outfile, protocol=0)
+    pickler.persistent_id = pickle_persistent_id
+    pickler.dump(docindex)
+    outfile.close()
+    log.end_progress()
+
+def pickle_persistent_id(obj):
+    """Helper for pickling, which allows us to save and restore UNKNOWN,
+    which is required to be identical to apidoc.UNKNOWN."""
+    if obj is UNKNOWN: return 'UNKNOWN'
+    else: return None
+
+def pickle_persistent_load(identifier):
+    """Helper for pickling, which allows us to save and restore UNKNOWN,
+    which is required to be identical to apidoc.UNKNOWN."""
+    if identifier == 'UNKNOWN': return UNKNOWN
+    else: raise pickle.UnpicklingError, 'Invalid persistent id'
 
 _RERUN_LATEX_RE = re.compile(r'(?im)^LaTeX\s+Warning:\s+Label\(s\)\s+may'
                              r'\s+have\s+changed.\s+Rerun')
