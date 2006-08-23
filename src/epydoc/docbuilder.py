@@ -101,7 +101,7 @@ def build_doc(item, introspect=True, parse=True, add_submodules=True):
     @param parse: If true, then use parsing to examine the specified
         items.  Otherwise, just use introspection.
     """
-    docindex = build_doc_index(item, introspect, parse, add_submodules)
+    docindex = build_doc_index([item], introspect, parse, add_submodules)
     return docindex.root[0]
 
 def build_doc_index(items, introspect=True, parse=True,
@@ -297,6 +297,14 @@ def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
             _, parse_docs = _get_docs_from_pyname(
                 str(introspect_doc.canonical_name), False, True,
                 progress_estimator, supress_warnings=True)
+    # We need a name:
+    if introspect_doc.canonical_name in (None, UNKNOWN):
+        if hasattr(obj, '__name__'):
+            introspect_doc.canonical_name = DottedName(
+                DottedName.UNREACHABLE, obj.__name__)
+        else:
+            introspect_doc.canonical_name = DottedName(
+                DottedName.UNREACHABLE)
     return (introspect_doc, parse_doc)
 
 def _get_docs_from_pyname(name, introspect, parse, progress_estimator,
