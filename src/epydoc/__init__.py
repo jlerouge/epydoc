@@ -202,7 +202,7 @@ information about the submodules and subpackages.
 """
 __docformat__ = 'restructuredtext en'
 
-__version__ = '3.0alpha2'
+__version__ = '3.0alpha3'
 """The version of epydoc"""
 
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
