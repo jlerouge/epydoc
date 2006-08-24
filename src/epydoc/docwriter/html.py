@@ -289,7 +289,7 @@ class HTMLWriter:
               source code files for each python module.
         """
         self.docindex = docindex
-        
+
         # Process keyword arguments.
         self._show_private = kwargs.get('show_private', 1)
         """Should private docs be included?"""
@@ -407,6 +407,10 @@ class HTMLWriter:
 
         # Figure out the url for the top page.
         self._top_page_url = self._find_top_page(self._top_page)
+
+        # Decide whether or not to split the identifier index.
+        self._split_ident_index = (len(self.indexed_docs) >=
+                                   self.SPLIT_IDENT_INDEX_SIZE)
         
         # Figure out how many output files there will be (for progress
         # reporting).
@@ -418,6 +422,8 @@ class HTMLWriter:
                            11 + len(self.METADATA_INDICES))
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
+        if self._split_ident_index:
+            self._num_files += len(self.LETTERS)
             
     def _find_top_page(self, pagename):
         """
@@ -513,20 +519,48 @@ class HTMLWriter:
         # Write images.
         self.write_images(directory)
 
-        # Write the term & identifier indices
+        # Build the indices.
         indices = {'ident': self.build_identifier_index(),
                    'term': self.build_term_index()}
         for (name, label, label2) in self.METADATA_INDICES:
             indices[name] = self.build_metadata_index(name)
-        self._write(self.write_link_index, directory,
-                    'identifier-index.html', indices,
-                    'Identifier Index', 'identifier-index.html', 'ident')
+
+        # Write the identifier index.  If requested, split it into
+        # separate pages for each letter.
+        ident_by_letter = self._group_by_letter(indices['ident'])
+        if not self._split_ident_index:
+            self._write(self.write_link_index, directory,
+                        'identifier-index.html', indices,
+                        'Identifier Index', 'identifier-index.html',
+                        ident_by_letter)
+        else:
+            # Write a page for each section.
+            for letter in self.LETTERS:
+                filename = 'identifier-index-%s.html' % letter
+                self._write(self.write_link_index, directory, filename,
+                            indices, 'Identifier Index', filename,
+                            ident_by_letter, [letter],
+                            'identifier-index-%s.html')
+            # Use the first non-empty section as the main index page.
+            for letter in self.LETTERS:
+                if letter in ident_by_letter:
+                    filename = 'identifier-index.html'
+                    self._write(self.write_link_index, directory, filename,
+                                indices, 'Identifier Index', filename,
+                                ident_by_letter, [letter], 
+                                'identifier-index-%s.html')
+                    break
+
+        # Write the term index.
         if indices['term']:
+            term_by_letter = self._group_by_letter(indices['term'])
             self._write(self.write_link_index, directory, 'term-index.html',
                         indices, 'Term Definition Index',
-                        'term-index.html', 'term')
+                        'term-index.html', term_by_letter)
         else:
             self._files_written += 1 # (skipped)
+
+        # Write the metadata indices.
         for (name, label, label2) in self.METADATA_INDICES:
             if indices[name]:
                 self._write(self.write_metadata_index, directory,
@@ -535,7 +569,6 @@ class HTMLWriter:
             else:
                 self._files_written += 1 # (skipped)
 
-        
         # Write the trees file (package & class hierarchies)
         if self.module_list:
             self._write(self.write_module_tree, directory, 'module-tree.html')
@@ -905,57 +938,51 @@ class HTMLWriter:
     #{ 2.4. Index pages
     #////////////////////////////////////////////////////////////
 
-    SPLIT_LINK_INDEX_SIZE = 10
-    """If a link index has more than this number of entries, then it
-    will be split into alphabetical sections.  Use 0 to always split
-    link indexes into alphabetical sections."""
+    SPLIT_IDENT_INDEX_SIZE = 3000
+    """If the identifier index has more than this number of entries,
+    then it will be split into separate pages, one for each
+    alphabetical section."""
 
-    def write_link_index(self, out, indices, title, url, index_name):
-        index = indices[index_name]
+    LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_'
+    """The alphabetical sections that are used for link index pages."""
+    
+    def write_link_index(self, out, indices, title, url, index_by_section,
+                         sections=LETTERS, section_url='#%s'):
         
-        # Header material.
+        # Header
         self.write_indexpage_header(out, indices, title, url)
 
-        # If the index is small enough, then don't bother to make
-        # alphabetical sections; just list it all in one section.
-        if len(index) < self.SPLIT_LINK_INDEX_SIZE:
-            out('<h1 class="epydoc">%s</h1><br />\n' % title)
-            self.write_index_section(out, index)
+        # Index title & links to alphabetical sections.
+        out('<table border="0" width="100%">\n'
+            '<tr valign="bottom"><td>\n')
+        out('<h1 class="epydoc">%s</h1>\n</td><td>\n[\n' % title)
+        for sec in self.LETTERS:
+            if sec in index_by_section:
+                out(' <a href="%s">%s</a>\n' % (section_url % sec, sec))
+            else:
+                out('  %s\n' % sec)
+        out(']\n')
+        out('</td></table>\n')
 
-        # Otherwise, group the index by letter, and write one section
-        # per letter.
-        else:
-            index = self._group_by_letter(index)
-    
-            # Header & links to alphabetical sections.
-            out('<table border="0" width="100%">\n'
-                '<tr valign="bottom"><td>\n')
-            out('<h1 class="epydoc">%s</h1>\n</td><td>\n[\n' % title)
-            for letter in 'ABCDEFGHIJKLMNOPQRSTUVWZYZ_':
-                if letter in index:
-                    out(' <a href="#%s">%s</a>\n' % (letter, letter))
-                else:
-                    out(' %s\n' % letter)
-            out(']\n')
-            out('</td></table>\n')
-    
-            # Alphabetical sections.
+        # Alphabetical sections.
+        sections = [s for s in sections if s in index_by_section]
+        if sections:
             out('<table border="0" width="100%"><tr valign="top">\n')
-            for letter in sorted(index.iterkeys()):
+            for section in sorted(sections):
                 out('<td valign="top" width="1%">')
                 out('<a name="%s"><h2 class="epydoc">%s</h2></a></td>\n' %
-                    (letter, letter))
+                    (section, section))
                 out('<td valign="top">\n')
-                section = index[letter]
-                self.write_index_section(out, section, True)
+                self.write_index_section(out, index_by_section[section], True)
                 out('</td></tr>\n')
             out('</table>\n</br />')
-    
+
         # Footer material.
         out('<br />')
         self.write_navbar(out, 'indices')
         self.write_footer(out)
-
+                
+        
     def write_metadata_index(self, out, indices, field, title, typ):
         """
         Write an HTML page containing a metadata index.
@@ -1030,15 +1057,15 @@ class HTMLWriter:
         out('<table class="link-index" width="100%" border="1">\n')
         num_rows = (len(items)+2)/3
         for row in range(num_rows):
-            out('  <tr>\n')
+            out('<tr>\n')
             for col in range(3):
-                out('    <td width="33%" class="link-index">')
+                out('<td width="33%" class="link-index">')
                 i = col*num_rows+row
                 if i < len(items):
                     name, url, container = items[col*num_rows+row]
                     out('<a href="%s">%s</a>' % (url, name))
                     if container is not None:
-                        out('<br />\n      ')
+                        out('<br />\n')
                         if isinstance(container, ModuleDoc):
                             label = container.canonical_name
                         else:
@@ -1048,10 +1075,10 @@ class HTMLWriter:
                 else:
                     out('&nbsp;')
                 out('</td>\n')
-            out('  </tr>\n')
+            out('</tr>\n')
             if add_blankline and num_rows == 1:
                 blank_cell = '<td class="link-index">&nbsp;</td>'
-                out('  <tr>'+3*blank_cell+'</tr>\n')
+                out('<tr>'+3*blank_cell+'</tr>\n')
         out('</table>\n')
 
     #////////////////////////////////////////////////////////////
