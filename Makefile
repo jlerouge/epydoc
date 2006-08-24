@@ -41,6 +41,9 @@ LATEX_STDLIB  = $(LATEX)/stdlib
 EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
 
+# Options for rst->html converter
+RST2HTML = $(PYTHON) src/tools/rst2html.py
+
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
 ##//////////////////////////////////////////////////////////////////////
@@ -92,6 +95,7 @@ xfer: test .webpage.up2date stdlib-html
 	rsync -arzv -e ssh $(HTML_STDLIB)/ $(HOST):$(DIR)/stdlib
 
 local: .webpage.up2date
+	rm -rf /var/www/epydoc/*
 	cp -r $(WEBDIR)/* /var/www/epydoc
 
 checkdoc: checkdocs
@@ -106,7 +110,7 @@ checkdocs:
 	cp -r $(DOCS) $(WEBDIR)
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
-	cp -r $(HTML_DOCTEST) $(WEBDIR)/doctest
+	cp -r $(HTML_DOCTEST)/* $(WEBDIR)/doctest
 	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
 	touch .webpage.up2date
 
@@ -132,14 +136,14 @@ api-pdf: .api-pdf.up2date
 	       --name "Epydoc $(VERSION)" $(PY_SRC) -v
 	touch .api-pdf.up2date
 
-doctest-html: .doctests.up2date
+doctest-html: .doctest-html.up2date
 .doctest-html.up2date: $(DOCTESTS)
 	rm -rf $(HTML_DOCTEST)
 	mkdir -p $(HTML_DOCTEST)
-	@for doctest in $(DOCTESTS); do \
+	for doctest in $(DOCTESTS); do \
 	    out_file=$(HTML_DOCTEST)/`basename $$doctest .doctest`.html; \
-	    echo rst2html $$doctest $$out_file; \
-	    if rst2html $$doctest $$out_file; then true; \
+	    echo "$(RST2HTML) $$doctest $$out_file"; \
+	    if $(RST2HTML) $$doctest $$out_file; then true; \
 	    else exit 1; fi\
 	done
 	touch .doctest-html.up2date
