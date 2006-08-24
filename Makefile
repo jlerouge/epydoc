@@ -38,7 +38,6 @@ HTML_DOCTEST  = $(HTML)/doctest
 LATEX_API     = $(LATEX)/api
 LATEX_STDLIB  = $(LATEX)/stdlib
 
-
 EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
 
@@ -116,7 +115,7 @@ checkdocs:
 # xml.dom.minidom and a few Docutils modules get plaintext
 # docstrings).
 api-html: .api-html.up2date
-.api-html.up2date: $(PY_SRCFILES) #profile.out
+.api-html.up2date: $(PY_SRCFILES) profile.out
 	rm -rf $(HTML_API)
 	mkdir -p $(HTML_API)
 	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
@@ -202,7 +201,6 @@ doc/epydocgui-man.html: man/epydocgui.1
 	     | sed 's/<A HREF="\/cgi-bin\/man2html">man2html<\/A>/man2html/'\
 	     > doc/epydocgui-man.html
 
-# [XX] A bug in the profiler for py 2.4 prevents this from working!!
 profile.out: $(PY_SRCFILES)
 	$(EPYDOC) -o profile.tmp --name epydoc --css white \
 	       --url http://epydoc.sourceforge.net --profile-epydoc \
