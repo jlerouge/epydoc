@@ -683,8 +683,10 @@ def _profile():
     # present, and if so, fix it.  (Bug was fixed in 2.4maint:
     # <http://mail.python.org/pipermail/python-checkins/
     #                         2005-September/047099.html>)
-    if Profile.dispatch['c_exception'] is Profile.trace_dispatch_exception:
-        Profile.dispatch['c_exception'] = Profile.trace_dispatch_return
+    if (Profile.dispatch['c_exception'] is
+        Profile.trace_dispatch_exception.im_func):
+        trace_dispatch_return = Profile.trace_dispatch_return.im_func
+        Profile.dispatch['c_exception'] = trace_dispatch_return
     try:
         prof = Profile()
         prof = prof.runctx('main(*parse_arguments())', globals(), {})
