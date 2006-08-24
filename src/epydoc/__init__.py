@@ -183,8 +183,6 @@ information about the submodules and subpackages.
        not necessary)
 
 :bug: UserDict.* is interpreted as imported .. why??
-:bug: Nested functions break source colorizer (and *why* is the source
-      colorizer being so slow on the stdlib???)
 
 :license: IBM Open Source License
 :copyright: |copy| 2006 Edward Loper

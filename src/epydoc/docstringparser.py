@@ -375,10 +375,13 @@ def user_docfields(api_doc, docindex):
     Return a list of user defined fields that can be used for the
     given object.  This list is taken from the given C{api_doc}, and
     any of its containing C{NamepaceDoc}s.
-    
-    @bug: If a child's docstring is parsed before its parents, then
-        its parent won't yet have had its C{extra_docstring_fields}
-        attribute initialized.
+
+    @note: We assume here that a parent's docstring will always be
+        parsed before its childrens'.  This is indeed the case when we
+        are called via L{docbuilder.build_doc_index()}.  If a child's
+        docstring is parsed before its parents, then its parent won't
+        yet have had its C{extra_docstring_fields} attribute
+        initialized.
     """
     docfields = []
     # Get any docfields from `api_doc` itself
