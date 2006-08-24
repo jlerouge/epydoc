@@ -23,7 +23,7 @@ HOST = shell.sf.net
 DIR = /home/groups/e/ep/epydoc/htdocs
 
 # The current version of epydoc.
-VERSION = $(shell python -c 'import epydoc; print epydoc.__version__')
+VERSION = $(shell $(PYTHON) -c 'import epydoc; print epydoc.__version__')
 
 # Base output directories
 WEBDIR        = webpage
