@@ -675,12 +675,18 @@ def cli():
         print >>sys.stderr, 'Use --debug to see trace information.'
 
 def _profile():
-    try: import profile
+    try: from profile import Profile
     except ImportError:
         print >>sys.stderr, "Could not import profile module!"
         return
+    # There was a bug in Python 2.4's profiler.  Check if it's
+    # present, and if so, fix it.  (Bug was fixed in 2.4maint:
+    # <http://mail.python.org/pipermail/python-checkins/
+    #                         2005-September/047099.html>)
+    if Profile.dispatch['c_exception'] is Profile.trace_dispatch_exception:
+        Profile.dispatch['c_exception'] = Profile.trace_dispatch_return
     try:
-        prof = profile.Profile()
+        prof = Profile()
         prof = prof.runctx('main(*parse_arguments())', globals(), {})
     except SystemExit:
         pass
