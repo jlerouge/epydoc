@@ -144,6 +144,7 @@ def compile_template(docstring, template_string,
         pysrc_lines.append('        raise')
         
     pysrc = '\n'.join(pysrc_lines)+'\n'
+    #log.debug(pysrc)
     if debug: localdict = {'__debug': (pysrc_lines, func_name)}
     else: localdict = {}
     try: exec pysrc in globals(), localdict
@@ -2296,18 +2297,22 @@ class HTMLWriter:
 
         # For strings, use repr.  Use tripple-quoted-strings where
         # appropriate.
-        elif type(pyval) is types.StringType:
+        elif isinstance(pyval, basestring):
             vstr = repr(pyval)
+            # Find the left quote.
+            lquote = vstr.find(vstr[-1])
+            # Use tripple quotes if the string is multi-line:
             if vstr.find(r'\n') >= 0:
-                body = vstr[1:-1].replace(r'\n', '\n')
-                vstr = ('<span class="variable-quote">'+vstr[0]*3+'</span>'+
+                body = vstr[lquote+1:-1].replace(r'\n', '\n')
+                vstr = ('<span class="variable-quote">'+vstr[:lquote]+
+                        vstr[lquote]*3+'</span>'+
                         plaintext_to_html(body) +
-                       '<span class="variable-quote">'+vstr[0]*3+'</span>')
-                     
+                       '<span class="variable-quote">'+vstr[-1]*3+'</span>')
+            # Use single quotes if the string is single-line:
             else:
-                vstr = ('<span class="variable-quote">'+vstr[0]+'</span>'+
-                        plaintext_to_html(vstr[1:-1])+
-                       '<span class="variable-quote">'+vstr[0]+'</span>')
+                vstr = ('<span class="variable-quote">'+vstr[:lquote+1]+
+                        '</span>'+ plaintext_to_html(vstr[lquote+1:-1])+
+                        '<span class="variable-quote">'+vstr[-1:]+'</span>')
 
         # For lists, tuples, and dicts, use pprint.  When possible,
         # restrict the amount of stuff that pprint needs to look at,
@@ -2342,6 +2347,10 @@ class HTMLWriter:
         else:
             try: vstr = plaintext_to_html(repr(pyval))
             except: vstr = '...'
+
+        # Encode vstr, if necessary.
+        if isinstance(vstr, str):
+            vstr = decode_with_backslashreplace(vstr)
 
         # Do line-wrapping.
         return self._linewrap_html(vstr, self._variable_linelen,
