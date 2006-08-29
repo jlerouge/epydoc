@@ -206,6 +206,14 @@ def parse_arguments():
               "include multiple graph types in the output.  GRAPHTYPE "
               "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
     options_group.add_option(
+        '--graph-font', dest='graph_font', metavar='FONT',
+        help=("Specify the font used to generate Graphviz graphs.  (e.g., "
+              "helvetica or times)."))
+    options_group.add_option(
+        '--graph-font-size', dest='graph_font_size', metavar='SIZE',
+        help=("Specify the font size used to generate Graphviz graphs, "
+              "in points."))
+    options_group.add_option(
         '--separate-classes', action='store_true',
         dest='list_classes_separately',
         help=("When generating LaTeX or PDF output, list each class in "
@@ -236,6 +244,7 @@ def parse_arguments():
                            parse=True, introspect=True,
                            debug=epydoc.DEBUG, profile=False,
                            graphs=[], list_classes_separately=False,
+                           graph_font=None, graph_font_size=None,
                            include_source_code=True, pstat_files=[])
 
     # Parse the arguments.
@@ -372,6 +381,10 @@ def parse_configfiles(configfiles, options, names):
                     raise ValueError('"%s" expected one of: all, %s.' %
                                      (optname, ', '.join(GRAPH_TYPES)))
             options.graphs.extend(graphtypes)
+        elif optname in ('graph-font', 'graph_font'):
+            options.graph_font = val
+        elif optname in ('graph-font-size', 'graph_font_size'):
+            options.graph_font_size = int(val)
         elif optname in ('separate-classes', 'separate_classes'):
             options.list_classes_separately = _str_to_bool(val, optname)
         elif optname == 'sourcecode':
@@ -446,6 +459,18 @@ def main(options, names):
     if options.dotpath:
         from epydoc.docwriter import dotgraph
         dotgraph.DOT_PATH = options.dotpath
+
+    # Set the default graph font & size
+    if options.graph_font:
+        from epydoc.docwriter import dotgraph
+        fontname = options.graph_font
+        dotgraph.DotGraph.DEFAULT_NODE_DEFAULTS['fontname'] = fontname
+        dotgraph.DotGraph.DEFAULT_EDGE_DEFAULTS['fontname'] = fontname
+    if options.graph_font_size:
+        from epydoc.docwriter import dotgraph
+        fontsize = options.graph_font_size
+        dotgraph.DotGraph.DEFAULT_NODE_DEFAULTS['fontsize'] = fontsize
+        dotgraph.DotGraph.DEFAULT_EDGE_DEFAULTS['fontsize'] = fontsize
 
     # If the input name is a pickle file, then read the docindex that
     # it contains.  Otherwise, build the docs for the input names.
