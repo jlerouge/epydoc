@@ -146,7 +146,15 @@ class DotGraph:
             if not self.write(image_file):
                 return '' # failed to render
             cmapx = self.render('cmapx') or ''
-            
+
+        # Decode the cmapx (dot uses utf-8)
+        try:
+            cmapx = cmapx.decode('utf-8')
+        except UnicodeDecodeError:
+            log.debug('%s: unable to decode cmapx from dot; graph will '
+                      'not have clickable regions' % image_file)
+            cmapx = ''
+
         title = plaintext_to_html(self.title or '')
         caption = plaintext_to_html(self.caption or '')
         if title or caption:
