@@ -504,6 +504,18 @@ def introspect_other(val, val_doc):
 # Helper functions
 #////////////////////////////////////////////////////////////
 
+def isclass(object):
+    """
+    Return true if the given object is a class.  In particular, return
+    true if object is an instance of C{types.TypeType} or of
+    C{types.ClassType}.  This is used instead of C{inspect.isclass()},
+    because the latter returns true for objects that are not classes
+    (in particular, it returns true for any object that has a
+    C{__bases__} attribute, including objects that define
+    C{__getattr__} to always return a value).
+    """
+    return isinstance(object, (TypeType, ClassType))
+
 def get_docstring(value):
     """
     Return the docstring for the given value; or C{None} if it
@@ -623,7 +635,7 @@ def get_containing_module(value):
     """
     if inspect.ismodule(value):
         return DottedName(value.__name__)
-    elif inspect.isclass(value):
+    elif isclass(value):
         return DottedName(value.__module__)
     elif (inspect.ismethod(value) and value.im_self is not None and
           value.im_class is ClassType): # class method.
@@ -702,7 +714,7 @@ def is_classmethod(v): return isinstance(v, classmethod)
 def is_staticmethod(v): return isinstance(v, staticmethod)
 def is_property(v): return isinstance(v, property)
 register_introspecter(inspect.ismodule, introspect_module, priority=20)
-register_introspecter(inspect.isclass, introspect_class, priority=24)
+register_introspecter(isclass, introspect_class, priority=24)
 register_introspecter(inspect.isroutine, introspect_routine, priority=28)
 register_introspecter(is_property, introspect_property, priority=30)
 
