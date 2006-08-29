@@ -1306,7 +1306,16 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
     # right thing to do; but it will almost always be what the
     # module's author intended.
     if isinstance(docstring, str):
-        docstring = docstring.decode(encoding)
+        try:
+            docstring = docstring.decode(encoding)
+        except UnicodeDecodeError:
+            # If decoding failed, then fall back on using
+            # decode_with_backslashreplace, which will map e.g.
+            # "\xe9" -> u"\\xe9".
+            docstring = decode_with_backslashreplace(docstring)
+            log.warning("While parsing %s: docstring is not a unicode "
+                        "string, but it contains non-ascii data." %
+                        prev_line_doc.canonical_name)
 
     # If the modified APIDoc is an instance variable, and it has
     # not yet been added to its class's C{variables} list,
