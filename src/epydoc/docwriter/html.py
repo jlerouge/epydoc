@@ -886,8 +886,7 @@ class HTMLWriter:
         the top-level list is a class with no (documented) bases; and
         under each class is listed all of its subclasses.  Note that
         in the case of multiple inheritance, a class may appear
-        multiple times.  This is used by L{write_trees} to write
-        the class hierarchy.
+        multiple times.  
         
         @todo: For multiple inheritance, don't repeat subclasses the
             second time a class is mentioned; instead, link to the
@@ -2906,10 +2905,22 @@ class HTMLWriter:
         ''')
         # \------------------------------------------------------------/
 
+    _url_cache = {}
     def url(self, obj):
         """
         Return the URL for the given object, which can be a
         C{VariableDoc}, a C{ValueDoc}, or a C{DottedName}.
+        """
+        cached_url = self._url_cache.get(id(obj))
+        if cached_url is not None:
+            return cached_url
+        else:
+            url = self._url_cache[id(obj)] = self._url(obj)
+            return url
+
+    def _url(self, obj):
+        """
+        Internal helper for L{url}.
         """
         # Module: <canonical_name>-module.html
         if isinstance(obj, ModuleDoc):
