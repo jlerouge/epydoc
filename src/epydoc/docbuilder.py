@@ -992,7 +992,7 @@ def assign_canonical_names(val_doc, name, docindex, score=0):
     # Update val_doc's canonical name, if appropriate.
     if (val_doc not in _name_scores and
         val_doc.canonical_name is not UNKNOWN):
-        # If this is the fist time we've seen val_doc, and it
+        # If this is the first time we've seen val_doc, and it
         # already has a name, then don't change that name.
         _name_scores[val_doc] = sys.maxint
         name = val_doc.canonical_name
