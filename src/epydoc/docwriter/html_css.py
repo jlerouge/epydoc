@@ -253,9 +253,9 @@ table pre.py-doctest        { background: #dce4ec;
                               color: #000000; }
 pre.py-src                  { border: 2px solid #000000; 
                               background: #f0f0f0; color: #000000; }
-span.py-line                { border-left: 2px solid #000000; 
+.py-line                    { border-left: 2px solid #000000; 
                               margin-left: .2em; padding-left: .4em; }
-span.py-lineno              { font-style: italic; font-size: 90%;
+.py-lineno                  { font-style: italic; font-size: 90%;
                               padding-left: .5em; }
 a.py-toggle                 { text-decoration: none; }
 div.py-highlight-hdr        { border-top: 2px solid #000000;
