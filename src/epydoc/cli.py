@@ -77,6 +77,7 @@ INHERITANCE_STYLES = ('grouped', 'listed', 'included')
 GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'
+PROFILER = 'hotshot' #: Which profiler to use: 'hotshot' or 'profile'
 
 ######################################################################
 #{ Argument & Config File Parsing
@@ -185,11 +186,11 @@ def parse_arguments():
     options_group.add_option(                               # --introspect-only
         "--introspect-only", action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
-    if epydoc.DEBUG:
-        # this option is for developers, not users.
-        options_group.add_option(
-            "--profile-epydoc", action="store_true", dest="profile",
-            help="Run the profiler.  Output will be written to profile.out")
+    # this option is for developers, not users.
+    options_group.add_option(
+        "--profile-epydoc", action="store_true", dest="profile",
+        help=("Run the hotshot profiler on epydoc itself.  Output "
+              "will be written to profile.out."))
     options_group.add_option(
         "--dotpath", dest="dotpath", metavar='PATH',
         help="The path to the Graphviz 'dot' executable.")
@@ -458,7 +459,7 @@ def main(options, names):
     # Set the dot path
     if options.dotpath:
         from epydoc.docwriter import dotgraph
-        dotgraph.DOT_PATH = options.dotpath
+        dotgraph.DOT_COMMAND = options.dotpath
 
     # Set the default graph font & size
     if options.graph_font:
@@ -700,42 +701,48 @@ def cli():
         print >>sys.stderr, 'Use --debug to see trace information.'
 
 def _profile():
-    try: from profile import Profile
-    except ImportError:
-        print >>sys.stderr, "Could not import profile module!"
-        return
-    # There was a bug in Python 2.4's profiler.  Check if it's
-    # present, and if so, fix it.  (Bug was fixed in 2.4maint:
-    # <http://mail.python.org/pipermail/python-checkins/
-    #                         2005-September/047099.html>)
-    if (Profile.dispatch['c_exception'] is
-        Profile.trace_dispatch_exception.im_func):
-        trace_dispatch_return = Profile.trace_dispatch_return.im_func
-        Profile.dispatch['c_exception'] = trace_dispatch_return
-    try:
-        prof = Profile()
-        prof = prof.runctx('main(*parse_arguments())', globals(), {})
-    except SystemExit:
-        pass
-    prof.dump_stats('profile.out')
-    return
+    # Hotshot profiler.
+    if PROFILER == 'hotshot':
+        try: import hotshot, hotshot.stats
+        except ImportError:
+            print >>sys.stderr, "Could not import profile module!"
+            return
+        try:
+            prof = hotshot.Profile('hotshot.out')
+            prof = prof.runctx('main(*parse_arguments())', globals(), {})
+        except SystemExit:
+            pass
+        prof.close()
+        # Convert profile.hotshot -> profile.out
+        print 'Consolidating hotshot profiling info...'
+        hotshot.stats.load('hotshot.out').dump_stats('profile.out')
 
-    # Use the pstats statistical browser.  This is made unnecessarily
-    # difficult because the whole browser is wrapped in an
-    # if __name__=='__main__' clause.
-    try: import pstats
-    except ImportError:
-        log.error("Could not import pstats -- skipping browser")
-    try:
-        pstats_pyfile = os.path.splitext(pstats.__file__)[0]+'.py'
-        sys.argv = ['pstats.py', 'profile.out']
-        print
-        execfile(pstats_pyfile, {'__name__':'__main__'})
-    except:
-        print 'Could not run the pstats browser'
+    # Standard 'profile' profiler.
+    elif PROFILER == 'profile':
+        try: from profile import Profile
+        except ImportError:
+            print >>sys.stderr, "Could not import profile module!"
+            return
+
+        # There was a bug in Python 2.4's profiler.  Check if it's
+        # present, and if so, fix it.  (Bug was fixed in 2.4maint:
+        # <http://mail.python.org/pipermail/python-checkins/
+        #                         2005-September/047099.html>)
+        if (Profile.dispatch['c_exception'] is
+            Profile.trace_dispatch_exception.im_func):
+            trace_dispatch_return = Profile.trace_dispatch_return.im_func
+            Profile.dispatch['c_exception'] = trace_dispatch_return
+        try:
+            prof = Profile()
+            prof = prof.runctx('main(*parse_arguments())', globals(), {})
+        except SystemExit:
+            pass
+        prof.dump_stats('profile.out')
+
+    else:
+        print >>sys.stderr, 'Unknown profiler %s' % PROFILER
+        return
     
-    print 'Profiling output is in "profile.out"'
-        
 ######################################################################
 #{ Logging
 ######################################################################
