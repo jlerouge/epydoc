@@ -132,6 +132,12 @@ def parse_docstring(docstring, errors, **options):
                                        'warning_stream':None})
     return ParsedRstDocstring(writer.document)
 
+class OptimizedReporter(docutils.utils.Reporter):
+    """A reporter that ignores all debug messages.  This is used to
+    shave a couple seconds off of epydoc's run time, since docutils
+    isn't very fast about processing its own debug messages."""
+    def debug(self, *args, **kwargs): pass
+
 class ParsedRstDocstring(ParsedDocstring):
     """
     An encoded version of a ReStructuredText docstring.  The contents
@@ -150,7 +156,7 @@ class ParsedRstDocstring(ParsedDocstring):
         
         # The default document reporter and transformer are not
         # pickle-able; so replace them with stubs that are.
-        document.reporter = docutils.utils.Reporter(
+        document.reporter = OptimizedReporter(
             document.reporter.source, 'SEVERE', 'SEVERE', '')
         document.transformer = docutils.transforms.Transformer(document)
 
@@ -460,10 +466,13 @@ def latex_head_prefix():
     return translator.head_prefix
     
 class _EpydocLaTeXTranslator(LaTeXTranslator):
+    settings = None
     def __init__(self, document, docstring_linker):
         # Set the document's settings.
-        settings = OptionParser([LaTeXWriter()]).get_default_values()
-        document.settings = settings
+        if self.settings is None:
+            settings = OptionParser([LaTeXWriter()]).get_default_values()
+            self.__class__.settings = settings
+        document.settings = self.settings
 
         LaTeXTranslator.__init__(self, document)
         self._linker = docstring_linker
@@ -495,6 +504,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         raise SkipNode()
 
 class _EpydocHTMLTranslator(HTMLTranslator):
+    settings = None
     def __init__(self, document, docstring_linker, directory,
                  docindex, context):
         self._linker = docstring_linker
@@ -503,8 +513,10 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         self._context = context
         
         # Set the document's settings.
-        settings = OptionParser([HTMLWriter()]).get_default_values()
-        document.settings = settings
+        if self.settings is None:
+            settings = OptionParser([HTMLWriter()]).get_default_values()
+            self.__class__.settings = settings
+        document.settings = self.settings
 
         # Call the parent constructor.
         HTMLTranslator.__init__(self, document)
