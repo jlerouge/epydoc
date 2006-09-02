@@ -90,18 +90,18 @@ class DotGraph:
         self.nodes = []
         """A list of the nodes that are present in the graph.
         
-        :type: `list` of `DotGraphNode`"""
+        :type: ``list`` of `DotGraphNode`"""
         
         self.edges = []
         """A list of the edges that are present in the graph.
         
-        :type: `list` of `DotGraphEdge`"""
+        :type: ``list`` of `DotGraphEdge`"""
 
         self.body = body
         """A string that should be included as-is in the body of the
         graph.
         
-        :type: `str`"""
+        :type: ``str``"""
         
         self.node_defaults = node_defaults or self.DEFAULT_NODE_DEFAULTS
         """Default attribute values for nodes."""
@@ -401,7 +401,7 @@ class DotGraphUmlClassNode(DotGraphNode):
                 names will be contextualized to this context.
             `collapsed` : ``bool``
                 If true, then display this node as a simple box.
-            `bgcolor` : ``str``
+            `bgcolor` : ```str```
                 The background color for this node.
             `options` : ``dict``
                 A set of options used to control how the node should
@@ -858,9 +858,9 @@ class DotGraphUmlModuleNode(DotGraphNode):
         """
         :Return: (label, depth, width) where:
         
-          - `label` is the HTML label
-          - `depth` is the depth of the package tree (for coloring)
-          - `width` is the max width of the HTML label, roughly in
+          - ``label`` is the HTML label
+          - ``depth`` is the depth of the package tree (for coloring)
+          - ``width`` is the max width of the HTML label, roughly in
              units of characters.
         """
         MAX_ROW_WIDTH = 80 # unit is roughly characters.
@@ -1109,7 +1109,7 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
                     edge['constraint'] = 'False'
                 
     # Construct the graph.
-    graph = DotGraph('UML class diagram for %s' % class_doc,
+    graph = DotGraph('UML class diagram for %s' % class_doc.canonical_name,
                      body='ranksep=.2\n;nodesep=.3\n')
     graph.nodes = nodes.values()
     
