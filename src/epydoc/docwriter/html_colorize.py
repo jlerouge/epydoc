@@ -341,13 +341,13 @@ function collapse(id) {
     
     var indent = elt.getAttribute("indent");
     var pad = elt.getAttribute("pad");
-    var s = "<span class=\'py-lineno\'>";
+    var s = "<tt class=\'py-lineno\'>";
     for (var i=0; i<pad.length; i++) { s += "&nbsp;" }
-    s += "</span>";
-    s += "&nbsp;&nbsp;<span class=\'py-line\'>";
+    s += "</tt>";
+    s += "&nbsp;&nbsp;<tt class=\'py-line\'>";
     for (var i=0; i<indent.length; i++) { s += "&nbsp;" }
     s += "<a href=\'#\' onclick=\'expand(\\"" + id;
-    s += "\\");return false\'>...</a></span><br />";
+    s += "\\");return false\'>...</a></tt><br />";
     elt.innerHTML = s;
   }
 }
@@ -358,7 +358,9 @@ function toggle(id) {
       collapse(id); 
   else
       expand(id);
+  return false;
 }
+
 function highlight(id) {
   var elt = document.getElementById(id+"-def");
   if (elt) elt.className = "py-highlight-hdr";
@@ -410,17 +412,18 @@ function expandto(href) {
 }
 
 function kill_doclink(id) {
-  if (id) {
-    var parent = document.getElementById(id);
-    parent.removeChild(parent.childNodes.item(0));
-  }
-  else if (!this.contains(event.toElement)) {
+  var parent = document.getElementById(id);
+  parent.removeChild(parent.childNodes.item(0));
+}
+function auto_kill_doclink(ev) {
+  if (!ev) var ev = window.event;
+  if (!this.contains(ev.toElement)) {
     var parent = document.getElementById(this.parentID);
     parent.removeChild(parent.childNodes.item(0));
   }
 }
 
-function doclink(id, name, targets) {
+function doclink(id, name, targets_id) {
   var elt = document.getElementById(id);
 
   // If we already opened the box, then destroy it.
@@ -452,9 +455,12 @@ function doclink(id, name, targets) {
     box2.style.background = "white";
     box2.style.padding = ".3em .4em .3em .4em";
     box2.style.fontStyle = "normal";
-    box2.onmouseout=kill_doclink;
+    box2.onmouseout=auto_kill_doclink;
     box2.parentID = id;
 
+    // Get the targets
+    var targets_elt = document.getElementById(targets_id);
+    var targets = targets_elt.getAttribute("targets");
     var links = "";
     target_list = targets.split(",");
     for (var i=0; i<target_list.length; i++) {
@@ -477,6 +483,7 @@ function doclink(id, name, targets) {
         "onclick=\'kill_doclink(\\""+id+"\\");return false;\'>"+
         "<i>None of the above</i></a></li></ul>";
   }
+  return false;
 }
 '''
 
@@ -702,7 +709,7 @@ class PythonSourceColorizer:
     def lineno_to_html(self):
         template = '%%%ds' % self.linenum_size
         n = template % self.lineno
-        return '<span class="py-lineno">%s</span>' % n
+        return '<tt class="py-lineno">%s</tt>' % n
 
     def colorize(self):
         """
@@ -718,6 +725,10 @@ class PythonSourceColorizer:
         self.lineno = 1
         self.def_name = None
         self.def_type = None
+
+        # Cache, used so we only need to list the target elements once
+        # for each variable.
+        self.doclink_targets_cache = {}
 
         # Load the module's text.
         self.text = open(self.module_filename).read()
@@ -828,7 +839,7 @@ class PythonSourceColorizer:
             self.lineno += 1
         else:
             s = ''
-        s += '  <span class="py-line">'
+        s += '  <tt class="py-line">'
 
         # Loop through each token, and colorize it appropriately.
         for i, (toktype, toktext) in enumerate(line):
@@ -846,7 +857,7 @@ class PythonSourceColorizer:
             css_class = None
             url = None
             tooltip = None
-            onclick = uid = None # these 3 are used together.
+            onclick = uid = targets = None # these 3 are used together.
 
             # Is this token the class name in a class definition?  If
             # so, then make it a link back into the API docs.
@@ -956,7 +967,7 @@ class PythonSourceColorizer:
                         if len(docs) == 1 and self.GUESS_LINK_TARGETS:
                             url = self.url_func(docs[0])
                         else:
-                            uid, onclick = self.doclink(toktext, docs)
+                            uid, onclick, targets = self.doclink(toktext, docs)
 
             # For all other tokens, look up the CSS class to use
             # based on the token's type.
@@ -987,8 +998,10 @@ class PythonSourceColorizer:
             if css_class: css_class_html = ' class="%s"' % css_class
             else: css_class_html = ''
             if onclick:
-                s += ('<span id="%s"%s><a%s%s href="#" onclick="%s">' %
-                      (uid, css_class_html, tooltip_html,
+                if targets: targets_html = ' targets="%s"' % targets
+                else: targets_html = ''
+                s += ('<tt id="%s"%s%s><a%s%s href="#" onclick="%s">' %
+                      (uid, css_class_html, targets_html, tooltip_html,
                        css_class_html, onclick))
             elif url:
                 if isinstance(url, unicode):
@@ -996,9 +1009,9 @@ class PythonSourceColorizer:
                 s += ('<a%s%s href="%s">' %
                       (tooltip_html, css_class_html, url))
             elif css_class_html or tooltip_html:
-                s += '<span%s%s>' % (tooltip_html, css_class_html)
+                s += '<tt%s%s>' % (tooltip_html, css_class_html)
             if i == len(line)-1:
-                s += ' </span>' # Closes <span class="py-line">
+                s += ' </tt>' # Closes <tt class="py-line">
                 s += cgi.escape(toktext)
             else:
                 try:
@@ -1007,16 +1020,16 @@ class PythonSourceColorizer:
                     print (toktext, css_class, toktext.encode('ascii'))
                     raise
 
-            if onclick: s += "</a></span>"
+            if onclick: s += "</a></tt>"
             if url: s += '</a>'
-            elif css_class_html or tooltip_html: s += '</span>'
+            elif css_class_html or tooltip_html: s += '</tt>'
 
         if self.ADD_DEF_BLOCKS:
             for i in range(ended_def_blocks):
                 self.out(self.END_DEF_BLOCK)
 
-        # Strip any empty <span>s.
-        s = re.sub(r'<span class="[\w+]"></span>', '', s)
+        # Strip any empty <tt>s.
+        s = re.sub(r'<tt class="[\w+]"></tt>', '', s)
 
         # Write the line.
         self.out(s)
@@ -1048,13 +1061,20 @@ class PythonSourceColorizer:
         container = DottedName(self.module_name, *context)
         #else:
         #    container = None
-        targets = ['%s=%s' % (str(self.doc_descr(d,container)),
+        targets = ','.join(['%s=%s' % (str(self.doc_descr(d,container)),
                               str(self.url_func(d)))
-                   for d in docs]
-        onclick = ("doclink('%s', '%s', '%s'); return false;" %
-                   (uid, name, ','.join(targets)))
-        return uid, onclick
+                            for d in docs])
 
+        if targets in self.doclink_targets_cache:
+            onclick = ("return doclink('%s', '%s', '%s');" %
+                       (uid, name, self.doclink_targets_cache[targets]))
+            return uid, onclick, None
+        else:
+            self.doclink_targets_cache[targets] = uid
+            onclick = ("return doclink('%s', '%s', '%s');" %
+                       (uid, name, uid))
+            return uid, onclick, targets
+            
     def doc_descr(self, doc, context):
         name = str(doc.canonical_name)
         descr = '%s %s' % (self.doc_kind(doc), name)
@@ -1090,9 +1110,9 @@ class PythonSourceColorizer:
     def mark_def(self, s, name):
         replacement = ('<a name="%s"></a><div id="%s-def">\\1'
                        '<a class="py-toggle" href="#" id="%s-toggle" '
-                       'onclick="toggle(\'%s\'); return false;">-</a>\\2' %
+                       'onclick="return toggle(\'%s\');">-</a>\\2' %
                        (name, name, name, name))
-        return re.sub('(.*) (<span class="py-line">.*)\Z', replacement, s)
+        return re.sub('(.*) (<tt class="py-line">.*)\Z', replacement, s)
                     
     def is_docstring(self, line, i):
         if line[i][0] != token.STRING: return False
@@ -1108,13 +1128,13 @@ class PythonSourceColorizer:
         end = s.find('\n')+1
         while end:
             result += s[start:end-1]
-            if css_class: result += '</span>'
-            result += ' </span>' # py-line
+            if css_class: result += '</tt>'
+            result += ' </tt>' # py-line
             result += '\n'
             if self.ADD_LINE_NUMBERS:
                 result += self.lineno_to_html()
-            result += '  <span class="py-line">'
-            if css_class: result += '<span class="%s">' % css_class
+            result += '  <tt class="py-line">'
+            if css_class: result += '<tt class="%s">' % css_class
             start = end
             end = s.find('\n', end)+1
             self.lineno += 1
