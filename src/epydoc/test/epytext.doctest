@@ -9,16 +9,15 @@ than it was with unittest.
     >>> import re
     >>> def testparse(s):
     ...     # this strips off the <epytext>...</epytext>
-    ...     out = ''.join([n.toxml() for n in
-    ...                    epytext.parse(s).childNodes[0].childNodes])
+    ...     out = ''.join([str(n) for n in
+    ...                    epytext.parse(s).children])
     ...     # This is basically word-wrapping:
     ...     out = re.sub(r'((</\w+>)+)', r'\1\n', out).rstrip()
     ...     out = re.sub(r'(?m)^(.{50,70}>)(.)', r'\1\n\2', out).rstrip()
     ...     return out
     >>> def checkparse(s, expect):
     ...     # this strips off the <epytext>...</epytext>
-    ...     got = ''.join([n.toxml() for n in
-    ...                    epytext.parse(s).childNodes[0].childNodes])
+    ...     got = ''.join([str(n) for n in epytext.parse(s).children])
     ...     if got != expect:
     ...         raise ValueError('mismatch: %r %r' % (expect, got))
 
