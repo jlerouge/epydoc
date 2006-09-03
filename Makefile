@@ -125,7 +125,7 @@ api-html: .api-html.up2date
 	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
 	       --url http://epydoc.sourceforge.net --pstat profile.out \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
-	       --docformat plaintext -v --graph all $(PY_SRC)
+	       --docformat plaintext -v --graph all --debug $(PY_SRC)
 	touch .api-html.up2date
 
 api-pdf: .api-pdf.up2date
@@ -133,7 +133,7 @@ api-pdf: .api-pdf.up2date
 	rm -rf $(LATEX_API)
 	mkdir -p $(LATEX_API)
 	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
-	       --name "Epydoc $(VERSION)" $(PY_SRC) -v
+	       --name "Epydoc $(VERSION)" $(PY_SRC) -v --debug
 	touch .api-pdf.up2date
 
 doctest-html: .doctest-html.up2date
@@ -152,21 +152,21 @@ examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)
 	rm -rf $(HTML_EXAMPLES)
 	mkdir -p $(HTML_EXAMPLES)
-	$(EPYDOC) -o $(HTML_EXAMPLES) --name epydoc \
+	$(EPYDOC) -o $(HTML_EXAMPLES) --name epydoc --debug \
 	       --url http://epydoc.sourceforge.net \
 	       --css white --top epytext_example --docformat=plaintext \
 	       --navlink 'epydoc examples' doc/epytext_example.py sre
-	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/grouped --debug \
 	       --inheritance=grouped \
 	       --name epydoc --url http://epydoc.sourceforge.net \
 	       --css white --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
-	$(EPYDOC) -o $(HTML_EXAMPLES)/listed \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/listed --debug \
 	       --inheritance=listed \
 	       --name epydoc --url http://epydoc.sourceforge.net \
 	       --css white --debug \
 	       --navlink 'epydoc examples' doc/inh_example.py
-	$(EPYDOC) -o $(HTML_EXAMPLES)/included \
+	$(EPYDOC) -o $(HTML_EXAMPLES)/included --debug \
 	       --inheritance=included \
 	       --name epydoc --url http://epydoc.sourceforge.net \
 	       --css white --debug \
@@ -206,7 +206,7 @@ doc/epydocgui-man.html: man/epydocgui.1
 	     > doc/epydocgui-man.html
 
 profile.out: $(PY_SRCFILES)
-	$(EPYDOC) -o profile.tmp --name epydoc --css white \
+	$(EPYDOC) -o profile.tmp --name epydoc --css white --debug \
 	       --url http://epydoc.sourceforge.net --profile-epydoc \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
 	       --docformat plaintext -v --graph all $(PY_SRC)
@@ -233,7 +233,7 @@ stdlib-html: .stdlib-html.up2date
 	mkdir -p $(HTML_STDLIB)
 	@echo "Building stdlib html docs..."
 	@$(EPYDOC) -o $(HTML_STDLIB) --css white --name $(SLNAME) \
-	       --url $(SLURL) --debug --graph classtree \
+	       --url $(SLURL) --debug --graph classtree --debug \
 	       --show-imports $(SLBUILTINS) $(SLFILES)
 	touch .stdlib-html.up2date
 
@@ -242,7 +242,7 @@ stdlib-pdf: .stdlib-pdf.up2date
 .stdlib-pdf.up2date: $(PY_SRCFILES)
 	rm -rf $(LATEX_STDLIB)
 	mkdir -p $(LATEX_STDLIB)
-	$(EPYDOC) --pdf -o $(LATEX_STDLIB) \
+	$(EPYDOC) --pdf -o $(LATEX_STDLIB) --debug \
 		--no-private --name $(SLNAME) --docformat plaintext \
 		--debug --builtins $(SLFILES)
 ##//////////////////////////////////////////////////////////////////////
@@ -263,7 +263,7 @@ docutils-html: .docutils-html.up2date
 .docutils-html.up2date: $(PY_SRCFILES)
 	rm -rf $(HTML)/docutils
 	mkdir -p $(HTML)/docutils
-	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html \
+	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html --debug \
 	        --docformat plaintext --ignore-param-mismatch \
 	        /usr/lib/python2.3/site-packages/docutils
 	touch .docutils-html.up2date
@@ -272,7 +272,7 @@ docutils-pdf: .docutils-pdf.up2date
 .docutils-pdf.up2date: $(PY_SRCFILES)
 	rm -rf $(LATEX)/docutils
 	mkdir -p $(LATEX)/docutils
-	$(EPYDOC) -o $(LATEX)/docutils -n 'Docutils' --pdf \
+	$(EPYDOC) -o $(LATEX)/docutils -n 'Docutils' --pdf --debug \
 	        --docformat plaintext --ignore-param-mismatch \
 	        /usr/lib/python2.3/site-packages/docutils
 	touch .docutils-pdf.up2date
