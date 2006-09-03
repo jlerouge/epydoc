@@ -87,7 +87,15 @@ class DottedName:
         contains a string, then it is divided into substrings by
         splitting on periods, and each substring is checked to see if
         it is a valid identifier.
+
+        As an optimization, C{pieces} may also contain a single tuple
+        of values.  In that case, that tuple will be used as the
+        C{DottedName}'s identifiers; it will I{not} be checked to
+        see if it's valid.
         """
+        if len(pieces) == 1 and isinstance(pieces[0], tuple):
+            self._identifiers = pieces[0] # Optimization
+            return
         if len(pieces) == 0:
             raise DottedName.InvalidDottedName('Empty DottedName')
         self._identifiers = []
@@ -148,7 +156,7 @@ class DottedName:
         """
         if isinstance(i, types.SliceType):
             pieces = self._identifiers[i.start:i.stop]
-            if pieces: return DottedName(*pieces)
+            if pieces: return DottedName(pieces)
             else: return []
         else:
             return self._identifiers[i]
@@ -613,28 +621,30 @@ class VariableDoc(APIDoc):
                               self.name.endswith('_'))
         
     def __repr__(self):
-        if (self.container is not UNKNOWN and
-            self.container.canonical_name is not UNKNOWN):
-            return '<%s %s.%s>' % (self.__class__.__name__,
-                                   self.container.canonical_name, self.name)
+        if self.canonical_name is not UNKNOWN:
+            return '<%s %s>' % (self.__class__.__name__, self.canonical_name)
         if self.name is not UNKNOWN:
             return '<%s %s>' % (self.__class__.__name__, self.name)
         else:                     
             return '<%s>' % self.__class__.__name__
 
     def _get_canonical_name(self):
-        if self.container is UNKNOWN:
-            raise ValueError, `self`
+        # Check cache.
+        canonical_name = getattr(self, '_canonical_name', None)
+        if canonical_name is not None: return canonical_name
+        # Otherwise, compute it.
         if (self.container is UNKNOWN or
             self.container.canonical_name is UNKNOWN):
             return UNKNOWN
         else:
-            return self.container.canonical_name + self.name
-    canonical_name = property(_get_canonical_name, doc="""
-    A read-only property that can be used to get the variable's
-    canonical name.  This is formed by taking the varaible's
-    container's cannonical name, and adding the variable's name
-    to it.""")
+            self._canonical_name = self.container.canonical_name + self.name
+            return self._canonical_name
+    canonical_name = property(_get_canonical_name,
+    doc="""A read-only property that can be used to get the variable's
+           canonical name.  This is formed by taking the varaible's
+           container's cannonical name, and adding the variable's name
+           to it.  (The value is cached upon the first successful
+           look-up.)""")
 
     def _get_defining_module(self):
         if self.container is UNKNOWN:
@@ -763,6 +773,11 @@ class ValueDoc(APIDoc):
         return self.__pickle_state
 
     def pyval_repr(self):
+        if not hasattr(self, '_pyval_repr'):
+            self._pyval_repr = self._get_pyval_repr()
+        return self._pyval_repr
+        
+    def _get_pyval_repr(self):
         """
         Return a string representation of this value based on its pyval;
         or UNKNOWN if we don't succeed.  This should probably eventually
@@ -1036,9 +1051,10 @@ class ModuleDoc(NamespaceDoc):
         whose values have the specified type.  If C{group} is given,
         then only return variables that belong to the specified group.
 
-        @require: The L{sorted_variables} and L{groups} attributes
-            must be initialized before this method can be used.  See
-            L{init_sorted_variables()} and L{init_groups()}.
+        @require: The L{sorted_variables}, L{variable_groups}, and
+            L{submodule_groups} attributes must be initialized before
+            this method can be used.  See L{init_sorted_variables()}
+            and L{init_groups()}.
 
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
@@ -1211,9 +1227,10 @@ class ClassDoc(NamespaceDoc):
         If C{inherited} is True, then only return inherited variables;
         if C{inherited} is False, then only return local variables.
 
-        @require: The L{sorted_variables} and L{groups} attributes
-            must be initialized before this method can be used.  See
-            L{init_sorted_variables()} and L{init_groups()}.
+        @require: The L{sorted_variables} and L{variable_groups}
+            attributes must be initialized before this method can be
+            used.  See L{init_sorted_variables()} and
+            L{init_groups()}.
 
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
@@ -1612,8 +1629,7 @@ class DocIndex:
         if (isinstance(val_doc, ModuleDoc) and
             val_doc.submodules is not UNKNOWN):
             for submodule in val_doc.submodules:
-                if (submodule.canonical_name ==
-                    DottedName(val_doc.canonical_name, identifier)):
+                if submodule.canonical_name[-1] == identifier:
                     var_doc = None
                     val_doc = submodule
                     if val_doc is UNKNOWN: val_doc = None
