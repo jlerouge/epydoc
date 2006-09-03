@@ -213,7 +213,7 @@ __license__ = 'IBM Open Source License'
 """The license governing the use and distribution of epydoc"""
 
 # [xx] this should probably be a private variable:
-DEBUG = True
+DEBUG = False
 """True if debugging is turned on."""
 
 # Changes needed for docs:
