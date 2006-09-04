@@ -76,6 +76,10 @@ class DottedName:
         An exception raised by the DottedName constructor when one of
         its arguments is not a valid dotted name.
         """
+
+    _ok_identifiers = set()
+    """A cache of identifier strings that have been checked against
+    _IDENTIFIER_RE and found to be acceptable."""
     
     def __init__(self, *pieces):
         """
@@ -104,13 +108,16 @@ class DottedName:
                 self._identifiers += piece._identifiers
             elif isinstance(piece, basestring):
                 for subpiece in piece.split('.'):
-                    if not self._IDENTIFIER_RE.match(subpiece):
-                        raise DottedName.InvalidDottedName(
-                            'Bad identifier %r' % (piece,))
+                    if piece not in self._ok_identifiers:
+                        if self._IDENTIFIER_RE.match(subpiece):
+                            self._ok_identifiers.add(piece)
+                        else:
+                            raise DottedName.InvalidDottedName(
+                                'Bad identifier %r' % (piece,))
                     self._identifiers.append(subpiece)
             else:
-                raise DottedName.InvalidDottedName(
-                    'Bad identifier %r' % (piece,))
+                raise TypeError('Bad identifier %r: expected '
+                                'DottedName or str' % (piece,))
         self._identifiers = tuple(self._identifiers)
 
     def __repr__(self):
