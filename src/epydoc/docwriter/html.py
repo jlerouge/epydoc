@@ -1974,6 +1974,8 @@ class HTMLWriter:
 
     def write_details_entry(self, out, var_doc):
         descr = self.descr(var_doc, indent=2)
+        if descr: descr = '<br />'+descr
+        else: descr = ''
         if var_doc.is_public: div_class = ''
         else: div_class = ' class="private"'
 

@@ -205,12 +205,15 @@ def parse_docstring(api_doc, docindex):
                                field.arg(), field.body())
         except ValueError, e: field_warnings.append(str(e))
 
-    # [XX] If descr is empty but we have a return field, 
-    # generate a descr from it..
-
     # Extract a summary
     if api_doc.summary is None and api_doc.descr is not None:
         api_doc.summary = api_doc.descr.summary()
+
+    # If the summary is empty, but the return field is not, then use
+    # the return field to generate a summary description.
+    if (isinstance(api_doc, RoutineDoc) and api_doc.summary is None and
+        api_doc.return_descr is not None):
+        api_doc.summary = RETURN_PDS + api_doc.return_descr.summary()
 
     # [XX] Make sure we don't have types/param descrs for unknown
     # vars/params?
@@ -320,6 +323,11 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
 
     # End the message block.
     log.end_block()
+
+RETURN_PDS = markup.parse('Returns', markup='epytext')
+"""A ParsedDocstring containing the text 'Returns'.  This is used to
+construct summary descriptions for routines that have empty C{descr},
+but non-empty C{return_descr}."""
 
 ######################################################################
 #{ Field Processing Error Messages

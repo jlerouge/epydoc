@@ -146,7 +146,10 @@ class ParsedJavadocDocstring(ParsedDocstring):
                 parsed_body = ParsedJavadocDocstring(body)
                 fields.append(Field(tag, arg, parsed_body))
 
-        return (descr, fields)
+        if pieces[0].strip():
+            return (descr, fields)
+        else:
+            return (None, fields)
 
     #////////////////////////////////////////////////////////////
     # HTML Output.

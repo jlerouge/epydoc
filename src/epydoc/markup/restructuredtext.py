@@ -164,7 +164,10 @@ class ParsedRstDocstring(ParsedDocstring):
         # Inherit docs
         visitor = _SplitFieldsTranslator(self._document, errors)
         self._document.walk(visitor)
-        return self, visitor.fields
+        if len(self._document.children) > 0:
+            return self, visitor.fields
+        else:
+            return None, visitor.fields
 
     def summary(self):
         # Inherit docs

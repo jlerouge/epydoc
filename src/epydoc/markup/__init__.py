@@ -245,7 +245,8 @@ class ParsedDocstring:
         
         @return: A tuple C{(M{body}, M{fields})}, where C{M{body}} is
             the main body of this docstring, and C{M{fields}} is a list
-            of its fields.
+            of its fields.  If the resulting body is empty, return
+            C{None} for the body.
         @rtype: C{(L{ParsedDocstring}, list of L{Field})}
         @param errors: A list where any errors generated during
             splitting will be stored.  If no list is specified, then
@@ -336,7 +337,8 @@ class ParsedDocstring:
 ##################################################
 class ConcatenatedDocstring:
     def __init__(self, *parsed_docstrings):
-        self._parsed_docstrings = parsed_docstrings
+        self._parsed_docstrings = [pds for pds in parsed_docstrings
+                                   if pds is not None]
         
     def split_fields(self, errors=None):
         bodies = []

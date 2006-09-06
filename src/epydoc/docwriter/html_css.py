@@ -84,6 +84,8 @@ h3                          { font-size: +110%; font-style: italic;
 h1.epydoc                   { margin: 0; font-size: +140%; font-weight: bold; }
 h2.epydoc                   { font-size: +130%; font-weight: bold; }
 h3.epydoc                   { font-size: +115%; font-weight: bold; }
+td h3.epydoc                { font-size: +115%; font-weight: bold;
+                              margin-bottom: 0; }
 table.navbar                { background: #a0c0ff; color: #000000;
                               border: 2px groove #c0d0d0; }
 table.navbar table          { color: #000000; }

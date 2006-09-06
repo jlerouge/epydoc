@@ -2020,11 +2020,10 @@ class ParsedEpytextDocstring(ParsedDocstring):
 
         # Save the remaining docstring as the description..
         if tree.children and tree.children[0].children:
-            descr = tree
+            return ParsedEpytextDocstring(tree), fields
         else:
-            descr = None
+            return None, fields
 
-        return ParsedEpytextDocstring(descr), fields
     
     def index_terms(self):
         if self._terms is None:
