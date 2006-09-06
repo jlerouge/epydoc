@@ -205,6 +205,9 @@ def parse_docstring(api_doc, docindex):
                                field.arg(), field.body())
         except ValueError, e: field_warnings.append(str(e))
 
+    # [XX] If descr is empty but we have a return field, 
+    # generate a descr from it..
+
     # Extract a summary
     if api_doc.summary is None and api_doc.descr is not None:
         api_doc.summary = api_doc.descr.summary()
@@ -607,8 +610,9 @@ register_field_handler(process_raise_field, 'raise', 'raises',
 
 def set_var_descr(api_doc, ident, descr):
     if ident not in api_doc.variables:
-        api_doc.variables[ident] = VariableDoc(container=api_doc,
-                                               name=ident)
+        api_doc.variables[ident] = VariableDoc(
+            container=api_doc, name=ident,
+            canonical_name=api_doc.canonical_name+ident)
                                       
     var_doc = api_doc.variables[ident]
     if var_doc.descr not in (None, UNKNOWN):
@@ -619,8 +623,10 @@ def set_var_descr(api_doc, ident, descr):
 
 def set_var_type(api_doc, ident, descr):
     if ident not in api_doc.variables:
-        api_doc.variables[ident] = VariableDoc(container=api_doc,
-                                               name=ident)
+        api_doc.variables[ident] = VariableDoc(
+            container=api_doc, name=ident,
+            canonical_name=api_doc.canonical_name+ident)
+        
     var_doc = api_doc.variables[ident]
     if var_doc.type_descr not in (None, UNKNOWN):
         raise ValueError(REDEFINED % ('type for '+ident))

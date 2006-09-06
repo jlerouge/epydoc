@@ -678,9 +678,12 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
     # them.  E.g., we don't want to merge 2+2 with 4.  So just copy
     # the inspect_doc's pyval to the parse_doc, and return the parse_doc.
     if type(introspect_doc) == type(parse_doc) == GenericValueDoc:
-        parse_doc.pyval = introspect_doc.pyval
+        if introspect_doc.pyval is not UNKNOWN:
+            parse_doc.pyval = introspect_doc.pyval
+        if introspect_doc.parse_repr is not UNKNOWN:
+            parse_doc.parse_repr = introspect_doc.parse_repr
         parse_doc.docs_extracted_by = 'both'
-        return parse_doc
+        return parse_doc.merge_and_overwrite(introspect_doc)
 
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
@@ -1008,9 +1011,16 @@ def assign_canonical_names(val_doc, name, docindex, score=0):
     # Recurse to any contained values.
     if isinstance(val_doc, NamespaceDoc):
         for var_doc in val_doc.variables.values():
-            if var_doc.value is UNKNOWN: continue
+            # Set the variable's canonical name.
             varname = DottedName(name, var_doc.name)
-    
+            var_doc.canonical_name = varname
+
+            # If the value is unknown, or is a generic value doc, then
+            # the valuedoc doesn't get assigned a name; move on.
+            if (var_doc.value is UNKNOWN
+                or isinstance(var_doc.value, GenericValueDoc)):
+                continue
+            
             # This check is for cases like curses.wrapper, where an
             # imported variable shadows its value's "real" location.
             if _var_shadows_self(var_doc, varname):

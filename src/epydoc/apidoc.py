@@ -568,6 +568,12 @@ class VariableDoc(APIDoc):
        variable.
        @type: L{ValueDoc}"""
     
+    canonical_name = UNKNOWN
+    """@ivar: A dotted name that serves as a unique identifier for
+       this C{VariableDoc}.  It should be formed by concatenating
+       the C{VariableDoc}'s C{container} with its C{name}.
+       @type: L{DottedName}"""
+
     value = UNKNOWN
     """@ivar: The API documentation for this variable's value.
        @type: L{ValueDoc}"""
@@ -634,24 +640,6 @@ class VariableDoc(APIDoc):
             return '<%s %s>' % (self.__class__.__name__, self.name)
         else:                     
             return '<%s>' % self.__class__.__name__
-
-    def _get_canonical_name(self):
-        # Check cache.
-        canonical_name = getattr(self, '_canonical_name', None)
-        if canonical_name is not None: return canonical_name
-        # Otherwise, compute it.
-        if (self.container is UNKNOWN or
-            self.container.canonical_name is UNKNOWN):
-            return UNKNOWN
-        else:
-            self._canonical_name = self.container.canonical_name + self.name
-            return self._canonical_name
-    canonical_name = property(_get_canonical_name,
-    doc="""A read-only property that can be used to get the variable's
-           canonical name.  This is formed by taking the varaible's
-           container's cannonical name, and adding the variable's name
-           to it.  (The value is cached upon the first successful
-           look-up.)""")
 
     def _get_defining_module(self):
         if self.container is UNKNOWN:
