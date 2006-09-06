@@ -331,6 +331,7 @@ EXPECTED_SINGLE_ARG = '%r expected a single argument'
 BAD_CONTEXT = 'Invalid context for %r'
 REDEFINED = 'Redefinition of %s'
 UNKNOWN_TAG = 'Unknown field tag %r'
+BAD_PARAM = '@%s for unknown parameter %s'
 
 ######################################################################
 #{ Field Processing
@@ -517,6 +518,10 @@ def process_type_field(api_doc, docindex, tag, arg, descr):
         if arg in api_doc.arg_types:
             raise ValueError(REDEFINED % ('type for '+arg))
         api_doc.arg_types[arg] = descr
+        # Check to make sure that the documented parameter(s) are
+        # actually part of the function signature.
+        if arg not in api_doc.all_args():
+            raise ValueError(BAD_PARAM % (tag, '"%s"' % arg))
     else:
         raise ValueError(BAD_CONTEXT % arg)
 
@@ -578,6 +583,11 @@ def process_arg_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg=True)
     idents = re.split('[:;, ] *', arg)
     api_doc.arg_descrs.append( (idents, descr) )
+    # Check to make sure that the documented parameter(s) are
+    # actually part of the function signature.
+    bad_params = ['"%s"' % i for i in idents if i not in api_doc.all_args()]
+    if bad_params:
+        raise ValueError(BAD_PARAM % (tag, ', '.join(bad_params)))
 
 def process_kwarg_field(api_doc, docindex, tag, arg, descr):
     # [xx] these should -not- be checked if they exist..
