@@ -1172,7 +1172,7 @@ def rhs_to_valuedoc(rhs, parent_docs):
     try:
         rhs_name = parse_dotted_name(rhs)
         rhs_val = lookup_value(rhs_name, parent_docs)
-        if rhs_val is not None:
+        if rhs_val is not None and rhs_val is not UNKNOWN:
             return rhs_val, True
     except ParseError:
         pass
