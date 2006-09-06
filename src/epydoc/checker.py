@@ -53,7 +53,7 @@ class DocChecker:
       - Public/private specifiers indicate whether public or private
         objects should be checked: L{PRIVATE}.
       - Check specifiers indicate what checks should be run on the
-        objects: L{TYPE}; L{DESCR}; L{DESCR_LAZY}; L{AUTHOR};
+        objects: L{TYPE}; L{DESCR}; L{AUTHOR};
         and L{VERSION}.
 
     The L{check} method is used to perform a check on the
@@ -66,7 +66,7 @@ class DocChecker:
     values together:
     
         >>> checker.check(DocChecker.MODULE | DocChecker.CLASS |
-        ...               DocChecker.FUNC | DocChecker.DESCR_LAZY)
+        ...               DocChecker.FUNC )
 
     @group Types: MODULE, CLASS, FUNC, VAR, IVAR, CVAR, PARAM,
         RETURN, ALL_T
@@ -98,7 +98,7 @@ class DocChecker:
     @cvar ALL_T: Type specifier that indicates that the documentation
         of all objects should be checked.
 
-    @group Checks: TYPE, AUTHOR, VERSION, DESCR_LAZY, DESCR, ALL_C
+    @group Checks: TYPE, AUTHOR, VERSION, DESCR, ALL_C
     @type TYPE: C{int}
     @cvar TYPE: Check specifier that indicates that every variable and
         parameter should have a C{@type} field.
@@ -235,7 +235,7 @@ class DocChecker:
         L{_check_class}, and L{_check_func}.
 
         @param doc: The documentation that should be checked.
-        @type doc: L{ObjDoc}
+        @type doc: L{APIDoc}
         @rtype: C{None}
         """
         if ((self._checks & DocChecker.DESCR) and
@@ -287,7 +287,7 @@ class DocChecker:
         whose name is C{name}.
         
         @param doc: The documentation for the variable to check.
-        @type doc: L{Doc}
+        @type doc: L{APIDoc}
         @param check_type: Whether or not the variable's type should
             be checked.  This is used to allow varargs and keyword
             parameters to have no type specified.

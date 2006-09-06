@@ -70,13 +70,13 @@ class Logger:
     
     def start_block(self, header):
         """
-        Start a new message block.  Any calls to L{info}, L{warn}, or
-        L{error} that occur between a call to C{start_block} and a
-        corresponding call to C{end_block} will be grouped together,
-        and displayed with a common header.  C{start_block} can be
-        called multiple times (to form nested blocks), but every call
-        to C{start_block} I{must} be balanced by a call to
-        C{end_block}.
+        Start a new message block.  Any calls to L{info()},
+        L{warning()}, or L{error()} that occur between a call to
+        C{start_block} and a corresponding call to C{end_block} will
+        be grouped together, and displayed with a common header.
+        C{start_block} can be called multiple times (to form nested
+        blocks), but every call to C{start_block} I{must} be balanced
+        by a call to C{end_block}.
         """
         
     def end_block(self):

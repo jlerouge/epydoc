@@ -45,7 +45,7 @@ DOT_COMMAND = 'dot'
 
 class DotGraph:
     """
-    A `dot` directed graph.  The contents of the graph are
+    A ``dot`` directed graph.  The contents of the graph are
     constructed from the following instance variables:
 
       - `nodes`: A list of `DotGraphNode`\\s, encoding the nodes
@@ -62,7 +62,7 @@ class DotGraph:
 
     The `link()` method can be used to resolve crossreference links
     within the graph.  In particular, if the 'href' attribute of any
-    node or edge is assigned a value of the form `<name>`, then it
+    node or edge is assigned a value of the form ``<name>``, then it
     will be replaced by the URL of the object with that name.  This
     applies to the `body` as well as the `nodes` and `edges`.
 
@@ -190,8 +190,8 @@ class DotGraph:
 
     def link(self, docstring_linker):
         """
-        Replace any href attributes whose value is <name> with 
-        the url of the object whose name is <name>.
+        Replace any href attributes whose value is ``<name>`` with 
+        the url of the object whose name is ``<name>``.
         """
         # Link xrefs in nodes
         self._link_href(self.node_defaults, docstring_linker)
@@ -237,7 +237,7 @@ class DotGraph:
     def render(self, language='gif'):
         """
         Use the ``dot`` command to render this graph, using the output
-        format `language`.  Return the result as a string, or `None`
+        format `language`.  Return the result as a string, or ``None``
         if the rendering failed.
         """
         return self._run_dot('-T%s' % language)
@@ -394,7 +394,7 @@ class DotGraphUmlClassNode(DotGraphNode):
         `class_doc`.
 
         :Parameters:
-            `linker` : `DocstringLinker<markup.DocstringLinker>`
+            `linker` : `markup.DocstringLinker`
                 Used to look up URLs for classes.
             `context` : `APIDoc`
                 The context in which this node will be drawn; dotted
@@ -526,7 +526,7 @@ class DotGraphUmlClassNode(DotGraphNode):
             labelled with the variable name, and marked with '0..1' at
             the type end of the edge.
 
-        The edges created by `link_attribute()` are handled internally
+        The edges created by `link_attributes()` are handled internally
         by `DotGraphUmlClassNode`; they should *not* be added directly
         to the `DotGraph`.
 
@@ -594,7 +594,7 @@ class DotGraphUmlClassNode(DotGraphNode):
 
     def _add_attribute_edge(self, var, nodes, type_str, **attribs):
         """
-        Helper for `link_attribute()`: try to add an edge for the
+        Helper for `link_attributes()`: try to add an edge for the
         given attribute variable `var`.  Return ``True`` if
         successful.
         """
@@ -1156,12 +1156,12 @@ def import_graph(modules, docindex, linker, context=None, **options):
 def call_graph(api_docs, docindex, linker, context=None, **options):
     """
     :param options:
-        - `dir`: rankdir for the graph.  (default=LR)
-        - `add_callers`: also include callers for any of the
-          routines in `api_docs`.  (default=False)
-        - `add_callees`: also include callees for any of the
-          routines in `api_docs`.  (default=False)
-    :todo: Add an `exclude` option?
+        - ``dir``: rankdir for the graph.  (default=LR)
+        - ``add_callers``: also include callers for any of the
+          routines in ``api_docs``.  (default=False)
+        - ``add_callees``: also include callees for any of the
+          routines in ``api_docs``.  (default=False)
+    :todo: Add an ``exclude`` option?
     """
     if docindex.callers is None:
         log.warning("No profiling information for call graph!")

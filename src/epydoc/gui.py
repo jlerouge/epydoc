@@ -208,7 +208,7 @@ def document(options, cancel, done):
 
     @param options: The options to use for generating documentation.
         This includes keyword options that can be given to
-        L{html.HTMLFormatter}, as well as the option C{target}, which
+        L{docwriter.html.HTMLWriter}, as well as the option C{target}, which
         controls where the output is written to.
     @type options: C{dictionary}
     """

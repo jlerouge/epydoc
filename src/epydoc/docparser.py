@@ -10,13 +10,42 @@
 Extract API documentation about python objects by parsing their source
 code.
 
-L{DocParser} is a processing class that reads the Python source code
-for one or more modules, and uses it to create L{APIDoc} objects
-containing the API documentation for the variables and values defined
-in those modules.
+The function L{parse_docs()}, which provides the main interface
+of this module, reads and parses the Python source code for a
+module, and uses it to create an L{APIDoc} object containing
+the API documentation for the variables and values defined in
+that modules.
 
-C{DocParser} can be subclassed to extend the set of source code
-constructions that it supports.
+Currently, C{parse_docs()} extracts documentation from the following
+source code constructions:
+
+  - module docstring
+  - import statements
+  - class definition blocks
+  - function definition blocks
+  - assignment statements
+    - simple assignment statements
+    - assignment statements with multiple C{'='}s
+    - assignment statements with unpacked left-hand sides
+    - assignment statements that wrap a function in classmethod
+      or staticmethod.
+    - assignment to special variables __path__, __all__, and
+      __docformat__.
+  - delete statements
+
+C{parse_docs()} does not yet support the following source code
+constructions:
+
+  - assignment statements that create properties
+
+By default, C{parse_docs()} will expore the contents of top-level
+C{try} and C{if} blocks.  If desired, C{parse_docs()} can also
+be configured to explore the contents of C{while} and C{for} blocks.
+(See the configuration constants, below.)
+
+@todo: Make it possible to extend the functionality of C{parse_docs()},
+       by replacing process_line with a dispatch table that can be
+       customized (similarly to C{docintrospector.register_introspector()}).
 """
 __docformat__ = 'epytext en'
 
@@ -58,52 +87,6 @@ _moduledoc_cache = {}
 C{_moduledoc_cache} is a dictionary mapping from filenames to
 C{ValueDoc} objects.
 @type: C{dict}"""
-
-# [xx] outdated:
-"""    
-An API documentation extractor based on source code parsing.
-C{DocParser} reads and parses the Python source code for one or
-more modules, and uses it to create L{APIDoc} objects containing
-the API documentation for the variables and values defined in
-those modules.  The main interface method is L{parse()}, which
-returns the documentation for an object with a given dotted name,
-or a module with a given filename.
-
-Currently, C{DocParser} extracts documentation from the following
-source code constructions:
-
-  - module docstring
-  - import statements
-  - class definition blocks
-  - function definition blocks
-  - assignment statements
-    - simple assignment statements
-    - assignment statements with multiple C{'='}s
-    - assignment statements with unpacked left-hand sides
-    - assignment statements that wrap a function in classmethod
-      or staticmethod.
-    - assignment to special variables __path__, __all__, and
-      __docformat__.
-  - delete statements
-
-C{DocParser} does not yet support the following source code
-constructions:
-
-  - assignment statements that create properties
-
-By default, C{DocParser} will expore the contents of top-level
-C{try} and C{if} blocks.  If desired, C{DocParser} can also
-be told to explore the contents of C{while} and C{for} blocks.
-
-Subclassing
-===========
-C{DocParser} can be subclassed, to extend the set of source code
-constructions that it supports.  C{DocParser} can be extended in
-several different ways:
-
-  - [XX] fill this in!
-
-"""
 
 #////////////////////////////////////////////////////////////
 # Configuration Constants
@@ -211,7 +194,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
         C{ModuleDoc} describing its contents.
     @param name: The fully-qualified python dotted name of any
         value (including packages, modules, classes, and
-        functions).  C{DocParser} will automatically figure out
+        functions).  C{parse_docs()} will automatically figure out
         which module(s) it needs to parse in order to find the
         documentation for the specified object.
     @param context: The API documentation for the package that

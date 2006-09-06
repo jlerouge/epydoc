@@ -428,7 +428,7 @@ class LatexWriter:
 
     def write_module_tree_item(self, out, doc, depth=0):
         """
-        Helper function for L{_module_tree} and L{_module_list}.
+        Helper function for L{write_module_tree} and L{write_module_list}.
         
         @rtype: C{string}
         """

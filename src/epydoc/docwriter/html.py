@@ -2488,7 +2488,7 @@ class HTMLWriter:
 
     def contextual_label(self, doc, context):
         """
-        Return the label for L{doc} to be shown in C{context}.
+        Return the label for C{doc} to be shown in C{context}.
         """
         if doc.canonical_name is None:
             if doc.parse_repr is not None:
@@ -2818,23 +2818,6 @@ class HTMLWriter:
             for (arg, descr_list) in descrs.iteritems():
                 index.setdefault(arg, []).append( (doc, descr_list) )
         return index
-
-    def _get_index_terms(self, parsed_docstring, link, terms, links):
-        """
-        A helper function for L{_extract_term_index}.
-        
-        For each index term M{t} with key M{k} in C{parsed_docstring},
-        modify C{terms} and C{links} as follows:
-          - Set C{terms[M{k}] = t} (if C{terms[M{k}]} doesn't exist).
-          - Append C{link} to C{links[M{k}]}.
-        """
-        if parsed_docstring in (None, UNKNOWN): return
-        for term in parsed_docstring.index_terms():
-            key = self._term_index_to_anchor(term)
-            if not terms.has_key(key):
-                terms[key] = term
-                links[key] = []
-            links[key].append(link)
 
     def _term_index_to_anchor(self, term):
         """
@@ -3169,6 +3152,16 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         # Find the APIDoc for it (if it's available).
         doc = self.docindex.find(identifier, self.container)
 
+        # If we didn't find a target, then try checking in the contexts
+        # of the ancestor classes. 
+        if doc is None and isinstance(self.container, RoutineDoc):
+            container = self.docindex.get_vardoc(
+                self.container.canonical_name)
+            while (doc is None and container not in (None, UNKNOWN)
+                   and container.overrides not in (None, UNKNOWN)):
+                container = container.overrides
+                doc = self.docindex.find(identifier, container)
+                
         # Translate it into HTML.
         if doc is None:
             self._failed_xref(identifier)
@@ -3196,6 +3189,12 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     def _failed_xref(self, identifier):
         """Add an identifier to the htmlwriter's failed crossreference
         list."""
+        # Don't count it as a failed xref if it's a parameter of the
+        # current function.
+        if (isinstance(self.container, RoutineDoc) and
+            identifier in self.container.all_args()):
+            return
+        
         failed_xrefs = self.htmlwriter._failed_xrefs
         context = self.container.canonical_name
         failed_xrefs.setdefault(identifier,{})[context] = 1

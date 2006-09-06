@@ -813,8 +813,8 @@ class NamespaceDoc(ValueDoc):
         dictionary mapping from identifiers to C{VariableDoc}s.  This
         dictionary contains all names defined by the namespace,
         including imported variables, aliased variables, and variables
-        inherited from base classes (once L{DocInheriter
-        <epydoc.docinheriter.DocInheriter>} has added them).
+        inherited from base classes (once L{inherit_docs()
+        <epydoc.docbuilder.inherit_docs>} has added them).
        @type: C{dict} from C{string} to L{VariableDoc}"""
     sorted_variables = UNKNOWN
     """@ivar: A list of all variables defined by this
@@ -1048,8 +1048,8 @@ class ModuleDoc(NamespaceDoc):
 
         @require: The L{sorted_variables}, L{variable_groups}, and
             L{submodule_groups} attributes must be initialized before
-            this method can be used.  See L{init_sorted_variables()}
-            and L{init_groups()}.
+            this method can be used.  See L{init_sorted_variables()},
+            L{init_variable_groups()}, and L{init_submodule_groups()}.
 
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
@@ -1225,7 +1225,7 @@ class ClassDoc(NamespaceDoc):
         @require: The L{sorted_variables} and L{variable_groups}
             attributes must be initialized before this method can be
             used.  See L{init_sorted_variables()} and
-            L{init_groups()}.
+            L{init_variable_groups()}.
 
         @param value_type: A string specifying the value type for
             which variables should be returned.  Valid values are:
@@ -1365,7 +1365,7 @@ class RoutineDoc(ValueDoc):
     """@ivar: A list of names of decorators that were applied to this
        routine, in the order that they are listed in the source code.
        (I.e., in the reverse of the order that they were applied in.)
-       @type: C{list} of L{string}"""
+       @type: C{list} of C{string}"""
     #} end of "decorators" group
 
     #{ Information Extracted from Docstrings
@@ -1543,7 +1543,7 @@ class DocIndex:
         """A mapping from C{profile} function ids to corresponding
            C{APIDoc} objects.  A function id is a tuple of the form
            C{(filename, lineno, funcname)}.  This is used to update
-           the L{callers} and L{calleeds} variables."""
+           the L{callers} and L{callees} variables."""
 
         self._container_cache = {}
         """A cache for the L{container()} method, to increase speed."""

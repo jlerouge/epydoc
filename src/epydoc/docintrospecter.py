@@ -10,12 +10,14 @@
 Extract API documentation about python objects by directly introspecting
 their values.
 
-L{DocIntrospecter} is a processing class that examines Python objects via
-introspection, and uses the information it finds to create L{APIDoc}
-objects containing the API documentation for those objects.
+The function L{introspect_docs()}, which provides the main interface
+of this module, examines a Python objects via introspection, and uses
+the information it finds to create an L{APIDoc} objects containing the
+API documentation for that objects.
 
-C{DocIntrospecter} can be subclassed to extend the set of object types
-that it supports.
+The L{register_introspecter()} method can be used to extend the
+functionality of C{docintrospector}, by providing methods that handle
+special value types.
 """
 __docformat__ = 'epytext en'
 
@@ -60,41 +62,6 @@ pyid to C{bool}."""
 ######################################################################
 ## Introspection
 ######################################################################
-
-# [xx] old:
-"""
-An API documentation extractor based on introspecting python values.
-C{DocIntrospecter} examines Python objects via introspection, and uses
-the information it finds to create L{APIDoc} objects containing
-the API documentation for those objects.  The main interface to
-the C{DocIntrospecter} class is the L{introspect} method, which takes a
-Python value, and returns an L{APIDoc} that describes it.
-
-Currently, C{DocIntrospecter} can extract documentation information
-from the following object types:
-
-  - modules
-  - classes
-  - functions
-  - methods
-  - class methods
-  - static methods
-  - builtin routines
-  - properties
-
-Subclassing
-===========
-C{DocIntrospecter} can be subclassed, to extend the set of object
-types that it supports.  C{DocIntrospecter} can be extended in
-several different ways:
-
-  - A subclass can override one of the existing introspection methods
-    to modify the behavior for a currently supported object type.
-
-  - A subclass can add support for a new type by adding a new
-    introspection method; and extending L{introspecter_method()} to
-    return that method for values of the new type.
-"""
 
 def introspect_docs(value=None, name=None, filename=None, context=None,
                     is_script=False):

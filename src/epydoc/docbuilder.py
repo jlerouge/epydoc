@@ -36,7 +36,7 @@ of objects is represented using a L{DocIndex}.
 
 The main interface to C{epydoc.docbuilder} consists of two functions:
 
-  - L{build_docs()} -- Builds documentation for a single item, and
+  - L{build_doc()} -- Builds documentation for a single item, and
     returns it as an L{APIDoc} object.
   - L{build_doc_index()} -- Builds documentation for a collection of
     items, and returns it as a L{DocIndex} object.
@@ -57,7 +57,7 @@ __docformat__ = 'epytext en'
 ######################################################################
 ## Contents
 ######################################################################
-## 1. build_docs() -- the main interface.
+## 1. build_doc() & build_doc_index() -- the main interface.
 ## 2. merge_docs() -- helper, used to merge parse & introspect info
 ## 3. link_imports() -- helper, used to connect imported vars w/ values
 ## 4. assign_canonical_names() -- helper, used to set canonical names
@@ -77,7 +77,7 @@ from epydoc.util import *
 from epydoc.compat import * # Backwards compatibility
 
 ######################################################################
-## 1. build_docs()
+## 1. build_doc()
 ######################################################################
 
 def build_doc(item, introspect=True, parse=True, add_submodules=True):
