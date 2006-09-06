@@ -2277,6 +2277,11 @@ class HTMLWriter:
             s = plaintext_to_html(val_doc.pyval_repr())
         elif val_doc.parse_repr is not UNKNOWN:
             s = plaintext_to_html(val_doc.parse_repr)
+        elif isinstance(val_doc, GenericValueDoc):
+            # This *should* never happen -- GenericValueDoc's should always
+            # have a pyval_repr or a parse_repr.
+            log.debug('pprint_value() got GenericValueDoc w/ UNKNOWN repr')
+            return ''
         else:
             s = self.href(val_doc)
         return self._linewrap_html(s, self._variable_linelen,
@@ -3031,6 +3036,10 @@ class HTMLWriter:
                 label = target.canonical_name
             elif isinstance(target, DottedName):
                 label = target
+            elif isinstance(target, GenericValueDoc):
+                raise ValueError("href() should not be called with "
+                                 "GenericValueDoc objects (perhaps you "
+                                 "meant to use the containing variable?)")
             else:
                 raise ValueError("Unable to find a label for %r" % target)
                 
