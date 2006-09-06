@@ -408,9 +408,14 @@ def _str_to_bool(val, optname):
 ######################################################################
 
 def main(options, names):
-    if options.action == 'text':
-        if options.parse and options.introspect:
-            options.parse = False
+    # Set the debug flag, if '--debug' was specified.
+    if options.debug:
+        epydoc.DEBUG = True
+
+    ## [XX] Did this serve a purpose?  Commenting out for now:
+    #if options.action == 'text':
+    #    if options.parse and options.introspect:
+    #        options.parse = False
 
     # Set up the logger
     if options.action == 'text':
