@@ -14,6 +14,9 @@ __docformat__ = 'epytext en'
 import unittest, doctest, epydoc, os, os.path
 
 def main():
+    # Turn on debugging.
+    epydoc.DEBUG = True
+    
     # Options for doctest:
     options = doctest.ELLIPSIS
     doctest.set_unittest_reportflags(doctest.REPORT_UDIFF)
