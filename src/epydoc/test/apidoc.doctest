@@ -160,7 +160,7 @@ contains a string that's not a valid python identifier:
     InvalidDottedName: Bad identifier '1+2'
     >>> DottedName({})
     Traceback (most recent call last):
-    InvalidDottedName: Bad identifier {}
+    TypeError: Bad identifier {}: expected DottedName or str
 
 The one exception is that '??' is treated as if it were a valid python
 identifier:
@@ -216,7 +216,7 @@ and extra_docstring_fields.
 
 The constructor does not accept positional arguments; and any keyword
 argument that does not correspond to a valid attribute will generate a
-TypeError:
+TypeError (but only if epydoc.DEBUG is true):
 
     >>> APIDoc('foo')
     Traceback (most recent call last):
@@ -226,7 +226,7 @@ TypeError:
     TypeError: APIDoc got unexpected arg 'foo'
 
 Any assignment to an attribute that's not valid will also generate a
-TypeError:
+TypeError (but only if epydoc.DEBUG is true):
 
     >>> api_doc = APIDoc(docstring='ds')
     >>> api_doc.foo = 0
