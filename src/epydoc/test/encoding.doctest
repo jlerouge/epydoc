@@ -251,7 +251,6 @@ Make sure that docstrings are rendered correctly in different contexts.
     ... @group \xc2\x80: x
     ... """
     ... ''')
-    <BLANKLINE>
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
 
