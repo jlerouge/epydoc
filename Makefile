@@ -206,11 +206,12 @@ doc/epydocgui-man.html: man/epydocgui.1
 	     > doc/epydocgui-man.html
 
 profile.out: $(PY_SRCFILES)
+	rm -f profile.out
 	$(EPYDOC) -o profile.tmp --name epydoc --css white --debug \
 	       --url http://epydoc.sourceforge.net --profile-epydoc \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
 	       --docformat plaintext -v --graph all $(PY_SRC)
-	rm -rf profile.tmp
+	rm -rf profile.tmp hotshot.out
 
 ##//////////////////////////////////////////////////////////////////////
 ## Standard Library docs
@@ -221,6 +222,7 @@ SLURL = "http://www.python.org/doc/lib/lib.html"
 SLFILES = $(shell find /usr/lib/$(PYTHON)/ -name '*.py' -o -name '*.so' \
 	      |grep -v "/$(PYTHON)/config/" \
 	      |grep -v "/$(PYTHON)/lib-old/" \
+	      |grep -v "/$(PYTHON)/idlelib/" \
 	      |grep -v "/$(PYTHON)/site-packages/" \
               |grep -v "/$(PYTHON)/__phello__\.foo\.py" )
 PY_PRINT_BUILTINS = "import sys; print ' '.join(sys.builtin_module_names)"
