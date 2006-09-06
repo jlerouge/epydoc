@@ -615,7 +615,7 @@ class Token:
 # a docstring.
 _ULIST_BULLET = '[-]( +|$)'
 _OLIST_BULLET = '(\d+[.])+( +|$)'
-_FIELD_BULLET = '@\w+( [^{}:\n]+)?:( +|$)'
+_FIELD_BULLET = '@\w+( [^{}:\n]+)?:'
 _BULLET_RE = re.compile(_ULIST_BULLET + '|' +
                         _OLIST_BULLET + '|' +
                         _FIELD_BULLET)
