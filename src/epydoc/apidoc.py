@@ -1371,9 +1371,9 @@ class RoutineDoc(ValueDoc):
     #{ Information Extracted from Docstrings
     arg_descrs = UNKNOWN
     """@ivar: A list of descriptions of the routine's
-       arguments.  Each element of this list is a tuple C{(arg,
-       descr)}, where C{arg} is an argument name (or a tuple of 
-       of argument names); and C{descr} is a L{ParsedDocstring
+       arguments.  Each element of this list is a tuple C{(args,
+       descr)}, where C{args} is a list of argument names; and
+       C{descr} is a L{ParsedDocstring
        <epydoc.markup.ParsedDocstring>} describing the argument(s)
        specified by C{arg}.
        @type: C{list}"""
