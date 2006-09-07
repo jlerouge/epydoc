@@ -167,14 +167,14 @@ class DocChecker:
         contained by this C{DocChecker}'s C{DocIndex}.  Any errors found
         are printed to standard out.
 
-        @param checks: The checks that should be run on the
+        @param check_sets: The checks that should be run on the
             documentation.  This value is constructed by or-ing
             together the specifiers that indicate which objects should
             be checked, and which checks should be run.  See the
             L{module description<checker>} for more information.
             If no checks are specified, then a default set of checks
             will be run.
-        @type checks: C{int}
+        @type check_sets: C{int}
         @return: True if no problems were found.
         @rtype: C{boolean}
         """
@@ -288,9 +288,6 @@ class DocChecker:
         
         @param doc: The documentation for the variable to check.
         @type doc: L{APIDoc}
-        @param check_type: Whether or not the variable's type should
-            be checked.  This is used to allow varargs and keyword
-            parameters to have no type specified.
         @rtype: C{None}
         """
         if self._checks & DocChecker.VAR:
