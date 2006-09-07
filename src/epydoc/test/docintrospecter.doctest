@@ -374,6 +374,27 @@ Classes
                  +- docstring = u'calculated base'
                  +- variables = {}
 
+Some class variable have a special meaning. The ``__slots__`` variable isn't
+very useful and should be discarded.
+
+    >>> runintrospecter(s="""
+    ...     class Foo:
+    ...         __slots__ = ['bar']
+    ...         def __init__(self):
+    ...             self.bar = 0
+    ...     """,
+    ...     attribs="variables name value")
+    ModuleDoc for epydoc_test [0]
+     +- variables
+        +- Foo => VariableDoc for epydoc_test.Foo [1]
+           +- name = 'Foo'
+           +- value
+              +- ClassDoc for epydoc_test.Foo [2]
+                 +- variables
+                    +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [3]
+                       +- name = '__init__'
+                       +- value
+                          +- RoutineDoc [4]
 
 Delete Statements
 =================

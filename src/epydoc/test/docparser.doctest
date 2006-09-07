@@ -229,6 +229,28 @@ overwrites the earlier one:
               +- GenericValueDoc [2]
                  +- parse_repr = u'33'
 
+Some class variable have a special meaning. The ``__slots__`` variable isn't
+very useful and should be discarded.
+
+    >>> runparser(s="""
+    ...     class Foo:
+    ...         __slots__ = ['bar']
+    ...         def __init__(self):
+    ...             self.bar = 0
+    ...     """,
+    ...     attribs="variables name value")
+    ModuleDoc for test [0]
+     +- variables
+        +- Foo => VariableDoc for test.Foo [1]
+           +- name = u'Foo'
+           +- value
+              +- ClassDoc for test.Foo [2]
+                 +- variables
+                    +- __init__ => VariableDoc for test.Foo.__init__ [3]
+                       +- name = u'__init__'
+                       +- value
+                          +- RoutineDoc for test.Foo.__init__ [4]
+
 Module Control Blocks
 =====================
 DocParser will look inside certain types of module-level control

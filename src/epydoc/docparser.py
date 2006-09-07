@@ -1078,6 +1078,11 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
         if lhs_name is not None:
             lhs_parent = get_lhs_parent(lhs_name, parent_docs)
             if lhs_parent is None: continue
+
+            # Skip a special class variable.
+            if lhs_name[-1] == '__slots__':
+                continue
+
             # Create the VariableDoc.
             var_doc = VariableDoc(name=lhs_name[-1], value=rhs_val,
                                   is_imported=False, is_alias=is_alias,
