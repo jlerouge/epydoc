@@ -369,11 +369,13 @@ def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
     Construct and return the API documentation for the python
     module with the given filename.
 
-    @param parent_doc: The C{ModuleDoc} of the containing package.
-        If C{parent_doc} is not provided, then this method will
+    @param parent_docs: The C{ModuleDoc} of the containing package.
+        If C{parent_docs} is not provided, then this method will
         check if the given filename is contained in a package; and
         if so, it will construct a stub C{ModuleDoc} for the
-        containing package(s).
+        containing package(s).  C{parent_docs} is a tuple, where
+        the first element is the parent from introspection, and
+        the second element is the parent from parsing.
     """
     # Record our progress.
     modulename = os.path.splitext(os.path.split(filename)[1])[0]
@@ -589,7 +591,7 @@ def register_attribute_mergefunc(attrib, mergefunc):
     @param attrib: The name of the attribute whose values are merged
     by C{mergefunc}.
 
-    @param mergefun: The merge function, whose sinature is:
+    @param mergefunc: The merge function, whose sinature is:
 
     >>> def mergefunc(introspect_val, parse_val, precedence, cyclecheck, path):
     ...     return calculate_merged_value(introspect_val, parse_val)
