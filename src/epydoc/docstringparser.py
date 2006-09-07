@@ -205,6 +205,10 @@ def parse_docstring(api_doc, docindex):
                                field.arg(), field.body())
         except ValueError, e: field_warnings.append(str(e))
 
+    # Check to make sure that all type parameters correspond to
+    # some documented parameter.
+    check_type_fields(api_doc, field_warnings)
+
     # Extract a summary
     if api_doc.summary is None and api_doc.descr is not None:
         api_doc.summary = api_doc.descr.summary()
@@ -526,13 +530,7 @@ def process_type_field(api_doc, docindex, tag, arg, descr):
         if arg in api_doc.arg_types:
             raise ValueError(REDEFINED % ('type for '+arg))
         api_doc.arg_types[arg] = descr
-        # Check to make sure that the documented parameter(s) are
-        # actually part of the function signature.
-        if arg not in api_doc.all_args():
-            raise ValueError(BAD_PARAM % (tag, '"%s"' % arg))
-    else:
-        raise ValueError(BAD_CONTEXT % arg)
-
+        
 def process_var_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=ModuleDoc, expect_arg=True)
     for ident in re.split('[:;, ] *', arg):
@@ -625,6 +623,18 @@ register_field_handler(process_raise_field, 'raise', 'raises',
 ######################################################################
 #{ Helper Functions
 ######################################################################
+
+def check_type_fields(api_doc, field_warnings):
+    """Check to make sure that all type fields correspond to some
+    documented parameter; if not, append a warning to field_warnings."""
+    if isinstance(api_doc, RoutineDoc):
+        for arg in api_doc.arg_types:
+            if arg not in api_doc.all_args():
+                for args, descr in api_doc.arg_descrs:
+                    if arg in args:
+                        break
+                else:
+                    field_warnings.append(BAD_PARAM % ('type', '"%s"' % arg))
 
 def set_var_descr(api_doc, ident, descr):
     if ident not in api_doc.variables:
