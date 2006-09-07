@@ -107,7 +107,7 @@ class Logger:
         """
         Update the progress display.
         
-        @param progress: A float from 0.0 to 1.0, indicating how much
+        @param percent: A float from 0.0 to 1.0, indicating how much
             progress has been made.
         @param message: A message indicating the most recent action
             that contributed towards that progress.

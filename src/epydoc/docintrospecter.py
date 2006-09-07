@@ -758,7 +758,7 @@ def get_value_from_name(name, globs=None):
     """
     Given a name, return the corresponding value.
     
-    @param globals: A namespace to check for the value, if there is no
+    @param globs: A namespace to check for the value, if there is no
         module containing the named value.  Defaults to __builtin__.
     """
     name = DottedName(name)

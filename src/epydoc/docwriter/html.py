@@ -208,7 +208,7 @@ class HTMLWriter:
         Construct a new HTML writer, using the given documentation
         index.
         
-        @param docmap: The documentation index.
+        @param docindex: The documentation index.
         
         @type prj_name: C{string}
         @keyword prj_name: The name of the project.  Defaults to
@@ -286,7 +286,7 @@ class HTMLWriter:
               inherited objects are mixed in with non-inherited
               objects.  The default is 'grouped'.
         @type include_source_code: C{boolean}
-        @param include_sourc_ecode: If true, then generate colorized
+        @keyword include_source_code: If true, then generate colorized
               source code files for each python module.
         """
         self.docindex = docindex
