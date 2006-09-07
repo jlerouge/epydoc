@@ -545,7 +545,7 @@ def process_cvar_field(api_doc, docindex, tag, arg, descr):
         isinstance(api_doc.container, ClassDoc)):
         _check(api_doc, tag, arg, expect_arg=False)
         api_doc.is_instvar = False
-        api_doc.descr = api_doc.descr.concatenate(descr)
+        api_doc.descr = markup.ConcatenatedDocstring(api_doc.descr, descr)
         api_doc.summary = descr.summary()
 
     # Otherwise, @cvar should be used in a class.
@@ -563,7 +563,7 @@ def process_ivar_field(api_doc, docindex, tag, arg, descr):
         _check(api_doc, tag, arg, expect_arg=False)
         # require that there be no other descr?
         api_doc.is_instvar = True
-        api_doc.descr = api_doc.descr.concatenate(descr)
+        api_doc.descr = markup.ConcatenatedDocstring(api_doc.descr, descr)
         api_doc.summary = descr.summary()
 
     # Otherwise, @ivar should be used in a class.
