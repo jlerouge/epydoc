@@ -162,9 +162,8 @@ def build_doc_index(items, introspect=True, parse=True,
     # their targets.
     if parse:
         log.start_progress('Linking imported variables')
-        valdocs = docindex.reachable_valdocs(sort_by_name=True, imports=False,
-                                             submodules=False, packages=False,
-                                             subclasses=False)
+        valdocs = sorted(docindex.reachable_valdocs(
+            imports=False, submodules=False, packages=False, subclasses=False))
         for i, val_doc in enumerate(valdocs):
             _report_valdoc_progress(i, val_doc, valdocs)
             link_imports(val_doc, docindex)
@@ -179,9 +178,8 @@ def build_doc_index(items, introspect=True, parse=True,
 
     # Parse the docstrings for each object.
     log.start_progress('Parsing docstrings')
-    valdocs = docindex.reachable_valdocs(sort_by_name=True, imports=False,
-                                         submodules=False, packages=False,
-                                         subclasses=False)
+    valdocs = sorted(docindex.reachable_valdocs(
+        imports=False, submodules=False, packages=False, subclasses=False))
     for i, val_doc in enumerate(valdocs):
         _report_valdoc_progress(i, val_doc, valdocs)
         # the value's docstring
