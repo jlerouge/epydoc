@@ -374,7 +374,7 @@ class APIDoc(object):
         """
         if epydoc.DEBUG:
             for key in kwargs:
-                if not hasattr(self.__class__, key):
+                if key[0] != '_' and not hasattr(self.__class__, key):
                     raise TypeError('%s got unexpected arg %r' %
                                     (self.__class__.__name__, key))
         self.__dict__.update(kwargs)
@@ -850,7 +850,7 @@ class NamespaceDoc(ValueDoc):
        names, and the values are lists of C{VariableDoc}s.  The order
        that groups should be listed in should be taken from
        L{group_specs}.
-       @type: C{dict} from C{str} to C{list} of L{APIDoc}"""
+       @type: C{dict} from C{str} to C{list} of L{VariableDoc}"""
     #} end of group "information about variables"
 
     def __init__(self, **kwargs):
@@ -996,7 +996,7 @@ class ModuleDoc(NamespaceDoc):
        names, and the values are lists of C{ModuleDoc}s.  The order
        that groups should be listed in should be taken from
        L{group_specs}.
-       @type: C{dict} from C{str} to C{list} of L{APIDoc}"""
+       @type: C{dict} from C{str} to C{list} of L{ModuleDoc}"""
     #{ Information about Packages
     package = UNKNOWN
     """@ivar: API documentation for the module's containing package.
