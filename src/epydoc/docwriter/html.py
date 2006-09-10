@@ -2498,8 +2498,11 @@ class HTMLWriter:
             else:
                 return '??'
         else:
-            context_name = context.canonical_name
-            return str(doc.canonical_name.contextualize(context_name))
+            if context is UNKNOWN:
+                return str(doc.canonical_name)
+            else:
+                context_name = context.canonical_name
+                return str(doc.canonical_name.contextualize(context_name))
         
     #////////////////////////////////////////////////////////////
     #{ Function Signatures
