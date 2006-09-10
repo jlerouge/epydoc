@@ -188,6 +188,12 @@ def build_doc_index(items, introspect=True, parse=True,
         if (isinstance(val_doc, NamespaceDoc) and
             val_doc.variables not in (None, UNKNOWN)):
             for var_doc in val_doc.variables.values():
+                # Now we have a chance to propagate the defining module
+                # to objects for which introspection is not possible,
+                # such as properties.
+                if (isinstance(var_doc.value, ValueDoc)
+                    and var_doc.value.defining_module is UNKNOWN):
+                    var_doc.value.defining_module = val_doc.defining_module
                 parse_docstring(var_doc, docindex)
     log.end_progress()
 
