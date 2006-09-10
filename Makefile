@@ -235,7 +235,7 @@ stdlib-html: .stdlib-html.up2date
 	mkdir -p $(HTML_STDLIB)
 	@echo "Building stdlib html docs..."
 	@$(EPYDOC) -o $(HTML_STDLIB) --css white --name $(SLNAME) \
-	       --url $(SLURL) --debug --graph classtree --debug \
+	       --url $(SLURL) --debug --no-sourcecode --debug \
 	       --show-imports $(SLBUILTINS) $(SLFILES)
 	touch .stdlib-html.up2date
 
