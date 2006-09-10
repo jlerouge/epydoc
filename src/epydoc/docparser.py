@@ -157,7 +157,7 @@ was imported from another module?
 """
 
 #{ Configuration Constants: Comment docstrings
-COMMENT_DOCSTRING_MARKER = '#: '
+COMMENT_DOCSTRING_MARKER = '#:'
 """The prefix used to mark comments that contain attribute
 docstrings for variables."""
 
@@ -577,6 +577,8 @@ def process_file(module_doc):
         elif toktype == tokenize.COMMENT:
             if toktext.startswith(COMMENT_DOCSTRING_MARKER):
                 comment_line = toktext[len(COMMENT_DOCSTRING_MARKER):].rstrip()
+                if comment_line.startswith(" "):
+                    comment_line = comment_line[1:]
                 comments.append( [comment_line, srow])
             elif toktext.startswith(START_GROUP_MARKER):
                 start_group = toktext[len(START_GROUP_MARKER):].strip()
