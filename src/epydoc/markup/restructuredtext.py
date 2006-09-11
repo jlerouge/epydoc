@@ -215,7 +215,9 @@ class _EpydocReader(StandaloneReader):
     # depending on the version of docutils that's being used, because
     # the default_transforms attribute was deprecated & replaced by
     # get_transforms().
-    if [int(v) for v in docutils.__version__.split('.')] < [0,4,0]:
+    version = [int(v) for v in docutils.__version__.split('.')]
+    version += [ 0 ] * (3 - len(version))
+    if version < [0,4,0]:
         default_transforms = list(StandaloneReader.default_transforms)
         try: default_transforms.remove(docutils.transforms.frontmatter.DocInfo)
         except ValueError: pass
@@ -223,6 +225,7 @@ class _EpydocReader(StandaloneReader):
         def get_transforms(self):
             return [t for t in StandaloneReader.get_transforms(self)
                     if t != docutils.transforms.frontmatter.DocInfo]
+    del version
 
     def __init__(self, errors):
         self._errors = errors
