@@ -846,12 +846,24 @@ def process_from_import(line, parent_docs, prev_line_doc, lineno,
     # >>> from os.path import join, split
     else:
         src_name = parse_dotted_name(lhs)
-        for elt in rhs:
-            if elt != (token.OP, ','):
-                var_name = parse_name(elt)
+        parts = split_on(rhs, (token.OP, ','))
+        for part in parts:
+            # from m import x
+            if len(part) == 1:
+                var_name = parse_name(part[0])
                 _import_var_as(DottedName(src_name, var_name),
                                     var_name, parent_docs)
-    
+
+            # from m import x as y
+            elif len(part) == 3 and part[1] == (token.NAME, 'as'):
+                orig_name = parse_name(part[0])
+                var_name = parse_name(part[2])
+                _import_var_as(DottedName(src_name, orig_name),
+                                    var_name, parent_docs)
+
+            else:
+                ParseError("Bad from-import")
+
 def _process_fromstar_import(src, parent_docs):
     """
     Handle a statement of the form:

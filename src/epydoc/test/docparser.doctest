@@ -710,6 +710,21 @@ Imports
            +- is_imported = True
            +- value = <UNKNOWN>
 
+    >>> runparser(s="""
+    ...     from re import match as much, split, sub as scuba
+    ...     """,
+    ...     attribs='variables name imported_from')
+    ModuleDoc for test [0]
+     +- variables
+        +- much => VariableDoc for test.much [1]
+        |  +- imported_from = DottedName(u're', u'match')
+        |  +- name = u'much'
+        +- scuba => VariableDoc for test.scuba [2]
+        |  +- imported_from = DottedName(u're', u'sub')
+        |  +- name = u'scuba'
+        +- split => VariableDoc for test.split [3]
+           +- imported_from = DottedName(u're', u'split')
+           +- name = u'split'
 
 Unicode
 =======
