@@ -255,6 +255,10 @@ def introspect_module(module, module_doc, preliminary=False):
                                         container=module_doc,
                                         docs_extracted_by='introspecter')
         elif container is None or module_doc.canonical_name is UNKNOWN:
+
+            # Don't introspect stuff "from __future__"
+            if is_future_feature(child): continue
+
             # Possibly imported variable.
             child_val_doc = introspect_docs(child, context=module_doc)
             child_var_doc = VariableDoc(name=child_name,
@@ -482,6 +486,31 @@ def isclass(object):
     C{__getattr__} to always return a value).
     """
     return isinstance(object, (TypeType, ClassType))
+
+__future_check_works = None
+
+def is_future_feature(object):
+    """
+    Return True if C{object} results from a C{from __future__ import feature"}
+    statement.
+    """
+    # Guard from unexpected implementation changes of the __future__ module.
+    global __future_check_works
+    if __future_check_works is not None:
+        if __future_check_works:
+            import __future__
+            return isinstance(object, __future__._Feature)
+        else:
+            return False
+    else:
+        __future_check_works = True
+        try:
+            return is_future_feature(object)
+        except:
+            __future_check_works = False
+            log.warning("Troubles inspecting __future__. Python implementation"
+                        " may have been changed.")
+            return False
 
 def get_docstring(value):
     """

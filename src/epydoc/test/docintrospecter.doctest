@@ -520,6 +520,16 @@ Imports
               +- ModuleDoc for re [4]
                  +- variables = {}
 
+    >>> runintrospecter(s="""
+    ...     from __future__ import division
+    ...     from re import match
+    ...     """,
+    ...     attribs='variables value')
+    ModuleDoc for epydoc_test [0]
+     +- variables
+        +- match => VariableDoc for epydoc_test.match [1]
+           +- value
+              +- ValueDoc for sre.match [2]
 
 Unicode
 =======
