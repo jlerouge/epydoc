@@ -246,7 +246,7 @@ def introspect_module(module, module_doc, preliminary=False):
         # Create a VariableDoc for the child, and introspect its
         # value if it's defined in this module.
         container = get_containing_module(child)
-        if container != None and container == module_doc.canonical_name:
+        if container is not None and container == module_doc.canonical_name:
             # Local variable.
             child_val_doc = introspect_docs(child, context=module_doc)
             child_var_doc = VariableDoc(name=child_name,
