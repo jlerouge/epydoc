@@ -715,12 +715,23 @@ register_introspecter(isclass, introspect_class, priority=24)
 register_introspecter(inspect.isroutine, introspect_routine, priority=28)
 register_introspecter(is_property, introspect_property, priority=30)
 
+# Register getset_descriptor as a property
 try:
     import array
-    attribute = type(array.array.typecode)
+    getset_type = type(array.array.typecode)
     del array
-    def is_attribute(v): return isinstance(v, attribute)
-    register_introspecter(is_attribute, introspect_property, priority=32)
+    def is_getset(v): return isinstance(v, getset_type)
+    register_introspecter(is_getset, introspect_property, priority=32)
+except:
+    pass
+
+# Register member_descriptor as a property
+try:
+    import datetime
+    member_type = type(datetime.timedelta.days)
+    del datetime
+    def is_member(v): return isinstance(v, member_type)
+    register_introspecter(is_member, introspect_property, priority=34)
 except:
     pass
 
