@@ -299,7 +299,8 @@ def introspect_module(module, module_doc, preliminary=False):
 #: A list of class variables that should not be included in a
 #: class's API documentation.
 UNDOCUMENTED_CLASS_VARS = (
-    '__doc__', '__module__', '__dict__', '__weakref__', '__slots__')
+    '__doc__', '__module__', '__dict__', '__weakref__', '__slots__',
+    '__pyx_vtable__')
 
 def introspect_class(cls, class_doc):
     """
