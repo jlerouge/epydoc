@@ -2085,8 +2085,8 @@ class HTMLWriter:
         >>> #endif
           </h3>
           </td><td align="right" valign="top"
-            >$self.pysrc_link(func_doc)$&nbsp;</span
-            >$self.callgraph_link(callgraph)$</td>
+            >$self.pysrc_link(func_doc)$&nbsp;
+            $self.callgraph_link(callgraph)$</td>
           </table>
           $self.render_callgraph(callgraph)$
           $descr$
