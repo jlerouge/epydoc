@@ -168,7 +168,9 @@ def parse_docstring(api_doc, docindex):
         user docfields defined by containing objects.
     """
     if api_doc.metadata is not UNKNOWN:
-        log.debug("%s's docstring processed twice" % api_doc.canonical_name)
+        if not (isinstance(api_doc, RoutineDoc)
+                and api_doc.canonical_name[-1] == '__init__'):
+            log.debug("%s's docstring processed twice" % api_doc.canonical_name)
         return
         
     initialize_api_doc(api_doc)
@@ -197,8 +199,30 @@ def parse_docstring(api_doc, docindex):
     descr, fields = parsed_docstring.split_fields(parse_errors)
     api_doc.descr = descr
 
-    # Process fields
     field_warnings = []
+
+    # Handle the constructor fields that have been defined in the class
+    # docstring. This code assumes that a class docstring is parsed before
+    # the same class __init__ docstring.
+    if isinstance(api_doc, ClassDoc):
+
+        # Parse ahead the __init__ docstring for this class
+        initvar = api_doc.variables.get('__init__')
+        if initvar and initvar.value not in (None, UNKNOWN):
+            init_api_doc = initvar.value
+            parse_docstring(init_api_doc, docindex)
+
+            parse_function_signature(init_api_doc, api_doc)
+            init_fields = split_init_fields(fields, field_warnings)
+
+            # Process fields
+            for field in init_fields:
+                try:
+                    process_field(init_api_doc, docindex, field.tag(),
+                                    field.arg(), field.body())
+                except ValueError, e: field_warnings.append(str(e))
+
+    # Process fields
     for field in fields:
         try:
             process_field(api_doc, docindex, field.tag(),
@@ -253,6 +277,91 @@ def initialize_api_doc(api_doc):
             api_doc.group_specs = []
         if api_doc.sort_spec is UNKNOWN:
             api_doc.sort_spec = []
+
+def split_init_fields(fields, warnings):
+    """
+    Remove the fields related to the constructor from a class docstring
+    fields list.
+
+    @param fields: The fields to process. The list will be modified in place
+    @type fields: C{list} of L{markup.Field}
+    @param warnings: A list to emit processing warnings
+    @type warnings: C{list}
+    @return: The C{fields} items to be applied to the C{__init__} method
+    @rtype: C{list} of L{markup.Field}
+    """
+    init_fields = []
+
+    # Split fields in lists according to their argument, keeping order.
+    arg_fields = {}
+    args_order = []
+    i = 0
+    while i < len(fields):
+        field = fields[i]
+
+        # gather together all the fields with the same arg
+        if field.arg() is not None:
+            arg_fields.setdefault(field.arg(), []).append(fields.pop(i))
+            args_order.append(field.arg())
+        else:
+            i += 1
+
+    # Now check that for each argument there is at most a single variable
+    # and a single parameter, and at most a single type for each of them.
+    for arg in args_order:
+        ff = arg_fields.pop(arg, None)
+        if ff is None:
+            continue
+
+        var = tvar = par = tpar = None
+        for field in ff:
+            if field.tag() in VARIABLE_TAGS:
+                if var is None:
+                    var = field
+                    fields.append(field)
+                else:
+                    warnings.append(
+                        "There is more than one variable named '%s'"
+                        % arg)
+            elif field.tag() in PARAMETER_TAGS:
+                if par is None:
+                    par = field
+                    init_fields.append(field)
+                else:
+                    warnings.append(
+                        "There is more than one parameter named '%s'"
+                        % arg)
+
+            elif field.tag() == 'type':
+                if var is None and par is None:
+                    # type before obj
+                    tvar = tpar = field
+                else:
+                    if var is not None and tvar is None:
+                        tvar = field
+                    if par is not None and tpar is None:
+                        tpar = field
+
+            elif field.tag() in EXCEPTION_TAGS:
+                init_fields.append(field)
+
+            else: # Unespected field
+                fields.append(field)
+
+        # Put selected types into the proper output lists
+        if tvar is not None:
+            if var is not None:
+                fields.append(tvar)
+            else:
+                pass # [xx] warn about type w/o object?
+
+        if tpar is not None:
+            if par is not None:
+                init_fields.append(tpar)
+            else:
+                pass # [xx] warn about type w/o object?
+
+    return init_fields
 
 def report_errors(api_doc, docindex, parse_errors, field_warnings):
     """A helper function for L{parse_docstring()} that reports any
@@ -620,6 +729,16 @@ register_field_handler(process_kwarg_field, 'kwarg', 'keyword', 'kwparam')
 register_field_handler(process_raise_field, 'raise', 'raises',
                                             'except', 'exception')
 
+# Tags related to function parameters
+PARAMETER_TAGS = ('arg', 'argument', 'parameter', 'param',
+                  'kwarg', 'keyword', 'kwparam')
+
+# Tags related to variables in a class
+VARIABLE_TAGS = ('cvar', 'cvariable', 'ivar', 'ivariable')
+
+# Tags related to exceptions
+EXCEPTION_TAGS = ('raise', 'raises', 'except', 'exception')
+
 ######################################################################
 #{ Helper Functions
 ######################################################################
@@ -697,7 +816,7 @@ def unindent_docstring(docstring):
     # [xx] copied from inspect.getdoc(); we can't use inspect.getdoc()
     # itself, since it expects an object, not a string.
     
-    if docstring == '': return ''
+    if not docstring: return ''
     lines = docstring.expandtabs().split('\n')
 
     # Find minimum indentation of any non-blank lines after first line.
@@ -780,7 +899,7 @@ _SIGNATURE_RE = re.compile(
 """A regular expression that is used to extract signatures from
 docstrings."""
     
-def parse_function_signature(func_doc):
+def parse_function_signature(func_doc, doc_source=None):
     """
     Construct the signature for a builtin function or method from
     its docstring.  If the docstring uses the standard convention
@@ -790,15 +909,26 @@ def parse_function_signature(func_doc):
     Otherwise, the signature will be set to a single varargs
     variable named C{"..."}.
 
+    @param func_doc: The target object where to store parsed signature. Also
+        container of the docstring to parse if doc_source is C{None}
+    @type func_doc: L{RoutineDoc}
+    @param doc_source: Contains the docstring to parse. If C{None}, parse
+        L{func_doc} docstring instead
+    @type doc_source: L{APIDoc}
     @rtype: C{None}
     """
-    # If there's no docstring, then don't do anything.
-    if not func_doc.docstring: return False
+    if doc_source is None:
+        doc_source = func_doc
 
-    m = _SIGNATURE_RE.match(func_doc.docstring)
+    # If there's no docstring, then don't do anything.
+    if not doc_source.docstring: return False
+
+    m = _SIGNATURE_RE.match(doc_source.docstring)
     if m is None: return False
 
     # Do I want to be this strict?
+    # Notice that __init__ must match the class name instead, if the signature
+    # comes from the class docstring
 #     if not (m.group('func') == func_doc.canonical_name[-1] or
 #             '_'+m.group('func') == func_doc.canonical_name[-1]):
 #         log.warning("Not extracting function signature from %s's "
@@ -857,7 +987,7 @@ def parse_function_signature(func_doc):
         func_doc.posarg_defaults.insert(0, None)
 
     # Remove the signature from the docstring.
-    func_doc.docstring = func_doc.docstring[m.end():]
+    doc_source.docstring = doc_source.docstring[m.end():]
         
     # We found a signature.
     return True

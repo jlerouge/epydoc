@@ -1,5 +1,5 @@
 Regression Testing for epydoc.docbuilder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Test Function
 =============
@@ -14,6 +14,22 @@ instead of bilding docs for the whole module.
 
     >>> import tempfile, re, os, os.path, textwrap, sys
     >>> from epydoc.docbuilder import build_doc
+    >>> from epydoc.apidoc import ClassDoc, RoutineDoc
+    >>> from epydoc.markup import ParsedDocstring
+
+    >>> def to_plain(docstring):
+    ...     """Conver a parsed docstring into plain text"""
+    ...     if isinstance(docstring, ParsedDocstring):
+    ...         docstring = docstring.to_plaintext(None)
+    ...     return docstring.rsplit()
+
+    >>> def fun_to_plain(val_doc):
+    ...     """Convert parsed docstrings in text from a RoutineDoc"""
+    ...     for k, v in val_doc.arg_types.items():
+    ...         val_doc.arg_types[k] = to_plain(v)
+    ...     for i, (k, v) in enumerate(val_doc.arg_descrs):
+    ...         val_doc.arg_descrs[i] = (k, to_plain(v))
+
     >>> def runbuilder(s, attribs='', build=None, exclude=''):
     ...     # Write it to a temp file.
     ...     tmp_dir = tempfile.mkdtemp()
@@ -24,6 +40,10 @@ instead of bilding docs for the whole module.
     ...     val_doc = build_doc(os.path.join(tmp_dir, 'epydoc_test.py'))
     ...     if build: val_doc = val_doc.variables[build].value
     ...     # Display it.
+    ...     if isinstance(val_doc, ClassDoc):
+    ...         for val in val_doc.variables.values():
+    ...             if isinstance(val.value, RoutineDoc):
+    ...                 fun_to_plain(val.value)
     ...     s = val_doc.pp(include=attribs.split(),exclude=exclude.split())
     ...     s = re.sub(r"(filename = ).*", r"\1...", s)
     ...     s = re.sub(r"(<module 'epydoc_test' from ).*", r'\1...', s)
@@ -115,3 +135,291 @@ variable.
               +- PropertyDoc for epydoc_test.Foo.y [9]
                  +- descr = u'A property has no defining module'
                  +- type_descr = u'int'
+
+Stuff from future doesn't appear as variable.
+
+    >>> runbuilder(s="""
+    ...     from __future__ import division
+    ...     from re import match
+    ...     """,
+    ...     attribs='variables value')
+    ModuleDoc for epydoc_test [0]
+     +- variables
+        +- match => VariableDoc for epydoc_test.match [1]
+           +- value
+              +- ValueDoc for sre.match [2]
+
+
+Specifying constructor signature in class docstring
+===================================================
+
+The class signature can be specified in the class docstring instead of __init__
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         @param a: init param.
+    ...         @ivar a: instance var.
+    ...         @type a: date
+    ...         """
+    ...         def __init__(self, a):
+    ...             """The ctor docstring.
+    ...
+    ...             @type a: str
+    ...             """
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+        |  +- name = '__init__'
+        |  +- value
+        |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+        |        +- arg_descrs = [([u'a'], ...
+        |        +- arg_types = {u'a': ...
+        |        +- kwarg = None
+        |        +- posargs = ['self', 'a']
+        |        +- vararg = None
+        +- a => VariableDoc for epydoc_test.Foo.a [3]
+           +- name = u'a'
+           +- value = <UNKNOWN>
+
+Also keywords arguments can be put in the constructor
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         @keyword a: a kwarg.
+    ...         @type a: str
+    ...         """
+    ...         def __init__(self, **kwargs):
+    ...             """The ctor docstring.
+    ...
+    ...             @type a: str
+    ...             """
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+           +- name = '__init__'
+           +- value
+              +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+                 +- arg_descrs = [([u'a'], ...
+                 +- arg_types = {u'a': ...
+                 +- kwarg = 'kwargs'
+                 +- posargs = ['self']
+                 +- vararg = None
+
+A missing docstring on the __init__ is not an issue.
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         @param a: a param.
+    ...         @type a: str
+    ...         """
+    ...         def __init__(self):
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+           +- name = '__init__'
+           +- value
+              +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+                 +- arg_descrs = [([u'a'], ...
+                 +- arg_types = {u'a': ...
+                 +- kwarg = None
+                 +- posargs = ['self']
+                 +- vararg = None
+
+Exceptions can be put in the docstring class, and they are assigned to the
+constructor too.
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """Foo(x, y)
+    ...
+    ...         A class to ship rockets in outer space.
+    ...
+    ...         @param x: first param
+    ...         @param y: second param
+    ...         @except ValueError: frobnication error
+    ...         """
+    ...         def __init__(self, a, b):
+    ...             """__init__ doc"""
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value exception_descrs "
+    ...         "posargs vararg kwarg type arg_types arg_descrs docstring")
+    ClassDoc for epydoc_test.Foo [0]
+     +- docstring = u'A class to ship rockets in outer sp...
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+           +- docstring = <UNKNOWN>
+           +- name = '__init__'
+           +- value
+              +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+                 +- arg_descrs = [([u'x'], [u'first', u'param']), ...
+                 +- arg_types = {}
+                 +- docstring = u'__init__ doc'
+                 +- exception_descrs = [(DottedName(u'ValueError'), ...
+                 +- kwarg = None
+                 +- posargs = [u'x', u'y']
+                 +- vararg = None
+
+
+Epydoc can also grok the constructor signature from the class docstring
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """Foo(x, y)
+    ...
+    ...         A class to ship rockets in outer space.
+    ...
+    ...         @param x: first param
+    ...         @param y: second param
+    ...         """
+    ...         def __init__(self, a, b):
+    ...             """__init__ doc"""
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type arg_types arg_descrs docstring")
+    ClassDoc for epydoc_test.Foo [0]
+     +- docstring = u'A class to ship rockets ...
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+           +- docstring = <UNKNOWN>
+           +- name = '__init__'
+           +- value
+              +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+                 +- arg_descrs = [([u'x'], ...
+                 +- arg_types = {}
+                 +- docstring = u'__init__ doc'
+                 +- kwarg = None
+                 +- posargs = [u'x', u'y']
+                 +- vararg = None
+
+A type can apply to both a param and a variable
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         @param a: init param.
+    ...         @ivar a: instance var.
+    ...         @type a: date
+    ...         """
+    ...         def __init__(self, a):
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type_descr arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+        |  +- name = '__init__'
+        |  +- type_descr = None
+        |  +- value
+        |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
+        |        +- arg_types = {u'a': [u'date']}
+        |        +- kwarg = None
+        |        +- posargs = ['self', 'a']
+        |        +- vararg = None
+        +- a => VariableDoc for epydoc_test.Foo.a [3]
+           +- name = u'a'
+           +- type_descr = u'date\n\n'
+           +- value = <UNKNOWN>
+
+But there can also be two different types
+
+    >>> runbuilder(s='''
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         @param a: init param.
+    ...         @type a: string
+    ...         @ivar a: instance var.
+    ...         @type a: date
+    ...         """
+    ...         def __init__(self, a):
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value "
+    ...         "posargs vararg kwarg type_descr arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+        |  +- name = '__init__'
+        |  +- type_descr = None
+        |  +- value
+        |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
+        |        +- arg_types = {u'a': [u'string']}
+        |        +- kwarg = None
+        |        +- posargs = ['self', 'a']
+        |        +- vararg = None
+        +- a => VariableDoc for epydoc_test.Foo.a [3]
+           +- name = u'a'
+           +- type_descr = u'date\n\n'
+           +- value = <UNKNOWN>
+
+Also reST consolidated fields are not a problem.
+
+    >>> runbuilder(s='''
+    ...     __docformat__ = 'restructuredtext'
+    ...     class Foo:
+    ...         """This is the object docstring
+    ...
+    ...         :Parameters:
+    ...           `a` : string
+    ...             init param.
+    ...
+    ...         :Exceptions:
+    ...           * `ValueError`: frobnication error
+    ...             init param.
+    ...
+    ...         :IVariables:
+    ...           `a` : date
+    ...             instance var.
+    ...         """
+    ...         def __init__(self, a):
+    ...             pass
+    ...     ''',
+    ...     build="Foo",
+    ...     attribs="variables name value exception_descrs "
+    ...         "posargs vararg kwarg type_descr arg_types arg_descrs")
+    ClassDoc for epydoc_test.Foo [0]
+     +- variables
+        +- __init__ => VariableDoc for epydoc_test.Foo.__init__ [1]
+        |  +- name = '__init__'
+        |  +- type_descr = None
+        |  +- value
+        |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
+        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
+        |        +- arg_types = {u'a': [u'string']}
+        |        +- exception_descrs = [(DottedName(u'ValueError'), ...
+        |        +- kwarg = None
+        |        +- posargs = ['self', 'a']
+        |        +- vararg = None
+        +- a => VariableDoc for epydoc_test.Foo.a [3]
+           +- name = u'a'
+           +- type_descr = u'date'
+           +- value = <UNKNOWN>
