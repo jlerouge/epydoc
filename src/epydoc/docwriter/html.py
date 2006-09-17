@@ -2012,7 +2012,9 @@ class HTMLWriter:
                           self.summary(val_doc)) for (name, val_doc) in
                          [('Get', prop_doc.fget), ('Set', prop_doc.fset),
                           ('Delete', prop_doc.fdel)]
-                            if val_doc is not UNKNOWN ]
+                            if val_doc not in (None, UNKNOWN)
+                            and val_doc.pyval is not None ]
+
             self.write_property_details_entry(out, var_doc, descr,
                                               accessors, div_class)
         
