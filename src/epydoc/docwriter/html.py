@@ -1939,7 +1939,7 @@ class HTMLWriter:
         '''
           <tr$tr_class$>
             <td width="15%" align="right" valign="top" class="summary">
-              <code class="summary-type">$typ or "&nbsp;"$</code>
+              <span class="summary-type">$typ or "&nbsp;"$</span>
             </td><td class="summary">
               $description$
             </td>
@@ -2058,7 +2058,7 @@ class HTMLWriter:
         if arg_name in func_doc.arg_types:
             typ = func_doc.arg_types[arg_name]
             typ_html = self.docstring_to_html(typ, func_doc, 10)
-            s += " (<code>%s</code>)" % typ_html
+            s += " (%s)" % typ_html
         return s
 
     write_function_details_entry = compile_template(
@@ -2104,13 +2104,13 @@ class HTMLWriter:
         >>> #endif
         >>> # === return type ===
         >>> if rdescr and rtype:
-            <dl><dt>Returns: <code>$rtype$</code></dt>
+            <dl><dt>Returns: $rtype$</dt>
                 <dd>$rdescr$</dd></dl>
         >>> elif rdescr:
             <dl><dt>Returns:</dt>
                 <dd>$rdescr$</dd></dl>
         >>> elif rtype:
-            <dl><dt>Returns: <code>$rtype$</code></dt></dl>
+            <dl><dt>Returns: $rtype$</dt></dl>
         >>> #endif
         >>> # === decorators ===
         >>> if func_doc.decorators not in (None, UNKNOWN):
