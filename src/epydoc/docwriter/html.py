@@ -1499,7 +1499,7 @@ class HTMLWriter:
     def callgraph_link(self, callgraph):
         # Use class=codelink, to match style w/ the source code link.
         if callgraph is None: return ''
-        return ('<br /><span class="codelink"><a href="javascript: void(0);" '
+        return ('<br /><span class="codelink"><a href="javascript:void(0);" '
                 'onclick="toggleCallGraph(\'%s-div\');return false;">'
                 'call&nbsp;graph</a></span>&nbsp;' % callgraph.uid)
 
@@ -2882,7 +2882,7 @@ class HTMLWriter:
     TABLE_FOOTER = '</table>\n'
 
     PRIVATE_LINK = '''
-    <span class="options">[<a href="javascript: void(0);" class="privatelink"
+    <span class="options">[<a href="javascript:void(0);" class="privatelink"
     onclick="toggle_private();">hide private</a>]</span>
     '''.strip()
 
