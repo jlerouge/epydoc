@@ -2111,11 +2111,21 @@ class HTMLWriter:
             <dl><dt>Returns: <code>$rtype$</code></dt></dl>
         >>> #endif
         >>> # === decorators ===
-        >>> if func_doc.decorators not in (None, UNKNOWN, (), []):
+        >>> if func_doc.decorators not in (None, UNKNOWN):
+        >>>   # (staticmethod & classmethod are already shown, above)
+        >>>   decos = filter(lambda deco:
+        >>>     not ((deco=="staticmethod" and
+        >>>            isinstance(func_doc, StaticMethodDoc)) or
+        >>>          (deco=="classmethod" and
+        >>>           isinstance(func_doc, ClassMethodDoc))),
+        >>>     func_doc.decorators)
+        >>> else:
+        >>>   decos = None
+        >>> #endif
+        >>> if decos:
             <dl><dt>Decorators:</dt></dl>
             <ul class="nomargin">
-        >>>   for deco in func_doc.decorators:
-        >>>     # (staticmethod & classmethod are already shown, above)
+        >>>   for deco in decos:
         >>>     if not ((deco=="staticmethod" and
         >>>              isinstance(func_doc, StaticMethodDoc)) or
         >>>             (deco=="classmethod" and
