@@ -2128,10 +2128,6 @@ class HTMLWriter:
             <dl><dt>Decorators:</dt></dl>
             <ul class="nomargin">
         >>>   for deco in decos:
-        >>>     if not ((deco=="staticmethod" and
-        >>>              isinstance(func_doc, StaticMethodDoc)) or
-        >>>             (deco=="classmethod" and
-        >>>              isinstance(func_doc, ClassMethodDoc))):
                 <li><code>@$deco$</code></li>
         >>>   #endfor
             </ul>
