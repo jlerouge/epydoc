@@ -170,11 +170,11 @@ class DotGraph:
             
         if center: s = '<center>'
         if title or caption:
-            s += ('<p><table border="0" cellpadding="0" cellspacing="0" '
+            s += ('<table border="0" cellpadding="0" cellspacing="0" '
                   'class="graph"%s>\n  <tr><td align="center">\n' %
                   table_width)
         s += ('  %s\n  <img src="%s" alt=%r usemap="#%s" '
-              'ismap="ismap" class="%s">\n' %
+              'ismap="ismap" class="%s" />\n' %
               (cmapx.strip(), image_url, title, self.uid, css_class))
         if title or caption:
             s += '  </td></tr>\n  <tr><td align=%r>\n' % title_align
@@ -184,7 +184,7 @@ class DotGraph:
                 s += ' -- '
             if caption:
                 s += '<span class="graph-caption">%s</span>' % caption
-            s += '\n  </th></tr>\n</table></p>'
+            s += '\n  </td></tr>\n</table><br/>'
         if center: s += '</center>'
         return s
 
