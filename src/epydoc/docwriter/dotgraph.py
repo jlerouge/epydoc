@@ -73,8 +73,8 @@ class DotGraph:
     """A set of all uids that that have been generated, used to ensure
     that each new graph has a unique uid."""
 
-    DEFAULT_NODE_DEFAULTS={'fontsize':10, 'fontname': 'helvetica'}
-    DEFAULT_EDGE_DEFAULTS={'fontsize':10, 'fontname': 'helvetica'}
+    DEFAULT_NODE_DEFAULTS={'fontsize':10, 'fontname': 'Helvetica'}
+    DEFAULT_EDGE_DEFAULTS={'fontsize':10, 'fontname': 'Helvetica'}
     
     def __init__(self, title, body='', node_defaults=None,
                  edge_defaults=None, caption=None):
