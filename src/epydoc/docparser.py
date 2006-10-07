@@ -281,6 +281,9 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
             raise ParseError('Error during parsing: %s '
                              '(%s, line %d, char %d)' %
                              (msg, module_doc.filename, srow, scol))
+        except IndentationError, e:
+            raise ParseError('Error during parsing: %s (%s)' %
+                             (e, module_doc.filename))
 
         # Handle any special variables (__path__, __docformat__, etc.)
         handle_special_module_vars(module_doc)
@@ -639,11 +642,18 @@ def process_file(module_doc):
                 # grouping...
                 if groups[-1] and prev_line_doc not in (None, 'skip_block'):
                     if isinstance(prev_line_doc, VariableDoc):
-                        # This special case is needed for inst vars, where
-                        # parent_docs[-1] is the __init__ function, not the
-                        # containing class:
-                        add_to_group(prev_line_doc.container,
-                                     prev_line_doc, groups[-1])
+                        # prev_line_doc's container will only be
+                        # UNKNOWN if it's an instance variable that
+                        # didn't have a doc-comment, but might still
+                        # be followed by a docstring.  Since we
+                        # tokenize in order, we can't do lookahead to
+                        # see if the variable will have a comment; but
+                        # it should only be added to the container if
+                        # it does.  So we defer the grouping of that
+                        # to be handled by process_docstring instead.
+                        if prev_line_doc.container is not UNKNOWN:
+                            add_to_group(prev_line_doc.container,
+                                         prev_line_doc, groups[-1])
                     elif isinstance(parent_docs[-1], NamespaceDoc):
                         add_to_group(parent_docs[-1], prev_line_doc,
                                      groups[-1])
@@ -663,6 +673,7 @@ def add_to_group(container, api_doc, group_name):
     if isinstance(api_doc, VariableDoc):
         var_name = api_doc.name
     else:
+        if api_doc.canonical_name is UNKNOWN: log.debug('ouch', `api_doc`)
         var_name = api_doc.canonical_name[-1]
 
     for (name, group_vars) in container.group_specs:
@@ -1326,12 +1337,14 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
     # we only want to add instance variables if they have an
     # associated docstring.  (For more info, see the comment above
     # the set_variable() call in process_assignment().)
+    added_instvar = False
     if (isinstance(prev_line_doc, VariableDoc) and
-        prev_line_doc.is_instvar and
-        prev_line_doc.docstring in (None, UNKNOWN)):
+         prev_line_doc.is_instvar and
+         prev_line_doc.docstring in (None, UNKNOWN)):
         for i in range(len(parent_docs)-1, -1, -1):
             if isinstance(parent_docs[i], ClassDoc):
                 set_variable(parent_docs[i], prev_line_doc, True)
+                added_instvar = True
                 break
 
     if prev_line_doc.docstring not in (None, UNKNOWN):
@@ -1341,6 +1354,12 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
         
     prev_line_doc.docstring = docstring
     prev_line_doc.docstring_lineno = lineno
+
+    # If the modified APIDoc is an instance variable, and we added it
+    # to the class's variables list here, then it still needs to be
+    # grouped too; so return it for use as the new "prev_line_doc."
+    if added_instvar:
+        return prev_line_doc
 
     
 #/////////////////////////////////////////////////////////////////
@@ -1400,8 +1419,12 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
         else:
             deco_repr = UNKNOWN
         func_doc = apply_decorator(deco_name, func_doc)
-        func_doc.canonical_name = UNKNOWN
         func_doc.parse_repr = deco_repr
+        # [XX] Is there a reson the following should be done?  It
+        # causes the grouping code to break.  Presumably the canonical
+        # name should remain valid if we're just applying a standard
+        # decorator.
+        #func_doc.canonical_name = UNKNOWN
 
     # Add a variable to the containing namespace.
     var_doc = VariableDoc(name=func_name, value=func_doc,
