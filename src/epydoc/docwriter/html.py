@@ -16,6 +16,7 @@ __docformat__ = 'epytext en'
 
 import re, os, sys, codecs, sre_constants, pprint, base64
 import urllib
+import __builtin__
 from epydoc.apidoc import *
 import epydoc.docstringparser
 import time, epydoc, epydoc.markup
@@ -623,6 +624,11 @@ class HTMLWriter:
         self._files_written += 1
         log.progress(self._files_written/self._num_files, 'index.html')
         self.write_homepage(directory)
+
+        # Don't report references to builtins as missing
+        for k in self._failed_xrefs.keys(): # have a copy of keys
+            if hasattr(__builtin__, k):
+                del self._failed_xrefs[k]
 
         # Report any failed crossreferences
         if self._failed_xrefs:
