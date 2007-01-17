@@ -129,7 +129,8 @@ class ParsedJavadocDocstring(ParsedDocstring):
             else:
                 # Get the field argument (if appropriate).
                 if tag in self._ARG_FIELDS:
-                    (arg, body) = pieces[i].strip().split(None, 1)
+                    subpieces = pieces[i].strip().split(None, 1)+['','']
+                    (arg, body) = subpieces[:2]
                 else:
                     (arg, body) = (None, pieces[i])
 
