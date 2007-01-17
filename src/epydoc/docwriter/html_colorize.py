@@ -15,7 +15,7 @@ expressions and doctest blocks.
 """
 __docformat__ = 'epytext en'
 
-import sys, sre_parse, sre, re, codecs
+import sys, sre_parse, re, codecs
 import sre_constants
 from epydoc import log
 from epydoc.util import decode_with_backslashreplace, plaintext_to_html
