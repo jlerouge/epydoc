@@ -1797,7 +1797,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return '%s<ul>\n%s%s</ul>\n' % (indent*' ', childstr, indent*' ')
         elif tree.tag == 'olist':
             start = tree.attribs.get('start') or ''
-            return ('%s<ol%s>\n%s%s</ol>\n' %
+            return ('%s<ol start="%s">\n%s%s</ol>\n' %
                     (indent*' ', start, childstr, indent*' '))
         elif tree.tag == 'li':
             return indent*' '+'<li>\n%s%s</li>\n' % (childstr, indent*' ')
