@@ -314,6 +314,14 @@ class _SplitFieldsTranslator(NodeVisitor):
     @ivar fields: The fields of the most recently walked document.
     @type fields: C{list} of L{Field<markup.Field>}
     """
+    
+    ALLOW_UNMARKED_ARG_IN_CONSOLIDATED_FIELD = True
+    """If true, then consolidated fields are not required to mark
+    arguments with C{`backticks`}.  (This is currently only
+    implemented for consolidated fields expressed as definition lists;
+    consolidated fields expressed as unordered lists still require
+    backticks for now."""
+    
     def __init__(self, document, errors):
         NodeVisitor.__init__(self, document)
         self._errors = errors
@@ -425,7 +433,7 @@ class _SplitFieldsTranslator(NodeVisitor):
                 child = fbody[0][0]
                 if child.data[:1] in ':-':
                     child.data = child.data[1:].lstrip()
-                elif child.data[:2] == ' -':
+                elif child.data[:2] in (' -', ' :'):
                     child.data = child.data[2:].lstrip()
 
             # Wrap the field body, and add a new field
@@ -446,7 +454,9 @@ class _SplitFieldsTranslator(NodeVisitor):
                 raise ValueError('bad definition list (bad child %d).' % n)
             if len(item) > 3:
                 raise ValueError(_BAD_ITEM % n)
-            if item[0][0].tagname != 'title_reference':
+            if not ((item[0][0].tagname == 'title_reference') or
+                    (self.ALLOW_UNMARKED_ARG_IN_CONSOLIDATED_FIELD and
+                     isinstance(item[0][0], docutils.nodes.Text))):
                 raise ValueError(_BAD_ITEM % n)
             for child in item[0][1:]:
                 if child.astext() != '':
