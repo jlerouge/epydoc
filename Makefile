@@ -16,7 +16,7 @@ DOCS = $(wildcard doc/*)
 DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
 
 # What version of python to use?
-PYTHON = python2.4
+PYTHON = python
 
 # The location of the webpage.
 HOST = shell.sf.net

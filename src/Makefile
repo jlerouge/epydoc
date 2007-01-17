@@ -14,7 +14,7 @@ MAN = ${LIB}/man/
 DOC = ${LIB}/doc/
 
 # What version of python to use?
-PYTHON = python2.4
+PYTHON = python
 
 ##//////////////////////////////////////////////////////////////////////
 ## Makefile
