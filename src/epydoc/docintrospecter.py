@@ -345,7 +345,7 @@ def introspect_class(cls, class_doc):
             bases = None
             log.warning("Class '%s' defines __bases__, but it does not "
                         "contain an iterable; ignoring base list."
-                        % cls.__name__)
+                        % getattr(cls, '__name__', '??'))
         if bases is not None:
             class_doc.bases = []
             for base in bases:
@@ -360,8 +360,8 @@ def introspect_class(cls, class_doc):
 
     # Record the class's local variables.
     class_doc.variables = {}
-    private_prefix = '_%s__' % cls.__name__
     if hasattr(cls, '__dict__'):
+        private_prefix = '_%s__' % getattr(cls, '__name__', '<none>')
         for child_name, child in cls.__dict__.items():
             if (child_name in base_children
                 and base_children[child_name] == child):
