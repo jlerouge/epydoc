@@ -64,7 +64,7 @@ pyid to C{bool}."""
 ######################################################################
 
 def introspect_docs(value=None, name=None, filename=None, context=None,
-                    is_script=False):
+                    is_script=False, module_name=None):
     """
     Generate the API documentation for a specified object by
     introspecting Python values, and return it as a L{ValueDoc}.  The
@@ -85,6 +85,9 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
         documentation for the specified object.
     @param context: The API documentation for the class of module
         that contains C{value} (if available).
+    @param module_name: The name of the module where the value is defined.
+        Useful to retrieve the docstring encoding if there is no way to
+        detect the module by introspection (such as in properties)
     """
     if value is None and name is not None and filename is None:
         value = get_value_from_name(DottedName(name))
@@ -113,7 +116,7 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     # Introspect the value.
     _introspected_values[pyid] = True
     introspect_func = _get_introspecter(value)
-    introspect_func(value, val_doc)
+    introspect_func(value, val_doc, module_name=module_name)
 
     # Set canonical name, if it was given
     if val_doc.canonical_name is UNKNOWN and name is not None:
@@ -176,7 +179,7 @@ UNDOCUMENTED_MODULE_VARS = (
     '__builtins__', '__doc__', '__all__', '__file__', '__path__',
     '__name__', '__extra_epydoc_fields__', '__docformat__')
 
-def introspect_module(module, module_doc, preliminary=False):
+def introspect_module(module, module_doc, module_name=None, preliminary=False):
     """
     Add API documentation information about the module C{module}
     to C{module_doc}.
@@ -248,7 +251,8 @@ def introspect_module(module, module_doc, preliminary=False):
         container = get_containing_module(child)
         if container is not None and container == module_doc.canonical_name:
             # Local variable.
-            child_val_doc = introspect_docs(child, context=module_doc)
+            child_val_doc = introspect_docs(child, context=module_doc,
+                                            module_name=dotted_name)
             child_var_doc = VariableDoc(name=child_name,
                                         value=child_val_doc,
                                         is_imported=False,
@@ -302,7 +306,7 @@ UNDOCUMENTED_CLASS_VARS = (
     '__doc__', '__module__', '__dict__', '__weakref__', '__slots__',
     '__pyx_vtable__')
 
-def introspect_class(cls, class_doc):
+def introspect_class(cls, class_doc, module_name=None):
     """
     Add API documentation information about the class C{cls}
     to C{class_doc}.
@@ -372,7 +376,8 @@ def introspect_class(cls, class_doc):
             if child_name in UNDOCUMENTED_CLASS_VARS: continue
             #try: child = getattr(cls, child_name)
             #except: continue
-            val_doc = introspect_docs(child, context=class_doc)
+            val_doc = introspect_docs(child, context=class_doc,
+                                      module_name=module_name)
             var_doc = VariableDoc(name=child_name, value=val_doc,
                                   container=class_doc,
                                   docs_extracted_by='introspecter')
@@ -384,7 +389,7 @@ def introspect_class(cls, class_doc):
 # Routine Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_routine(routine, routine_doc):
+def introspect_routine(routine, routine_doc, module_name=None):
     """Add API documentation information about the function
     C{routine} to C{routine_doc} (specializing it to C{Routine_doc})."""
     routine_doc.specialize_to(RoutineDoc)
@@ -447,13 +452,13 @@ def introspect_routine(routine, routine_doc):
 # Property Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_property(prop, prop_doc):
+def introspect_property(prop, prop_doc, module_name=None):
     """Add API documentation information about the property
     C{prop} to C{prop_doc} (specializing it to C{PropertyDoc})."""
     prop_doc.specialize_to(PropertyDoc)
 
     # Record the property's docstring.
-    prop_doc.docstring = get_docstring(prop)
+    prop_doc.docstring = get_docstring(prop, module_name=module_name)
 
     # Record the property's access functions.
     if hasattr(prop, 'fget'):
@@ -467,7 +472,7 @@ def introspect_property(prop, prop_doc):
 # Generic Value Introspection
 #////////////////////////////////////////////////////////////
 
-def introspect_other(val, val_doc):
+def introspect_other(val, val_doc, module_name=None):
     """Specialize val_doc to a C{GenericValueDoc} and return it."""
     val_doc.specialize_to(GenericValueDoc)
     return val_doc
@@ -513,7 +518,7 @@ def is_future_feature(object):
                         " may have been changed.")
             return False
 
-def get_docstring(value):
+def get_docstring(value, module_name=None):
     """
     Return the docstring for the given value; or C{None} if it
     does not have a docstring.
@@ -527,7 +532,8 @@ def get_docstring(value):
     elif isinstance(docstring, str):
         try: return unicode(docstring, 'ascii')
         except UnicodeDecodeError:
-            module_name = get_containing_module(value)
+            if module_name is None:
+                module_name = get_containing_module(value)
             if module_name is not None:
                 try:
                     module = get_value_from_name(module_name)
