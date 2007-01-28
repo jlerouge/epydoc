@@ -669,8 +669,8 @@ def digraph_directive(name, arguments, options, content, lineno,
     """
     if arguments: title = arguments[0]
     else: title = ''
-    return dotgraph(_construct_digraph, title, options.get('caption'),
-                    '\n'.join(content))
+    return [ dotgraph(_construct_digraph, title, options.get('caption'),
+                    '\n'.join(content)) ]
 digraph_directive.arguments = (0, 1, True)
 digraph_directive.options = {'caption': directives.unchanged}
 digraph_directive.content = True
@@ -698,7 +698,7 @@ def classtree_directive(name, arguments, options, content, lineno,
       - C{:dir:} -- Specifies the orientation of the graph.  One of
         C{down}, C{right} (default), C{left}, C{up}.
     """
-    return dotgraph(_construct_classtree, arguments, options)
+    return [ dotgraph(_construct_classtree, arguments, options) ]
 classtree_directive.arguments = (0, 1, True)
 classtree_directive.options = {'dir': _dir_option}
 classtree_directive.content = False
@@ -734,7 +734,7 @@ def packagetree_directive(name, arguments, options, content, lineno,
       - C{:dir:} -- Specifies the orientation of the graph.  One of
         C{down}, C{right} (default), C{left}, C{up}.
     """
-    return dotgraph(_construct_packagetree, arguments, options)
+    return [ dotgraph(_construct_packagetree, arguments, options) ]
 packagetree_directive.arguments = (0, 1, True)
 packagetree_directive.options = {
   'dir': _dir_option,
@@ -759,8 +759,7 @@ def _construct_packagetree(docindex, context, linker, arguments, options):
 
 def importgraph_directive(name, arguments, options, content, lineno,
                         content_offset, block_text, state, state_machine):
-    return dotgraph(_construct_importgraph, arguments, options)
-importgraph_directive.arguments = None
+    return [ dotgraph(_construct_importgraph, arguments, options) ]
 importgraph_directive.options = {'dir': _dir_option}
 importgraph_directive.content = False
 directives.register_directive('importgraph', importgraph_directive)
@@ -772,7 +771,7 @@ def _construct_importgraph(docindex, context, linker, arguments, options):
 
 def callgraph_directive(name, arguments, options, content, lineno,
                         content_offset, block_text, state, state_machine):
-    return dotgraph(_construct_callgraph, arguments, options)
+    return [ dotgraph(_construct_callgraph, arguments, options) ]
 callgraph_directive.arguments = (0, 1, True)
 callgraph_directive.options = {'dir': _dir_option,
                                  'add_callers': directives.flag,
