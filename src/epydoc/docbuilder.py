@@ -283,7 +283,7 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
 
 def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
     progress_estimator.complete += 1
-    log.progress(progress_estimator.progress(), `obj`)
+    log.progress(progress_estimator.progress(), repr(obj))
     
     if not introspect:
         log.error("Cannot get docs for Python objects without "

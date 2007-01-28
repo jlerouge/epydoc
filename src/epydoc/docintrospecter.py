@@ -537,7 +537,7 @@ def get_docstring(value):
                 except KeyboardInterrupt: raise
                 except Exception: pass
             if hasattr(value, '__name__'): name = value.__name__
-            else: name = `value`
+            else: name = repr(value)
             log.warning("%s's docstring is not a unicode string, but it "
                         "contains non-ascii data -- treating it as "
                         "latin-1." % name)
@@ -548,7 +548,7 @@ def get_docstring(value):
         return None
     else:
         if hasattr(value, '__name__'): name = value.__name__
-        else: name = `value`
+        else: name = repr(value)
         log.warning("%s's docstring is not a string -- ignoring it." %
                     name)
         return None
