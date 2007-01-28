@@ -457,6 +457,7 @@ class HTMLWriter:
             # Otherwise, give up.
             log.warning('Could not find top page %r; using %s '
                         'instead' % (pagename, self._trees_url))
+            return self._trees_url
 
         # If no page name was specified, then try to choose one
         # automatically.
