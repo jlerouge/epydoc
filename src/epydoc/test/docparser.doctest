@@ -496,7 +496,7 @@ Decorators & Wrapper Assignments
         +- f => VariableDoc for test.f [1]
            +- docstring = <UNKNOWN>
            +- value
-              +- ClassMethodDoc [2]
+              +- ClassMethodDoc for test.f [2]
                  +- docstring = u'docstring for f'
                  +- posargs = [u'cls', u'x']
 
