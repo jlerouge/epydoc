@@ -2650,13 +2650,13 @@ class HTMLWriter:
         if doc.summary not in (None, UNKNOWN):
             out(': <em class="summary">'+
                 self.description(doc.summary, doc, 8)+'</em>')
-        out('</li>\n')
         if doc.submodules != UNKNOWN and doc.submodules:
-            if priv: out('    <ul class="private">\n')
-            else: out('    <ul>\n')
+            if priv: out('\n    <ul class="private">\n')
+            else: out('\n    <ul>\n')
             for submodule in doc.submodules:
                 self.write_module_tree_item(out, submodule, package=doc)
-            out('    </ul>\n    </li>\n')
+            out('    </ul>\n')
+        out('    </li>\n')
 
     #////////////////////////////////////////////////////////////
     #{ Class trees
