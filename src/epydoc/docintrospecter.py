@@ -435,6 +435,9 @@ def introspect_routine(routine, routine_doc, module_name=None):
 
     else:
         # [XX] I should probably use UNKNOWN here??
+        # dvarrazzo: if '...' is to be changed, also check that
+        # `docstringparser.process_arg_field()` works correctly.
+        # See SF bug #1556024.
         routine_doc.posargs = ['...']
         routine_doc.posarg_defaults = [None]
         routine_doc.kwarg = None

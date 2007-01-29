@@ -700,9 +700,11 @@ def process_arg_field(api_doc, docindex, tag, arg, descr):
     api_doc.arg_descrs.append( (idents, descr) )
     # Check to make sure that the documented parameter(s) are
     # actually part of the function signature.
-    bad_params = ['"%s"' % i for i in idents if i not in api_doc.all_args()]
-    if bad_params:
-        raise ValueError(BAD_PARAM % (tag, ', '.join(bad_params)))
+    all_args = api_doc.all_args()
+    if all_args not in (['...'], UNKNOWN):
+        bad_params = ['"%s"' % i for i in idents if i not in all_args]
+        if bad_params:
+            raise ValueError(BAD_PARAM % (tag, ', '.join(bad_params)))
 
 def process_kwarg_field(api_doc, docindex, tag, arg, descr):
     # [xx] these should -not- be checked if they exist..
