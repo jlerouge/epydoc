@@ -570,7 +570,7 @@ def get_canonical_name(value):
     classes; methods of non-nested classes; and some class methods
     of non-nested classes.
     
-    @rtype: L{DottedName} or C{None}
+    @rtype: L{DottedName} or C{UNKNOWN}
     """
     if not hasattr(value, '__name__'): return UNKNOWN
 
@@ -588,12 +588,12 @@ def get_canonical_name(value):
           value.im_class is ClassType and
           not value.__name__.startswith('<')): # class method.
         class_name = get_canonical_name(value.im_self)
-        if class_name is None: return UNKNOWN
+        if class_name is UNKNOWN: return UNKNOWN
         dotted_name = DottedName(class_name, value.__name__)
     elif (inspect.ismethod(value) and
           not value.__name__.startswith('<')):
         class_name = get_canonical_name(value.im_class)
-        if class_name is None: return UNKNOWN
+        if class_name is UNKNOWN: return UNKNOWN
         dotted_name = DottedName(class_name, value.__name__)
     elif (isinstance(value, FunctionType) and
           not value.__name__.startswith('<')):
