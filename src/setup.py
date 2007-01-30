@@ -1,7 +1,6 @@
-#!/usr/local/bin/python
+#! /usr/bin/env python
 #
-# Distutils setup script for the Natural Language
-# Processing Toolkit
+# Edward Loper's API Documentation Generation Tool
 #
 # Created [05/27/01 09:04 PM]
 # Edward Loper
