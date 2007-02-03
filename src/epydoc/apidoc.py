@@ -63,10 +63,9 @@ class DottedName:
     """
     UNREACHABLE = "??"
     _IDENTIFIER_RE = re.compile("""(?x)
-        (%s |             # UNREACHABLE marker, or..
-         (script-)?       #   Prefix: script (not a module)
-         [a-zA-Z_]\w*     #   Identifier
-         '?)              #   Suffix: submodule that is shadowed by a var
+        (%s |             # UNREACHABLE marker, or...
+         script-\w+ |     #   Script name, or ...
+         [a-zA-Z_]\w*'?)  #   Identifier.  (' used for shadowing submodules)
         (-\d+)?           # Suffix: unreachable vals with the same name
         $"""
         % re.escape(UNREACHABLE))
