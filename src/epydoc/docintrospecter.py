@@ -362,6 +362,11 @@ def introspect_class(cls, class_doc, module_name=None):
                 if hasattr(base, '__dict__'):
                     base_children.update(base.__dict__)
 
+    # The module name is not defined if the class is being introspected
+    # as another class base.
+    if module_name is None and class_doc.defining_module is not None:
+        module_name = class_doc.defining_module.canonical_name
+        
     # Record the class's local variables.
     class_doc.variables = {}
     if hasattr(cls, '__dict__'):
