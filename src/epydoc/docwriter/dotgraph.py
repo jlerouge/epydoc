@@ -1238,7 +1238,7 @@ def get_dot_version():
                 _dot_version = [int(x) for x in m.group(1).split('.')]
             else:
                 _dot_version = (0,)
-        except RunSubprocessError, e:
+        except OSError, e:
             _dot_version = (0,)
         log.info('Detected dot version %s' % _dot_version)
     return _dot_version
