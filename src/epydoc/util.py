@@ -269,7 +269,11 @@ def run_subprocess(cmd, data=None):
     else:
         to_child, from_child, child_err = os.popen3(' '.join(cmd), 'b')
         if data:
-            to_child.write(data)
+            try:
+                to_child.write(data)
+            # Guard for a broken pipe error
+            except IOError, e:
+                raise OSError(e)
         to_child.close()
         err = child_err.read()
         out = from_child.read()
