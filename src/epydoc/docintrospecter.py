@@ -364,7 +364,7 @@ def introspect_class(cls, class_doc, module_name=None):
 
     # The module name is not defined if the class is being introspected
     # as another class base.
-    if module_name is None and class_doc.defining_module is not None:
+    if module_name is None and class_doc.defining_module not in (None, UNKNOWN):
         module_name = class_doc.defining_module.canonical_name
         
     # Record the class's local variables.
