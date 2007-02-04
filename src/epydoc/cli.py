@@ -65,7 +65,7 @@ __docformat__ = 'epytext en'
 
 import sys, os, time, re, pickle
 from glob import glob
-from optparse import OptionParser, OptionGroup
+from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
 import epydoc
 from epydoc import log
 from epydoc.util import wordwrap, run_subprocess, RunSubprocessError
@@ -89,7 +89,23 @@ def parse_arguments():
     version = "Epydoc, version %s" % epydoc.__version__
     optparser = OptionParser(usage=usage, version=version)
     action_group = OptionGroup(optparser, 'Actions')
-    options_group = OptionGroup(optparser, 'Options')
+    generation_group = OptionGroup(optparser, 'Generation options')
+    output_group = OptionGroup(optparser, 'Output options')
+    graph_group = OptionGroup(optparser, 'Graph options')
+
+    optparser.add_option(
+        '--config', action='append', dest="configfiles", metavar='FILE',
+        help=("A configuration file, specifying additional OPTIONS "
+              "and/or NAMES.  This option may be repeated."))
+    optparser.add_option(                               # --quiet
+        "--quiet", "-q", action="count", dest="quiet",
+        help="Decrease the verbosity.")
+    optparser.add_option(                               # --verbose
+        "--verbose", "-v", action="count", dest="verbose",
+        help="Increase the verbosity.")
+    optparser.add_option(                               # --debug
+        "--debug", action="store_true", dest="debug",
+        help="Show full tracebacks for internal errors.")
 
     # Add options -- Actions
     action_group.add_option(                               # --html
@@ -117,88 +133,85 @@ def parse_arguments():
         "--pickle", action="store_const", dest="action", const="pickle",
         help="Write the documentation to a pickle file.")
 
-    # Add options -- Options
-    options_group.add_option(                               # --output
-        "--output", "-o", dest="target", metavar="PATH",
-        help="The output directory.  If PATH does not exist, then "
-        "it will be created.")
-    options_group.add_option(                               # --show-imports
-        "--inheritance", dest="inheritance", metavar="STYLE",
-        help="The format for showing inheritance objects.  STYLE "
-        "should be one of: %s." % ', '.join(INHERITANCE_STYLES))
-    options_group.add_option(                               # --output
+    # Add options -- Generation
+    generation_group.add_option(                            # --docformat
         "--docformat", dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
         "to \"%s\"." % DEFAULT_DOCFORMAT)
-    options_group.add_option(                               # --css
+    generation_group.add_option(                            # --parse-only
+        "--parse-only", action="store_false", dest="introspect",
+        help="Get all information from parsing (don't introspect)")
+    generation_group.add_option(                            # --introspect-only
+        "--introspect-only", action="store_false", dest="parse",
+        help="Get all information from introspecting (don't parse)")
+    generation_group.add_option(                            # --inheritance
+        "--inheritance", dest="inheritance", metavar="STYLE",
+        help="The format for showing inheritance objects.  STYLE "
+        "should be one of: %s." % ', '.join(INHERITANCE_STYLES))
+    generation_group.add_option(                            # --show-private
+        "--show-private", action="store_true", dest="show_private",
+        help="Include private variables in the output. (default)")
+    generation_group.add_option(                            # --no-private
+        "--no-private", action="store_false", dest="show_private",
+        help="Do not include private variables in the output.")
+    generation_group.add_option(                            # --show-imports
+        "--show-imports", action="store_true", dest="show_imports",
+        help="List each module's imports.")
+    generation_group.add_option(                            # --no-imports
+        "--no-imports", action="store_false", dest="show_imports",
+        help="Do not list each module's imports. (default)")
+    generation_group.add_option(                            # --show-sourcecode
+        '--show-sourcecode', action='store_true', dest='include_source_code',
+        help=("Include source code with syntax highlighting in the "
+              "HTML output. (default)"))
+    generation_group.add_option(                            # --no-sourcecode
+        '--no-sourcecode', action='store_false', dest='include_source_code',
+        help=("Do not include source code with syntax highlighting in the "
+              "HTML output."))
+
+    # Add options -- Output
+    output_group.add_option(                                # --output
+        "--output", "-o", dest="target", metavar="PATH",
+        help="The output directory.  If PATH does not exist, then "
+        "it will be created.")
+    output_group.add_option(                                # --css
         "--css", dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
-    options_group.add_option(                               # --name
+    output_group.add_option(                                # --name
         "--name", dest="prj_name", metavar="NAME",
         help="The documented project's name (for the navigation bar).")
-    options_group.add_option(                               # --url
+    output_group.add_option(                                # --url
         "--url", dest="prj_url", metavar="URL",
         help="The documented project's URL (for the navigation bar).")
-    options_group.add_option(                               # --navlink
+    output_group.add_option(                                # --navlink
         "--navlink", dest="prj_link", metavar="HTML",
         help="HTML code for a navigation link to place in the "
         "navigation bar.")
-    options_group.add_option(                               # --top
+    output_group.add_option(                                # --top
         "--top", dest="top_page", metavar="PAGE",
         help="The \"top\" page for the HTML documentation.  PAGE can "
         "be a URL, the name of a module or class, or one of the "
         "special names \"trees.html\", \"indices.html\", or \"help.html\"")
-    options_group.add_option(                               # --help-file
+    output_group.add_option(                                # --help-file
         "--help-file", dest="help_file", metavar="FILE",
         help="An alternate help file.  FILE should contain the body "
         "of an HTML file -- navigation bars will be added to it.")
-    options_group.add_option(                               # --frames
+    output_group.add_option(                                # --frames
         "--show-frames", action="store_true", dest="show_frames",
         help="Include frames in the HTML output. (default)")
-    options_group.add_option(                               # --no-frames
+    output_group.add_option(                                # --no-frames
         "--no-frames", action="store_false", dest="show_frames",
         help="Do not include frames in the HTML output.")
-    options_group.add_option(                               # --private
-        "--show-private", action="store_true", dest="show_private",
-        help="Include private variables in the output. (default)")
-    options_group.add_option(                               # --no-private
-        "--no-private", action="store_false", dest="show_private",
-        help="Do not include private variables in the output.")
-    options_group.add_option(                               # --show-imports
-        "--show-imports", action="store_true", dest="show_imports",
-        help="List each module's imports.")
-    options_group.add_option(                               # --show-imports
-        "--no-imports", action="store_false", dest="show_imports",
-        help="Do not list each module's imports. (default)")
-    options_group.add_option(                               # --quiet
-        "--quiet", "-q", action="count", dest="quiet",
-        help="Decrease the verbosity.")
-    options_group.add_option(                               # --verbose
-        "--verbose", "-v", action="count", dest="verbose",
-        help="Increase the verbosity.")
-    options_group.add_option(                               # --debug
-        "--debug", action="store_true", dest="debug",
-        help="Show full tracebacks for internal errors.")
-    options_group.add_option(                               # --parse-only
-        "--parse-only", action="store_false", dest="introspect",
-        help="Get all information from parsing (don't introspect)")
-    options_group.add_option(                               # --introspect-only
-        "--introspect-only", action="store_false", dest="parse",
-        help="Get all information from introspecting (don't parse)")
-    # this option is for developers, not users.
-    options_group.add_option(
-        "--profile-epydoc", action="store_true", dest="profile",
-        help=("Run the hotshot profiler on epydoc itself.  Output "
-              "will be written to profile.out."))
-    options_group.add_option(
-        "--dotpath", dest="dotpath", metavar='PATH',
-        help="The path to the Graphviz 'dot' executable.")
-    options_group.add_option(
-        '--config', action='append', dest="configfiles", metavar='FILE',
-        help=("A configuration file, specifying additional OPTIONS "
-              "and/or NAMES.  This option may be repeated."))
-    options_group.add_option(
+    output_group.add_option(                                # --separate-classes
+        '--separate-classes', action='store_true',
+        dest='list_classes_separately',
+        help=("When generating LaTeX or PDF output, list each class in "
+              "its own section, instead of listing them under their "
+              "containing module."))
+
+    # Add options -- Graph options
+    graph_group.add_option(
         '--graph', action='append', dest='graphs', metavar='GRAPHTYPE',
         help=("Include graphs of type GRAPHTYPE in the generated output.  "
               "Graphs are generated using the Graphviz dot executable.  "
@@ -206,35 +219,32 @@ def parse_arguments():
               "to specify its location.  This option may be repeated to "
               "include multiple graph types in the output.  GRAPHTYPE "
               "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
-    options_group.add_option(
+    graph_group.add_option(
+        "--dotpath", dest="dotpath", metavar='PATH',
+        help="The path to the Graphviz 'dot' executable.")
+    graph_group.add_option(
         '--graph-font', dest='graph_font', metavar='FONT',
         help=("Specify the font used to generate Graphviz graphs.  (e.g., "
               "helvetica or times)."))
-    options_group.add_option(
+    graph_group.add_option(
         '--graph-font-size', dest='graph_font_size', metavar='SIZE',
         help=("Specify the font size used to generate Graphviz graphs, "
               "in points."))
-    options_group.add_option(
-        '--separate-classes', action='store_true',
-        dest='list_classes_separately',
-        help=("When generating LaTeX or PDF output, list each class in "
-              "its own section, instead of listing them under their "
-              "containing module."))
-    options_group.add_option(
-        '--show-sourcecode', action='store_true', dest='include_source_code',
-        help=("Include source code with syntax highlighting in the "
-              "HTML output."))
-    options_group.add_option(
-        '--no-sourcecode', action='store_false', dest='include_source_code',
-        help=("Do not include source code with syntax highlighting in the "
-              "HTML output."))
-    options_group.add_option(
+    graph_group.add_option(
         '--pstat', action='append', dest='pstat_files', metavar='FILE',
         help="A pstat output file, to be used in generating call graphs.")
+    # this option is for developers, not users.
+    graph_group.add_option(
+        "--profile-epydoc", action="store_true", dest="profile",
+        help=SUPPRESS_HELP or
+             ("Run the hotshot profiler on epydoc itself.  Output "
+              "will be written to profile.out."))
 
     # Add the option groups.
     optparser.add_option_group(action_group)
-    optparser.add_option_group(options_group)
+    optparser.add_option_group(generation_group)
+    optparser.add_option_group(output_group)
+    optparser.add_option_group(graph_group)
 
     # Set the option parser's defaults.
     optparser.set_defaults(action="html", show_frames=True,
