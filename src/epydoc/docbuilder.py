@@ -93,6 +93,16 @@ class BuildOptions:
         self.exclude_parse = exclude_parse
         self.add_submodules = add_submodules
 
+        # Test for pattern syntax and compile them into pattern objects.
+        try:
+            self._introspect_regexp = (exclude_introspect
+                and re.compile(exclude_introspect))
+            self._parse_regexp = (exclude_parse
+                and re.compile(exclude_parse))
+        except Exception, exc:
+            log.error('Error in regular expression pattern: %s' % exc)
+            raise
+
     def must_introspect(self, name):
         """
         Return C{True} if a module is to be introsepcted with the current
@@ -102,7 +112,7 @@ class BuildOptions:
         @type name: L{DottedName} or C{str}
         """
         return self.introspect \
-            and not self._matches_filter(name, self.exclude_introspect)
+            and not self._matches_filter(name, self._introspect_regexp)
 
     def must_parse(self, name):
         """
@@ -112,27 +122,27 @@ class BuildOptions:
         @type name: L{DottedName} or C{str}
         """
         return self.parse \
-            and not self._matches_filter(name, self.exclude_parse)
+            and not self._matches_filter(name, self._parse_regexp)
 
-    def _matches_filter(self, name, pattern):
+    def _matches_filter(self, name, regexp):
         """
         Test if a module name matches a pattern.
 
         @param name: The name of the module to test
         @type name: L{DottedName} or C{str}
-        @param pattern: The pattern to match C{name} againts.
+        @param regexp: The pattern object to match C{name} against.
             If C{None}, return C{False}
-        @type pattern: C{str}
-        @return: C{True} if C{name} in dotted format matches C{pattern},
+        @type regexp: C{pattern}
+        @return: C{True} if C{name} in dotted format matches C{regexp},
             else C{False}
         @rtype: C{bool}
         """
-        if not pattern: return False
+        if regexp is None: return False
 
         if isinstance(name, DottedName):
             name = str(name)
 
-        return bool(re.search(pattern, name))
+        return bool(regexp.search(name))
 
 
 def build_doc(item, introspect=True, parse=True, add_submodules=True,
@@ -184,9 +194,12 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
     @param parse: If true, then use parsing to examine the specified
         items.  Otherwise, just use introspection.
     """
-    options = BuildOptions(parse=parse, introspect=introspect,
-        exclude_introspect=exclude_introspect, exclude_parse=exclude_parse,
-        add_submodules=add_submodules)
+    try:
+        options = BuildOptions(parse=parse, introspect=introspect,
+            exclude_introspect=exclude_introspect, exclude_parse=exclude_parse,
+            add_submodules=add_submodules)
+    except Exception:
+        return None
 
     # Get the basic docs for each item.
     doc_pairs = _get_docs_from_items(items, options)
