@@ -1544,7 +1544,17 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     if class_doc.bases is not UNKNOWN:
         for basedoc in class_doc.bases:
             if isinstance(basedoc, ClassDoc):
-                basedoc.subclasses.append(class_doc)
+                # This test avoids that a subclass gets listed twice when
+                # both introspection and parsing.
+                # [XXX] This check only works because currently parsing is
+                # always performed just after introspection of the same
+                # class. A more complete fix shuld be independent from
+                # calling order; probably the subclasses list should be
+                # replaced by a ClassDoc set or a {name: ClassDoc} mapping.
+                if (basedoc.subclasses
+                    and basedoc.subclasses[-1].canonical_name
+                        != class_doc.canonical_name):
+                    basedoc.subclasses.append(class_doc)
     
     # If the preceeding comment includes a docstring, then add it.
     add_docstring_from_comments(class_doc, comments)
@@ -1571,8 +1581,10 @@ def find_base(name, parent_docs):
             src = lookup_name(name[0], parent_docs)
             if (src is not None and
                 src.imported_from not in (None, UNKNOWN)):
-                _import_var(name, parent_docs)
-                base_var = lookup_variable(name, parent_docs)
+                base_src = DottedName(src.imported_from, name[1:])
+                base_var = VariableDoc(name=name[-1], is_imported=True,
+                                       is_alias=False, imported_from=base_src,
+                                       docs_extracted_by='parser')
         # Otherwise, it must have come from an "import *" statement
         # (or from magic, such as direct manipulation of the module's
         # dictionary), so we don't know where it came from.  So
