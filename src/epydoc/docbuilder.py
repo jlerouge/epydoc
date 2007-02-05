@@ -67,7 +67,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import sys, os, os.path, __builtin__, imp
+import sys, os, os.path, __builtin__, imp, re
 from epydoc.apidoc import *
 from epydoc.docintrospecter import introspect_docs
 from epydoc.docparser import parse_docs, ParseError
@@ -80,7 +80,63 @@ from epydoc.compat import * # Backwards compatibility
 ## 1. build_doc()
 ######################################################################
 
-def build_doc(item, introspect=True, parse=True, add_submodules=True):
+class BuildOptions:
+    """
+    Holds the parameters for a documentation building process.
+    """
+    def __init__(self, introspect=True, parse=True,
+                 exclude_introspect=None, exclude_parse=None,
+                 add_submodules=True):
+        self.introspect = introspect
+        self.parse = parse
+        self.exclude_introspect = exclude_introspect
+        self.exclude_parse = exclude_parse
+        self.add_submodules = add_submodules
+
+    def must_introspect(self, name):
+        """
+        Return C{True} if a module is to be introsepcted with the current
+        settings.
+
+        @param name: The name of the module to test
+        @type name: L{DottedName} or C{str}
+        """
+        return self.introspect \
+            and not self._matches_filter(name, self.exclude_introspect)
+
+    def must_parse(self, name):
+        """
+        Return C{True} if a module is to be parsed with the current settings.
+
+        @param name: The name of the module to test
+        @type name: L{DottedName} or C{str}
+        """
+        return self.parse \
+            and not self._matches_filter(name, self.exclude_parse)
+
+    def _matches_filter(self, name, pattern):
+        """
+        Test if a module name matches a pattern.
+
+        @param name: The name of the module to test
+        @type name: L{DottedName} or C{str}
+        @param pattern: The pattern to match C{name} againts.
+            If C{None}, return C{False}
+        @type pattern: C{str}
+        @return: C{True} if C{name} in dotted format matches C{pattern},
+            else C{False}
+        @rtype: C{bool}
+        """
+        if not pattern: return False
+
+        if isinstance(name, DottedName):
+            name = str(name)
+
+        return bool(re.search(pattern, name))
+
+
+def build_doc(item, introspect=True, parse=True, add_submodules=True,
+              exclude_introspect=None, exclude_parse=None):
     """
     Build API documentation for a given item, and return it as
     an L{APIDoc} object.
@@ -101,11 +157,13 @@ def build_doc(item, introspect=True, parse=True, add_submodules=True):
     @param parse: If true, then use parsing to examine the specified
         items.  Otherwise, just use introspection.
     """
-    docindex = build_doc_index([item], introspect, parse, add_submodules)
+    docindex = build_doc_index([item], introspect, parse, add_submodules,
+                               exclude_introspect=exclude_introspect,
+                               exclude_parse=exclude_parse)
     return docindex.root[0]
 
-def build_doc_index(items, introspect=True, parse=True,
-                    add_submodules=True):
+def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
+                    exclude_introspect=None, exclude_parse=None):
     """
     Build API documentation for the given list of items, and
     return it in the form of a L{DocIndex}.
@@ -126,11 +184,15 @@ def build_doc_index(items, introspect=True, parse=True,
     @param parse: If true, then use parsing to examine the specified
         items.  Otherwise, just use introspection.
     """
+    options = BuildOptions(parse=parse, introspect=introspect,
+        exclude_introspect=exclude_introspect, exclude_parse=exclude_parse,
+        add_submodules=add_submodules)
+
     # Get the basic docs for each item.
-    doc_pairs = _get_docs_from_items(items, introspect, parse, add_submodules)
+    doc_pairs = _get_docs_from_items(items, options)
 
     # Merge the introspection & parse docs.
-    if parse and introspect:
+    if options.parse and options.introspect:
         log.start_progress('Merging parsed & introspected information')
         docs = []
         for i, (introspect_doc, parse_doc) in enumerate(doc_pairs):
@@ -146,7 +208,7 @@ def build_doc_index(items, introspect=True, parse=True,
             elif parse_doc is not None:
                 docs.append(parse_doc)
         log.end_progress()
-    elif introspect:
+    elif options.introspect:
         docs = [doc_pair[0] for doc_pair in doc_pairs if doc_pair[0]]
     else:
         docs = [doc_pair[1] for doc_pair in doc_pairs if doc_pair[1]]
@@ -160,7 +222,7 @@ def build_doc_index(items, introspect=True, parse=True,
 
     # Replace any proxy valuedocs that we got from importing with
     # their targets.
-    if parse:
+    if options.parse:
         log.start_progress('Linking imported variables')
         valdocs = sorted(docindex.reachable_valdocs(
             imports=False, submodules=False, packages=False, subclasses=False))
@@ -230,7 +292,8 @@ def _report_valdoc_progress(i, val_doc, val_docs):
 # Documentation Generation
 #/////////////////////////////////////////////////////////////////
 
-def _get_docs_from_items(items, introspect, parse, add_submodules):
+def _get_docs_from_items(items, options):
+
     # Start the progress bar.
     log.start_progress('Building documentation')
     progress_estimator = _ProgressEstimator(items)
@@ -241,21 +304,21 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
         if isinstance(item, basestring):
             if is_module_file(item):
                 doc_pairs.append(_get_docs_from_module_file(
-                    item, introspect, parse, progress_estimator))
+                    item, options, progress_estimator))
             elif is_package_dir(item):
                 pkgfile = os.path.abspath(os.path.join(item, '__init__'))
                 doc_pairs.append(_get_docs_from_module_file(
-                    pkgfile, introspect, parse, progress_estimator))
+                    pkgfile, options, progress_estimator))
             elif os.path.isfile(item):
                 doc_pairs.append(_get_docs_from_pyscript(
-                    item, introspect, parse, progress_estimator))
+                    item, options, progress_estimator))
             elif hasattr(__builtin__, item):
                 val = getattr(__builtin__, item)
                 doc_pairs.append(_get_docs_from_pyobject(
-                    val, introspect, parse, progress_estimator))
+                    val, options, progress_estimator))
             elif is_pyname(item):
                 doc_pairs.append(_get_docs_from_pyname(
-                    item, introspect, parse, progress_estimator))
+                    item, options, progress_estimator))
             elif os.path.isdir(item):
                 log.error("Directory %r is not a package" % item)
                 continue
@@ -268,24 +331,24 @@ def _get_docs_from_items(items, introspect, parse, add_submodules):
                 continue
         else:
             doc_pairs.append(_get_docs_from_pyobject(
-                item, introspect, parse, progress_estimator))
+                item, options, progress_estimator))
 
         # This will only have an effect if doc_pairs[-1] contains a
         # package's docs.  The 'not is_module_file(item)' prevents
         # us from adding subdirectories if they explicitly specify
         # a package's __init__.py file.
-        if add_submodules and not is_module_file(item):
+        if options.add_submodules and not is_module_file(item):
             doc_pairs += _get_docs_from_submodules(
-                item, doc_pairs[-1], introspect, parse, progress_estimator)
+                item, doc_pairs[-1], options, progress_estimator)
 
     log.end_progress()
     return doc_pairs
 
-def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
+def _get_docs_from_pyobject(obj, options, progress_estimator):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), repr(obj))
     
-    if not introspect:
+    if not options.introspect:
         log.error("Cannot get docs for Python objects without "
                   "introspecting them.")
             
@@ -296,11 +359,17 @@ def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
     except ImportError, e:
         log.error(e)
         return (None, None)
-    if parse:
+    if options.parse:
         if introspect_doc.canonical_name is not None:
-            _, parse_docs = _get_docs_from_pyname(
-                str(introspect_doc.canonical_name), False, True,
-                progress_estimator, supress_warnings=True)
+            prev_introspect = options.introspect
+            options.introspect = False
+            try:
+                _, parse_docs = _get_docs_from_pyname(
+                    str(introspect_doc.canonical_name), options,
+                    progress_estimator, supress_warnings=True)
+            finally:
+                options.introspect = prev_introspect
+
     # We need a name:
     if introspect_doc.canonical_name in (None, UNKNOWN):
         if hasattr(obj, '__name__'):
@@ -311,19 +380,19 @@ def _get_docs_from_pyobject(obj, introspect, parse, progress_estimator):
                 DottedName.UNREACHABLE)
     return (introspect_doc, parse_doc)
 
-def _get_docs_from_pyname(name, introspect, parse, progress_estimator,
+def _get_docs_from_pyname(name, options, progress_estimator,
                           supress_warnings=False):
     progress_estimator.complete += 1
     log.progress(progress_estimator.progress(), name)
     
     introspect_doc = parse_doc = None
     introspect_error = parse_error = None
-    if introspect:
+    if options.must_introspect(name):
         try:
             introspect_doc = introspect_docs(name=name)
         except ImportError, e:
             introspect_error = str(e)
-    if parse:
+    if options.must_parse(name):
         try:
             parse_doc = parse_docs(name=name)
         except ParseError, e:
@@ -341,18 +410,18 @@ def _get_docs_from_pyname(name, introspect, parse, progress_estimator,
     # Return the docs we found.
     return (introspect_doc, parse_doc)
 
-def _get_docs_from_pyscript(filename, introspect, parse, progress_estimator):
+def _get_docs_from_pyscript(filename, options, progress_estimator):
     # [xx] I should be careful about what names I allow as filenames,
     # and maybe do some munging to prevent problems.
 
     introspect_doc = parse_doc = None
     introspect_error = parse_error = None
-    if introspect:
+    if options.introspect:
         try:
             introspect_doc = introspect_docs(filename=filename, is_script=True)
         except ImportError, e:
             introspect_error = str(e)
-    if parse:
+    if options.parse:
         try:
             parse_doc = parse_docs(filename=filename, is_script=True)
         except ParseError, e:
@@ -367,7 +436,7 @@ def _get_docs_from_pyscript(filename, introspect, parse, progress_estimator):
     # Return the docs we found.
     return (introspect_doc, parse_doc)
     
-def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
+def _get_docs_from_module_file(filename, options, progress_estimator,
                                parent_docs=(None,None)):
     """
     Construct and return the API documentation for the python
@@ -406,13 +475,13 @@ def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
     # Get the introspected & parsed docs (as appropriate)
     introspect_doc = parse_doc = None
     introspect_error = parse_error = None
-    if introspect:
+    if options.must_introspect(modulename):
         try:
             introspect_doc = introspect_docs(
                 filename=filename, context=parent_docs[0])
         except ImportError, e:
             introspect_error = str(e)
-    if parse and src_file_available:
+    if src_file_available and options.must_parse(modulename):
         try:
             parse_doc = parse_docs(
                 filename=filename, context=parent_docs[1])
@@ -428,8 +497,7 @@ def _get_docs_from_module_file(filename, introspect, parse, progress_estimator,
     # Return the docs we found.
     return (introspect_doc, parse_doc)
 
-def _get_docs_from_submodules(item, pkg_docs, introspect, parse,
-                              progress_estimator):
+def _get_docs_from_submodules(item, pkg_docs, options, progress_estimator):
     # Extract the package's __path__.
     if isinstance(pkg_docs[0], ModuleDoc) and pkg_docs[0].is_package:
         pkg_path = pkg_docs[0].path
@@ -462,14 +530,14 @@ def _get_docs_from_submodules(item, pkg_docs, introspect, parse,
     docs = [pkg_docs]
     for module_filename in module_filenames.values():
         d = _get_docs_from_module_file(
-            module_filename, introspect, parse, progress_estimator, pkg_docs)
+            module_filename, options, progress_estimator, pkg_docs)
         docs.append(d)
     for subpackage_dir in subpackage_dirs:
         subpackage_file = os.path.join(subpackage_dir, '__init__')
         docs.append(_get_docs_from_module_file(
-            subpackage_file, introspect, parse, progress_estimator, pkg_docs))
+            subpackage_file, options, progress_estimator, pkg_docs))
         docs += _get_docs_from_submodules(
-            subpackage_dir, docs[-1], introspect, parse, progress_estimator)
+            subpackage_dir, docs[-1], options, progress_estimator)
     return docs
 
 def _report_errors(name, introspect_doc, parse_doc,

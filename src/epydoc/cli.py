@@ -144,6 +144,14 @@ def parse_arguments():
     generation_group.add_option(                            # --introspect-only
         "--introspect-only", action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
+    generation_group.add_option(                        # --exclude-introspect
+        "--exclude-introspect", dest="exclude_introspect", metavar="PATTERN",
+        help="Exclude introspection of modules whose dotted name matches "
+             "the regular expression PATTERN")
+    generation_group.add_option(                        # --exclude-parse
+        "--exclude-parse", dest="exclude_parse", metavar="PATTERN",
+        help="Exclude parsing of modules whose dotted name matches "
+             "the regular expression PATTERN")
     generation_group.add_option(                            # --inheritance
         "--inheritance", dest="inheritance", metavar="STYLE",
         help="The format for showing inheritance objects.  STYLE "
@@ -504,7 +512,9 @@ def main(options, names):
         # Build docs for the named values.
         from epydoc.docbuilder import build_doc_index
         docindex = build_doc_index(names, options.introspect, options.parse,
-                                   add_submodules=(options.action!='text'))
+                                   add_submodules=(options.action!='text'),
+                                   exclude_introspect=options.exclude_introspect,
+                                   exclude_parse=options.exclude_parse)
 
     if docindex is None:
         return # docbuilder already logged an error.
