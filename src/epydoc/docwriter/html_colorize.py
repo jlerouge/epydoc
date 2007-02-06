@@ -709,7 +709,8 @@ class PythonSourceColorizer:
     def lineno_to_html(self):
         template = '%%%ds' % self.linenum_size
         n = template % self.lineno
-        return '<tt class="py-lineno">%s</tt>' % n
+        return '<a name="L%s" /><tt class="py-lineno">%s</tt>' \
+            % (self.lineno, n)
 
     def colorize(self):
         """
