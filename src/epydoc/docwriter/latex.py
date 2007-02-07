@@ -55,6 +55,7 @@ class LatexWriter:
         "\\definecolor{py@inputcolour}{rgb}{0,0,0}",
         "\\definecolor{py@outputcolour}{rgb}{0,0,1}",
         "\\definecolor{py@exceptcolour}{rgb}{1,0,0}",
+        "\\definecolor{py@defnamecolour}{rgb}{1,0.5,0.5}",
         "\\definecolor{py@builtincolour}{rgb}{0.58039,0,0.58039}",
         "\\definecolor{py@identifiercolour}{rgb}{0,0,0}",
         "\\definecolor{py@linenumcolour}{rgb}{0.4,0.4,0.4}",
@@ -70,6 +71,8 @@ class LatexWriter:
         "\\newcommand{\\pysrcbuiltin}[1]{\\textcolor{py@builtincolour}"
             "{\\small\\textbf{#1}}}",
         "\\newcommand{\\pysrcstring}[1]{\\textcolor{py@stringcolour}"
+            "{\\small\\textbf{#1}}}",
+        "\\newcommand{\\pysrcdefname}[1]{\\textcolor{py@defnamecolour}"
             "{\\small\\textbf{#1}}}",
         "\\newcommand{\\pysrcother}[1]{\\small\\textbf{#1}}",
         "% Comments",
