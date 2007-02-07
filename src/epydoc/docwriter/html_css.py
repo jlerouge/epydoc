@@ -59,9 +59,9 @@ TEMPLATE = """
  *     either class='epydoc' or class='toc' (CSS styles for both
  *     defined below).
  */
-body                        { background: #ffffff; color: #000000; }
-a:link                      { color: #0000ff; }
-a:visited                   { color: #204080; }
+body                        { background: $body_bg; color: $body_fg; }
+a:link                      { color: $body_link; }
+a:visited                   { color: $body_visited_link; }
 dt                          { font-weight: bold; }
 h1                          { font-size: +140%; font-style: italic;
                               font-weight: bold; }
@@ -86,14 +86,14 @@ h2.epydoc                   { font-size: +130%; font-weight: bold; }
 h3.epydoc                   { font-size: +115%; font-weight: bold; }
 td h3.epydoc                { font-size: +115%; font-weight: bold;
                               margin-bottom: 0; }
-table.navbar                { background: #a0c0ff; color: #000000;
-                              border: 2px groove #c0d0d0; }
-table.navbar table          { color: #000000; }
-th.navbar-select            { background: #70b0ff;
-                              color: #000000; } 
+table.navbar                { background: $navbar_bg; color: $navbar_fg;
+                              border: $navbar_border; }
+table.navbar table          { color: $navbar_fg; }
+th.navbar-select            { background: $navbar_select_bg;
+                              color: $navbar_select_fg; } 
 table.navbar a              { text-decoration: none; }  
-table.navbar a:link         { color: #0000ff; }
-table.navbar a:visited      { color: #204080; }
+table.navbar a:link         { color: $navbar_link; }
+table.navbar a:visited      { color: $navbar_visited_link; }
 span.breadcrumbs            { font-size: 85%; font-weight: bold; }
 span.options                { font-size: 70%; }
 span.codelink               { font-size: 85%; }
@@ -107,16 +107,16 @@ td.footer                   { font-size: 85%; }
  *   - Summary tables that contain user-defined groups mark those
  *     groups using 'group header' rows.
  */
-td.table-header             { background: #70b0ff; color: #000000;
-                              border: 1px solid #608090; }
-td.table-header table       { color: #000000; }
-td.table-header table a:link      { color: #0000ff; }
-td.table-header table a:visited   { color: #204080; }
+td.table-header             { background: $table_hdr_bg; color: $table_hdr_fg;
+                              border: $table_border; }
+td.table-header table       { color: $table_hdr_fg; }
+td.table-header table a:link      { color: $table_hdr_link; }
+td.table-header table a:visited   { color: $table_hdr_visited_link; }
 span.table-header           { font-size: 120%; font-weight: bold; }
-th.group-header             { background: #c0e0f8; color: #000000;
+th.group-header             { background: $group_hdr_bg; color: $group_hdr_fg;
                               text-align: left; font-style: italic; 
                               font-size: 115%; 
-                              border: 1px solid #608090; }
+                              border: $table_border; }
 
 /* Summary Tables (functions, variables, etc)
  *   - Each object is described by a single row of the table with
@@ -127,12 +127,12 @@ th.group-header             { background: #c0e0f8; color: #000000;
  *     defined above, under 'Table Headers'
  */
 table.summary               { border-collapse: collapse;
-                              background: #e8f0f8; color: #000000;
-                              border: 1px solid #608090; }
-td.summary                  { border: 1px solid #608090; }
+                              background: $table_bg; color: $table_fg;
+                              border: $table_border; }
+td.summary                  { border: $table_border; }
 code.summary-type           { font-size: 85%; }
-table.summary a:link        { color: #0000ff; }
-table.summary a:visited     { color: #204080; }
+table.summary a:link        { color: $table_link; }
+table.summary a:visited     { color: $table_visited_link; }
 
 
 /* Details Tables (functions, variables, etc)
@@ -142,12 +142,12 @@ table.summary a:visited     { color: #204080; }
  *     is defined above, under 'Table Headers').
  */
 table.details               { border-collapse: collapse;
-                              background: #e8f0f8; color: #000000;
-                              border: 1px solid #608090;
+                              background: $table_bg; color: $table_fg;
+                              border: $table_border;
                               margin: .2em 0 0 0; }
-table.details table         { color: #000000; }
-table.details a:link        { color: #0000ff; }
-table.details a:visited     { color: #204080; }
+table.details table         { color: $table_fg; }
+table.details a:link        { color: $table_link; }
+table.details a:visited     { color: $table_visited_link; }
 
 /* Index tables (identifier index, term index, etc)
  *   - link-index is used for indices containing lists of links
@@ -158,34 +158,34 @@ table.details a:visited     { color: #204080; }
  *     extracted from fields (namely, the bug index & todo index).
  */
 table.link-index            { border-collapse: collapse;
-                              background: #e8f0f8; color: #000000;
-                              border: 1px solid #608090; }
+                              background: $table_bg; color: $table_fg;
+                              border: $table_border; }
 td.link-index               { border-width: 0px; }
-table.link-index a:link     { color: #0000ff; }
-table.link-index a:visited  { color: #204080; }
+table.link-index a:link     { color: $table_link; }
+table.link-index a:visited  { color: $table_visited_link; }
 span.index-where            { font-size: 70%; }
 table.metadata-index        { border-collapse: collapse;
-                              background: #e8f0f8; color: #000000;
-                              border: 1px solid #608090; 
+                              background: $table_bg; color: $table_fg;
+                              border: $table_border; 
                               margin: .2em 0 0 0; }
 td.metadata-index           { border-width: 1px; border-style: solid; }
-table.metadata-index a:link { color: #0000ff; }
-table.metadata-index a:visited  { color: #204080; }
+table.metadata-index a:link { color: $table_link; }
+table.metadata-index a:visited  { color: $table_visited_link; }
 
 /* Function signatures
  *   - sig* is used for the signature in the details section.
  *   - .summary-sig* is used for the signature in the summary 
  *     table, and when listing property accessor functions.
  * */
-.sig-name                   { color: #006080; }
-.sig-arg                    { color: #008060; }
-.sig-default                { color: #602000; }
+.sig-name                   { color: $sig_name; }
+.sig-arg                    { color: $sig_arg; }
+.sig-default                { color: $sig_default; }
 .summary-sig                { font-family: monospace; }
-.summary-sig-name           { color: #006080; font-weight: bold; }
-a.summary-sig-name:link     { color: #006080; font-weight: bold; }
-a.summary-sig-name:visited  { color: #006080; font-weight: bold; }
-.summary-sig-arg            { color: #006040; }
-.summary-sig-default        { color: #501800; }
+.summary-sig-name           { color: $summary_sig_name; font-weight: bold; }
+a.summary-sig-name:link     { color: $summary_sig_name; font-weight: bold; }
+a.summary-sig-name:visited  { color: $summary_sig_name; font-weight: bold; }
+.summary-sig-arg            { color: $summary_sig_arg; }
+.summary-sig-default        { color: $summary_sig_default; }
 
 /* Variable values
  *   - In the 'variable details' sections, each varaible's value is
@@ -201,16 +201,16 @@ a.summary-sig-name:visited  { color: #006080; font-weight: bold; }
  *     the re* CSS classes.
  */
 pre.variable                { padding: .5em; margin: 0;
-                              background: #dce4ec; color: #000000;
-                              border: 1px solid #708890; }
-.variable-linewrap          { color: #604000; font-weight: bold; }
-.variable-ellipsis          { color: #604000; font-weight: bold; }
-.variable-quote             { color: #604000; font-weight: bold; }
-.re                         { color: #000000; }
-.re-char                    { color: #006030; }
-.re-op                      { color: #600000; }
-.re-group                   { color: #003060; }
-.re-ref                     { color: #404040; }
+                              background: $variable_bg; color: $variable_fg;
+                              border: $variable_border; }
+.variable-linewrap          { color: $variable_linewrap; font-weight: bold; }
+.variable-ellipsis          { color: $variable_ellipsis; font-weight: bold; }
+.variable-quote             { color: $variable_quote; font-weight: bold; }
+.re                         { color: $re; }
+.re-char                    { color: $re_char; }
+.re-op                      { color: $re_op; }
+.re-group                   { color: $re_group; }
+.re-ref                     { color: $re_ref; }
 
 /* Base tree
  *   - Used by class pages to display the base class hierarchy.
@@ -249,36 +249,38 @@ h2.toc                      { font-size: 100%; font-weight: bold;
  *     etc.)
  */
 pre.py-doctest              { padding: .5em; margin: 1em;
-                              background: #e8f0f8; color: #000000;
-                              border: 1px solid #708890; }
-table pre.py-doctest        { background: #dce4ec;
-                              color: #000000; }
-pre.py-src                  { border: 2px solid #000000; 
-                              background: #f0f0f0; color: #000000; }
-.py-line                    { border-left: 2px solid #000000; 
+                              background: $doctest_bg; color: $doctest_fg;
+                              border: $doctest_border; }
+table pre.py-doctest        { background: $doctest_in_table_bg;
+                              color: $doctest_in_table_fg; }
+pre.py-src                  { border: $pysrc_border; 
+                              background: $pysrc_bg; color: $pysrc_fg; }
+.py-line                    { border-left: $pysrc_sep_border; 
                               margin-left: .2em; padding-left: .4em; }
 .py-lineno                  { font-style: italic; font-size: 90%;
                               padding-left: .5em; }
 a.py-toggle                 { text-decoration: none; }
-div.py-highlight-hdr        { border-top: 2px solid #000000;
-                              border-bottom: 2px solid #000000;
-                              background: #d8e8e8; }
-div.py-highlight            { border-bottom: 2px solid #000000;
-                              background: #d0e0e0; }
-.py-prompt                  { color: #005050; font-weight: bold;}
-.py-string                  { color: #006030; }
-.py-comment                 { color: #003060; }
-.py-keyword                 { color: #600000; }
-.py-output                  { color: #404040; }
-.py-name                    { color: #000050; }
-.py-name:link               { color: #000050; }
-.py-name:visited            { color: #000050; }
-.py-number                  { color: #005000; }
-.py-def-name                { color: #000060; font-weight: bold; }
-.py-base-class              { color: #000060; }
-.py-param                   { color: #000060; }
-.py-docstring               { color: #006030; }
-.py-decorator               { color: #804020; }
+div.py-highlight-hdr        { border-top: $pysrc_border;
+                              border-bottom: $pysrc_border;
+                              background: $pysrc_highlight_hdr_bg; }
+div.py-highlight            { border-bottom: $pysrc_border;
+                              background: $pysrc_highlight_bg; }
+.py-prompt                  { color: $py_prompt; font-weight: bold;}
+.py-more                    { color: $py_more; font-weight: bold;}
+.py-string                  { color: $py_string; }
+.py-comment                 { color: $py_comment; }
+.py-keyword                 { color: $py_keyword; }
+.py-output                  { color: $py_output; }
+.py-name                    { color: $py_name; }
+.py-name:link               { color: $py_name; }
+.py-name:visited            { color: $py_name; }
+.py-number                  { color: $py_number; }
+.py-defname                 { color: $py_def_name; font-weight: bold; }
+.py-def-name                { color: $py_def_name; font-weight: bold; }
+.py-base-class              { color: $py_base_class; }
+.py-param                   { color: $py_param; }
+.py-docstring               { color: $py_docstring; }
+.py-decorator               { color: $py_decorator; }
 /* Use this if you don't want links to names underlined: */
 /*a.py-name                   { text-decoration: none; }*/
 
@@ -289,7 +291,7 @@ div.py-highlight            { border-bottom: 2px solid #000000;
  *     clickable).
  */
 img.graph-without-title     { border: none; }
-img.graph-with-title        { border: 1px solid #000000; }
+img.graph-with-title        { border: $graph_border; }
 span.graph-title            { font-weight: bold; }
 span.graph-caption          { }
 
@@ -396,6 +398,7 @@ _WHITE_COLORS = dict(
     pysrc_highlight_hdr_bg  =  '#d8e8e8',
     pysrc_highlight_bg      =  '#d0e0e0',
     py_prompt               =  '#005050',
+    py_more                 =  '#005050',
     py_string               =  '#006030',
     py_comment              =  '#003060',
     py_keyword              =  '#600000',
@@ -445,7 +448,6 @@ _BLUE_COLORS.update(dict(
 
 _WHITE = _set_colors(TEMPLATE, _WHITE_COLORS)
 _BLUE = _set_colors(TEMPLATE, _BLUE_COLORS)
-_WHITE = _BLUE
 
     # Black-on-green
 _GREEN = _COLOR_RE.sub(_darken_darks, _COLOR_RE.sub(r'#\1\3\2', _BLUE))
