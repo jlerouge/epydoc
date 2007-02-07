@@ -437,7 +437,7 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
     # End the message block.
     log.end_block()
 
-RETURN_PDS = markup.parse('Returns', markup='epytext')
+RETURN_PDS = markup.parse('Returns:', markup='epytext')
 """A ParsedDocstring containing the text 'Returns'.  This is used to
 construct summary descriptions for routines that have empty C{descr},
 but non-empty C{return_descr}."""
