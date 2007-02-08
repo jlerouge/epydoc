@@ -1022,7 +1022,7 @@ class PythonSourceColorizer:
                     raise
 
             if onclick: s += "</a></tt>"
-            if url: s += '</a>'
+            elif url: s += '</a>'
             elif css_class_html or tooltip_html: s += '</tt>'
 
         if self.ADD_DEF_BLOCKS:
