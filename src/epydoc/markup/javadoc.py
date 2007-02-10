@@ -221,12 +221,26 @@ class ParsedJavadocDocstring(ParsedDocstring):
 
     # Jeff's hack to get summary working
     def summary(self):
-        m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', self._docstring)
+        # Drop tags
+        doc = "\n".join([ row for row in self._docstring.split('\n')
+                          if not row.lstrip().startswith('@') ])
+
+        m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', doc)
         if m:
-            return ParsedJavadocDocstring(m.group(1))
+            other = doc[m.end():]
+            return (ParsedJavadocDocstring(m.group(1)),
+                    other != '' and not other.isspace())
+            
         else:
-            summary = self._docstring.split('\n', 1)[0]+'...'
-            return ParsedJavadocDocstring(summary)
+            parts = doc.strip('\n').split('\n', 1)
+            if len(parts) == 1:
+                summary = parts[0]
+                other = False
+            else:
+                summary = parts[0] + '...'
+                other = True
+            
+            return ParsedJavadocDocstring(summary), other
         
 #     def concatenate(self, other):
 #         if not isinstance(other, ParsedJavadocDocstring):

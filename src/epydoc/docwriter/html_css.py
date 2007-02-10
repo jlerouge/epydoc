@@ -187,6 +187,10 @@ a.summary-sig-name:visited  { color: $summary_sig_name; font-weight: bold; }
 .summary-sig-arg            { color: $summary_sig_arg; }
 .summary-sig-default        { color: $summary_sig_default; }
 
+/* To render variables, classes etc. like functions */
+.summary-name               { color: $summary_sig_name; font-weight: bold;
+                              font-family: monospace; }
+
 /* Variable values
  *   - In the 'variable details' sections, each varaible's value is
  *     listed in a 'pre.variable' box.  The width of this box is

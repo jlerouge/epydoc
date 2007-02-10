@@ -258,12 +258,14 @@ class ParsedDocstring:
 
     def summary(self):
         """
-        @return: A short summary of this docstring.  Typically, the
-            summary consists of the first sentence of the docstring.
-        @rtype: L{ParsedDocstring}
+        @return: A pair consisting of a short summary of this docstring and a
+            boolean value indicating whether there is further documentation
+            in addition to the summary. Typically, the summary consists of the
+            first sentence of the docstring.
+        @rtype: (L{ParsedDocstring}, C{bool})
         """
         # Default behavior:
-        return self
+        return self, False
 
     def concatenate(self, other):
         """

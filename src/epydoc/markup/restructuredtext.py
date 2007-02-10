@@ -174,7 +174,7 @@ class ParsedRstDocstring(ParsedDocstring):
         visitor = _SummaryExtractor(self._document)
         try: self._document.walk(visitor)
         except docutils.nodes.NodeFound: pass
-        return visitor.summary
+        return visitor.summary, bool(visitor.other_docs)
 
 #     def concatenate(self, other):
 #         result = self._document.copy()
@@ -278,12 +278,16 @@ class _SummaryExtractor(NodeVisitor):
     def __init__(self, document):
         NodeVisitor.__init__(self, document)
         self.summary = None
+        self.other_docs = None
         
     def visit_document(self, node):
         self.summary = None
         
     def visit_paragraph(self, node):
-        if self.summary is not None: return
+        if self.summary is not None:
+            # found a paragraph after the first one
+            self.other_docs = True
+            raise docutils.nodes.NodeFound('Found summary')
 
         summary_pieces = []
 
@@ -293,6 +297,9 @@ class _SummaryExtractor(NodeVisitor):
                 m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', child.data)
                 if m:
                     summary_pieces.append(docutils.nodes.Text(m.group(1)))
+                    other = child.data[m.end():]
+                    if other and not other.isspace():
+                        self.other_docs = True
                     break
             summary_pieces.append(child)
 
@@ -301,7 +308,9 @@ class _SummaryExtractor(NodeVisitor):
         summary_doc[:] = [summary_para]
         summary_para[:] = summary_pieces
         self.summary = ParsedRstDocstring(summary_doc)
-        raise docutils.nodes.NodeFound('Found summary')
+
+    def visit_field(self, node):
+        raise SkipNode
 
     def unknown_visit(self, node):
         'Ignore all unknown nodes'

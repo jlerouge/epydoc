@@ -53,10 +53,19 @@ class ParsedPlaintextDocstring(ParsedDocstring):
     def summary(self):
         m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', self._text)
         if m:
-            return ParsedPlaintextDocstring(m.group(1), verbatim=0)
+            other = self._text[m.end():]
+            return (ParsedPlaintextDocstring(m.group(1), verbatim=0),
+                    other != '' and not other.isspace())
         else:
-            summary = self._text.split('\n', 1)[0]+'...'
-            return ParsedPlaintextDocstring(summary, verbatim=0)
+            parts = self._text.strip('\n').split('\n', 1)
+            if len(parts) == 1:
+                summary = parts[0]
+                other = False
+            else:
+                summary = parts[0] + '...'
+                other = True
+                
+            return ParsedPlaintextDocstring(summary, verbatim=0), other
         
 #     def concatenate(self, other):
 #         if not isinstance(other, ParsedPlaintextDocstring):

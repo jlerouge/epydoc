@@ -400,7 +400,7 @@ class HTMLWriter:
                               if not isinstance(d, GenericValueDoc)]
         for doc in valdocs:
             if isinstance(doc, NamespaceDoc):
-                # add any vars with generic vlaues; but don't include
+                # add any vars with generic values; but don't include
                 # inherited vars.
                 self.indexed_docs += [d for d in doc.variables.values() if
                                       isinstance(d.value, GenericValueDoc)
@@ -508,6 +508,11 @@ class HTMLWriter:
         if not directory: directory = os.curdir
         self._mkdir(directory)
         self._directory = directory
+
+        # Set the default value for L{ValueDoc.summary_linelen} so that
+        # L{ValueDoc.summary_pyval_repr()} return value is consistent with
+        # L{ValueDoc.is_detailed()}
+        ValueDoc.summary_linelen = self._variable_summary_linelen
 
         # Write the CSS file.
         self._files_written += 1
@@ -1898,6 +1903,8 @@ class HTMLWriter:
         @param container: The API documentation for the class or
             module whose summary table we're writing.
         """
+        link = None     # link to the source code
+        
         # If it's a private variable, then mark its <tr>.
         if var_doc.is_public: tr_class = ''
         else: tr_class = ' class="private"'
@@ -1907,24 +1914,18 @@ class HTMLWriter:
         if isinstance(var_doc.value, RoutineDoc):
             typ = self.return_type(var_doc, indent=6)
             description = self.function_signature(var_doc, True, True)
+            link = self.pysrc_link(var_doc.value)
         else:
             typ = self.type_descr(var_doc, indent=6)
-            description = self.href(var_doc)
+            description = self.summary_name(var_doc, link_name=True)
             if isinstance(var_doc.value, GenericValueDoc):
-                pyval_repr = var_doc.value.pyval_repr()
-                if pyval_repr is not UNKNOWN:
-                    val_repr = pyval_repr
-                else:
-                    val_repr = var_doc.value.parse_repr
-                if val_repr is not UNKNOWN:
-                    val_repr = ' '.join(val_repr.strip().split())
-                    maxlen = self._variable_summary_linelen
-                    if len(val_repr) > maxlen:
-                        val_repr = val_repr[:maxlen-3]+'...'
-                    val_repr = plaintext_to_html(val_repr)
-                    tooltip = self.variable_tooltip(var_doc)
-                    description += (' = <code%s>%s</code>' %
-                                    (tooltip, val_repr))
+                # The summary max length has been chosen setting
+                # L{ValueDoc.summary_linelen} when L{write()} was called
+                val_repr = var_doc.value.summary_pyval_repr()[0]
+                val_repr = plaintext_to_html(val_repr)
+                tooltip = self.variable_tooltip(var_doc)
+                description += (' = <code%s>%s</code>' %
+                                (tooltip, val_repr))
 
         # Add the summary to the description (if there is one).
         summary = self.summary(var_doc, indent=6)
@@ -1936,11 +1937,11 @@ class HTMLWriter:
                         self.href(var_doc.container) + ")</em>")
 
         # Write the summary line.
-        self._write_summary_line(out, typ, description, tr_class)
+        self._write_summary_line(out, typ, description, tr_class, link)
 
     _write_summary_line = compile_template(
         """
-        _write_summary_line(self, out, typ, description, tr_class)
+        _write_summary_line(self, out, typ, description, tr_class, link)
         """,
         # /------------------------- Template -------------------------\
         '''
@@ -1948,7 +1949,17 @@ class HTMLWriter:
             <td width="15%" align="right" valign="top" class="summary">
               <span class="summary-type">$typ or "&nbsp;"$</span>
             </td><td class="summary">
-              $description$
+        >>> if link is not None:
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>$description$</td>
+                  <td align="right" valign="top">$link$</td>
+                </tr>
+              </table>
+        >>> #endif
+        >>> if link is None:
+                $description$
+        >>> #endif
             </td>
           </tr>
         ''')
@@ -1963,11 +1974,13 @@ class HTMLWriter:
         if isinstance(doc, ClassDoc):
             var_docs = doc.select_variables(value_type=value_type,
                                             imported=False, inherited=False,
-                                            public=self._public_filter)
+                                            public=self._public_filter,
+                                            detailed=True)
         else:
             var_docs = doc.select_variables(value_type=value_type,
                                             imported=False,
-                                            public=self._public_filter)
+                                            public=self._public_filter,
+                                            detailed=True)
         if not var_docs: return
 
         # Write a header
@@ -2273,15 +2286,8 @@ class HTMLWriter:
     def variable_tooltip(self, var_doc):
         if var_doc.value in (None, UNKNOWN):
             return ''
-        else:
-            pyval_repr = var_doc.value.pyval_repr()
-            if pyval_repr is not UNKNOWN:
-                s = pyval_repr
-            elif var_doc.value.parse_repr is not UNKNOWN:
-                s = var_doc.value.parse_repr
-            else:
-                return ''
-            
+
+        s = var_doc.value.pyval_repr()
         if len(s) > self._variable_tooltip_linelen:
             s = s[:self._variable_tooltip_linelen-3]+'...'
         return ' title="%s"' % plaintext_to_html(s)
@@ -2290,15 +2296,8 @@ class HTMLWriter:
         if val_doc is UNKNOWN: return ''
         if val_doc.pyval is not UNKNOWN:
             return self.pprint_pyval(val_doc.pyval)
-        elif val_doc.pyval_repr() is not UNKNOWN:
-            s = plaintext_to_html(val_doc.pyval_repr())
-        elif val_doc.parse_repr is not UNKNOWN:
-            s = plaintext_to_html(val_doc.parse_repr)
         elif isinstance(val_doc, GenericValueDoc):
-            # This *should* never happen -- GenericValueDoc's should always
-            # have a pyval_repr or a parse_repr.
-            log.debug('pprint_value() got GenericValueDoc w/ UNKNOWN repr')
-            return ''
+            s = plaintext_to_html(val_doc.pyval_repr())
         else:
             s = self.href(val_doc)
         return self._linewrap_html(s, self._variable_linelen,
@@ -2537,15 +2536,12 @@ class HTMLWriter:
                          '</span>(...)</span>') %
                         (css_class, css_class, api_doc.name))
             # Get the function's name.
-            if link_name:
-                name = self.href(api_doc, css_class=css_class+'-name')
-            else:
-                name = ('<span class="%s-name">%s</span>' %
-                        (css_class, api_doc.name))
+            name = self.summary_name(api_doc, css_class=css_class+'-name',
+                                     link_name=link_name)
         else:
             func_doc = api_doc
             name = self.href(api_doc, css_class=css_class+'-name')
-            
+
         if func_doc.posargs == UNKNOWN:
             args = ['...']
         else:
@@ -2564,6 +2560,13 @@ class HTMLWriter:
         return ('<span class="%s">%s(%s)</span>' %
                 (css_class, name, ',\n        '.join(args)))
 
+    def summary_name(self, api_doc, css_class='summary-name', link_name=False):
+        if link_name and api_doc.is_detailed():
+            return self.href(api_doc, css_class=css_class)
+        else:
+            return '<a name="%s" /><span class="%s">%s</span>' % \
+                (api_doc.name, css_class, api_doc.name)
+
     # [xx] tuple args???
     def func_arg(self, name, default, css_class):
         name = self._arg_name(name)
@@ -2573,12 +2576,8 @@ class HTMLWriter:
                 s += ('=<span class="%s-default">%s</span>' %
                       (css_class, plaintext_to_html(default.parse_repr)))
             else:
-                pyval_repr = default.pyval_repr()
-                if pyval_repr is not UNKNOWN:
-                    s += ('=<span class="%s-default">%s</span>' %
-                          (css_class, plaintext_to_html(pyval_repr)))
-                else:
-                    s += '=<span class="%s-default">??</span>' % css_class
+                s += ('=<span class="%s-default">%s</span>' %
+                        (css_class, plaintext_to_html(default.pyval_repr())))
         return s
 
     def _arg_name(self, arg):

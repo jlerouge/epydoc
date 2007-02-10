@@ -235,13 +235,15 @@ def parse_docstring(api_doc, docindex):
 
     # Extract a summary
     if api_doc.summary is None and api_doc.descr is not None:
-        api_doc.summary = api_doc.descr.summary()
+        api_doc.summary, api_doc.other_docs = api_doc.descr.summary()
 
     # If the summary is empty, but the return field is not, then use
     # the return field to generate a summary description.
     if (isinstance(api_doc, RoutineDoc) and api_doc.summary is None and
         api_doc.return_descr is not None):
-        api_doc.summary = RETURN_PDS + api_doc.return_descr.summary()
+        s, o = api_doc.return_descr.summary()
+        api_doc.summary = RETURN_PDS + s
+        api_doc.other_docs = o
 
     # [XX] Make sure we don't have types/param descrs for unknown
     # vars/params?
@@ -653,7 +655,7 @@ def process_cvar_field(api_doc, docindex, tag, arg, descr):
         _check(api_doc, tag, arg, expect_arg=False)
         api_doc.is_instvar = False
         api_doc.descr = markup.ConcatenatedDocstring(api_doc.descr, descr)
-        api_doc.summary = descr.summary()
+        api_doc.summary, api_doc.other_docs = descr.summary()
 
     # Otherwise, @cvar should be used in a class.
     else:
@@ -671,7 +673,7 @@ def process_ivar_field(api_doc, docindex, tag, arg, descr):
         # require that there be no other descr?
         api_doc.is_instvar = True
         api_doc.descr = markup.ConcatenatedDocstring(api_doc.descr, descr)
-        api_doc.summary = descr.summary()
+        api_doc.summary, api_doc.other_docs = descr.summary()
 
     # Otherwise, @ivar should be used in a class.
     else:
@@ -768,7 +770,7 @@ def set_var_descr(api_doc, ident, descr):
         raise ValueError(REDEFINED % ('description for '+ident))
     var_doc.descr = descr
     if var_doc.summary in (None, UNKNOWN):
-        var_doc.summary = var_doc.descr.summary()
+        var_doc.summary, var_doc.other_docs = var_doc.descr.summary()
 
 def set_var_type(api_doc, ident, descr):
     if ident not in api_doc.variables:

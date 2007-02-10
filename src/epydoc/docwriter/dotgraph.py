@@ -693,14 +693,9 @@ class DotGraphUmlClassNode(DotGraphNode):
         """
         if default is None:
             return '%s' % name
-        elif default.parse_repr is not UNKNOWN:
-            return '%s=%s' % (name, default.parse_repr)
         else:
-            pyval_repr = default.pyval_repr()
-            if pyval_repr is not UNKNOWN:
-                return '%s=%s' % (name, pyval_repr)
-            else:
-                return '%s=??' % name
+            pyval_repr = default.summary_pyval_repr()[0]
+            return '%s=%s' % (name, pyval_repr)
 
     def _qualifier_cell(self, key_label, port):
         return self._QUALIFIER_CELL  % (port, self.bgcolor, key_label)

@@ -341,6 +341,11 @@ class APIDoc(object):
        its docstring.
        @type: L{ParsedDocstring<epydoc.markup.ParsedDocstring>}"""
     
+    other_docs = UNKNOWN
+    """@ivar: A flag indicating if the entire L{docstring} body (except tags
+       if any) is entirely included in the L{summary}.
+       @type: C{bool}"""
+    
     metadata = UNKNOWN
     """@ivar: Metadata about the documented item, extracted from fields in
        its docstring.  I{Currently} this is encoded as a list of tuples
@@ -446,7 +451,20 @@ class APIDoc(object):
         name_cmp = cmp(self.canonical_name, other.canonical_name)
         if name_cmp == 0: return -1
         else: return name_cmp
-        
+
+    def is_detailed(self):
+        """
+        Does this object deserve a box with extra details?
+
+        @return: True if the object needs extra details, else False.
+        @rtype: C{bool}
+        """
+        if self.other_docs is True:
+            return True
+
+        if self.metadata is not UNKNOWN:
+            return bool(self.metadata)
+
     __mergeset = None
     """The set of all C{APIDoc} objects that have been merged with
     this C{APIDoc} (using L{merge_and_overwrite()}).  Each C{APIDoc}
@@ -655,6 +673,12 @@ class VariableDoc(APIDoc):
         else:
             return [self.value]
 
+    def is_detailed(self):
+        if (self.value in (None, UNKNOWN)):
+            return super(VariableDoc, self).is_detailed()
+        else:
+            return self.value.is_detailed()
+
 ######################################################################
 # Value Documentation Objects
 ######################################################################
@@ -699,6 +723,9 @@ class ValueDoc(APIDoc):
        reflect the actual value (e.g., if the value was modified after
        the initial assignment).
        @type: C{unicode}"""
+
+    summary_linelen = 75
+    """@cvar: The maximum length of a row to fit in a summary."""
     #} end of "value representation" group
 
     #{ Context
@@ -737,12 +764,8 @@ class ValueDoc(APIDoc):
     def __repr__(self):
         if self.canonical_name is not UNKNOWN:
             return '<%s %s>' % (self.__class__.__name__, self.canonical_name)
-        elif self.pyval_repr() is not UNKNOWN:
-            return '<%s %s>' % (self.__class__.__name__, self.pyval_repr())
-        elif self.parse_repr is not UNKNOWN:
-            return '<%s %s>' % (self.__class__.__name__, self.parse_repr)
         else:
-            return '<%s>' % self.__class__.__name__
+            return '<%s %s>' % (self.__class__.__name__, self.pyval_repr())
 
     def __setstate__(self, state):
         self.__dict__ = state
@@ -766,11 +789,69 @@ class ValueDoc(APIDoc):
         # Return the pickle state.
         return self.__pickle_state
 
+    UNKNOWN_REPR = "??"
+    """@cvar: The string representation of an unknown value."""
+
     def pyval_repr(self):
-        if not hasattr(self, '_pyval_repr'):
-            self._pyval_repr = self._get_pyval_repr()
-        return self._pyval_repr
-        
+        """Return a string representation of the python value.
+
+        The string representation may include data from introspection, parsing
+        and is authoritative as "the best way to represent a Python value."
+
+        @return: A nice string representation. Never C{None} nor L{UNKNOWN}
+        @rtype: C{str}
+
+        @todo: String representation can be made better here.
+        """
+        if hasattr(self, '_pyval_repr'):
+            return self._pyval_repr
+
+        rv = self._get_pyval_repr()
+        if rv is UNKNOWN:
+            rv = self.parse_repr
+
+        if rv is UNKNOWN:
+            rv = self.UNKNOWN_REPR
+
+        assert isinstance(rv, basestring)
+        self._pyval_repr = rv
+        return rv
+
+    def summary_pyval_repr(self, max_len=None):
+        """Return a short version of L{pyval_repr}, fitting on a single line.
+
+        Notice that L{GenericValueDoc.is_detailed()} uses this function to
+        return an answer leavling C{max_len} to the default value. So, if
+        a writer is to decide whether to emit a complete representation or
+        limit itself to the summary, it should call this function leaving
+        C{max_len} to its default value too, if it wants to generate consistent
+        results.
+
+        @param max_len: The maximum length allowed. If None, use
+            L{summary_linelen}
+
+        @return: the short representation and a boolean value stating if there
+            is further value to represent after such representation or not.
+
+        @rtype: C{(str, bool)}
+        """
+        ro = self.pyval_repr()
+        lo = False
+
+        # Reduce to a single line
+        if "\n" in ro:
+            ro = ro.split("\n",1)[0]
+            lo = True
+
+        # Truncate a long line
+        if max_len is None:
+            max_len = self.summary_linelen
+        if len(ro) > max_len:
+            ro = ro[:max_len-3]+'...'
+            lo = True
+
+        return (ro, lo)
+
     def _get_pyval_repr(self):
         """
         Return a string representation of this value based on its pyval;
@@ -801,6 +882,9 @@ class GenericValueDoc(ValueDoc):
     """
     canonical_name = None
     
+    def is_detailed(self):
+        return self.summary_pyval_repr()[1]
+
 class NamespaceDoc(ValueDoc):
     """
     API documentation information about a singe Python namespace
@@ -856,6 +940,9 @@ class NamespaceDoc(ValueDoc):
         kwargs.setdefault('variables', {})
         APIDoc.__init__(self, **kwargs)
         assert self.variables is not UNKNOWN
+
+    def is_detailed(self):
+        return True
 
     def apidoc_links(self, **filters):
         variables = filters.get('variables', True)
@@ -1038,7 +1125,7 @@ class ModuleDoc(NamespaceDoc):
         self.submodule_groups = self._init_grouping(elts)
 
     def select_variables(self, group=None, value_type=None, public=None,
-                         imported=None):
+                         imported=None, detailed=None):
         """
         Return a specified subset of this module's L{sorted_variables}
         list.  If C{value_type} is given, then only return variables
@@ -1065,6 +1152,11 @@ class ModuleDoc(NamespaceDoc):
             always the special group name C{''}, which is used for
             variables that do not belong to any group.
         @type group: C{string}
+
+        @param detailed: If True (False), return only the variables
+            deserving (not deserving) a detailed informative box.
+            If C{None}, don't care.
+        @type detailed: C{bool}
         """
         if (self.sorted_variables is UNKNOWN or 
             self.variable_groups is UNKNOWN):
@@ -1086,6 +1178,12 @@ class ModuleDoc(NamespaceDoc):
             var_list = [v for v in var_list if v.is_imported is True]
         elif imported is False:
             var_list = [v for v in var_list if v.is_imported is not True]
+
+        # Detailed filter
+        if detailed is True:
+            var_list = [v for v in var_list if v.is_detailed() is True]
+        elif detailed is False:
+            var_list = [v for v in var_list if v.is_detailed() is not True]
 
         # [xx] Modules are not currently included in any of these
         # value types.
@@ -1211,8 +1309,8 @@ class ClassDoc(NamespaceDoc):
           for seq in nonemptyseqs: # remove cand
               if seq[0] == cand: del seq[0]
     
-    def select_variables(self, group=None, value_type=None,
-                         inherited=None, public=None, imported=None):
+    def select_variables(self, group=None, value_type=None, inherited=None,
+                         public=None, imported=None, detailed=None):
         """
         Return a specified subset of this class's L{sorted_variables}
         list.  If C{value_type} is given, then only return variables
@@ -1257,6 +1355,11 @@ class ClassDoc(NamespaceDoc):
         @param inherited: If C{None}, then return both inherited and
             local variables; if C{True}, then return only inherited
             variables; if C{False}, then return only local variables.
+
+        @param detailed: If True (False), return only the variables
+            deserving (not deserving) a detailed informative box.
+            If C{None}, don't care.
+        @type detailed: C{bool}
         """
         if (self.sorted_variables is UNKNOWN or 
             self.variable_groups is UNKNOWN):
@@ -1284,7 +1387,13 @@ class ClassDoc(NamespaceDoc):
             var_list = [v for v in var_list if v.is_imported is True]
         elif imported is False:
             var_list = [v for v in var_list if v.is_imported is not True]
-        
+
+        # Detailed filter
+        if detailed is True:
+            var_list = [v for v in var_list if v.is_detailed() is True]
+        elif detailed is False:
+            var_list = [v for v in var_list if v.is_detailed() is not True]
+
         if value_type is None:
             return var_list
         elif value_type == 'method':
@@ -1399,6 +1508,29 @@ class RoutineDoc(ValueDoc):
        @type: C{list}"""
     #} end of "information extracted from docstrings" group
 
+    def is_detailed(self):
+        if super(RoutineDoc, self).is_detailed():
+            return True
+
+        if self.arg_descrs not in (None, UNKNOWN) and self.arg_descrs:
+            return True
+
+        if self.arg_types not in (None, UNKNOWN) and self.arg_types:
+            return True
+
+        if self.return_descr not in (None, UNKNOWN):
+            return True
+
+        if self.exception_descrs not in (None, UNKNOWN) and self.exception_descrs:
+            return True
+
+        if (self.decorators not in (None, UNKNOWN)
+            and [ d for d in self.decorators
+                 if d not in ('classmethod', 'staticmethod') ]):
+            return True
+
+        return False
+
     def all_args(self):
         """
         @return: A list of the names of all arguments (positional,
@@ -1459,6 +1591,19 @@ class PropertyDoc(ValueDoc):
         if self.fset not in (None, UNKNOWN): val_docs.append(self.fset)
         if self.fdel not in (None, UNKNOWN): val_docs.append(self.fdel)
         return val_docs
+
+    def is_detailed(self):
+        if super(PropertyDoc, self).is_detailed():
+            return True
+
+        if self.fget not in (None, UNKNOWN) and self.fget.pyval is not None:
+             return True
+        if self.fset not in (None, UNKNOWN) and self.fset.pyval is not None:
+             return True
+        if self.fdel not in (None, UNKNOWN) and self.fdel.pyval is not None:
+             return True
+
+        return False
 
 ######################################################################
 ## Index

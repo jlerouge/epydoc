@@ -1,0 +1,52 @@
+Regression Testing for plaintext
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Summary
+=======
+The implementation of the summaization function works as expected.
+
+>>> from epydoc.markup import plaintext
+>>> def getsummary(s):
+...     p = plaintext.parse_docstring(s, [])
+...     s, o = p.summary()
+...     s = s.to_plaintext(None).strip()
+...     return s, o
+
+Let's not lose anything!
+
+>>> getsummary("Single line")
+('Single line', False)
+
+>>> getsummary("Single line.")
+('Single line.', False)
+
+>>> getsummary("""
+... Single line with period.
+... """)
+('Single line with period.', False)
+
+>>> getsummary("""
+... Other lines with period.
+... This is attached
+... """)
+('Other lines with period.', True)
+
+>>> getsummary("""
+... Other lines with period.
+...
+... This is detached
+... """)
+('Other lines with period.', True)
+
+>>> getsummary("""
+... Other lines without period
+... This is attached
+... """)
+('Other lines without period...', True)
+
+>>> getsummary("""
+... Other lines without period
+...
+... This is detached
+... """)
+('Other lines without period...', True)

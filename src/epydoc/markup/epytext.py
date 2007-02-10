@@ -1952,7 +1952,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return childstr
 
     def summary(self):
-        if self._tree is None: return self
+        if self._tree is None: return self, False
         tree = self._tree
         doc = Element('epytext')
     
@@ -1974,8 +1974,16 @@ class ParsedEpytextDocstring(ParsedDocstring):
             variables[0].children.append(str)
     
         # If we didn't find a paragraph, return an empty epytext.
-        if len(variables) == 0: return ParsedEpytextDocstring(doc)
+        if len(variables) == 0: return ParsedEpytextDocstring(doc), False
     
+        # Is there anything else, excluding tags, after the first variable?
+        long_docs = False
+        for var in variables[1:]:
+            if isinstance(var, Element) and var.tag == 'fieldlist':
+                continue
+            long_docs = True
+            break
+        
         # Extract the first sentence.
         parachildren = variables[0].children
         para = Element('para')
@@ -1985,10 +1993,15 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', parachild)
                 if m:
                     para.children.append(m.group(1))
-                    return ParsedEpytextDocstring(doc)
+                    long_docs |= parachild is not parachildren[-1]
+                    if not long_docs:
+                        other = parachild[m.end():]
+                        if other and not other.isspace():
+                            long_docs = True
+                    return ParsedEpytextDocstring(doc), long_docs
             para.children.append(parachild)
 
-        return ParsedEpytextDocstring(doc)
+        return ParsedEpytextDocstring(doc), long_docs
 
     def split_fields(self, errors=None):
         if self._tree is None: return (self, ())
