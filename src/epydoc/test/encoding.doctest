@@ -202,7 +202,6 @@ properties:
     ... ''') # doctest: +ELLIPSIS
     <property object at ...>'s docstring is not a unicode string, but it contains non-ascii data -- treating it as latin-1.
     &#194;&#128;
-    &#194;&#128;
 
 Introspection/Parsing Tests
 ===========================
@@ -252,7 +251,6 @@ Make sure that docstrings are rendered correctly in different contexts.
     ... """
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
 
     >>> test('''# -*- coding: utf-8 -*-
     ... def f(x):
@@ -285,10 +283,6 @@ Make sure that docstrings are rendered correctly in different contexts.
     ...     
     ...     z = property(doc=u"abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80")
     ... ''')
-    abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
