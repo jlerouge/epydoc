@@ -77,7 +77,7 @@ from docutils.utils import new_document
 from docutils.nodes import NodeVisitor, Text, SkipChildren
 from docutils.nodes import SkipNode, TreeCopyVisitor
 from docutils.frontend import OptionParser
-from docutils.parsers.rst import directives
+from docutils.parsers.rst import directives, Directive
 import docutils.nodes
 import docutils.transforms.frontmatter
 import docutils.transforms
@@ -87,7 +87,8 @@ from epydoc.compat import * # Backwards compatibility
 from epydoc.markup import *
 from epydoc.apidoc import ModuleDoc, ClassDoc
 from epydoc.docwriter.dotgraph import *
-from epydoc.markup.doctest import doctest_to_html, doctest_to_latex
+from epydoc.markup.doctest import doctest_to_html, doctest_to_latex, \
+                                  HTMLDoctestColorizer
 
 #: A dictionary whose keys are the "consolidated fields" that are
 #: recognized by epydoc; and whose values are the corresponding epydoc
@@ -619,8 +620,29 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         raise SkipNode()
 
     def visit_doctest_block(self, node):
-        self.body.append(doctest_to_html(str(node[0])))
+        pysrc = str(node[0])
+        if node.get('codeblock'):
+            self.body.append(HTMLDoctestColorizer().colorize_codeblock(pysrc))
+        else:
+            self.body.append(doctest_to_html(str(node[0])))
         raise SkipNode()
+
+
+class PythonCodeDirective(Directive):
+    required_arguments = 0
+    optional_arguments = 0
+    has_content = True
+
+    def run(self):
+        self.assert_has_content()
+        text = '\n'.join(self.content)
+
+        #node = docutils.nodes.doctest_block(rawsource=text)
+        #self.state.nested_parse(self.content, self.content_offset, node)
+        node = docutils.nodes.doctest_block(text, text, codeblock=True)
+        return [ node ]
+
+directives.register_directive('python', PythonCodeDirective)
 
 ######################################################################
 #{ Graph Generation Directives

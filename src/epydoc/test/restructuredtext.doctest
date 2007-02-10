@@ -75,3 +75,36 @@ The implementation of the summaization function works as expected.
 ... Other stuff after a tag.
 ... """)
 (u'This is the first line.', True)
+
+Python code
+===========
+reStructuredText markup defines a ``python`` directive to represent a block
+as colorized Python code.
+
+>>> err = []
+>>> p = restructuredtext.parse_docstring(
+... """A test module
+...
+... .. python::
+...
+...     # This is some Python code
+...     def foo():
+...         pass
+...
+...     class Foo:
+...         def __init__(self):
+...             pass
+... """, err)
+>>> err
+[]
+>>> print p.to_html(None)
+<p>A test module</p>
+<pre class="py-doctest">
+<span class="py-comment"># This is some Python code</span>
+<span class="py-keyword">def</span> <span class="py-defname">foo</span>():
+    <span class="py-keyword">pass</span>
+<BLANKLINE>
+<span class="py-keyword">class</span> <span class="py-defname">Foo</span>:
+    <span class="py-keyword">def</span> <span class="py-defname">__init__</span>(self):
+        <span class="py-keyword">pass</span></pre>
+<BLANKLINE>
