@@ -22,7 +22,9 @@ method.)
     >>> # Monkey-patch the write function:
     >>> def docstring_to_html(self, parsed_docstring, w=None, i=0):
     ...     s = parsed_docstring.to_html(None).strip()
-    ...     print s.encode('ascii', 'xmlcharrefreplace')
+    ...     s = s.encode('ascii', 'xmlcharrefreplace')
+    ...     s = remove_surrogates(s)
+    ...     print s
     ...     return ''
     >>> HTMLWriter.docstring_to_html = docstring_to_html
 
