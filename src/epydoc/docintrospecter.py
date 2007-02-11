@@ -240,6 +240,14 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
     if module_doc.package not in (None, UNKNOWN):
         module_doc.package.submodules.append(module_doc)
 
+    # Look up the module's __all__ attribute (public names).
+    public_names = None
+    if hasattr(module, '__all__'):
+        try:
+            public_names = set([str(name) for name in module.__all__])
+        except KeyboardInterrupt: raise
+        except: pass
+
     # Record the module's variables.
     module_doc.variables = {}
     for child_name in dir(module):
@@ -249,7 +257,10 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
         # Create a VariableDoc for the child, and introspect its
         # value if it's defined in this module.
         container = get_containing_module(child)
-        if container is not None and container == module_doc.canonical_name:
+        if ((container is not None and
+             container == module_doc.canonical_name) or
+            (public_names is not None and
+             child_name in public_names)):
             # Local variable.
             child_val_doc = introspect_docs(child, context=module_doc,
                                             module_name=dotted_name)
@@ -278,21 +289,17 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
                                         container=module_doc,
                                         docs_extracted_by='introspecter')
 
-        module_doc.variables[child_name] = child_var_doc
+        # If the module's __all__ attribute is set, use it to set the
+        # variables public/private status and imported status.
+        if public_names is not None:
+            if child_name in public_names:
+                child_var_doc.is_public = True
+                if not isinstance(child_var_doc, ModuleDoc):
+                    child_var_doc.is_imported = False
+            else:
+                child_var_doc.is_public = False
 
-    # Record the module's __all__ attribute (public names).
-    if hasattr(module, '__all__'):
-        try:
-            public_names = set([str(name) for name in module.__all__])
-            for name, var_doc in module_doc.variables.items():
-                if name in public_names:
-                    var_doc.is_public = True
-                    if not isinstance(var_doc, ModuleDoc):
-                        var_doc.is_imported = False
-                else:
-                    var_doc.is_public = False
-        except KeyboardInterrupt: raise
-        except: pass
+        module_doc.variables[child_name] = child_var_doc
 
     return module_doc
 

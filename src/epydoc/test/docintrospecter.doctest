@@ -614,3 +614,24 @@ Recursive objects
            +- name = 'b'
            +- value
               +- ClassDoc for epydoc_test.B [1] (defined above)
+
+Closed Bugs
+===========
+
+SF Bug [ 1657050 ] Builtins not resolved in "os"
+------------------------------------------------
+If a variable is listed in __all__, then we need to introspect it,
+even if we know for certain that it's imported.  Before this bug
+was fixed, the following test generated a generic 'ValueDoc' value
+instead of a 'RoutineDoc' value, because it didn't introspect the
+value of getcwd.
+
+    >>> x = runintrospecter(s="""
+    ...     __all__ = ['getcwd']
+    ...     from os import getcwd
+    ...     """, attribs='variables value')
+    ModuleDoc for epydoc_test [0]
+     +- variables
+        +- getcwd => VariableDoc for epydoc_test.getcwd [1]
+           +- value
+              +- RoutineDoc [2]
