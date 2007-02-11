@@ -1064,7 +1064,7 @@ def _colorize(doc, token, errors, tagName='para'):
 
             # Special handling for literal braces elements:
             if stack[-1].tag == 'litbrace':
-                stack[-2].children = ['{'] + stack[-1].children + ['}']
+                stack[-2].children[-1:] = ['{'] + stack[-1].children + ['}']
 
             # Special handling for graphs:
             if stack[-1].tag == 'graph':
