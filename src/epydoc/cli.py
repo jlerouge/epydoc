@@ -92,6 +92,7 @@ def parse_arguments():
     generation_group = OptionGroup(optparser, 'Generation options')
     output_group = OptionGroup(optparser, 'Output options')
     graph_group = OptionGroup(optparser, 'Graph options')
+    return_group = OptionGroup(optparser, 'Return value options')
 
     optparser.add_option(
         '--config', action='append', dest="configfiles", metavar='FILE',
@@ -252,11 +253,29 @@ def parse_arguments():
              ("Run the hotshot profiler on epydoc itself.  Output "
               "will be written to profile.out."))
 
+    return_group.add_option(
+        "--fail-on-error", action="store_const", dest="fail_on",
+        const=log.ERROR,
+        help="Return a non-zero exit status, indicating failure, if any "
+        "errors are encountered.")
+    return_group.add_option(
+        "--fail-on-warning", action="store_const", dest="fail_on",
+        const=log.WARNING,
+        help="Return a non-zero exit status, indicating failure, if any "
+        "errors or warnings are encountered (not including docstring "
+        "warnings).")
+    return_group.add_option(
+        "--fail-on-docstring-warning", action="store_const", dest="fail_on",
+        const=log.DOCSTRING_WARNING,
+        help="Return a non-zero exit status, indicating failure, if any "
+        "errors or warnings are encountered (including docstring "
+        "warnings).")
     # Add the option groups.
     optparser.add_option_group(action_group)
     optparser.add_option_group(generation_group)
     optparser.add_option_group(output_group)
     optparser.add_option_group(graph_group)
+    optparser.add_option_group(return_group)
 
     # Set the option parser's defaults.
     optparser.set_defaults(action="html", show_frames=True,
@@ -269,7 +288,7 @@ def parse_arguments():
                            graphs=[], list_classes_separately=False,
                            graph_font=None, graph_font_size=None,
                            include_source_code=True, pstat_files=[],
-                           simple_term=False)
+                           simple_term=False, fail_on=None)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -417,6 +436,17 @@ def parse_configfiles(configfiles, options, names):
             options.pstat_files.extend(val.replace(',', ' ').split())
         elif optname in ('simple-term', 'simple_term'):
             options.simple_term = _str_to_bool(val, optname)
+        elif optname in ('failon', 'fail-on', 'fail_on'):
+            if val.lower.strip() in ('error', 'errors'):
+                options.fail_on = log.ERROR
+            elif val.lower.strip() in ('warning', 'warnings'):
+                options.fail_on = log.WARNING
+            elif val.lower.strip() in ('docstring_warning',
+                                       'docstring_warnings'):
+                options.fail_on = log.DOCSTRING_WARNING
+            else:
+                raise ValueError("%r expected one of: error, warning, "
+                                 "docstring_warning" % optname)
         else:
             raise ValueError('Unknown option %s' % optname)
 
@@ -482,7 +512,8 @@ def main(options, names):
     if options.action not in ('text', 'check', 'pickle'):
         if os.path.exists(options.target):
             if not os.path.isdir(options.target):
-                return log.error("%s is not a directory" % options.target)
+                log.error("%s is not a directory" % options.target)
+                sys.exit(1)
 
     # Set the default docformat
     from epydoc import docstringparser
@@ -526,7 +557,10 @@ def main(options, names):
                                    exclude_parse=options.exclude_parse)
 
     if docindex is None:
-        return # docbuilder already logged an error.
+        if log.ERROR in logger.reported_message_levels:
+            sys.exit(1)
+        else:
+            return # docbuilder already logged an error.
 
     # Load profile information, if it was given.
     if options.pstat_files:
@@ -571,6 +605,13 @@ def main(options, names):
     # Basic timing breakdown:
     if options.verbosity >= 2 and logger is not None:
         logger.print_times()
+
+    # If we encountered any message types that we were requested to
+    # fail on, then exit with status 1.
+    if options.fail_on is not None:
+        max_reported_message_level = max(logger.reported_message_levels)
+        if max_reported_message_level >= options.fail_on:
+            sys.exit(1)
 
 def write_html(docindex, options):
     from epydoc.docwriter.html import HTMLWriter
@@ -721,6 +762,8 @@ def cli():
             _profile()
         else:
             main(options, names)
+    except SystemExit:
+        raise
     except KeyboardInterrupt:
         print '\n\n'
         print >>sys.stderr, 'Keyboard interrupt.'
@@ -733,7 +776,7 @@ def cli():
         print >>sys.stderr, ('\nUNEXPECTED ERROR:\n'
                              '%s\n' % (str(e) or e.__class__.__name__))
         print >>sys.stderr, 'Use --debug to see trace information.'
-
+    
 def _profile():
     # Hotshot profiler.
     if PROFILER == 'hotshot':
@@ -867,6 +910,11 @@ class ConsoleLogger(log.Logger):
         # For per-task times:
         self._task_times = []
         self._progress_header = None
+
+        self.reported_message_levels = set()
+        """This set contains all the message levels (WARNING, ERROR,
+        etc) that have been reported.  It is used by the options
+        --fail-on-warning etc to determine the return value."""
         
         self.supressed_docstring_warning = 0
         """This variable will be incremented once every time a
@@ -932,6 +980,7 @@ class ConsoleLogger(log.Logger):
         return color+prefix+self.term.NORMAL+''.join(lines)
 
     def log(self, level, message):
+        self.reported_message_levels.add(level)
         if self._verbosity >= -2 and level >= log.ERROR:
             message = self._format('  Error: ', message, self.term.RED)
         elif self._verbosity >= -1 and level >= log.WARNING:
