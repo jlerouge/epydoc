@@ -136,17 +136,14 @@ api-pdf: .api-pdf.up2date
 	       --name "Epydoc $(VERSION)" $(PY_SRC) -v --debug
 	touch .api-pdf.up2date
 
-doctest-html: .doctest-html.up2date
-.doctest-html.up2date: $(DOCTESTS)
-	rm -rf $(HTML_DOCTEST)
+# Convert doctest files to HTML, using rst2html.
+DOCTEST_HTML_FILES := \
+    $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
+doctest-html: doctest-html-mkdir $(DOCTEST_HTML_FILES)
+doctest-html-mkdir: 
 	mkdir -p $(HTML_DOCTEST)
-	for doctest in $(DOCTESTS); do \
-	    out_file=$(HTML_DOCTEST)/`basename $$doctest .doctest`.html; \
-	    echo "$(RST2HTML) $$doctest $$out_file"; \
-	    if $(RST2HTML) $$doctest $$out_file; then true; \
-	    else exit 1; fi\
-	done
-	touch .doctest-html.up2date
+$(HTML_DOCTEST)/%.html: src/epydoc/test/%.doctest
+	$(RST2HTML) $< $@
 
 examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)
