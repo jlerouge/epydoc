@@ -1669,7 +1669,30 @@ class DocIndex:
         # Initialize the root items list.  We sort them by length in
         # ascending order.  (This ensures that variables will shadow
         # submodules when appropriate.)
-        self.root = sorted(root, key=lambda d:len(d.canonical_name))
+        # When the elements name is the same, list in alphabetical order:
+        # this is needed by the check for duplicates below.
+        self.root = sorted(root,
+            key=lambda d: (len(d.canonical_name), d.canonical_name))
+        """The list of C{ValueDoc}s to document.
+            @type: C{list}"""
+
+        # Drop duplicated modules
+        # [xx] maybe what causes duplicates should be fixed instead.
+        #      If fixed, adjust the sort here above: sorting by names will not
+        #      be required anymore
+        i = 1
+        while i < len(self.root):
+            if self.root[i-1] is self.root[i]:
+                del self.root[i]
+            else:
+                i += 1
+
+        self.mlclasses = self._get_module_classes(self.root)
+        """A mapping from class names to L{ClassDoc}. Contains
+           classes defined at module level for modules in L{root}
+           and which can be used as fallback by L{find()} if looking
+           in containing namespaces fails.
+           @type: C{dict} from C{str} to L{ClassDoc} or C{list}"""
 
         self.callers = None
         """A dictionary mapping from C{RoutineDoc}s in this index
@@ -1789,6 +1812,7 @@ class DocIndex:
             look for the remaining part of the name using C{find}
           - Builtins
           - Parameter attributes
+          - Classes at module level (if the name is not ambiguous)
         
         @type name: C{str} or L{DottedName}
         @type context: L{APIDoc}
@@ -1836,6 +1860,57 @@ class DocIndex:
             all_args = context.all_args()
             if all_args is not UNKNOWN and name[0] in all_args:
                 return None
+
+        # Is this an object directly contained by any module?
+        doc = self.mlclasses.get(name[-1])
+        if isinstance(doc, APIDoc):
+            return doc
+        elif isinstance(doc, list):
+            log.warning("%s is an ambiguous name: it may be %s" % (
+                name[-1],
+                ", ".join([ "'%s'" % d.canonical_name for d in doc ])))
+
+            # Drop this item so that the warning is reported only once.
+            # fail() will fail anyway.
+            del self.mlclasses[name[-1]]
+
+    def _get_module_classes(self, docs):
+        """
+        Gather all the classes defined in a list of modules.
+
+        Very often people refers to classes only by class name,
+        even if they are not imported in the namespace. Linking
+        to such classes will fail if we look for them only in nested
+        namespaces. Allow them to retrieve only by name.
+
+        @param docs: containers of the objects to collect
+        @type docs: C{list} of C{APIDoc}
+        @return: mapping from objects name to the object(s) with that name
+        @rtype: C{dict} from C{str} to L{ClassDoc} or C{list}
+        """
+        classes = {}
+        for doc in docs:
+            if not isinstance(doc, ModuleDoc):
+                continue
+
+            for var in doc.variables.values():
+                if not isinstance(var.value, ClassDoc):
+                    continue
+
+                val = var.value
+                if val in (None, UNKNOWN) or val.defining_module is not doc:
+                    continue
+
+                name = val.canonical_name[-1]
+                vals = classes.get(name)
+                if vals is None:
+                    classes[name] = val
+                elif not isinstance(vals, list):
+                    classes[name] = [ vals, val ]
+                else:
+                    vals.append(val)
+
+        return classes
 
     #////////////////////////////////////////////////////////////
     # etc
