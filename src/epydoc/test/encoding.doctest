@@ -2,7 +2,7 @@ End-to-end Tests for Unicode Encoding
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Test Function
 =============
-The following function is used as an end-to-end test for unicode
+The function `testencoding` is used as an end-to-end test for unicode
 encodings.  It takes a given string, writes it to a python file, and
 processes that file's documentation.  It then generates HTML output
 from the documentation, extracts all docstrings from the generated
@@ -10,58 +10,8 @@ HTML output, and displays them.  (In order to extract & display all
 docstrings, it monkey-patches the HMTLwriter.docstring_to_html()
 method.)
 
-    >>> # Display warninings & errors:
-    >>> from epydoc import log
-    >>> log.register_logger(log.SimpleLogger())
-
-    >>> # Other imports:
-    >>> import tempfile, os, re, textwrap, sys
-    >>> from epydoc.docbuilder import build_doc_index
-    >>> from epydoc.docwriter.html import HTMLWriter
-
-    >>> # Monkey-patch the write function:
-    >>> def docstring_to_html(self, parsed_docstring, w=None, i=0):
-    ...     s = parsed_docstring.to_html(None).strip()
-    ...     s = s.encode('ascii', 'xmlcharrefreplace')
-    ...     s = remove_surrogates(s)
-    ...     print s
-    ...     return ''
-    >>> HTMLWriter.docstring_to_html = docstring_to_html
-
-    >>> # The actual test function:
-    >>> def test(s, introspect=True, parse=True, debug=False):
-    ...     # Write s to a temporary file.
-    ...     tmp_dir = tempfile.mkdtemp()
-    ...     path = os.path.join(tmp_dir, 'enc_test.py')
-    ...     out = open(path, 'w')
-    ...     out.write(textwrap.dedent(s))
-    ...     out.close()
-    ...     # Build docs for it
-    ...     docindex = build_doc_index([path], introspect, parse)
-    ...     if docindex is None: return
-    ...     try: del sys.modules['enc_test']
-    ...     except: pass
-    ...     # Write html output.  
-    ...     writer = HTMLWriter(docindex, mark_docstrings=True)
-    ...     writer.write(tmp_dir)
-    ...     for file in os.listdir(tmp_dir):
-    ...         os.unlink(os.path.join(tmp_dir,file))
-    ...     os.rmdir(tmp_dir)
-
-The following is a helper function, used to convert two-character
-surrogate sequences into single characters.  This is needed because
-some systems create surrogates but others don't.
-
-    >>> def remove_surrogates(s):
-    ...     pieces = re.split('(&#\d+;)', s)
-    ...     for i in range(3, len(pieces)-1, 2):
-    ...         if pieces[i-1] != '': continue
-    ...         high,low = int(pieces[i-2][2:-1]), int(pieces[i][2:-1])
-    ...         if 0xd800 <= high <= 0xdbff and 0xdc00 <= low <= 0xdfff:
-    ...             pieces[i-2] = '&#%d;' % (((high&0x3ff)<<10) +
-    ...                                      (low&0x3ff) + 0x10000)
-    ...             pieces[i] = ''
-    ...     return ''.join(pieces)
+    >>> from epydoc.test.util import print_warnings, testencoding
+    >>> print_warnings()
 
 Encoding Tests
 ==============
@@ -72,27 +22,27 @@ new encoding.
 
 Tests for several Microsoft codepges:
 
-    >>> test('''# -*- coding: cp874 -*-
+    >>> testencoding('''# -*- coding: cp874 -*-
     ... """abc ABC 123 \x80 \x85"""
     ... ''')
     abc ABC 123 &#8364; &#8230;
 
-    >>> test('''# -*- coding: cp1250 -*-
+    >>> testencoding('''# -*- coding: cp1250 -*-
     ... """abc ABC 123 \x80 \x82 \x84 \x85 \xff"""
     ... ''')
     abc ABC 123 &#8364; &#8218; &#8222; &#8230; &#729;
 
-    >>> test('''# -*- coding: cp1251 -*-
+    >>> testencoding('''# -*- coding: cp1251 -*-
     ... """abc ABC 123 \x80 \x81 \x82 \xff"""
     ... ''')
     abc ABC 123 &#1026; &#1027; &#8218; &#1103;
 
-    >>> test('''# -*- coding: cp1252 -*-
+    >>> testencoding('''# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
     abc ABC 123 &#8364; &#8218; &#402; &#255;
 
-    >>> test('''# -*- coding: cp1253 -*-
+    >>> testencoding('''# -*- coding: cp1253 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xfe"""
     ... ''')
     abc ABC 123 &#8364; &#8218; &#402; &#974;
@@ -115,21 +65,21 @@ Unicode tests:
     >>> utf8_bom = '\xef\xbb\xbf'
 
     >>> # UTF-8 with a coding directive:
-    >>> test("# -*- coding: utf-8 -*-\n"+utf8_test)
+    >>> testencoding("# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
     >>> # UTF-8 with a BOM & a coding directive:
-    >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test)
+    >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
     >>> # UTF-8 with a BOM & no coding directive:
-    >>> test(utf8_bom+utf8_test)
+    >>> testencoding(utf8_bom+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -137,30 +87,30 @@ Unicode tests:
 
 Tests for KOI8-R:
 
-    >>> test('''# -*- coding: koi8-r -*-
+    >>> testencoding('''# -*- coding: koi8-r -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
     abc ABC 123 &#9472; &#9484; &#9488; &#1066;
 
 Tests for 'coding' directive on the second line:
 
-    >>> test('''\n# -*- coding: cp1252 -*-
+    >>> testencoding('''\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
     abc ABC 123 &#8364; &#8218; &#402; &#255;
     
-    >>> test('''# comment on the first line.\n# -*- coding: cp1252 -*-
+    >>> testencoding('''# comment on the first line.\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
     abc ABC 123 &#8364; &#8218; &#402; &#255;
 
-    >>> test("\n# -*- coding: utf-8 -*-\n"+utf8_test)
+    >>> testencoding("\n# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
-    >>> test("# comment\n# -*- coding: utf-8 -*-\n"+utf8_test)
+    >>> testencoding("# comment\n# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -168,7 +118,7 @@ Tests for 'coding' directive on the second line:
 
 Tests for shift-jis
 
-    >>> test('''# -*- coding: shift_jis -*-
+    >>> testencoding('''# -*- coding: shift_jis -*-
     ... """abc ABC 123 \xA1 \xA2 \xA3"""
     ... ''')
     abc ABC 123 &#65377; &#65378; &#65379;
@@ -177,12 +127,12 @@ Str/Unicode Test
 ================
 Make sure that we use the coding for both str and unicode docstrings.
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... """abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... u"""abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
@@ -199,7 +149,7 @@ Under these circumstances, we issue a warning, and treat the docstring
 as latin-1.  An example of this is a non-unicode docstring for
 properties:
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... p=property(doc="""\xc2\x80""")
     ... ''') # doctest: +ELLIPSIS
     <property object at ...>'s docstring is not a unicode string, but it contains non-ascii data -- treating it as latin-1.
@@ -210,33 +160,33 @@ Introspection/Parsing Tests
 This section checks to make sure that both introspection & parsing are
 getting the right results.
 
-    >>> test("# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
+    >>> testencoding("# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
-    >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
+    >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
-    >>> test(utf8_bom+utf8_test, introspect=False)
+    >>> testencoding(utf8_bom+utf8_test, introspect=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
 
-    >>> test("# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
+    >>> testencoding("# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
-    >>> test(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
+    >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
     0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
-    >>> test(utf8_bom+utf8_test, parse=False)
+    >>> testencoding(utf8_bom+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
@@ -246,7 +196,7 @@ Context checks
 ==============
 Make sure that docstrings are rendered correctly in different contexts.
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... """
     ... @var x: abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80
     ... @group \xc2\x80: x
@@ -254,7 +204,7 @@ Make sure that docstrings are rendered correctly in different contexts.
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... def f(x):
     ...     """
     ...     abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80
@@ -274,7 +224,7 @@ Make sure that docstrings are rendered correctly in different contexts.
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
 
-    >>> test('''# -*- coding: utf-8 -*-
+    >>> testencoding('''# -*- coding: utf-8 -*-
     ... class A:
     ...     """
     ...     abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80

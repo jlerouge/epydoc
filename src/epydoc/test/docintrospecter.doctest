@@ -15,36 +15,7 @@ of the `APIDoc`s should be displayed.  The `introspect` argument gives the
 name of a variable in the module whose value should be introspected,
 instead of introspecting the whole module.
 
-    >>> import tempfile, re, os, os.path, textwrap, sys
-    >>> from epydoc.docintrospecter import introspect_docs
-    >>> def runintrospecter(s, attribs='', introspect=None, exclude=''):
-    ...     # Write it to a temp file.
-    ...     tmp_dir = tempfile.mkdtemp()
-    ...     out = open(os.path.join(tmp_dir, 'epydoc_test.py'), 'w')
-    ...     out.write(textwrap.dedent(s))
-    ...     out.close()
-    ...     # Import it.
-    ...     sys.path.insert(0, tmp_dir)
-    ...     if introspect is None:
-    ...         import epydoc_test as val
-    ...     else:
-    ...         exec("from epydoc_test import %s as val" % introspect)
-    ...     del sys.path[0]
-    ...     # Introspect it.
-    ...     val_doc = introspect_docs(val)
-    ...     # Display it.
-    ...     s = val_doc.pp(include=attribs.split(),exclude=exclude.split())
-    ...     s = re.sub(r"(filename = ).*", r"\1...", s)
-    ...     s = re.sub(r"(<module 'epydoc_test' from ).*", r'\1...', s)
-    ...     s = re.sub(r"(<function \w+ at )0x\w+>", r"\1...>", s)
-    ...     s = re.sub(r"(<\w+ object at )0x\w+>", r"\1...>", s)
-    ...     print s
-    ...     # Clean up.
-    ...     os.unlink(os.path.join(tmp_dir, 'epydoc_test.py'))
-    ...     try: os.unlink(os.path.join(tmp_dir, 'epydoc_test.pyc'))
-    ...     except OSError: pass
-    ...     os.rmdir(tmp_dir)
-    ...     del sys.modules['epydoc_test']
+    >>> from epydoc.test.util import runintrospecter
 
 Module Variables
 ================
