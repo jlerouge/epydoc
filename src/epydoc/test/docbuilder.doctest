@@ -140,14 +140,14 @@ Stuff from future doesn't appear as variable.
 
     >>> runbuilder(s="""
     ...     from __future__ import division
-    ...     from re import match
+    ...     from pickle import dump
     ...     """,
     ...     attribs='variables value')
     ModuleDoc for epydoc_test [0]
      +- variables
-        +- match => VariableDoc for epydoc_test.match [1]
+        +- dump => VariableDoc for epydoc_test.dump [1]
            +- value
-              +- ValueDoc for sre.match [2]
+              +- ValueDoc for pickle.dump [2]
 
 
 Specifying constructor signature in class docstring

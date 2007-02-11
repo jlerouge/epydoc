@@ -148,9 +148,9 @@ Similarly, the introspecter can't always tell if a variable was imported
 or not, so it sets `is_imported` to `UNKNOWN` when it can't decide:
 
     >>> runintrospecter(s="""
-    ...     from re import match       # definitely imported
-    ...     from re import error       # definitely imported
-    ...     from re import MULTILINE   # might be imported
+    ...     from pickle import dump       # definitely imported
+    ...     from pickle import Pickler    # definitely imported
+    ...     from pickle import HIGHEST_PROTOCOL   # might be imported
     ...     class A: pass              # definitely not imported
     ...     def f(x): pass             # definitely not imported
     ...     """, attribs="variables is_imported")
@@ -158,14 +158,14 @@ or not, so it sets `is_imported` to `UNKNOWN` when it can't decide:
      +- variables
         +- A => VariableDoc for epydoc_test.A [1]
         |  +- is_imported = False
-        +- MULTILINE => VariableDoc for epydoc_test.MULTILINE [2]
+        +- HIGHEST_PROTOCOL => VariableDoc for epydoc_test.HIGHEST_PROTOCOL [2]
         |  +- is_imported = <UNKNOWN>
-        +- error => VariableDoc for epydoc_test.error [3]
+        +- Pickler => VariableDoc for epydoc_test.Pickler [3]
         |  +- is_imported = True
-        +- f => VariableDoc for epydoc_test.f [4]
-        |  +- is_imported = False
-        +- match => VariableDoc for epydoc_test.match [5]
-           +- is_imported = True
+        +- dump => VariableDoc for epydoc_test.dump [4]
+        |  +- is_imported = True
+        +- f => VariableDoc for epydoc_test.f [5]
+           +- is_imported = False
 
 Variable Docstrings
 ===================
@@ -504,32 +504,32 @@ Imports
 =======
 
     >>> runintrospecter(s="""
-    ...     import re
-    ...     from re import match
+    ...     import pickle
+    ...     from pickle import dump
     ...     """,
     ...     attribs='variables value is_imported')
     ModuleDoc for epydoc_test [0]
      +- variables
-        +- match => VariableDoc for epydoc_test.match [1]
+        +- dump => VariableDoc for epydoc_test.dump [1]
         |  +- is_imported = True
         |  +- value
-        |     +- ValueDoc for sre.match [2]
-        +- re => VariableDoc for epydoc_test.re [3]
+        |     +- ValueDoc for pickle.dump [2]
+        +- pickle => VariableDoc for epydoc_test.pickle [3]
            +- is_imported = True
            +- value
-              +- ModuleDoc for re [4]
+              +- ModuleDoc for pickle [4]
                  +- variables = {}
 
     >>> runintrospecter(s="""
     ...     from __future__ import division
-    ...     from re import match
+    ...     from pickle import dump
     ...     """,
     ...     attribs='variables value')
     ModuleDoc for epydoc_test [0]
      +- variables
-        +- match => VariableDoc for epydoc_test.match [1]
+        +- dump => VariableDoc for epydoc_test.dump [1]
            +- value
-              +- ValueDoc for sre.match [2]
+              +- ValueDoc for pickle.dump [2]
 
 Unicode
 =======
