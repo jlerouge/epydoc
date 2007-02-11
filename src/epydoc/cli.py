@@ -106,6 +106,10 @@ def parse_arguments():
     optparser.add_option(                               # --debug
         "--debug", action="store_true", dest="debug",
         help="Show full tracebacks for internal errors.")
+    optparser.add_option(
+        "--simple-term", action="store_true", dest="simple_term",
+        help="Do not try to use color or cursor control when displaying "
+        "the progress bar, warnings, or errors.")
 
     # Add options -- Actions
     action_group.add_option(                               # --html
@@ -264,7 +268,8 @@ def parse_arguments():
                            debug=epydoc.DEBUG, profile=False,
                            graphs=[], list_classes_separately=False,
                            graph_font=None, graph_font_size=None,
-                           include_source_code=True, pstat_files=[])
+                           include_source_code=True, pstat_files=[],
+                           simple_term=False)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -410,6 +415,8 @@ def parse_configfiles(configfiles, options, names):
             options.include_source_code = _str_to_bool(val, optname)
         elif optname == 'pstat':
             options.pstat_files.extend(val.replace(',', ' ').split())
+        elif optname in ('simple-term', 'simple_term'):
+            options.simple_term = _str_to_bool(val, optname)
         else:
             raise ValueError('Unknown option %s' % optname)
 
@@ -436,6 +443,8 @@ def main(options, names):
     #        options.parse = False
 
     # Set up the logger
+    if options.simple_term:
+        TerminalController.FORCE_SIMPLE_TERM = True
     if options.action == 'text':
         logger = None # no logger for text output.
     elif options.verbosity > 1:
@@ -797,9 +806,15 @@ class TerminalController:
     _COLORS = """BLACK BLUE GREEN CYAN RED MAGENTA YELLOW WHITE""".split()
     _ANSICOLORS = "BLACK RED GREEN YELLOW BLUE MAGENTA CYAN WHITE".split()
 
+    #: If this is set to true, then new TerminalControllers will
+    #: assume that the terminal is not capable of doing manipulation
+    #: of any kind.
+    FORCE_SIMPLE_TERM = False
+
     def __init__(self, term_stream=sys.stdout):
         # If the stream isn't a tty, then assume it has no capabilities.
         if not term_stream.isatty(): return
+        if self.FORCE_SIMPLE_TERM: return
 
         # Curses isn't available on all platforms
         try: import curses
@@ -843,7 +858,7 @@ class TerminalController:
         return re.sub(r'\$<\d+>[/*]?', '', cap)
 
 class ConsoleLogger(log.Logger):
-    def __init__(self, verbosity):
+    def __init__(self, verbosity, progress_mode=None):
         self._verbosity = verbosity
         self._progress = None
         self._message_blocks = []
@@ -863,9 +878,11 @@ class ConsoleLogger(log.Logger):
         # Set the progress bar mode.
         if verbosity >= 2: self._progress_mode = 'list'
         elif verbosity >= 0:
-            if self.term.COLS < 15:
+            if progress_mode is not None:
+                self._progress_mode = progress_mode
+            elif self.term.COLS < 15:
                 self._progress_mode = 'simple-bar'
-            if self.term.BOL and self.term.CLEAR_EOL and self.term.UP:
+            elif self.term.BOL and self.term.CLEAR_EOL and self.term.UP:
                 self._progress_mode = 'multiline-bar'
             elif self.term.BOL and self.term.CLEAR_LINE:
                 self._progress_mode = 'bar'
@@ -1062,11 +1079,11 @@ class ConsoleLogger(log.Logger):
         print
 
 class UnifiedProgressConsoleLogger(ConsoleLogger):
-    def __init__(self, verbosity, stages):
+    def __init__(self, verbosity, stages, progress_mode=None):
         self.stage = 0
         self.stages = stages
         self.task = None
-        ConsoleLogger.__init__(self, verbosity)
+        ConsoleLogger.__init__(self, verbosity, progress_mode)
         
     def progress(self, percent, message=''):
         #p = float(self.stage-1+percent)/self.stages
