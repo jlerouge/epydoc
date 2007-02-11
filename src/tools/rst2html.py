@@ -23,6 +23,7 @@ class CustomizedHTMLWriter(HTMLWriter):
         'stylesheet_path': None,
         'output_encoding': 'ascii',
         'output_encoding_error_handler': 'xmlcharrefreplace',
+        'embed_stylesheet': False,
         })
         
     def __init__(self):
