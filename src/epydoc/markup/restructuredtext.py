@@ -77,7 +77,7 @@ from docutils.utils import new_document
 from docutils.nodes import NodeVisitor, Text, SkipChildren
 from docutils.nodes import SkipNode, TreeCopyVisitor
 from docutils.frontend import OptionParser
-from docutils.parsers.rst import directives, Directive
+from docutils.parsers.rst import directives
 import docutils.nodes
 import docutils.transforms.frontmatter
 import docutils.transforms
@@ -628,21 +628,28 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         raise SkipNode()
 
 
-class PythonCodeDirective(Directive):
+def python_code_directive(name, arguments, options, content, lineno,
+                          content_offset, block_text, state, state_machine):
+    """
+    A custom restructuredtext directive which can be used to display
+    syntax-highlighted Python code blocks.  This directive takes no
+    arguments, and the body should contain only Python code.  This
+    directive can be used instead of doctest blocks when it is
+    inconvenient to list prompts on each line, or when you would
+    prefer that the output not contain prompts (e.g., to make
+    copy/paste easier).
+    """
     required_arguments = 0
     optional_arguments = 0
-    has_content = True
 
-    def run(self):
-        self.assert_has_content()
-        text = '\n'.join(self.content)
+    text = '\n'.join(content)
+    node = docutils.nodes.doctest_block(text, text, codeblock=True)
+    return [ node ]
+    
+python_code_directive.arguments = (0, 0, 0)
+python_code_directive.content = True
 
-        #node = docutils.nodes.doctest_block(rawsource=text)
-        #self.state.nested_parse(self.content, self.content_offset, node)
-        node = docutils.nodes.doctest_block(text, text, codeblock=True)
-        return [ node ]
-
-directives.register_directive('python', PythonCodeDirective)
+directives.register_directive('python', python_code_directive)
 
 ######################################################################
 #{ Graph Generation Directives
