@@ -155,6 +155,7 @@ A missing docstring on the __init__ is not an issue.
 
 Exceptions can be put in the docstring class, and they are assigned to the
 constructor too.
+
     >>> runbuilder(s='''
     ...     class Foo:
     ...         """Foo(x, y)
