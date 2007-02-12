@@ -290,3 +290,27 @@ But there can also be two different types
            +- type_descr = u'date\n\n'
            +- value = <UNKNOWN>
 
+Value Representation
+====================
+Currently, many variable reprs use the introspected form where it
+would really be better to use the parsed version.  See SF bug
+#1653577.  We intend to improve on this.  This test documents the
+current behavior; but should be replaced when we change the behavior.
+
+    >>> from epydoc.test.util import buildvaluedoc
+    >>> def print_py_reprs(s):
+    ...     value_doc = buildvaluedoc(s)
+    ...     for (name, var_doc) in sorted(value_doc.variables.items()):
+    ...         print "%-5s %r" % (name, var_doc.value.pyval_repr())
+
+    >>> print_py_reprs('''
+    ...     class Foo: pass
+    ...     a = Foo()
+    ...     b = [1, 2, 3]
+    ...     c = 3+5
+    ...     b.append(99)
+    ...     ''')
+    Foo   u'<class epydoc_test.Foo at 0x40484bfc>'
+    a     u'<epydoc_test.Foo instance at 0x4069ca4c>'
+    b     u'[1, 2, 3, 99]'
+    c     u'8'
