@@ -1,0 +1,194 @@
+Regression Testing for epydoc.markup.pyval_repr
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    >>> from epydoc.markup.pyval_repr import *
+    >>> colorizer = XMLPyvalColorizer(linelen=40)
+    >>> def color(s): print colorizer.colorize(s)
+
+
+Simple Types
+============
+Integers, floats, None, and complex numbers get printed using str,
+with no syntax highlighting:
+
+    >>> color(10)
+    <pyval>10</pyval>
+    >>> color(1./4)
+    <pyval>0.25</pyval>
+    >>> color(None)
+    <pyval>None</pyval>
+    >>> color(100)
+    <pyval>100</pyval>
+
+Long ints will get wrapped if they're big enough:
+    
+    >>> color(10000000)
+    <pyval>10000000</pyval>
+    >>> color(10**90)
+    <pyval>1000000000000000000000000000000000000000<linewrap />
+    0000000000000000000000000000000000000000<linewrap />
+    00000000000</pyval>
+
+Strings
+=======
+Strings have their quotation marks tagged as 'quote'.  Characters are
+escaped using the 'string-escape' encoding.  
+
+    >>> color(''.join(chr(i) for i in range(256)))
+    <pyval><val-quote>'''</val-quote><val-string>\x00\x01\x02\x03\x04\x05\x06\x07\x08\</val-string><linewrap />
+    <val-string>t</val-string>
+    <val-string>\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x</val-string><linewrap />
+    <val-string>15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x</val-string><linewrap />
+    <val-string>1f !"#$%&amp;\'()*+,-./0123456789:;&lt;=&gt;?@ABCD</val-string><linewrap />
+    <ellipsis /></pyval>
+    
+Currently, the "'" quote is always used, because that's what the
+'string-escape' encoding expects.
+
+    >>> color('Hello')
+    <pyval><val-quote>'</val-quote><val-string>Hello</val-string><val-quote>'</val-quote></pyval>
+    >>> color('"Hello"')
+    <pyval><val-quote>'</val-quote><val-string>"Hello"</val-string><val-quote>'</val-quote></pyval>
+    >>> color("'Hello'")
+    <pyval><val-quote>'</val-quote><val-string>\'Hello\'</val-string><val-quote>'</val-quote></pyval>
+
+Strings containing newlines are automatically rendered as multiline
+strings.
+
+    >>> color("This\n  is a multiline\n string!")
+    <pyval><val-quote>'''</val-quote><val-string>This</val-string>
+    <val-string>  is a multiline</val-string>
+    <val-string> string!</val-string><val-quote>'''</val-quote></pyval>
+
+Unicode strings are handled properly.
+
+    >>> color(u"Hello world")
+    <pyval><val-quote>u'</val-quote><val-string>Hello world</val-string><val-quote>'</val-quote></pyval>
+    >>> color(u"\uaaaa And \ubbbb")
+    <pyval><val-quote>u'</val-quote><val-string>\uaaaa And \ubbbb</val-string><val-quote>'</val-quote></pyval>
+
+Lists, Tuples, etc.
+===================
+Lists, tuples, and sets are all colorized using the same method.  The
+braces and commas are tagged with "op".  If the value can fit on the
+current line, it is displayed on one line.  Otherwise, each value is
+listed on a separate line, indented by the size of the open-bracket.
+    
+    >>> color(range(10))
+    <pyval><val-group>[</val-group>0<val-op>, </val-op>1<val-op>, </val-op>2<val-op>, </val-op>3<val-op>, </val-op>4<val-op>, </val-op>5<val-op>, </val-op>6<val-op>, </val-op>7<val-op>, </val-op>8<val-op>, </val-op>9<val-group>]</val-group></pyval>
+    >>> color(range(100))
+    <pyval><val-group>[</val-group>0<val-op>,</val-op>
+     1<val-op>,</val-op>
+     2<val-op>,</val-op>
+     3<val-op>,</val-op>
+     4<val-op>,</val-op>
+    <ellipsis /></pyval>
+    >>> color([1,2,[5,6,[(11,22,33),9],10],11]+[99,98,97,96,95])
+    <pyval><val-group>[</val-group>1<val-op>,</val-op>
+     2<val-op>,</val-op>
+     <val-group>[</val-group>5<val-op>, </val-op>6<val-op>, </val-op><val-group>[</val-group><val-group>(</val-group>11<val-op>, </val-op>22<val-op>, </val-op>33<val-group>)</val-group><val-op>, </val-op>9<val-group>]</val-group><val-op>, </val-op>10<val-group>]</val-group><val-op>,</val-op>
+     11<val-op>,</val-op>
+     99<val-op>,</val-op>
+    <ellipsis /></pyval>
+    >>> color(set(range(20)))
+    <pyval><val-group>set([</val-group>0<val-op>,</val-op>
+         1<val-op>,</val-op>
+         2<val-op>,</val-op>
+         3<val-op>,</val-op>
+         4<val-op>,</val-op>
+    <ellipsis /></pyval>
+
+Dictionaries
+============
+Dicts are treated just like lists, except that the ":" is also tagged as
+"op".
+
+    >>> color({1:33, 2:[1,2,3,{7:'oo'*20}]})
+    <pyval><val-group>{</val-group>1<val-op>: </val-op>33<val-op>,</val-op>
+     2<val-op>: </val-op><val-group>[</val-group>1<val-op>,</val-op>
+         2<val-op>,</val-op>
+         3<val-op>,</val-op>
+         <val-group>{</val-group>7<val-op>: </val-op><val-quote>'</val-quote><val-string>oooooooooooooooooooooooooooooo</val-string><linewrap />
+    <ellipsis /></pyval>
+
+Regular Expressions
+===================
+
+    >>> import re
+    >>> def color_re(s, check_roundtrip=True):
+    ...     val = colorizer.colorize(re.compile(s))
+    ...     if check_roundtrip:
+    ...         roundtrip_val = re.sub('</?[\w-]+>', '', val)
+    ...         roundtrip_val = roundtrip_val.replace('&gt;', '>')
+    ...         roundtrip_val = roundtrip_val.replace('&lt;', '<')
+    ...         roundtrip_val = roundtrip_val.replace('&amp;', '&')
+    ...         assert roundtrip_val == s, roundtrip_val
+    ...     print val
+
+    >>> # Literal characters
+    >>> color_re(u'abc \t\r\n\f\v \xff \uffff \U000fffff', False)
+    <pyval>abc \t\r\n\f\v \xff \uffff \U000fffff</pyval>
+    >>> color_re(r'\.\^\$\\\*\+\?\{\}\[\]\|\(\)')
+    <pyval>\.\^\$\\\*\+\?\{\}\[\]\|\(\)</pyval>
+
+    >>> # Any character & character classes
+    >>> color_re(r".\d\D\s\S\w\W\A^$\b\B\Z")
+    <pyval>.\d\D\s\S\w\W\A^$\b\B\Z</pyval>
+
+    >>> # Branching
+    >>> color_re(r"foo|bar")
+    <pyval>foo<re-op>|</re-op>bar</pyval>
+
+    >>> # Character classes
+    >>> color_re(r"[abcd]")
+    <pyval><re-group>[</re-group>abcd<re-group>]</re-group></pyval>
+
+    >>> # Repeats
+    >>> color_re(r"a*b+c{4,}d{,5}e{3,9}f?")
+    <pyval>a<re-op>*</re-op>b<re-op>+</re-op>c<re-op>{4,}</re-op>d<re-op>{,5}</re-op>e<re-op>{3,9}</re-op>f<re-op>?</re-op></pyval>
+    >>> color_re(r"a*?b+?c{4,}?d{,5}?e{3,9}?f??")
+    <pyval>a<re-op>*?</re-op>b<re-op>+?</re-op>c<re-op>{4,}?</re-op>d<re-op>{,5}?</re-op>e<re-op>{3,9}?</re-op>f<re-op>??</re-op></pyval>
+    
+    >>> # Subpatterns
+    >>> color_re(r"(foo (bar) | (baz))")
+    <pyval><re-group>(</re-group>foo <re-group>(</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+    >>> color_re(r"(?:foo (?:bar) | (?:baz))")
+    <pyval><re-group>(?:</re-group>foo <re-group>(?:</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(?:</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+    >>> color_re("(foo (?P<a>bar) | (?P<boop>baz))")
+    <pyval><re-group>(</re-group>foo <re-group>(?P&lt;</re-group><re-ref>a</re-ref><re-group>&gt;</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(?P&lt;</re-group><re-ref>boop</re-ref><re-group>&gt;</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+
+    >>> # Group References
+    >>> color_re(r"(...) and (\1)")
+    <pyval><re-group>(</re-group>...<re-group>)</re-group> and <re-group>(</re-group><re-ref>\1</re-ref><re-group>)</re-group></pyval>
+
+    >>> # Ranges
+    >>> color_re(r"[a-bp-z]")
+    <pyval><re-group>[</re-group>a<re-op>-</re-op>bp<re-op>-</re-op>z<re-group>]</re-group></pyval>
+    >>> color_re(r"[^a-bp-z]")
+    <pyval><re-group>[</re-group><re-op>^</re-op>a<re-op>-</re-op>bp<re-op>-</re-op>z<re-group>]</re-group></pyval>
+    >>> color_re(r"[^abc]")
+    <pyval><re-group>[</re-group><re-op>^</re-op>abc<re-group>]</re-group></pyval>
+
+    >>> # Lookahead/behinds
+    >>> color_re(r"foo(?=bar)")
+    <pyval>foo<re-group>(?=</re-group>bar<re-group>)</re-group></pyval>
+    >>> color_re(r"foo(?!bar)")
+    <pyval>foo<re-group>(?!</re-group>bar<re-group>)</re-group></pyval>
+    >>> color_re(r"(?<=bar)foo")
+    <pyval><re-group>(?&lt;=</re-group>bar<re-group>)</re-group>foo</pyval>
+    >>> color_re(r"(?<!bar)foo")
+    <pyval><re-group>(?&lt;!</re-group>bar<re-group>)</re-group>foo</pyval>
+
+    >>> # Flags
+    >>> color_re(r"(?im)^Food")
+    <pyval><re-flags>(?im)</re-flags>^Food</pyval>
+    >>> color_re(r"(?Limsx)^Food")
+    <pyval><re-flags>(?Limsx)</re-flags>^Food</pyval>
+    >>> color_re(r"(?Limstux)^Food")
+    <pyval><re-flags>(?Limstux)</re-flags>^Food</pyval>
+    >>> color_re(r"(?x)This   is   verbose", False)
+    <pyval><re-flags>(?x)</re-flags>Thisisverbose</pyval>
+
+
+
+
