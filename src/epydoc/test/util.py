@@ -23,6 +23,18 @@ from epydoc.docwriter.html import HTMLWriter
 #{ Test Functions
 ######################################################################
 
+def buildvaluedoc(s):
+    """
+    This test function takes a string containing the contents of a
+    module.  It writes the string contents to a file, imports the file
+    as a module, and uses build_doc to build documentation, and
+    returns it as a C{ValueDoc} object.
+    """
+    tmp_dir = write_pystring_to_tmp_dir(s)
+    val_doc = build_doc(os.path.join(tmp_dir, 'epydoc_test.py'))
+    cleanup_tmp_dir(tmp_dir)
+    return val_doc
+
 def runbuilder(s, attribs='', build=None, exclude=''):
     """
     This test function takes a string containing the contents of a
@@ -35,10 +47,7 @@ def runbuilder(s, attribs='', build=None, exclude=''):
     the whole module.
     """
     # Write it to a temp file.
-    tmp_dir = tempfile.mkdtemp()
-    out = open(os.path.join(tmp_dir, 'epydoc_test.py'), 'w')
-    out.write(textwrap.dedent(s))
-    out.close()
+    tmp_dir = write_pystring_to_tmp_dir(s)
     # Build it.
     val_doc = build_doc(os.path.join(tmp_dir, 'epydoc_test.py'))
     if build: val_doc = val_doc.variables[build].value
@@ -54,11 +63,7 @@ def runbuilder(s, attribs='', build=None, exclude=''):
     s = re.sub(r"(<\w+ object at )0x\w+>", r"\1...>", s)
     print s
     # Clean up.
-    os.unlink(os.path.join(tmp_dir, 'epydoc_test.py'))
-    try: os.unlink(os.path.join(tmp_dir, 'epydoc_test.pyc'))
-    except OSError: pass
-    os.rmdir(tmp_dir)
-    del sys.modules['epydoc_test']
+    cleanup_tmp_dir(tmp_dir)
 
 def runparser(s, attribs='', show=None, exclude=''):
     """
@@ -72,10 +77,7 @@ def runparser(s, attribs='', show=None, exclude=''):
     display).
     """
     # Write it to a temp file.
-    tmp_dir = tempfile.mkdtemp()
-    out = open(os.path.join(tmp_dir, 'test.py'), 'w')
-    out.write(textwrap.dedent(s))
-    out.close()
+    tmp_dir = write_pystring_to_tmp_dir(s)
     # Parse it.
     val_doc = parse_docs(out.name)
     if show is not None:
@@ -89,8 +91,7 @@ def runparser(s, attribs='', show=None, exclude=''):
     s = re.sub(r"filename = .*", "filename = ...", s)
     print s
     # Clean up.
-    os.unlink(os.path.join(tmp_dir, 'test.py'))
-    os.rmdir(tmp_dir)
+    cleanup_tmp_dir(tmp_dir)
 
 def runintrospecter(s, attribs='', introspect=None, exclude=''):
     """
@@ -104,10 +105,7 @@ def runintrospecter(s, attribs='', introspect=None, exclude=''):
     introspecting the whole module.
     """
     # Write it to a temp file.
-    tmp_dir = tempfile.mkdtemp()
-    out = open(os.path.join(tmp_dir, 'epydoc_test.py'), 'w')
-    out.write(textwrap.dedent(s))
-    out.close()
+    tmp_dir = write_pystring_to_tmp_dir(s)
     # Import it.
     sys.path.insert(0, tmp_dir)
     if introspect is None:
@@ -125,11 +123,7 @@ def runintrospecter(s, attribs='', introspect=None, exclude=''):
     s = re.sub(r"(<\w+ object at )0x\w+>", r"\1...>", s)
     print s
     # Clean up.
-    os.unlink(os.path.join(tmp_dir, 'epydoc_test.py'))
-    try: os.unlink(os.path.join(tmp_dir, 'epydoc_test.pyc'))
-    except OSError: pass
-    os.rmdir(tmp_dir)
-    del sys.modules['epydoc_test']
+    cleanup_tmp_dir(tmp_dir)
 
 def print_warnings():
     """
@@ -175,6 +169,20 @@ def testencoding(s, introspect=True, parse=True, debug=False):
 ######################################################################
 #{ Helper Functions
 ######################################################################
+
+def write_pystring_to_tmp_dir(s):
+    tmp_dir = tempfile.mkdtemp()
+    out = open(os.path.join(tmp_dir, 'epydoc_test.py'), 'w')
+    out.write(textwrap.dedent(s))
+    out.close()
+    return tmp_dir
+
+def cleanup_tmp_dir(tmp_dir):
+    os.unlink(os.path.join(tmp_dir, 'epydoc_test.py'))
+    try: os.unlink(os.path.join(tmp_dir, 'epydoc_test.pyc'))
+    except OSError: pass
+    os.rmdir(tmp_dir)
+    del sys.modules['epydoc_test']
 
 def to_plain(docstring):
     """Conver a parsed docstring into plain text"""
