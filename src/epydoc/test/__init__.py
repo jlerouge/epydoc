@@ -35,7 +35,7 @@ def main():
 
 def check_requirements(filename):
     """
-    Search for strings of the form:
+    Search for strings of the form::
     
         [Require: <module>]
 
