@@ -96,9 +96,9 @@ class BuildOptions:
         # Test for pattern syntax and compile them into pattern objects.
         try:
             self._introspect_regexp = (exclude_introspect
-                and re.compile(exclude_introspect))
+                and re.compile(exclude_introspect) or None)
             self._parse_regexp = (exclude_parse
-                and re.compile(exclude_parse))
+                and re.compile(exclude_parse) or None)
         except Exception, exc:
             log.error('Error in regular expression pattern: %s' % exc)
             raise
