@@ -27,7 +27,7 @@ import epydoc.markup
 class LatexWriter:
     PREAMBLE = [
         "\\documentclass{article}",
-        "\\usepackage{alltt, parskip, fancyheadings, boxedminipage}",
+        "\\usepackage{alltt, parskip, fancyhdr, boxedminipage}",
         "\\usepackage{makeidx, multirow, longtable, tocbibind, amssymb}",
         "\\usepackage{fullpage}",
         "\\usepackage[usenames]{color}",
@@ -287,7 +287,7 @@ class LatexWriter:
                 m = re.match(r'\\usepackage(\[.*?\])?{(.*?)}', line)
                 if m and m.group(2) in (
                     'babel', 'hyperref', 'color', 'alltt', 'parskip',
-                    'fancyheadings', 'boxedminipage', 'makeidx',
+                    'fancyhdr', 'boxedminipage', 'makeidx',
                     'multirow', 'longtable', 'tocbind', 'assymb',
                     'fullpage'):
                     pass
@@ -727,7 +727,8 @@ class LatexWriter:
     def func_arg(self, name, default):
         s = '\\textit{%s}' % plaintext_to_latex(self._arg_name(name))
         if default is not None:
-            s += '=\\texttt{%s}' % default.summary_pyval_repr()[0]
+            s += '=\\texttt{%s}' % plaintext_to_latex(
+                default.summary_pyval_repr()[0])
         return s
     
     def _arg_name(self, arg):

@@ -2572,12 +2572,9 @@ class HTMLWriter:
         name = self._arg_name(name)
         s = '<span class="%s-arg">%s</span>' % (css_class, name)
         if default is not None:
-            if default.parse_repr is not UNKNOWN:
-                s += ('=<span class="%s-default">%s</span>' %
-                      (css_class, plaintext_to_html(default.parse_repr)))
-            else:
-                s += ('=<span class="%s-default">%s</span>' %
-                        (css_class, plaintext_to_html(default.pyval_repr())))
+            s += ('=<span class="%s-default">%s</span>' %
+                    (css_class, plaintext_to_html(
+                        default.summary_pyval_repr()[0])))
         return s
 
     def _arg_name(self, arg):

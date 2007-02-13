@@ -794,6 +794,9 @@ class ValueDoc(APIDoc):
     UNKNOWN_REPR = "??"
     """@cvar: The string representation of an unknown value."""
 
+    STOCK_REPR = re.compile(r"(?i)^<.+\bat\b.+[0-9a-f]+.*>$")
+    """Match the return of repr() for object that didn't customize it."""
+    
     def pyval_repr(self):
         """Return a string representation of the python value.
 
@@ -810,6 +813,9 @@ class ValueDoc(APIDoc):
 
         rv = self._get_pyval_repr()
         if rv is UNKNOWN:
+            rv = self.parse_repr
+
+        elif self.STOCK_REPR.match(rv) and self.parse_repr is not UNKNOWN:
             rv = self.parse_repr
 
         if rv is UNKNOWN:
