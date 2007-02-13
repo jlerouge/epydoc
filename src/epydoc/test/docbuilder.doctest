@@ -310,7 +310,7 @@ current behavior; but should be replaced when we change the behavior.
     ...     c = 3+5
     ...     b.append(99)
     ...     ''')
-    Foo   u'<class epydoc_test.Foo at 0x40484bfc>'
-    a     u'<epydoc_test.Foo instance at 0x4069ca4c>'
+    Foo   u'<class epydoc_test.Foo at ...>'
+    a     u'Foo()'
     b     u'[1, 2, 3, 99]'
     c     u'8'

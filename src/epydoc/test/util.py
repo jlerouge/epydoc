@@ -79,7 +79,7 @@ def runparser(s, attribs='', show=None, exclude=''):
     # Write it to a temp file.
     tmp_dir = write_pystring_to_tmp_dir(s)
     # Parse it.
-    val_doc = parse_docs(out.name)
+    val_doc = parse_docs(os.path.join(tmp_dir, 'epydoc_test.py'))
     if show is not None:
         for name in show.split('.'):
             if isinstance(val_doc, ClassDoc):
@@ -154,9 +154,8 @@ def testencoding(s, introspect=True, parse=True, debug=False):
     # Build docs for it
     docindex = build_doc_index([path], introspect, parse)
     if docindex is None: return
-    try: del sys.modules['enc_test']
-    except: pass
-    # Write html output.  
+    sys.modules.pop('enc_test', None)
+    # Write html output.
     writer = HTMLWriter(docindex, mark_docstrings=True)
     writer.write(tmp_dir)
     for file in os.listdir(tmp_dir):
@@ -182,7 +181,7 @@ def cleanup_tmp_dir(tmp_dir):
     try: os.unlink(os.path.join(tmp_dir, 'epydoc_test.pyc'))
     except OSError: pass
     os.rmdir(tmp_dir)
-    del sys.modules['epydoc_test']
+    sys.modules.pop('epydoc_test', None)
 
 def to_plain(docstring):
     """Conver a parsed docstring into plain text"""
