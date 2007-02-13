@@ -1893,6 +1893,8 @@ class DocIndex:
                 val = var.value
                 if val in (None, UNKNOWN) or val.defining_module is not doc:
                     continue
+                if val.canonical_name in (None, UNKNOWN):
+                    continue
 
                 name = val.canonical_name[-1]
                 vals = classes.get(name)
