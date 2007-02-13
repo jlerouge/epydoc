@@ -812,29 +812,21 @@ class LatexWriter:
         out(' & ')
         has_descr = var_doc.descr not in (None, UNKNOWN)
         has_type = var_doc.type_descr not in (None, UNKNOWN)
-        out('\\raggedright ')
+        has_value = var_doc.value is not UNKNOWN
+        if has_type or has_value:
+            out('\\raggedright ')
         if has_descr:
             out(self.docstring_to_latex(var_doc.descr, 10).strip())
-            out('\n\n')
-        out('\\textbf{Value:} \n')
-        out(self._pprint_var_value(var_doc))
+            if has_type or has_value: out('\n\n')
+        if has_value:
+            out('\\textbf{Value:} \n{\\tt %s}' %
+                var_doc.value.summary_pyval_repr().to_latex(None))
         if has_type:
             ptype = self.docstring_to_latex(var_doc.type_descr, 12).strip()
             out('%s\\textit{(type=%s)}' % (' '*12, ptype))
         out('&\\\\\n')
         out('\\cline{1-2}\n')
 
-    def _pprint_var_value(self, var_doc):
-        pyval_repr = var_doc.value.pyval_repr().to_latex(None)
-        if '\n' in pyval_repr:
-            return ('\\begin{alltt}\n%s\\end{alltt}' %
-                    pyval_repr)
-                    #plaintext_to_latex(pyval_repr, nbsp=False, breakany=True))
-        else:
-            return '{\\tt %s}' % pyval_repr
-        #plaintext_to_latex(pyval_repr, nbsp=True,
-        #breakany=True)
-    
     def write_property_list_line(self, out, var_doc):
         prop_doc = var_doc.value
         out('\\raggedright ')
