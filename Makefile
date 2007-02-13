@@ -74,6 +74,7 @@ clean:
 	$(MAKE) -C src clean
 	rm -rf $(WEBDIR) $(HTML) $(LATEX)
 	rm -rf .*.up2date
+	rm -rf profile.out
 
 ##//////////////////////////////////////////////////////////////////////
 ## Distributions
