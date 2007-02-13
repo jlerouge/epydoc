@@ -563,8 +563,6 @@ def main(options, names):
         exclude_parse = '|'.join(options.exclude_parse+options.exclude)
         exclude_introspect = '|'.join(options.exclude_introspect+
                                       options.exclude)
-        log.warning('exclude parse', `exclude_parse`)
-        log.warning('exclude introspect', `exclude_introspect`)
         docindex = build_doc_index(names, options.introspect, options.parse,
                                    add_submodules=(options.action!='text'),
                                    exclude_introspect=exclude_introspect,
