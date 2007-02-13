@@ -28,7 +28,7 @@ try:
     set
 except NameError:
     try:
-        from sets import Set as set
+        from sets import Set as set, ImmutableSet as frozenset
     except ImportError:
         pass # use fallback, in the next section.
 
