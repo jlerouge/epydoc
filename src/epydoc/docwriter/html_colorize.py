@@ -8,298 +8,18 @@
 
 """
 Functions to produce colorized HTML code for various objects.
-Currently, C{colorize} defines functions to colorize regular
-expressions and doctest blocks.
-
-@group Regular Expression Tags: *_TAG
+Currently, C{html_colorize} defines functions to colorize
+Python source code.
 """
 __docformat__ = 'epytext en'
 
-import sys, sre_parse, re, codecs
-import sre_constants
+import re, codecs
 from epydoc import log
-from epydoc.util import decode_with_backslashreplace, plaintext_to_html
 from epydoc.util import py_src_filename
 from epydoc.apidoc import *
-
-######################################################################
-## Regular expression colorizer
-######################################################################
-
-# HTML tags for colorize_re
-
-RE_TAG         = 're'
-r'''The CSS class for colorizing regular expressions.'''
-
-ANY_TAG        = 're-char'
-r'''The CSS class for colorizing C{"."} in regexps.'''
-
-ESCAPE_TAG     = 're-char'
-r'''The CSS class for colorizing escaped characters (such as C{r"\("})
-in regexps.'''
-
-CATEGORY_TAG   = 're-char'
-r'''The CSS class for colorizing character categories (such as
-C{r"\d"})) in regexps.'''
-
-AT_TAG         = 're-char'
-r'''The CSS class for colorizing character locations (such as C{"^"})
-in regexps.'''
-
-BRANCH_TAG     = 're-op'
-r'''The CSS class for colorizing C{"|"} in regexps.'''
-
-STAR_TAG       = 're-op'
-r'''The CSS class for colorizing C{"*"} and C{"*?"} in regexps.'''
-
-PLUS_TAG       = 're-op'
-r'''The CSS class for colorizing C{"+"} and C{"+?"} in regexps.'''
-
-QMRK_TAG       = 're-op'
-r'''The CSS class for colorizing C{"?"} and C{"??"} in regexps.'''
-
-RNG_TAG        = 're-op'
-r'''The CSS class for colorizing repeat ranges (such as C{"a{3,8}"}) in
-regexps.'''
-
-PAREN_TAG      = 're-group'
-r'''The CSS class for colorizing parenthases in regexps.'''
-
-CHOICE_TAG     = 're-group'
-r'''The CSS class for colorizing character choice expressions (such as
-C{"[abc]"}) in regexps.'''
-
-ASSERT_TAG     = 're-group'
-r'''The CSS class for colorizing assertions (such as C{"(?=abc)"}) in
-regexps.'''
-
-REF_TAG        = 're-ref'
-r'''The CSS class for colorizing references (such as C{r"\1"}) in
-regexps.'''
-
-def colorize_re(regexp):
-    r"""
-    @return: The HTML code for a colorized version of the pattern for
-        the given SRE regular expression.  If C{colorize_re} can't
-        figure out how to colorize the regexp, then it will simply return
-        the (uncolorized) pattern, with C{'&'}, C{'<'}, and C{'>'}
-        escaped as HTML entities.  The colorized expression includes
-        spans with the following css classes:
-          - X{re}: The entire regular expression.
-          - X{re-char}: Special characters (such as C{'.'}, C{'\('}), 
-            character categories (such as C{'\w'}), and locations
-            (such as C{'\b'}).
-          - X{re-op}: Operators (such as C{'*'} and C{'|'}).
-          - X{re-group}: Grouping constructs (such as C{'(...)'}).
-          - X{re-ref} References (such as C{'\1'})
-    @rtype: C{string}
-    @param regexp: The regular expression to colorize.
-    @type regexp: C{SRE_Pattern} or C{string}
-    @raise sre_constants.error: If regexp is not a valid regular
-        expression.
-    """
-    if isinstance(regexp, str):
-        pat = decode_with_backslashreplace(regexp)
-        tree = sre_parse.parse(pat)
-        
-    elif isinstance(regexp, unicode):
-        tree = sre_parse.parse(regexp)
-        
-    elif hasattr(regexp, 'pattern') and hasattr(regexp, 'flags'):
-        if isinstance(regexp.pattern, str):
-            pat = decode_with_backslashreplace(regexp.pattern)
-            tree = sre_parse.parse(pat, regexp.flags)
-            
-        elif isinstance(regexp.pattern, unicode):
-            tree = sre_parse.parse(regexp.pattern, regexp.flags)
-            
-        else:
-            raise TypeError("Bad regexp object -- pattern is not a string")
-    else:
-        raise TypeError("Expected a regexp or a string")
-
-    return ('<span class="%s">%s</span>' %
-            (RE_TAG, _colorize_re(tree, 1)))
-    
-def _colorize_re(tree, noparen=0):
-    """
-    Recursively descend the given regexp parse tree to produce the
-    HTML code for a colorized version of the regexp.
-
-    @param tree: The regexp parse tree for the regexp that should be
-        colorized.
-    @type tree: L{sre_parse.SubPattern}
-    @param noparen: If true, then don't include parenthases around the
-        expression in C{tree}, even if it contains multiple elements.
-    @type noparen: C{boolean}
-    @return: The HTML code for a colorized version of C{tree}
-    @rtype: C{string}
-    """
-    result = []
-    out = result.append
-    
-    if len(tree) > 1 and not noparen:
-        out('<span class="%s">(</span>' % PAREN_TAG)
-    for elt in tree:
-        op = elt[0]
-        args = elt[1]
-
-        if op == sre_constants.LITERAL:
-            c = unichr(args)
-            if c == '\t': out(r'<span class="%s">\t</span>' % ESCAPE_TAG)
-            elif c == '\n': out(r'<span class="%s">\n</span>' % ESCAPE_TAG)
-            elif c == '\r': out(r'<span class="%s">\r</span>' % ESCAPE_TAG)
-            elif c == '\f': out(r'<span class="%s">\f</span>' % ESCAPE_TAG)
-            elif c == '\v': out(r'<span class="%s">\v</span>' % ESCAPE_TAG)
-            elif ord(c)<32 or ord(c)>=127:
-                if c < 256: template = r'<span class="%s">\x%02x</span>'
-                else: template = r'<span class="%s">\u%04x</span>'
-                out(template % (ESCAPE_TAG,ord(c)))
-            elif c in '.^$\\*+?{}[]|()':
-                out(r'<span class="%s">\%c</span>' % (ESCAPE_TAG, c))
-            else: out(plaintext_to_html(unichr(args)))
-            continue
-        
-        elif op == sre_constants.ANY:
-            out('<span class="%s">.</span>' % ANY_TAG)
-            
-        elif op == sre_constants.BRANCH:
-            if args[0] is not None:
-                raise ValueError('Branch expected None arg but got %s'
-                                 % args[0])
-            VBAR = '<span class="%s">|</span>' % BRANCH_TAG
-            out(VBAR.join([_colorize_re(item,1) for item in args[1]]))
-            
-        elif op == sre_constants.IN:
-            if (len(args) == 1 and args[0][0] == sre_constants.CATEGORY):
-                out(_colorize_re(args))
-            else:
-                out('<span class="%s">[</span>' % CHOICE_TAG)
-                out(_colorize_re(args, 1))
-                out('<span class="%s">]</span>' % CHOICE_TAG)
-                
-        elif op == sre_constants.CATEGORY:
-            out('<span class="%s">' % CATEGORY_TAG)
-            if args == sre_constants.CATEGORY_DIGIT: out(r'\d')
-            elif args == sre_constants.CATEGORY_NOT_DIGIT: out(r'\D')
-            elif args == sre_constants.CATEGORY_SPACE: out(r'\s')
-            elif args == sre_constants.CATEGORY_NOT_SPACE: out(r'\S')
-            elif args == sre_constants.CATEGORY_WORD: out(r'\w')
-            elif args == sre_constants.CATEGORY_NOT_WORD: out(r'\W')
-            else: raise ValueError('Unknown category %s' % args)
-            out('</span>')
-            
-        elif op == sre_constants.AT:
-            out('<span class="%s">' % AT_TAG)
-            if args == sre_constants.AT_BEGINNING_STRING: out(r'\A')
-            elif args == sre_constants.AT_BEGINNING: out(r'^')
-            elif args == sre_constants.AT_END: out(r'$')
-            elif args == sre_constants.AT_BOUNDARY: out(r'\b')
-            elif args == sre_constants.AT_NON_BOUNDARY: out(r'\B')
-            elif args == sre_constants.AT_END_STRING: out(r'\Z')
-            else: raise ValueError('Unknown position %s' % args)
-            out('</span>')
-            
-        elif op == sre_constants.MAX_REPEAT:
-            min = args[0]
-            max = args[1]
-            if max == sre_constants.MAXREPEAT:
-                if min == 0:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">*</span>' % STAR_TAG)
-                elif min == 1:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">+</span>' % PLUS_TAG)
-                else:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">{%d,}</span>' % (RNG_TAG, min))
-            elif min == 0:
-                if max == 1:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">?</span>' % QMRK_TAG)
-                else:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">{,%d}</span>' % (RNG_TAG, max))
-            elif min == max:
-                out(_colorize_re(args[2]))
-                out('<span class="%s">{%d}</span>' % (RNG_TAG, max))
-            else:
-                out(_colorize_re(args[2]))
-                out('<span class="%s">{%d,%d}</span>' % (RNG_TAG, min, max))
-
-        elif op == sre_constants.MIN_REPEAT:
-            min = args[0]
-            max = args[1]
-            if max == sre_constants.MAXREPEAT:
-                if min == 0:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">*?</span>' % STAR_TAG)
-                elif min == 1:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">+?</span>' % PLUS_TAG)
-                else:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">{%d,}?</span>' % (RNG_TAG, min))
-            elif min == 0:
-                if max == 1:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">??</span>' % QMRK_TAG)
-                else:
-                    out(_colorize_re(args[2]))
-                    out('<span class="%s">{,%d}?</span>' % (RNG_TAG, max))
-            elif min == max:
-                out(_colorize_re(args[2]))
-                out('<span class="%s">{%d}?</span>' % (RNG_TAG, max))
-            else:
-                out(_colorize_re(args[2]))
-                out('<span class="%s">{%d,%d}?</span>'%(RNG_TAG, min, max))
-
-        elif op == sre_constants.SUBPATTERN:
-            if args[0] is None:
-                out('<span class="%s">(?:</span>' % PAREN_TAG)
-            elif isinstance(args[0], (int, long)):
-                # This is cheating:
-                out('<span class="%s">(</span>' % PAREN_TAG)
-            else:
-                out('<span class="%s">(?P&lt;</span>' % PAREN_TAG)
-                out('<span class="%s">%s</span>' %
-                    (REF_TAG, plaintext_to_html(args[0])))
-                out('<span class="%s">&gt;</span>' % PAREN_TAG)
-            out(_colorize_re(args[1], 1))
-            out('<span class="%s">)</span>' % PAREN_TAG)
-
-        elif op == sre_constants.GROUPREF:
-            out('<span class="%s">\\%d</span>' % (REF_TAG, args))
-
-        elif op == sre_constants.RANGE:
-            start = _colorize_re( ((sre_constants.LITERAL, args[0]),) )
-            end = _colorize_re( ((sre_constants.LITERAL, args[1]),) )
-            out('%s<span class="%s">-</span>%s' % (start, CHOICE_TAG, end))
-            
-        elif op == sre_constants.NEGATE:
-            out('<span class="%s">^</span>' % CHOICE_TAG)
-
-        elif op == sre_constants.ASSERT:
-            if args[0]: out('<span class="%s">(?=</span>' % ASSERT_TAG)
-            else: out('<span class="%s">(?&lt;=</span>' % ASSERT_TAG)
-            out(''.join(_colorize_re(args[1], 1)))
-            out('<span class="%s">)</span>' % ASSERT_TAG)
-                           
-        elif op == sre_constants.ASSERT_NOT:
-            if args[0]: out('<span class="%s">(?!</span>' % ASSERT_TAG)
-            else: out('<span class="%s">(?&lt;!</span>' % ASSERT_TAG)
-            out(''.join(_colorize_re(args[1], 1)))
-            out('<span class="%s">)</span>' % ASSERT_TAG)
-
-        elif op == sre_constants.NOT_LITERAL:
-            lit = _colorize_re( ((sre_constants.LITERAL, args),) )
-            out('<span class="%s">[^</span>%s<span class="%s">]</span>' %
-                (CHOICE_TAG, lit, CHOICE_TAG))
-        else:
-            log.error("Error colorizing regexp: unknown elt %r" % elt)
-    if len(tree) > 1 and not noparen: 
-        out('<span class="%s">)</span>' % PAREN_TAG)
-    return u''.join(result)
+import tokenize, token, cgi, keyword
+try: from cStringIO import StringIO
+except: from StringIO import StringIO
 
 ######################################################################
 ## Python source colorizer
@@ -494,10 +214,6 @@ expandto(location.href);
 // -->
 </script>
 '''
-
-import tokenize, sys, token, cgi, keyword
-try: from cStringIO import StringIO
-except: from StringIO import StringIO
 
 class PythonSourceColorizer:
     """
@@ -1152,14 +868,7 @@ class PythonSourceColorizer:
         else:
             return '%s-module.html#%s' % (self.module_name, func_name)
 
-# if __name__=='__main__':
-#     s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
-#     import codecs
-#     f = codecs.open('/home/edloper/public_html/color.html', 'w', 'ascii', 'xmlcharrefreplace')
-#     f.write(s)
-#     f.close()
-
-HDR = '''\
+_HDR = '''\
 <?xml version="1.0" encoding="ascii"?>
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
                   "DTD/xhtml1-transitional.dtd">
@@ -1173,12 +882,12 @@ HDR = '''\
         <body bgcolor="white" text="black" link="blue" vlink="#204080"
               alink="#204080">
 '''
-FOOT = '</body></html>'
+_FOOT = '</body></html>'
 if __name__=='__main__':
     #s = PythonSourceColorizer('../apidoc.py', 'epydoc.apidoc').colorize()
     s = PythonSourceColorizer('/tmp/fo.py', 'epydoc.apidoc').colorize()
     #print s
     import codecs
     f = codecs.open('/home/edloper/public_html/color3.html', 'w', 'ascii', 'xmlcharrefreplace')
-    f.write(HDR+'<pre id="py-src-top" class="py-src">'+s+'</pre>'+FOOT)
+    f.write(_HDR+'<pre id="py-src-top" class="py-src">'+s+'</pre>'+_FOOT)
     f.close()
