@@ -69,6 +69,7 @@ h2                          { font-size: +125%; font-style: italic;
                               font-weight: bold; }
 h3                          { font-size: +110%; font-style: italic;
                               font-weight: normal; }
+code                        { font-size: 100%; }
  
 /* Page Header & Footer
  *   - The standard page header consists of a navigation bar (with
@@ -210,6 +211,10 @@ pre.variable                { padding: .5em; margin: 0;
 .variable-linewrap          { color: $variable_linewrap; font-weight: bold; }
 .variable-ellipsis          { color: $variable_ellipsis; font-weight: bold; }
 .variable-quote             { color: $variable_quote; font-weight: bold; }
+.variable-group             { color: $variable_group; font-weight: bold; }
+.variable-op                { color: $variable_op; font-weight: bold; }
+.variable-string            { color: $variable_string; }
+.variable-unknown           { color: $variable_unknown; font-weight: bold; }
 .re                         { color: $re; }
 .re-char                    { color: $re_char; }
 .re-op                      { color: $re_op; }
@@ -384,6 +389,10 @@ _WHITE_COLORS = dict(
     variable_linewrap       =  '#604000',
     variable_ellipsis       =  '#604000',
     variable_quote          =  '#604000',
+    variable_group          =  '#008000',
+    variable_string         =  '#006030',
+    variable_op             =  '#604000',
+    variable_unknown        =  '#a00000',
     re                      =  '#000000',
     re_char                 =  '#006030',
     re_op                   =  '#600000',

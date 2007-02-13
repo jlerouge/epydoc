@@ -148,6 +148,11 @@ class Element:
                 ''.join([str(child) for child in self.children]) +
                 '</%s>' % self.tag)
 
+    def __repr__(self):
+        attribs = ''.join([', %s=%r' % t for t in self.attribs.items()])
+        args = ''.join([', %r' % c for c in self.children])
+        return 'Element(%s%s%s)' % (self.tag, args, attribs)
+
 ##################################################
 ## Constants
 ##################################################
@@ -1591,7 +1596,6 @@ def parse_as_para(str):
 #################################################################
 ##                    SUPPORT FOR EPYDOC
 #################################################################
-from epydoc.docwriter.dotgraph import *
 
 def parse_docstring(docstring, errors, **options):
     """
@@ -1854,6 +1858,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 log.warning("Could not construct class tree: you must "
                             "specify one or more base classes.")
                 return None
+            from epydoc.docwriter.dotgraph import class_tree_graph
             return class_tree_graph(bases, linker, context)
         elif graph_type == 'packagetree':
             if graph_args:
@@ -1865,9 +1870,11 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 log.warning("Could not construct package tree: you must "
                             "specify one or more root packages.")
                 return None
+            from epydoc.docwriter.dotgraph import package_tree_graph
             return package_tree_graph(packages, linker, context)
         elif graph_type == 'importgraph':
             modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
+            from epydoc.docwriter.dotgraph import import_graph
             return import_graph(modules, docindex, linker, context)
 
         elif graph_type == 'callgraph':
@@ -1876,6 +1883,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                 docs = [doc for doc in docs if doc is not None]
             else:
                 docs = [context]
+            from epydoc.docwriter.dotgraph import call_graph
             return call_graph(docs, docindex, linker, context)
         else:
             log.warning("Unknown graph type %s" % graph_type)

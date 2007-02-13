@@ -144,6 +144,14 @@ class LatexWriter:
         # For progress reporting:
         self._files_written = 0.
         
+        # Set the default values for ValueDoc formatted representations.
+        orig_valdoc_defaults = (ValueDoc.SUMMARY_REPR_LINELEN,
+                                ValueDoc.REPR_LINELEN,
+                                ValueDoc.REPR_MAXLINES)
+        ValueDoc.SUMMARY_REPR_LINELEN = 60
+        ValueDoc.REPR_LINELEN = 52
+        ValueDoc.REPR_MAXLINES = 5
+
         # Create destination directories, if necessary
         if not directory: directory = os.curdir
         self._mkdir(directory)
@@ -162,6 +170,10 @@ class LatexWriter:
                 filename = '%s-class.tex' % val_doc.canonical_name
                 self._write(self.write_class, directory, filename, val_doc)
 
+        # Restore defaults that we changed.
+        (ValueDoc.SUMMARY_REPR_LINELEN, ValueDoc.REPR_LINELEN,
+         ValueDoc.REPR_MAXLINES) = orig_valdoc_defaults
+        
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
         self._files_written += 1
@@ -727,8 +739,7 @@ class LatexWriter:
     def func_arg(self, name, default):
         s = '\\textit{%s}' % plaintext_to_latex(self._arg_name(name))
         if default is not None:
-            s += '=\\texttt{%s}' % plaintext_to_latex(
-                default.summary_pyval_repr()[0])
+            s += '=\\texttt{%s}' % default.summary_pyval_repr().to_latex(None)
         return s
     
     def _arg_name(self, arg):
@@ -801,31 +812,28 @@ class LatexWriter:
         out(' & ')
         has_descr = var_doc.descr not in (None, UNKNOWN)
         has_type = var_doc.type_descr not in (None, UNKNOWN)
-        has_repr = (var_doc.value not in (None, UNKNOWN) and
-                    var_doc.value.pyval_repr() != var_doc.value.UNKNOWN_REPR)
-        if has_descr or has_type:
-            out('\\raggedright ')
+        out('\\raggedright ')
         if has_descr:
             out(self.docstring_to_latex(var_doc.descr, 10).strip())
             if has_type or has_repr: out('\n\n')
-        if has_repr:
-            out('\\textbf{Value:} \n')
-            pyval_repr = var_doc.value.pyval_repr()
-            out(self._pprint_var_value(pyval_repr, 80))
+        out('\\textbf{Value:} \n')
+        out(self._pprint_var_value(var_doc))
         if has_type:
             ptype = self.docstring_to_latex(var_doc.type_descr, 12).strip()
             out('%s\\textit{(type=%s)}' % (' '*12, ptype))
         out('&\\\\\n')
         out('\\cline{1-2}\n')
 
-    def _pprint_var_value(self, s, maxwidth=100):
-        if len(s) > maxwidth: s = s[:maxwidth-3] + '...'
-        if '\n' in s:
+    def _pprint_var_value(self, var_doc):
+        pyval_repr = var_doc.value.pyval_repr().to_latex(None)
+        if '\n' in pyval_repr:
             return ('\\begin{alltt}\n%s\\end{alltt}' %
-                    plaintext_to_latex(s, nbsp=False, breakany=True))
+                    pyval_repr)
+                    #plaintext_to_latex(pyval_repr, nbsp=False, breakany=True))
         else:
-            return '{\\tt %s}' % plaintext_to_latex(s, nbsp=True,
-                                                    breakany=True)
+            return '{\\tt %s}' % pyval_repr
+        #plaintext_to_latex(pyval_repr, nbsp=True,
+        #breakany=True)
     
     def write_property_list_line(self, out, var_doc):
         prop_doc = var_doc.value

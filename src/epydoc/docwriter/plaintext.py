@@ -15,9 +15,11 @@ from epydoc.apidoc import *
 import re
 
 class PlaintextWriter:
-    def write(self, api_doc):
+    def write(self, api_doc, **options):
         result = []
         out = result.append
+
+        self._cols = options.get('cols', 75)
 
         try:
             if isinstance(api_doc, ModuleDoc):
@@ -128,7 +130,7 @@ class PlaintextWriter:
         self.write_list(out, 'Inherited Nested Classes', class_doc,
                         value_type='class', prefix=prefix,
                         inherited=True, verbose=False)
-                        
+
     def write_variable(self, out, var_doc, name=None, prefix='', verbose=True):
         if name is None: name = var_doc.name
         out(prefix+self.bold(str(name)))
@@ -137,8 +139,9 @@ class PlaintextWriter:
             var_doc.value.canonical_name not in (None, UNKNOWN)):
             out(' = %s' % var_doc.value.canonical_name)
         elif var_doc.value not in (UNKNOWN, None):
-            val_repr = var_doc.value.summary_pyval_repr(max_len=len(name)-75)[0]
-            out(' = %s' % val_repr.expandtabs())
+            val_repr = var_doc.value.summary_pyval_repr(
+                max_len=self._cols-len(name)-len(prefix)-3)
+            out(' = %s' % val_repr.to_plaintext(None))
         out('\n')
         if not verbose: return
         prefix += '    ' # indent the body.
@@ -199,7 +202,8 @@ class PlaintextWriter:
         if default is None:
             return '%s' % name
         else:
-            return '%s=%s' % (name, default.summary_pyval_repr()[0])
+            default_repr = default.summary_pyval_repr()
+            return '%s=%s' % (name, default_repr.to_plaintext(None))
 
     def write_list(self, out, heading, doc, value_type=None, imported=False,
                    inherited=False, prefix='', noindent=False,

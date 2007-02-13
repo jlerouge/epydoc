@@ -79,28 +79,44 @@ class _Linebreak(Exception):
     generates a string containing a newline, but the state object's
     linebreakok variable is False."""
 
+class ColorizedPyvalRepr(ParsedEpytextDocstring):
+    """
+    @ivar score: A score, evaluating how good this repr is.
+    @ivar is_complete: True if this colorized repr completely describes
+       the object.
+    """
+    def __init__(self, tree, score, is_complete):
+        ParsedEpytextDocstring.__init__(self, tree)
+        self.score = score
+        self.is_complete = is_complete
+
+def colorize_pyval(pyval, parse_repr=None, min_score=None,
+                   linelen=75, maxlines=5, linebreakok=True, sort=True):
+    return PyvalColorizer(linelen, maxlines, linebreakok, sort).colorize(
+        pyval, parse_repr, min_score)
 
 class PyvalColorizer:
     """
     Syntax highlighter for Python values.
     """
 
-    def __init__(self, linelen=75, maxlines=5, sort=True):
+    def __init__(self, linelen=75, maxlines=5, linebreakok=True, sort=True):
         self.linelen = linelen
         self.maxlines = maxlines
+        self.linebreakok = linebreakok
         self.sort = sort
 
     #////////////////////////////////////////////////////////////
-    # Colorization Tags
+    # Colorization Tags & other constants
     #////////////////////////////////////////////////////////////
 
-    GROUP_TAG = 'val-group'     # e.g., "[" and "]"
-    COMMA_TAG = 'val-op'        # The "," that separates elements
-    COLON_TAG = 'val-op'        # The ":" in dictionaries
-    CONST_TAG = None            # None, True, False
-    NUMBER_TAG = None           # ints, floats, etc
-    QUOTE_TAG = 'val-quote'     # Quotes around strings.
-    STRING_TAG = 'val-string'   # Body of string literals
+    GROUP_TAG = 'variable-group'     # e.g., "[" and "]"
+    COMMA_TAG = 'variable-op'        # The "," that separates elements
+    COLON_TAG = 'variable-op'        # The ":" in dictionaries
+    CONST_TAG = None                 # None, True, False
+    NUMBER_TAG = None                # ints, floats, etc
+    QUOTE_TAG = 'variable-quote'     # Quotes around strings.
+    STRING_TAG = 'variable-string'   # Body of string literals
 
     RE_CHAR_TAG = None
     RE_GROUP_TAG = 're-group'
@@ -108,45 +124,60 @@ class PyvalColorizer:
     RE_OP_TAG = 're-op'
     RE_FLAGS_TAG = 're-flags'
 
-    # Should these use symbols instead?
-    ELLIPSIS = Element('code', '...', style='ellipsis')
-    LINEWRAP = Element('symbol', 'crarr')
+    ELLIPSIS = Element('code', u'...', style='variable-ellipsis')
+    LINEWRAP = Element('symbol', u'crarr')
+    UNKNOWN_REPR = Element('code', u'??', style='variable-unknown')
     
+    GENERIC_OBJECT_RE = re.compile(r'^<.* at 0x[0-9a-f]+>$', re.IGNORECASE)
+
     #////////////////////////////////////////////////////////////
     # Entry Point
     #////////////////////////////////////////////////////////////
 
-    def colorize(self, pyval, min_score=None):
-        pds, score = self.colorize_and_score(pyval)
-        if min_score is None or score >= min_score:
-            return pds
-        else:
-            return None
-    
-    def colorize_and_score(self, pyval):
+    def colorize(self, pyval, parse_repr=None, min_score=None):
         """
-        @return: A tuple (parsed_docstring, score).
+        @return: A L{ColorizedPyvalRepr} describing the given pyval.
         """
+        UNKNOWN = epydoc.apidoc.UNKNOWN
         # Create an object to keep track of the colorization.
         state = _ColorizerState()
+        state.linebreakok = self.linebreakok
         # Colorize the value.  If we reach maxlines, then add on an
         # ellipsis marker and call it a day.
         try:
-            self._colorize(pyval, state)
-        except _Maxlines:
-            state.result.append(self.ELLIPSIS)
+            if pyval is not UNKNOWN:
+                self._colorize(pyval, state)
+            elif parse_repr not in (None, UNKNOWN):
+                self._output(parse_repr, None, state)
+            else:
+                state.result.append(PyvalColorizer.UNKNOWN_REPR)
+            is_complete = True
+        except (_Maxlines, _Linebreak):
+            if self.linebreakok:
+                state.result.append('\n')
+                state.result.append(self.ELLIPSIS)
+            else:
+                if state.result[-1] is self.LINEWRAP:
+                    state.result.pop()
+                self._trim_result(state.result, 3)
+                state.result.append(self.ELLIPSIS)
+            is_complete = False
+        # If we didn't score high enough, then try again.
+        if (pyval is not UNKNOWN and parse_repr not in (None, UNKNOWN)
+            and min_score is not None and state.score < min_score):
+            return self.colorize(UNKNOWN, parse_repr)
         # Put it all together.
         tree = Element('epytext', *state.result)
-        return ParsedEpytextDocstring(tree), state.score
+        return ColorizedPyvalRepr(tree, state.score, is_complete)
 
     def _colorize(self, pyval, state):
         pyval_type = type(pyval)
         state.score += 1
         
         if pyval is None or pyval is True or pyval is False:
-            self._output(str(pyval), self.CONST_TAG, state)
+            self._output(unicode(pyval), self.CONST_TAG, state)
         elif pyval_type in (int, float, long, types.ComplexType):
-            self._output(str(pyval), self.NUMBER_TAG, state)
+            self._output(unicode(pyval), self.NUMBER_TAG, state)
         elif pyval_type is str:
             self._colorize_str(pyval, state, '', 'string-escape')
         elif pyval_type is unicode:
@@ -156,34 +187,56 @@ class PyvalColorizer:
         elif pyval_type is tuple:
             self._multiline(self._colorize_iter, pyval, state, '(', ')')
         elif pyval_type is set:
-            if self.sort: pyval = sorted(pyval)
-            self._multiline(self._colorize_iter, pyval, state,
-                            'set([', '])')
+            self._multiline(self._colorize_iter, self._sort(pyval),
+                            state, 'set([', '])')
         elif pyval_type is frozenset:
-            if self.sort: pyval = sorted(pyval)
-            self._multiline(self._colorize_iter, pyval, state,
-                            'frozenset([', '])')
+            self._multiline(self._colorize_iter, self._sort(pyval),
+                            state, 'frozenset([', '])')
         elif pyval_type is dict:
-            items = pyval.items()
-            if self.sort: items = sorted(items)
-            self._multiline(self._colorize_dict, items, state, '{', '}')
+            self._multiline(self._colorize_dict, self._sort(pyval.items()),
+                            state, '{', '}')
         elif is_re_pattern(pyval):
             self._colorize_re(pyval, state)
         else:
             try:
                 pyval_repr = repr(pyval)
-                self._output(pyval_repr, None, state)
-                if self.GENERIC_OBJECT_RE.match(pyval_repr):
-                    state.score -= 5
+                if not isinstance(pyval_repr, (str, unicode)):
+                    pyval_repr = unicode(pyval_repr)
+                pyval_repr_ok = True
             except KeyboardInterrupt:
                 raise
             except:
-                pyval_repr = '...'
+                pyval_repr_ok = False
                 state.score -= 100
 
-    GENERIC_OBJECT_RE = re.compile(r'^<.* at 0x[0-9a-f]+>$',
-                                   re.IGNORECASE)
+            if pyval_repr_ok:
+                self._output(pyval_repr, None, state)
+                if self.GENERIC_OBJECT_RE.match(pyval_repr):
+                    state.score -= 5
+            else:
+                state.result.append(self.UNKNOWN_REPR)
+
+    def _sort(self, items):
+        if not self.sort: return items
+        try: return sorted(items)
+        except KeyboardInterrupt: raise
+        except: return items
         
+    def _trim_result(self, result, num_chars):
+        while num_chars > 0:
+            if not result: return 
+            if isinstance(result[-1], Element):
+                assert len(result[-1].children) == 1
+                trim = min(num_chars, len(result[-1].children[0]))
+                result[-1].children[0] = result[-1].children[0][:-trim]
+                if not result[-1].children[0]: result.pop()
+                num_chars -= trim
+            else:
+                trim = min(num_chars, len(result[-1]))
+                result[-1] = result[-1][:-trim]
+                if not result[-1]: result.pop()
+                num_chars -= trim
+
     #////////////////////////////////////////////////////////////
     # Object Colorization Functions
     #////////////////////////////////////////////////////////////
@@ -238,12 +291,17 @@ class PyvalColorizer:
 
     def _colorize_str(self, pyval, state, prefix, encoding):
         # Decide which quote to use.
-        if '\n' in pyval: quote = "'''"
+        if '\n' in pyval and state.linebreakok: quote = "'''"
         else: quote = "'"
+        # Divide the string into lines.
+        if state.linebreakok:
+            lines = pyval.split('\n')
+        else:
+            lines = [pyval]
         # Open quote.
         self._output(prefix+quote, self.QUOTE_TAG, state)
         # Body
-        for i, line in enumerate(pyval.split('\n')):
+        for i, line in enumerate(lines):
             if i>0: self._output('\n', None, state)
             self._output(line.encode(encoding), self.STRING_TAG, state)
         # Close quote.
@@ -260,8 +318,10 @@ class PyvalColorizer:
         groups = dict([(num,name) for (name,num) in
                        tree.pattern.groupdict.items()])
         # Colorize it!
+        self._output("re.compile(r'", None, state)
         self._colorize_re_flags(tree.pattern.flags, state)
         self._colorize_re_tree(tree, state, True, groups)
+        self._output("')", None, state)
 
     def _colorize_re_flags(self, flags, state):
         if flags:
@@ -281,7 +341,7 @@ class PyvalColorizer:
             if op == sre_constants.LITERAL:
                 c = unichr(args)
                 # Add any appropriate escaping.
-                if c in '.^$\\*+?{}[]|()': c = '\\'+c
+                if c in '.^$\\*+?{}[]|()\'': c = '\\'+c
                 elif c == '\t': c = '\\t'
                 elif c == '\r': c = '\\r'
                 elif c == '\n': c = '\\n'
@@ -419,8 +479,9 @@ class PyvalColorizer:
         be line-wrapped.  If the total number of lines exceeds
         `self.maxlines`, then raise a `_Maxlines` exception.
         """
-        if '\n' in s and not state.linebreakok:
-            raise _Linebreak()
+        # Make sure the string is unicode.
+        if isinstance(s, str):
+            s = decode_with_backslashreplace(s)
         
         # Split the string into segments.  The first segment is the
         # content to add to the current line, and the remaining
@@ -431,13 +492,13 @@ class PyvalColorizer:
             # If this isn't the first segment, then add a newline to
             # split it from the previous segment.
             if i > 0:
+                if (state.lineno+1) > self.maxlines:
+                    raise _Maxlines()
                 if not state.linebreakok:
                     raise _Linebreak()
-                state.result.append('\n')
+                state.result.append(u'\n')
                 state.lineno += 1
                 state.charpos = 0
-                if state.lineno > self.maxlines:
-                    raise _Maxlines()
 
             # If the segment fits on the current line, then just call
             # markup to tag it, and store the result.

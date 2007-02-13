@@ -694,7 +694,7 @@ class DotGraphUmlClassNode(DotGraphNode):
         if default is None:
             return '%s' % name
         else:
-            pyval_repr = default.summary_pyval_repr()[0]
+            pyval_repr = default.summary_pyval_repr().to_plaintext(None)
             return '%s=%s' % (name, pyval_repr)
 
     def _qualifier_cell(self, key_label, port):

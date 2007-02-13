@@ -19,7 +19,7 @@ import urllib
 import __builtin__
 from epydoc.apidoc import *
 import epydoc.docstringparser
-import time, epydoc, epydoc.markup
+import time, epydoc, epydoc.markup, epydoc.markup.epytext
 from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_colorize import PythonSourceColorizer
 from epydoc.docwriter import html_colorize
@@ -330,7 +330,7 @@ class HTMLWriter:
         """Max line length for variable values"""
         
         self._variable_summary_linelen = \
-                         kwargs.get('variable_summary_linelength', 55)
+                         kwargs.get('variable_summary_linelength', 65)
         """Max length for variable value summaries"""
         
         self._variable_tooltip_linelen = \
@@ -501,6 +501,21 @@ class HTMLWriter:
         # For progress reporting:
         self._files_written = 0.
         
+        # Set the default values for ValueDoc formatted representations.
+        orig_valdoc_defaults = (ValueDoc.SUMMARY_REPR_LINELEN,
+                                ValueDoc.REPR_LINELEN,
+                                ValueDoc.REPR_MAXLINES)
+        ValueDoc.SUMMARY_REPR_LINELEN = self._variable_summary_linelen
+        ValueDoc.REPR_LINELEN = self._variable_linelen
+        ValueDoc.REPR_MAXLINES = self._variable_maxlines
+
+        # Use an image for the crarr symbol.
+        from epydoc.markup.epytext import ParsedEpytextDocstring
+        orig_crarr_html = ParsedEpytextDocstring.SYMBOL_TO_HTML['crarr']
+        ParsedEpytextDocstring.SYMBOL_TO_HTML['crarr'] = (
+            r'<span class="variable-linewrap">'
+            r'<img src="crarr.png" alt="\" /></span>')
+
         # Keep track of failed xrefs, and report them at the end.
         self._failed_xrefs = {}
 
@@ -508,11 +523,6 @@ class HTMLWriter:
         if not directory: directory = os.curdir
         self._mkdir(directory)
         self._directory = directory
-
-        # Set the default value for L{ValueDoc.summary_linelen} so that
-        # L{ValueDoc.summary_pyval_repr()} return value is consistent with
-        # L{ValueDoc.is_detailed()}
-        ValueDoc.summary_linelen = self._variable_summary_linelen
 
         # Write the CSS file.
         self._files_written += 1
@@ -524,7 +534,7 @@ class HTMLWriter:
         log.progress(self._files_written/self._num_files, 'epydoc.js')
         self.write_javascript(directory)
 
-        # Write images.
+        # Write images
         self.write_images(directory)
 
         # Build the indices.
@@ -655,6 +665,11 @@ class HTMLWriter:
             log.debug("Expected to write %d files, but actually "
                       "wrote %d files" %
                       (self._num_files, int(self._files_written)))
+
+        # Restore defaults that we changed.
+        (ValueDoc.SUMMARY_REPR_LINELEN, ValueDoc.REPR_LINELEN,
+         ValueDoc.REPR_MAXLINES) = orig_valdoc_defaults
+        ParsedEpytextDocstring.SYMBOL_TO_HTML['crarr'] = orig_crarr_html
 
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
@@ -1920,12 +1935,12 @@ class HTMLWriter:
             description = self.summary_name(var_doc, link_name=True)
             if isinstance(var_doc.value, GenericValueDoc):
                 # The summary max length has been chosen setting
-                # L{ValueDoc.summary_linelen} when L{write()} was called
-                val_repr = var_doc.value.summary_pyval_repr()[0]
-                val_repr = plaintext_to_html(val_repr)
+                # L{ValueDoc.SUMMARY_REPR_LINELEN} in the constructor
+                max_len=self._variable_summary_linelen-3-len(var_doc.name)
+                val_repr = var_doc.value.summary_pyval_repr(max_len)
                 tooltip = self.variable_tooltip(var_doc)
                 description += (' = <code%s>%s</code>' %
-                                (tooltip, val_repr))
+                                (tooltip, val_repr.to_html(None)))
 
         # Add the summary to the description (if there is one).
         summary = self.summary(var_doc, indent=6)
@@ -2058,9 +2073,7 @@ class HTMLWriter:
             if isinstance(val_doc, RoutineDoc):
                 return self.function_signature(val_doc, True, True)
             elif isinstance(val_doc, GenericValueDoc):
-                return ('<table><tr><td><pre class="variable">\n' +
-                        self.pprint_value(val_doc) +
-                        '\n</pre></td></tr></table>\n')
+                return self.pprint_value(val_doc)
             else:
                 return self.href(val_doc)
         else:
@@ -2272,9 +2285,7 @@ class HTMLWriter:
         >>> self.write_standard_fields(out, var_doc)
         >>> if var_doc.value is not UNKNOWN:
             <dl><dt>Value:</dt>
-              <dd><table><tr><td><pre class="variable">
-        $self.pprint_value(var_doc.value)$
-              </pre></td></tr></table></dd>
+              <dd>$self.pprint_value(var_doc.value)$</dd>
             </dl>
         >>> #endif
           </dd></dl>
@@ -2286,167 +2297,20 @@ class HTMLWriter:
     def variable_tooltip(self, var_doc):
         if var_doc.value in (None, UNKNOWN):
             return ''
-
-        s = var_doc.value.pyval_repr()
+        s = var_doc.value.pyval_repr().to_plaintext(None)
         if len(s) > self._variable_tooltip_linelen:
             s = s[:self._variable_tooltip_linelen-3]+'...'
         return ' title="%s"' % plaintext_to_html(s)
 
     def pprint_value(self, val_doc):
-        if val_doc is UNKNOWN: return ''
-        if val_doc.pyval is not UNKNOWN:
-            return self.pprint_pyval(val_doc.pyval)
+        if val_doc is UNKNOWN:
+            return '??'
         elif isinstance(val_doc, GenericValueDoc):
-            s = plaintext_to_html(val_doc.pyval_repr())
+            return ('<table><tr><td><pre class="variable">\n' +
+                    val_doc.pyval_repr().to_html(None) +
+                    '\n</pre></td></tr></table>\n')
         else:
-            s = self.href(val_doc)
-        return self._linewrap_html(s, self._variable_linelen,
-                                   self._variable_maxlines)
-
-    def pprint_pyval(self, pyval):
-        # Handle the most common cases first.  The following types
-        # will never need any line wrapping, etc; and they cover most
-        # variable values (esp int, for constants).  I leave out
-        # LongType on purpose, since long values may need line-
-        # wrapping.
-        if (type(pyval) is types.IntType or type(pyval) is types.FloatType or
-            type(pyval) is types.NoneType or type(pyval) is types.ComplexType):
-            # none of these should contain '&', '<' or '>'.
-            vstr = repr(pyval)
-            return vstr + '&nbsp;' * (self._variable_linelen-len(vstr))
-
-        # For strings, use repr.  Use tripple-quoted-strings where
-        # appropriate.
-        elif isinstance(pyval, basestring):
-            vstr = repr(pyval)
-            # Find the left quote.
-            lquote = vstr.find(vstr[-1])
-            # Use tripple quotes if the string is multi-line:
-            if vstr.find(r'\n') >= 0:
-                body = vstr[lquote+1:-1].replace(r'\n', '\n')
-                vstr = ('<span class="variable-quote">'+vstr[:lquote]+
-                        vstr[lquote]*3+'</span>'+
-                        plaintext_to_html(body) +
-                       '<span class="variable-quote">'+vstr[-1]*3+'</span>')
-            # Use single quotes if the string is single-line:
-            else:
-                vstr = ('<span class="variable-quote">'+vstr[:lquote+1]+
-                        '</span>'+ plaintext_to_html(vstr[lquote+1:-1])+
-                        '<span class="variable-quote">'+vstr[-1:]+'</span>')
-
-        # For lists, tuples, and dicts, use pprint.  When possible,
-        # restrict the amount of stuff that pprint needs to look at,
-        # since pprint is surprisingly slow.
-        elif type(pyval) is types.TupleType or type(pyval) is types.ListType:
-            try: vstr = repr(pyval)
-            except: vstr = '...'
-            if len(vstr) > self._variable_linelen:
-                vstr = pprint.pformat(pyval[:self._variable_maxlines+1])
-            vstr = plaintext_to_html(vstr)
-        elif type(pyval) is type({}):
-            try: vstr = repr(pyval)
-            except: vstr = '...'
-            if len(vstr) > self._variable_linelen:
-                if len(pyval) < self._variable_maxlines+50:
-                    vstr = pprint.pformat(pyval)
-                else:
-                    shortval = {}
-                    for (k,v) in pyval.items()[:self._variable_maxlines+1]:
-                        shortval[k]=v
-                    vstr = pprint.pformat(shortval)
-            vstr = plaintext_to_html(vstr)
-
-        # For regexps, use colorize_re.
-        elif type(pyval).__name__ == 'SRE_Pattern':
-            try: vstr = colorize_re(pyval)
-            except TypeError, sre_constants.error:
-                try: vstr = plaintext_to_html(repr(pyval))
-                except: vstr = '...'
-           
-        # For other objects, use repr to generate a representation.
-        else:
-            try: vstr = plaintext_to_html(repr(pyval))
-            except: vstr = '...'
-
-        # Encode vstr, if necessary.
-        if isinstance(vstr, str):
-            vstr = decode_with_backslashreplace(vstr)
-
-        # Do line-wrapping.
-        return self._linewrap_html(vstr, self._variable_linelen,
-                                   self._variable_maxlines)
-
-    def _linewrap_html(self, s, linelen, maxlines):
-        """
-        Add line-wrapping to the HTML string C{s}.  Line length is
-        determined by C{linelen}; and the maximum number of
-        lines to display is determined by C{maxlines}.  This
-        function treats HTML entities (e.g., C{&amp;}) as single
-        characters; and ignores HTML tags (e.g., C{<p>}).
-        """
-        LINEWRAP_MARKER = (r'<span class="variable-linewrap">'
-                           '<img src="crarr.png" alt="\" /></span>')
-        ELLIPSIS_MARKER = r'<span class="variable-ellipsis">...</span>'
-       
-        open_elements = [] # tag stack
-        lines = []
-        start = end = cnum = 0
-        while len(lines) <= maxlines and end < len(s):
-            # Skip over HTML tags.
-            if s[end] == '<':
-                newend = s.find('>', end)
-                tag = s[end+1:newend]
-                if tag[-1]!="/":
-                    # non-empty tag
-                    tagname = tag.split(None,1)[0]
-                    if tagname[0] == "/":
-                        open_elements.pop()
-                    else:
-                        open_elements.append(tagname)
-                end = newend
-                cnum -= 1
-
-            # HTML entities just count as 1 char.
-            elif s[end] == '&':
-                end = s.find(';', end)
-
-            # Go on to the next character.
-            cnum += 1
-            end += 1
-
-            # Check for end-of-line.
-            if s[end-1] == '\n':
-                lines.append(s[start:end-1])
-                cnum = 0
-                start = end
-
-            # Check for line-wrap
-            if cnum == linelen and end<len(s) and s[end] != '\n':
-                if maxlines == 1:
-                    closing_tags = ""
-                    for tag in open_elements:
-                        closing_tags += "</%s>" % (tag,)
-                    return s[start:end]+closing_tags+ELLIPSIS_MARKER
-                lines.append(s[start:end]+LINEWRAP_MARKER)
-                cnum = 0
-                start = end
-
-        # Add on anything that's left.
-        if end == len(s):
-            lines.append(s[start:end])
-
-        # Use the ellipsis marker if the string is too long.
-        if len(lines) > maxlines:
-            closing_tags = ""
-            for tag in open_elements:
-                closing_tags += "</%s>" % (tag,)
-            lines[-1] = closing_tags+ELLIPSIS_MARKER
-            cnum = 3
-
-        # Pad the last line to linelen.
-        lines[-1] += ' '*(linelen-cnum+1)
-
-        return ('\n').join(lines)
+            return self.href(val_doc)
 
     #////////////////////////////////////////////////////////////
     #{ Base Tree
@@ -2573,8 +2437,7 @@ class HTMLWriter:
         s = '<span class="%s-arg">%s</span>' % (css_class, name)
         if default is not None:
             s += ('=<span class="%s-default">%s</span>' %
-                    (css_class, plaintext_to_html(
-                        default.summary_pyval_repr()[0])))
+                    (css_class, default.summary_pyval_repr().to_html(None)))
         return s
 
     def _arg_name(self, arg):
