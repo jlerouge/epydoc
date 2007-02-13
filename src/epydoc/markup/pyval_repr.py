@@ -136,8 +136,7 @@ class PyvalColorizer:
         except _Maxlines:
             state.result.append(self.ELLIPSIS)
         # Put it all together.
-        tree = Element('epytext', Element('code', style='pyval',
-                                          *state.result))
+        tree = Element('epytext', *state.result)
         return ParsedEpytextDocstring(tree), state.score
 
     def _colorize(self, pyval, state):
