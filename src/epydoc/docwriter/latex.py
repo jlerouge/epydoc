@@ -815,7 +815,7 @@ class LatexWriter:
         out('\\raggedright ')
         if has_descr:
             out(self.docstring_to_latex(var_doc.descr, 10).strip())
-            if has_type or has_repr: out('\n\n')
+            out('\n\n')
         out('\\textbf{Value:} \n')
         out(self._pprint_var_value(var_doc))
         if has_type:
