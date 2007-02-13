@@ -150,11 +150,18 @@ def parse_arguments():
         "--introspect-only", action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
     generation_group.add_option(                        # --exclude-introspect
+        "--exclude", dest="exclude", metavar="PATTERN",
+        action="append",
+        help="Exclude modules whose dotted name matches "
+             "the regular expression PATTERN")
+    generation_group.add_option(                        # --exclude-introspect
         "--exclude-introspect", dest="exclude_introspect", metavar="PATTERN",
+        action="append",
         help="Exclude introspection of modules whose dotted name matches "
              "the regular expression PATTERN")
     generation_group.add_option(                        # --exclude-parse
         "--exclude-parse", dest="exclude_parse", metavar="PATTERN",
+        action="append",
         help="Exclude parsing of modules whose dotted name matches "
              "the regular expression PATTERN")
     generation_group.add_option(                            # --inheritance
@@ -288,7 +295,9 @@ def parse_arguments():
                            graphs=[], list_classes_separately=False,
                            graph_font=None, graph_font_size=None,
                            include_source_code=True, pstat_files=[],
-                           simple_term=False, fail_on=None)
+                           simple_term=False, fail_on=None,
+                           exclude=[], exclude_parse=[],
+                           exclude_introspect=[])
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -551,10 +560,15 @@ def main(options, names):
     else:
         # Build docs for the named values.
         from epydoc.docbuilder import build_doc_index
+        exclude_parse = '|'.join(options.exclude_parse+options.exclude)
+        exclude_introspect = '|'.join(options.exclude_introspect+
+                                      options.exclude)
+        log.warning('exclude parse', `exclude_parse`)
+        log.warning('exclude introspect', `exclude_introspect`)
         docindex = build_doc_index(names, options.introspect, options.parse,
                                    add_submodules=(options.action!='text'),
-                                   exclude_introspect=options.exclude_introspect,
-                                   exclude_parse=options.exclude_parse)
+                                   exclude_introspect=exclude_introspect,
+                                   exclude_parse=exclude_parse)
 
     if docindex is None:
         if log.ERROR in logger.reported_message_levels:
@@ -722,9 +736,9 @@ def write_latex(docindex, options, format):
                 running = 'ps2pdf'
                 log.progress(5./steps, 'ps2pdf')
                 run_subprocess(
-                    'ps2pdf -sPAPERSIZE=letter -dMaxSubsetPct=100 '
-                    '-dSubsetFonts=true -dCompatibilityLevel=1.2 '
-                    '-dEmbedAllFonts=true api.ps api.pdf')
+                    'ps2pdf -sPAPERSIZE#letter -dMaxSubsetPct#100 '
+                    '-dSubsetFonts#true -dCompatibilityLevel#1.2 '
+                    '-dEmbedAllFonts#true api.ps api.pdf')
         except RunSubprocessError, e:
             if running == 'latex':
                 e.out = re.sub(r'(?sm)\A.*?!( LaTeX Error:)?', r'', e.out)
