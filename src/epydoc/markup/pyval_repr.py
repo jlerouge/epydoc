@@ -20,6 +20,10 @@ stops generating repr output as soon as it has exceeded the specified
 number of lines (which should make it faster than pprint for large
 values).  It does I{not} bother to do automatic cycle detection,
 because maxlines is typically around 5, so it's really not worth it.
+
+The syntax-highlighted output is encoded using a
+L{ParsedEpydocDocstring}, which can then be used to generate output in
+a variety of formats.
 """
 
 # Implementation note: we use exact tests for classes (list, etc)
@@ -29,8 +33,11 @@ because maxlines is typically around 5, so it's really not worth it.
 import types, re
 import epydoc.apidoc
 from epydoc.util import decode_with_backslashreplace
+from epydoc.util import plaintext_to_html, plaintext_to_latex
 from epydoc.compat import *
 import sre_parse, sre_constants
+
+from epydoc.markup.epytext import Element, ParsedEpytextDocstring
 
 def is_re_pattern(pyval):
     return type(pyval).__name__ == 'SRE_Pattern'
@@ -42,19 +49,25 @@ class _ColorizerState:
     a backup point, and restore back to that backup point.  This is
     used by several colorization methods that first try colorizing
     their object on a single line (setting linebreakok=False); and
-    then fall back on a multi-line output if that fails.
+    then fall back on a multi-line output if that fails.  The L{score}
+    variable is used to keep track of a 'score', reflecting how good
+    we think this repr is.  E.g., unhelpful values like '<Foo instance
+    at 0x12345>' get low scores.  If the score is too low, we'll use
+    the parse-derived repr instead.
     """
     def __init__(self):
         self.result = []
         self.charpos = 0
         self.lineno = 1
         self.linebreakok = True
+        self.score = 0
 
     def mark(self):
-        return (len(self.result), self.charpos, self.lineno, self.linebreakok)
+        return (len(self.result), self.charpos,
+                self.lineno, self.linebreakok, self.score)
 
     def restore(self, mark):
-        n, self.charpos, self.lineno, self.linebreakok = mark
+        n, self.charpos, self.lineno, self.linebreakok, self.score = mark
         del self.result[n:]
 
 class _Maxlines(Exception):
@@ -78,40 +91,6 @@ class PyvalColorizer:
         self.sort = sort
 
     #////////////////////////////////////////////////////////////
-    # Subclassing Hooks
-    #////////////////////////////////////////////////////////////
-
-    PREFIX = None
-    """A string sequence that should be added to the beginning of all
-        colorized pyval outputs."""
-    
-    SUFFIX = None
-    """A string sequence that should be added to the beginning of all
-        colorized pyval outputs."""
-    
-    NEWLINE = '\n'
-    """The string sequence that should be generated to encode newlines."""
-    
-    LINEWRAP = None
-    """The string sequence that should be generated when linewrapping a
-       string that is too long to fit on a single line.  (The
-       NEWLINE sequence will be added immediately after this sequence)"""
-    
-    ELLIPSIS = None
-    """The string sequence that should be generated when omitting the
-       rest of the repr because maxlines has been exceeded."""
-    
-    def markup(self, s, tag=None):
-        """
-        Apply syntax highlighting to a single substring from a Python
-        value representation.  C{s} is the substring, and C{tag} is
-        the tag that should be applied to the substring.  C{tag} will
-        be one of the following strings:
-
-          - (list under construction)
-        """
-
-    #////////////////////////////////////////////////////////////
     # Colorization Tags
     #////////////////////////////////////////////////////////////
 
@@ -128,30 +107,43 @@ class PyvalColorizer:
     RE_REF_TAG = 're-ref'
     RE_OP_TAG = 're-op'
     RE_FLAGS_TAG = 're-flags'
+
+    # Should these use symbols instead?
+    ELLIPSIS = Element('code', '...', style='ellipsis')
+    LINEWRAP = Element('symbol', 'crarr')
     
     #////////////////////////////////////////////////////////////
     # Entry Point
     #////////////////////////////////////////////////////////////
 
-    def colorize(self, pyval):
+    def colorize(self, pyval, min_score=None):
+        pds, score = self.colorize_and_score(pyval)
+        if min_score is None or score >= min_score:
+            return pds
+        else:
+            return None
+    
+    def colorize_and_score(self, pyval):
+        """
+        @return: A tuple (parsed_docstring, score).
+        """
         # Create an object to keep track of the colorization.
         state = _ColorizerState()
-        # Add the prefix string.
-        state.result.append(self.PREFIX)
         # Colorize the value.  If we reach maxlines, then add on an
         # ellipsis marker and call it a day.
         try:
             self._colorize(pyval, state)
         except _Maxlines:
             state.result.append(self.ELLIPSIS)
-        # Add on the suffix string.
-        state.result.append(self.SUFFIX)
         # Put it all together.
-        return ''.join(state.result)
+        tree = Element('epytext', Element('code', style='pyval',
+                                          *state.result))
+        return ParsedEpytextDocstring(tree), state.score
 
     def _colorize(self, pyval, state):
         pyval_type = type(pyval)
-
+        state.score += 1
+        
         if pyval is None or pyval is True or pyval is False:
             self._output(str(pyval), self.CONST_TAG, state)
         elif pyval_type in (int, float, long, types.ComplexType):
@@ -179,7 +171,19 @@ class PyvalColorizer:
         elif is_re_pattern(pyval):
             self._colorize_re(pyval, state)
         else:
-            self._output(repr(pyval), None, state)
+            try:
+                pyval_repr = repr(pyval)
+                self._output(pyval_repr, None, state)
+                if self.GENERIC_OBJECT_RE.match(pyval_repr):
+                    state.score -= 5
+            except KeyboardInterrupt:
+                raise
+            except:
+                pyval_repr = '...'
+                state.score -= 100
+
+    GENERIC_OBJECT_RE = re.compile(r'^<.* at 0x[0-9a-f]+>$',
+                                   re.IGNORECASE)
         
     #////////////////////////////////////////////////////////////
     # Object Colorization Functions
@@ -430,7 +434,7 @@ class PyvalColorizer:
             if i > 0:
                 if not state.linebreakok:
                     raise _Linebreak()
-                state.result.append(self.NEWLINE)
+                state.result.append('\n')
                 state.lineno += 1
                 state.charpos = 0
                 if state.lineno > self.maxlines:
@@ -439,40 +443,21 @@ class PyvalColorizer:
             # If the segment fits on the current line, then just call
             # markup to tag it, and store the result.
             if state.charpos + len(segment) <= self.linelen:
-                state.result.append(self.markup(segment, tag))
                 state.charpos += len(segment)
+                if tag:
+                    segment = Element('code', segment, style=tag)
+                state.result.append(segment)
 
             # If the segment doesn't fit on the current line, then
             # line-wrap it, and insert the remainder of the line into
-            # the segments list that we're iterating over.
+            # the segments list that we're iterating over.  (We'll go
+            # the the beginning of the next line at the start of the
+            # next iteration through the loop.)
             else:
                 split = self.linelen-state.charpos
-                state.result += [self.markup(segment[:split], tag),
-                                 self.LINEWRAP]
                 segments.insert(i+1, segment[split:])
+                segment = segment[:split]
+                if tag:
+                    segment = Element('code', segment, style=tag)
+                state.result += [segment, self.LINEWRAP]
 
-class HTMLPyvalColorizer(PyvalColorizer):
-    NEWLINE = '\n'
-    PREFIX = SUFFIX = ''
-    LINEWRAP = (r'<span class="variable-linewrap">'
-                '<img src="crarr.png" alt="\" /></span>')
-    ELLIPSIS = r'<span class="variable-ellipsis">...</span>'
-    def markup(self, s, tag=None):
-        s = s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        if tag:
-            return '<span class="variable-%s">%s</span>' % (tag, s)
-        else:
-            return s
-
-class XMLPyvalColorizer(PyvalColorizer):
-    NEWLINE = '\n'
-    PREFIX = '<pyval>'
-    SUFFIX = '</pyval>'
-    LINEWRAP = '<linewrap />'
-    ELLIPSIS = '<ellipsis />'
-    def markup(self, s, tag=None):
-        s = s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-        if tag:
-            return '<%s>%s</%s>' % (tag, s, tag)
-        else:
-            return s

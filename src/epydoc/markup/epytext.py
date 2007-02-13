@@ -67,7 +67,7 @@ Description::
    <!ELEMENT tag (#PCDATA)>
    <!ELEMENT arg (#PCDATA)>
    
-   <!ELEMENT literalblock (#PCDATA)>
+   <!ELEMENT literalblock (#PCDATA | %colorized;)*>
    <!ELEMENT doctestblock (#PCDATA)>
 
    <!ELEMENT ulist (li+)>
@@ -86,6 +86,7 @@ Description::
    <!ELEMENT italic  (#PCDATA | %colorized;)*>
    <!ELEMENT bold    (#PCDATA | %colorized;)*>
    <!ELEMENT indexed (#PCDATA | %colorized;)>
+   <!ATTLIST code style CDATA #IMPLIED>
 
    <!ELEMENT symbol (#PCDATA)>
 
@@ -1270,6 +1271,10 @@ def to_epytext(tree, indent=0, seclevel=0):
                 return '%s{%s}' % (tag, childstr)
     raise ValueError('Unknown DOM element %r' % tree.tag)
 
+SYMBOL_TO_PLAINTEXT = {
+    'crarr': '\\',
+    }
+
 def to_plaintext(tree, indent=0, seclevel=0):
     """    
     Convert a DOM document encoding epytext to a string representation.
@@ -1344,7 +1349,7 @@ def to_plaintext(tree, indent=0, seclevel=0):
         #    if child.count('\n') > 2: return childstr
         return childstr.replace('\n\n', '\n')+'\n'
     elif tree.tag == 'symbol':
-        return '%s' % childstr
+        return '%s' % SYMBOL_TO_PLAINTEXT.get(childstr, childstr)
     elif tree.tag == 'graph':
         return '<<%s graph: %s>>' % (variables[0], ', '.join(variables[1:]))
     else:
@@ -1606,47 +1611,47 @@ def parse_docstring(docstring, errors, **options):
 class ParsedEpytextDocstring(ParsedDocstring):
     SYMBOL_TO_HTML = {
         # Symbols
-        '<-': 'larr', '->': 'rarr', '^': 'uarr', 'v': 'darr',
+        '<-': '&larr;', '->': '&rarr;', '^': '&uarr;', 'v': '&darr;',
     
         # Greek letters
-        'alpha': 'alpha', 'beta': 'beta', 'gamma': 'gamma',
-        'delta': 'delta', 'epsilon': 'epsilon', 'zeta': 'zeta',  
-        'eta': 'eta', 'theta': 'theta', 'iota': 'iota', 
-        'kappa': 'kappa', 'lambda': 'lambda', 'mu': 'mu',  
-        'nu': 'nu', 'xi': 'xi', 'omicron': 'omicron',  
-        'pi': 'pi', 'rho': 'rho', 'sigma': 'sigma',  
-        'tau': 'tau', 'upsilon': 'upsilon', 'phi': 'phi',  
-        'chi': 'chi', 'psi': 'psi', 'omega': 'omega',
-        'Alpha': 'Alpha', 'Beta': 'Beta', 'Gamma': 'Gamma',
-        'Delta': 'Delta', 'Epsilon': 'Epsilon', 'Zeta': 'Zeta',  
-        'Eta': 'Eta', 'Theta': 'Theta', 'Iota': 'Iota', 
-        'Kappa': 'Kappa', 'Lambda': 'Lambda', 'Mu': 'Mu',  
-        'Nu': 'Nu', 'Xi': 'Xi', 'Omicron': 'Omicron',  
-        'Pi': 'Pi', 'Rho': 'Rho', 'Sigma': 'Sigma',  
-        'Tau': 'Tau', 'Upsilon': 'Upsilon', 'Phi': 'Phi',  
-        'Chi': 'Chi', 'Psi': 'Psi', 'Omega': 'Omega',
+        'alpha': '&alpha;', 'beta': '&beta;', 'gamma': '&gamma;',
+        'delta': '&delta;', 'epsilon': '&epsilon;', 'zeta': '&zeta;',  
+        'eta': '&eta;', 'theta': '&theta;', 'iota': '&iota;', 
+        'kappa': '&kappa;', 'lambda': '&lambda;', 'mu': '&mu;',  
+        'nu': '&nu;', 'xi': '&xi;', 'omicron': '&omicron;',  
+        'pi': '&pi;', 'rho': '&rho;', 'sigma': '&sigma;',  
+        'tau': '&tau;', 'upsilon': '&upsilon;', 'phi': '&phi;',  
+        'chi': '&chi;', 'psi': '&psi;', 'omega': '&omega;',
+        'Alpha': '&Alpha;', 'Beta': '&Beta;', 'Gamma': '&Gamma;',
+        'Delta': '&Delta;', 'Epsilon': '&Epsilon;', 'Zeta': '&Zeta;',  
+        'Eta': '&Eta;', 'Theta': '&Theta;', 'Iota': '&Iota;', 
+        'Kappa': '&Kappa;', 'Lambda': '&Lambda;', 'Mu': '&Mu;',  
+        'Nu': '&Nu;', 'Xi': '&Xi;', 'Omicron': '&Omicron;',  
+        'Pi': '&Pi;', 'Rho': '&Rho;', 'Sigma': '&Sigma;',  
+        'Tau': '&Tau;', 'Upsilon': '&Upsilon;', 'Phi': '&Phi;',  
+        'Chi': '&Chi;', 'Psi': '&Psi;', 'Omega': '&Omega;',
     
         # HTML character entities
-        'larr': 'larr', 'rarr': 'rarr', 'uarr': 'uarr',
-        'darr': 'darr', 'harr': 'harr', 'crarr': 'crarr',
-        'lArr': 'lArr', 'rArr': 'rArr', 'uArr': 'uArr',
-        'dArr': 'dArr', 'hArr': 'hArr', 
-        'copy': 'copy', 'times': 'times', 'forall': 'forall',
-        'exist': 'exist', 'part': 'part',
-        'empty': 'empty', 'isin': 'isin', 'notin': 'notin',
-        'ni': 'ni', 'prod': 'prod', 'sum': 'sum',
-        'prop': 'prop', 'infin': 'infin', 'ang': 'ang',
-        'and': 'and', 'or': 'or', 'cap': 'cap', 'cup': 'cup',
-        'int': 'int', 'there4': 'there4', 'sim': 'sim',
-        'cong': 'cong', 'asymp': 'asymp', 'ne': 'ne',
-        'equiv': 'equiv', 'le': 'le', 'ge': 'ge',
-        'sub': 'sub', 'sup': 'sup', 'nsub': 'nsub',
-        'sube': 'sube', 'supe': 'supe', 'oplus': 'oplus',
-        'otimes': 'otimes', 'perp': 'perp',
+        'larr': '&larr;', 'rarr': '&rarr;', 'uarr': '&uarr;',
+        'darr': '&darr;', 'harr': '&harr;', 'crarr': '&crarr;',
+        'lArr': '&lArr;', 'rArr': '&rArr;', 'uArr': '&uArr;',
+        'dArr': '&dArr;', 'hArr': '&hArr;', 
+        'copy': '&copy;', 'times': '&times;', 'forall': '&forall;',
+        'exist': '&exist;', 'part': '&part;',
+        'empty': '&empty;', 'isin': '&isin;', 'notin': '&notin;',
+        'ni': '&ni;', 'prod': '&prod;', 'sum': '&sum;',
+        'prop': '&prop;', 'infin': '&infin;', 'ang': '&ang;',
+        'and': '&and;', 'or': '&or;', 'cap': '&cap;', 'cup': '&cup;',
+        'int': '&int;', 'there4': '&there4;', 'sim': '&sim;',
+        'cong': '&cong;', 'asymp': '&asymp;', 'ne': '&ne;',
+        'equiv': '&equiv;', 'le': '&le;', 'ge': '&ge;',
+        'sub': '&sub;', 'sup': '&sup;', 'nsub': '&nsub;',
+        'sube': '&sube;', 'supe': '&supe;', 'oplus': '&oplus;',
+        'otimes': '&otimes;', 'perp': '&perp;',
     
         # Alternate (long) names
-        'infinity': 'infin', 'integral': 'int', 'product': 'prod',
-        '<=': 'le', '>=': 'ge',
+        'infinity': '&infin;', 'integral': '&int;', 'product': '&prod;',
+        '<=': '&le;', '>=': '&ge;',
         }
     
     SYMBOL_TO_LATEX = {
@@ -1709,6 +1714,9 @@ class ParsedEpytextDocstring(ParsedDocstring):
         # Caching:
         self._html = self._latex = self._plaintext = None
         self._terms = None
+
+    def __str__(self):
+        return str(self._tree)
         
     def to_html(self, docstring_linker, directory=None, docindex=None,
                 context=None, **options):
@@ -1776,7 +1784,11 @@ class ParsedEpytextDocstring(ParsedDocstring):
         if tree.tag == 'para':
             return wordwrap('<p>%s</p>' % childstr, indent)
         elif tree.tag == 'code':
-            return '<code>%s</code>' % childstr
+            style = tree.attribs.get('style')
+            if style:
+                return '<code class="%s">%s</code>' % (style, childstr)
+            else:
+                return '<code>%s</code>' % childstr
         elif tree.tag == 'uri':
             return ('<a href="%s" target="_top">%s</a>' %
                     (variables[1], variables[0]))
@@ -1815,10 +1827,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             return childstr
         elif tree.tag == 'symbol':
             symbol = tree.children[0]
-            if self.SYMBOL_TO_HTML.has_key(symbol):
-                return '&%s;' % self.SYMBOL_TO_HTML[symbol]
-            else:
-                return '[??]'
+            return self.SYMBOL_TO_HTML.get(symbol, '[%s]' % symbol)
         elif tree.tag == 'graph':
             # Generate the graph.
             graph = self._build_graph(variables[0], variables[1:], linker,
@@ -1940,10 +1949,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                     ' '*indent + '\\end{itemize}\n\n')
         elif tree.tag == 'symbol':
             symbol = tree.children[0]
-            if self.SYMBOL_TO_LATEX.has_key(symbol):
-                return r'%s' % self.SYMBOL_TO_LATEX[symbol]
-            else:
-                return '[??]'
+            return self.SYMBOL_TO_LATEX.get(symbol, '[%s]' % symbol)
         elif tree.tag == 'graph':
             return '(GRAPH)'
             #raise ValueError, 'graph not implemented yet for latex'

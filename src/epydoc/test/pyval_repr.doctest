@@ -2,9 +2,8 @@ Regression Testing for epydoc.markup.pyval_repr
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     >>> from epydoc.markup.pyval_repr import *
-    >>> colorizer = XMLPyvalColorizer(linelen=40)
-    >>> def color(s): print colorizer.colorize(s)
-
+    >>> colorizer = PyvalColorizer(linelen=40)
+    >>> def color(s): print colorizer.colorize(s).to_html(None).rstrip()
 
 Simple Types
 ============
@@ -12,22 +11,27 @@ Integers, floats, None, and complex numbers get printed using str,
 with no syntax highlighting:
 
     >>> color(10)
-    <pyval>10</pyval>
+    <code class="pyval">10</code>
     >>> color(1./4)
-    <pyval>0.25</pyval>
+    <code class="pyval">0.25</code>
     >>> color(None)
-    <pyval>None</pyval>
+    <code class="pyval">None</code>
     >>> color(100)
-    <pyval>100</pyval>
+    <code class="pyval">100</code>
 
 Long ints will get wrapped if they're big enough:
     
     >>> color(10000000)
-    <pyval>10000000</pyval>
+    <code class="pyval">10000000</code>
     >>> color(10**90)
-    <pyval>1000000000000000000000000000000000000000<linewrap />
-    0000000000000000000000000000000000000000<linewrap />
-    00000000000</pyval>
+    <code class="pyval">1000000000000000000000000000000000000000&crarr;
+    0000000000000000000000000000000000000000&crarr;
+    00000000000</code>
+    >>> print '-'*40+'\n'+colorizer.colorize(10**90).to_plaintext(None)
+    ----------------------------------------
+    1000000000000000000000000000000000000000\
+    0000000000000000000000000000000000000000\
+    00000000000
 
 Strings
 =======
@@ -35,37 +39,37 @@ Strings have their quotation marks tagged as 'quote'.  Characters are
 escaped using the 'string-escape' encoding.  
 
     >>> color(''.join(chr(i) for i in range(256)))
-    <pyval><val-quote>'''</val-quote><val-string>\x00\x01\x02\x03\x04\x05\x06\x07\x08\</val-string><linewrap />
-    <val-string>t</val-string>
-    <val-string>\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x</val-string><linewrap />
-    <val-string>15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x</val-string><linewrap />
-    <val-string>1f !"#$%&amp;\'()*+,-./0123456789:;&lt;=&gt;?@ABCD</val-string><linewrap />
-    <ellipsis /></pyval>
+    <code class="pyval"><code class="val-quote">'''</code><code class="val-string">\x00\x01\x02\x03\x04\x05\x06\x07\x08\</code>&crarr;
+    <code class="val-string">t</code>
+    <code class="val-string">\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x</code>&crarr;
+    <code class="val-string">15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x</code>&crarr;
+    <code class="val-string">1f !&quot;#$%&amp;\'()*+,-./0123456789:;&lt;=&gt;?@ABCD</code>&crarr;
+    <code class="ellipsis">...</code></code>
     
 Currently, the "'" quote is always used, because that's what the
 'string-escape' encoding expects.
 
     >>> color('Hello')
-    <pyval><val-quote>'</val-quote><val-string>Hello</val-string><val-quote>'</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">'</code><code class="val-string">Hello</code><code class="val-quote">'</code></code>
     >>> color('"Hello"')
-    <pyval><val-quote>'</val-quote><val-string>"Hello"</val-string><val-quote>'</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">'</code><code class="val-string">&quot;Hello&quot;</code><code class="val-quote">'</code></code>
     >>> color("'Hello'")
-    <pyval><val-quote>'</val-quote><val-string>\'Hello\'</val-string><val-quote>'</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">'</code><code class="val-string">\'Hello\'</code><code class="val-quote">'</code></code>
 
 Strings containing newlines are automatically rendered as multiline
 strings.
 
     >>> color("This\n  is a multiline\n string!")
-    <pyval><val-quote>'''</val-quote><val-string>This</val-string>
-    <val-string>  is a multiline</val-string>
-    <val-string> string!</val-string><val-quote>'''</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">'''</code><code class="val-string">This</code>
+    <code class="val-string">  is a multiline</code>
+    <code class="val-string"> string!</code><code class="val-quote">'''</code></code>
 
 Unicode strings are handled properly.
 
     >>> color(u"Hello world")
-    <pyval><val-quote>u'</val-quote><val-string>Hello world</val-string><val-quote>'</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">u'</code><code class="val-string">Hello world</code><code class="val-quote">'</code></code>
     >>> color(u"\uaaaa And \ubbbb")
-    <pyval><val-quote>u'</val-quote><val-string>\uaaaa And \ubbbb</val-string><val-quote>'</val-quote></pyval>
+    <code class="pyval"><code class="val-quote">u'</code><code class="val-string">\uaaaa And \ubbbb</code><code class="val-quote">'</code></code>
 
 Lists, Tuples, etc.
 ===================
@@ -75,28 +79,28 @@ current line, it is displayed on one line.  Otherwise, each value is
 listed on a separate line, indented by the size of the open-bracket.
     
     >>> color(range(10))
-    <pyval><val-group>[</val-group>0<val-op>, </val-op>1<val-op>, </val-op>2<val-op>, </val-op>3<val-op>, </val-op>4<val-op>, </val-op>5<val-op>, </val-op>6<val-op>, </val-op>7<val-op>, </val-op>8<val-op>, </val-op>9<val-group>]</val-group></pyval>
+    <code class="pyval"><code class="val-group">[</code>0<code class="val-op">, </code>1<code class="val-op">, </code>2<code class="val-op">, </code>3<code class="val-op">, </code>4<code class="val-op">, </code>5<code class="val-op">, </code>6<code class="val-op">, </code>7<code class="val-op">, </code>8<code class="val-op">, </code>9<code class="val-group">]</code></code>
     >>> color(range(100))
-    <pyval><val-group>[</val-group>0<val-op>,</val-op>
-     1<val-op>,</val-op>
-     2<val-op>,</val-op>
-     3<val-op>,</val-op>
-     4<val-op>,</val-op>
-    <ellipsis /></pyval>
+    <code class="pyval"><code class="val-group">[</code>0<code class="val-op">,</code>
+     1<code class="val-op">,</code>
+     2<code class="val-op">,</code>
+     3<code class="val-op">,</code>
+     4<code class="val-op">,</code>
+    <code class="ellipsis">...</code></code>
     >>> color([1,2,[5,6,[(11,22,33),9],10],11]+[99,98,97,96,95])
-    <pyval><val-group>[</val-group>1<val-op>,</val-op>
-     2<val-op>,</val-op>
-     <val-group>[</val-group>5<val-op>, </val-op>6<val-op>, </val-op><val-group>[</val-group><val-group>(</val-group>11<val-op>, </val-op>22<val-op>, </val-op>33<val-group>)</val-group><val-op>, </val-op>9<val-group>]</val-group><val-op>, </val-op>10<val-group>]</val-group><val-op>,</val-op>
-     11<val-op>,</val-op>
-     99<val-op>,</val-op>
-    <ellipsis /></pyval>
+    <code class="pyval"><code class="val-group">[</code>1<code class="val-op">,</code>
+     2<code class="val-op">,</code>
+     <code class="val-group">[</code>5<code class="val-op">, </code>6<code class="val-op">, </code><code class="val-group">[</code><code class="val-group">(</code>11<code class="val-op">, </code>22<code class="val-op">, </code>33<code class="val-group">)</code><code class="val-op">, </code>9<code class="val-group">]</code><code class="val-op">, </code>10<code class="val-group">]</code><code class="val-op">,</code>
+     11<code class="val-op">,</code>
+     99<code class="val-op">,</code>
+    <code class="ellipsis">...</code></code>
     >>> color(set(range(20)))
-    <pyval><val-group>set([</val-group>0<val-op>,</val-op>
-         1<val-op>,</val-op>
-         2<val-op>,</val-op>
-         3<val-op>,</val-op>
-         4<val-op>,</val-op>
-    <ellipsis /></pyval>
+    <code class="pyval"><code class="val-group">set([</code>0<code class="val-op">,</code>
+         1<code class="val-op">,</code>
+         2<code class="val-op">,</code>
+         3<code class="val-op">,</code>
+         4<code class="val-op">,</code>
+    <code class="ellipsis">...</code></code>
 
 Dictionaries
 ============
@@ -104,91 +108,137 @@ Dicts are treated just like lists, except that the ":" is also tagged as
 "op".
 
     >>> color({1:33, 2:[1,2,3,{7:'oo'*20}]})
-    <pyval><val-group>{</val-group>1<val-op>: </val-op>33<val-op>,</val-op>
-     2<val-op>: </val-op><val-group>[</val-group>1<val-op>,</val-op>
-         2<val-op>,</val-op>
-         3<val-op>,</val-op>
-         <val-group>{</val-group>7<val-op>: </val-op><val-quote>'</val-quote><val-string>oooooooooooooooooooooooooooooo</val-string><linewrap />
-    <ellipsis /></pyval>
+    <code class="pyval"><code class="val-group">{</code>1<code class="val-op">: </code>33<code class="val-op">,</code>
+     2<code class="val-op">: </code><code class="val-group">[</code>1<code class="val-op">,</code>
+         2<code class="val-op">,</code>
+         3<code class="val-op">,</code>
+         <code class="val-group">{</code>7<code class="val-op">: </code><code class="val-quote">'</code><code class="val-string">oooooooooooooooooooooooooooooo</code>&crarr; 
+    <code class="ellipsis">...</code></code>
 
 Regular Expressions
 ===================
+
+    >>> def textcontent(elt):
+    ...     if isinstance(elt, basestring): return elt
+    ...     else: return ''.join(textcontent(c) for c in elt.children)
 
     >>> import re
     >>> def color_re(s, check_roundtrip=True):
     ...     val = colorizer.colorize(re.compile(s))
     ...     if check_roundtrip:
-    ...         roundtrip_val = re.sub('</?[\w-]+>', '', val)
-    ...         roundtrip_val = roundtrip_val.replace('&gt;', '>')
-    ...         roundtrip_val = roundtrip_val.replace('&lt;', '<')
-    ...         roundtrip_val = roundtrip_val.replace('&amp;', '&')
-    ...         assert roundtrip_val == s, roundtrip_val
-    ...     print val
+    ...         assert textcontent(val._tree) == s, val._tree
+    ...     print val.to_html(None).rstrip()
 
     >>> # Literal characters
     >>> color_re(u'abc \t\r\n\f\v \xff \uffff \U000fffff', False)
-    <pyval>abc \t\r\n\f\v \xff \uffff \U000fffff</pyval>
+    <code class="pyval">abc \t\r\n\f\v \xff \uffff \U000fffff</code>
     >>> color_re(r'\.\^\$\\\*\+\?\{\}\[\]\|\(\)')
-    <pyval>\.\^\$\\\*\+\?\{\}\[\]\|\(\)</pyval>
+    <code class="pyval">\.\^\$\\\*\+\?\{\}\[\]\|\(\)</code>
 
     >>> # Any character & character classes
     >>> color_re(r".\d\D\s\S\w\W\A^$\b\B\Z")
-    <pyval>.\d\D\s\S\w\W\A^$\b\B\Z</pyval>
+    <code class="pyval">.\d\D\s\S\w\W\A^$\b\B\Z</code>
 
     >>> # Branching
     >>> color_re(r"foo|bar")
-    <pyval>foo<re-op>|</re-op>bar</pyval>
+    <code class="pyval">foo<code class="re-op">|</code>bar</code>
 
     >>> # Character classes
     >>> color_re(r"[abcd]")
-    <pyval><re-group>[</re-group>abcd<re-group>]</re-group></pyval>
+    <code class="pyval"><code class="re-group">[</code>abcd<code class="re-group">]</code></code>
 
     >>> # Repeats
     >>> color_re(r"a*b+c{4,}d{,5}e{3,9}f?")
-    <pyval>a<re-op>*</re-op>b<re-op>+</re-op>c<re-op>{4,}</re-op>d<re-op>{,5}</re-op>e<re-op>{3,9}</re-op>f<re-op>?</re-op></pyval>
+    <code class="pyval">a<code class="re-op">*</code>b<code class="re-op">+</code>c<code class="re-op">{4,}</code>d<code class="re-op">{,5}</code>e<code class="re-op">{3,9}</code>f<code class="re-op">?</code></code>
     >>> color_re(r"a*?b+?c{4,}?d{,5}?e{3,9}?f??")
-    <pyval>a<re-op>*?</re-op>b<re-op>+?</re-op>c<re-op>{4,}?</re-op>d<re-op>{,5}?</re-op>e<re-op>{3,9}?</re-op>f<re-op>??</re-op></pyval>
+    <code class="pyval">a<code class="re-op">*?</code>b<code class="re-op">+?</code>c<code class="re-op">{4,}?</code>d<code class="re-op">{,5}?</code>e<code class="re-op">{3,9}?</code>f<code class="re-op">??</code></code>
     
     >>> # Subpatterns
     >>> color_re(r"(foo (bar) | (baz))")
-    <pyval><re-group>(</re-group>foo <re-group>(</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+    <code class="pyval"><code class="re-group">(</code>foo <code class="re-group">(</code>bar<code class="re-group">)</code> <code class="re-op">|</code> <code class="re-group">(</code>baz<code class="re-group">)</code><code class="re-group">)</code></code>
     >>> color_re(r"(?:foo (?:bar) | (?:baz))")
-    <pyval><re-group>(?:</re-group>foo <re-group>(?:</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(?:</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+    <code class="pyval"><code class="re-group">(?:</code>foo <code class="re-group">(?:</code>bar<code class="re-group">)</code> <code class="re-op">|</code> <code class="re-group">(?:</code>baz<code class="re-group">)</code><code class="re-group">)</code></code>
     >>> color_re("(foo (?P<a>bar) | (?P<boop>baz))")
-    <pyval><re-group>(</re-group>foo <re-group>(?P&lt;</re-group><re-ref>a</re-ref><re-group>&gt;</re-group>bar<re-group>)</re-group> <re-op>|</re-op> <re-group>(?P&lt;</re-group><re-ref>boop</re-ref><re-group>&gt;</re-group>baz<re-group>)</re-group><re-group>)</re-group></pyval>
+    <code class="pyval"><code class="re-group">(</code>foo <code class="re-group">(?P&lt;</code><code class="re-ref">a</code><code class="re-group">&gt;</code>bar<code class="re-group">)</code> <code class="re-op">|</code> <code class="re-group">(?P&lt;</code><code class="re-ref">boop</code><code class="re-group">&gt;</code>baz<code class="re-group">)</code><code class="re-group">)</code></code>
 
     >>> # Group References
     >>> color_re(r"(...) and (\1)")
-    <pyval><re-group>(</re-group>...<re-group>)</re-group> and <re-group>(</re-group><re-ref>\1</re-ref><re-group>)</re-group></pyval>
+    <code class="pyval"><code class="re-group">(</code>...<code class="re-group">)</code> and <code class="re-group">(</code><code class="re-ref">\1</code><code class="re-group">)</code></code>
 
     >>> # Ranges
     >>> color_re(r"[a-bp-z]")
-    <pyval><re-group>[</re-group>a<re-op>-</re-op>bp<re-op>-</re-op>z<re-group>]</re-group></pyval>
+    <code class="pyval"><code class="re-group">[</code>a<code class="re-op">-</code>bp<code class="re-op">-</code>z<code class="re-group">]</code></code>
     >>> color_re(r"[^a-bp-z]")
-    <pyval><re-group>[</re-group><re-op>^</re-op>a<re-op>-</re-op>bp<re-op>-</re-op>z<re-group>]</re-group></pyval>
+    <code class="pyval"><code class="re-group">[</code><code class="re-op">^</code>a<code class="re-op">-</code>bp<code class="re-op">-</code>z<code class="re-group">]</code></code>
     >>> color_re(r"[^abc]")
-    <pyval><re-group>[</re-group><re-op>^</re-op>abc<re-group>]</re-group></pyval>
+    <code class="pyval"><code class="re-group">[</code><code class="re-op">^</code>abc<code class="re-group">]</code></code>
 
     >>> # Lookahead/behinds
     >>> color_re(r"foo(?=bar)")
-    <pyval>foo<re-group>(?=</re-group>bar<re-group>)</re-group></pyval>
+    <code class="pyval">foo<code class="re-group">(?=</code>bar<code class="re-group">)</code></code>
     >>> color_re(r"foo(?!bar)")
-    <pyval>foo<re-group>(?!</re-group>bar<re-group>)</re-group></pyval>
+    <code class="pyval">foo<code class="re-group">(?!</code>bar<code class="re-group">)</code></code>
     >>> color_re(r"(?<=bar)foo")
-    <pyval><re-group>(?&lt;=</re-group>bar<re-group>)</re-group>foo</pyval>
+    <code class="pyval"><code class="re-group">(?&lt;=</code>bar<code class="re-group">)</code>foo</code>
     >>> color_re(r"(?<!bar)foo")
-    <pyval><re-group>(?&lt;!</re-group>bar<re-group>)</re-group>foo</pyval>
+    <code class="pyval"><code class="re-group">(?&lt;!</code>bar<code class="re-group">)</code>foo</code>
 
     >>> # Flags
     >>> color_re(r"(?im)^Food")
-    <pyval><re-flags>(?im)</re-flags>^Food</pyval>
+    <code class="pyval"><code class="re-flags">(?im)</code>^Food</code>
     >>> color_re(r"(?Limsx)^Food")
-    <pyval><re-flags>(?Limsx)</re-flags>^Food</pyval>
+    <code class="pyval"><code class="re-flags">(?Limsx)</code>^Food</code>
     >>> color_re(r"(?Limstux)^Food")
-    <pyval><re-flags>(?Limstux)</re-flags>^Food</pyval>
+    <code class="pyval"><code class="re-flags">(?Limstux)</code>^Food</code>
     >>> color_re(r"(?x)This   is   verbose", False)
-    <pyval><re-flags>(?x)</re-flags>Thisisverbose</pyval>
+    <code class="pyval"><code class="re-flags">(?x)</code>Thisisverbose</code>
 
+Representation Scores
+=====================
+When colorized representations are built, a score is computed
+evaluating how helpful the repr is.  E.g., unhelpful values like `<Foo
+instance at 0x12345>` get low scores.  Currently, the scoring
+algorithm is:
 
+- [+1] for each object colorized.  When the colorizer recurses into
+  a structure, this will add one for each element contained.
+- [-5] when repr(obj) looks like <xyz instance at ...>, for any
+  colorized object (including objects in structures).
+- [-100] if repr(obj) raises an exception, for any colorized object
+  (including objects in structures).
 
+The `min_score` arg to colorize can be used to set a cutoff-point for
+scores; if the score is too low, then `colorize` will return `None`.
+
+    >>> def color2(v):
+    ...     pds, score = colorizer.colorize_and_score(v)
+    ...     print 'repr: %s' % pds.to_plaintext(None)
+    ...     print 'score: %s (%s)' % (score, score>0 and 'ok' or 'bad')
+
+    >>> class A: pass
+
+    >>> color2('hello')
+    repr: 'hello'
+    score: 1 (ok)
+
+    >>> color2(["hello", 123])
+    repr: ['hello', 123]
+    score: 3 (ok)
+
+    >>> color2(A())
+    repr: <__builtin__.A instance at ...>
+    score: -4 (bad)
+
+    >>> color2([A()])
+    repr: [<__builtin__.A instance at ...>]
+    score: -3 (bad)
+
+    >>> color2([A(),1,2,3,4,5,6])
+    repr: [<__builtin__.A instance at ...>,
+     1,
+     2,
+     3,
+     4,
+    ...
+    score: 1 (ok)
 
