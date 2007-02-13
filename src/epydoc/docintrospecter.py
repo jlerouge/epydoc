@@ -512,7 +512,7 @@ __future_check_works = None
 
 def is_future_feature(object):
     """
-    Return True if C{object} results from a C{from __future__ import feature"}
+    Return True if C{object} results from a C{from __future__ import feature}
     statement.
     """
     # Guard from unexpected implementation changes of the __future__ module.
