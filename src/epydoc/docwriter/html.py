@@ -20,7 +20,6 @@ import __builtin__
 from epydoc.apidoc import *
 import epydoc.docstringparser
 import time, epydoc, epydoc.markup, epydoc.markup.epytext
-from epydoc.docwriter.html_colorize import colorize_re
 from epydoc.docwriter.html_colorize import PythonSourceColorizer
 from epydoc.docwriter import html_colorize
 from epydoc.docwriter.html_css import STYLESHEETS
