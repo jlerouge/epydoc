@@ -641,6 +641,9 @@ def process_type_field(api_doc, docindex, tag, arg, descr):
         if arg in api_doc.arg_types:
             raise ValueError(REDEFINED % ('type for '+arg))
         api_doc.arg_types[arg] = descr
+
+    else:
+        raise ValueError(BAD_CONTEXT % tag)
         
 def process_var_field(api_doc, docindex, tag, arg, descr):
     _check(api_doc, tag, arg, context=ModuleDoc, expect_arg=True)
