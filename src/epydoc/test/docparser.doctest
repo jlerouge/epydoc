@@ -82,7 +82,7 @@ assignments, is_imported and is_instvar will always be False.)
         |        |  +- ModuleDoc for epydoc_test [0] (defined above)
         |        +- docs_extracted_by = 'parser'
         |        +- parse_repr = u'[1, 2, 3]+ [4, 5]'
-        |        +- toktree = [[(51, u'['), (2, u'1'), (51, u','), ...
+        |        +- toktree = ...
         +- z => VariableDoc for epydoc_test.z [5]
            +- container
            |  +- ModuleDoc for epydoc_test [0] (defined above)
@@ -98,7 +98,7 @@ assignments, is_imported and is_instvar will always be False.)
                  |  +- ModuleDoc for epydoc_test [0] (defined above)
                  +- docs_extracted_by = 'parser'
                  +- parse_repr = u'f(x, y)'
-                 +- toktree = [(1, u'f'), [(51, u'('), (1, u'x'), (...
+                 +- toktree = ...
 
 In this example, DocParser decides that the assignment to y is
 creating an alias.  The same `ValueDoc` is shared by both variables.
@@ -466,11 +466,12 @@ Tuple arguments are encoded as a single ArgDoc with a complex name:
 Decorators & Wrapper Assignments
 ================================
 
-    >>> runparser(s="""
+    >>> runparser( # doctest: +PYTHON2.4
+    ...     s="""
     ...     @classmethod
     ...     def f(cls, x): 'docstring for f'
     ...     """,
-    ...     attribs='variables value docstring posargs')
+    ...     attribs='variables value docstring posargs') 
     ModuleDoc for epydoc_test [0]
      +- docstring = <UNKNOWN>
      +- variables

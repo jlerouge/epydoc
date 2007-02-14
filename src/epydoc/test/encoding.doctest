@@ -122,7 +122,7 @@ Tests for shift-jis
 
     >>> testencoding('''# -*- coding: shift_jis -*-
     ... """abc ABC 123 \xA1 \xA2 \xA3"""
-    ... ''')
+    ... ''') # doctest: +PYTHON2.4
     abc ABC 123 &#65377; &#65378; &#65379;
 
 Str/Unicode Test

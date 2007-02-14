@@ -188,7 +188,7 @@ def to_plain(docstring):
     """Conver a parsed docstring into plain text"""
     if isinstance(docstring, ParsedDocstring):
         docstring = docstring.to_plaintext(None)
-    return docstring.rsplit()
+    return docstring.rstrip()
 
 def fun_to_plain(val_doc):
     """Convert parsed docstrings in text from a RoutineDoc"""

@@ -42,7 +42,7 @@ Strings
 Strings have their quotation marks tagged as 'quote'.  Characters are
 escaped using the 'string-escape' encoding.  
 
-    >>> color(''.join(chr(i) for i in range(256)))
+    >>> color(''.join([chr(i) for i in range(256)]))
     <code class="variable-quote">'''</code><code class="variable-string">\x00\x01\x02\x03\x04\x05\x06\x07\x08\</code>&crarr;
     <code class="variable-string">t</code>
     <code class="variable-string">\x0b\x0c\r\x0e\x0f\x10\x11\x12\x13\x14\x</code>&crarr;
@@ -129,7 +129,7 @@ Regular Expressions
 
     >>> def textcontent(elt):
     ...     if isinstance(elt, basestring): return elt
-    ...     else: return ''.join(textcontent(c) for c in elt.children)
+    ...     else: return ''.join([textcontent(c) for c in elt.children])
 
     >>> import re
     >>> def color_re(s, check_roundtrip=True):

@@ -148,8 +148,8 @@ Consolidated Fields
         |  +- type_descr = None
         |  +- value
         |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
-        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
-        |        +- arg_types = {u'a': [u'string']}
+        |        +- arg_descrs = [([u'a'], u'init param.')]
+        |        +- arg_types = {u'a': u'string'}
         |        +- exception_descrs = [(DottedName(u'ValueError'), ...
         |        +- kwarg = None
         |        +- posargs = ['self', 'a']

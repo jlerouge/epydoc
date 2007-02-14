@@ -177,10 +177,10 @@ constructor too.
            +- name = '__init__'
            +- value
               +- RoutineDoc for epydoc_test.Foo.__init__ [2]
-                 +- arg_descrs = [([u'x'], [u'first', u'param']), ...
+                 +- arg_descrs = [([u'x'], u'first param'), ([u'y'], u...
                  +- arg_types = {}
                  +- docstring = u'__init__ doc'
-                 +- exception_descrs = [(DottedName(u'ValueError'), ...
+                 +- exception_descrs = [(DottedName(u'ValueError'), <epydoc....
                  +- kwarg = None
                  +- posargs = [u'x', u'y']
                  +- vararg = None
@@ -242,8 +242,8 @@ A type can apply to both a param and a variable
         |  +- type_descr = None
         |  +- value
         |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
-        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
-        |        +- arg_types = {u'a': [u'date']}
+        |        +- arg_descrs = [([u'a'], u'init param.')]
+        |        +- arg_types = {u'a': u'date'}
         |        +- kwarg = None
         |        +- posargs = ['self', 'a']
         |        +- vararg = None
@@ -276,8 +276,8 @@ But there can also be two different types
         |  +- type_descr = None
         |  +- value
         |     +- RoutineDoc for epydoc_test.Foo.__init__ [2]
-        |        +- arg_descrs = [([u'a'], [u'init', u'param.'])]
-        |        +- arg_types = {u'a': [u'string']}
+        |        +- arg_descrs = [([u'a'], u'init param.')]
+        |        +- arg_types = {u'a': u'string'}
         |        +- kwarg = None
         |        +- posargs = ['self', 'a']
         |        +- vararg = None
@@ -294,6 +294,7 @@ would really be better to use the parsed version.  See SF bug
 current behavior; but should be replaced when we change the behavior.
 
     >>> from epydoc.test.util import buildvaluedoc
+    >>> from epydoc.compat import *
     >>> def print_py_reprs(s):
     ...     value_doc = buildvaluedoc(s)
     ...     print 'Var  Score  Repr\n'+'-'*50
