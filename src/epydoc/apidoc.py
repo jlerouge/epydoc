@@ -679,6 +679,16 @@ class VariableDoc(APIDoc):
     def is_detailed(self):
         if (self.value in (None, UNKNOWN)):
             return super(VariableDoc, self).is_detailed()
+        if isinstance(self.value, GenericValueDoc):
+            # [XX] This is a little hackish -- we assume that the
+            # summary lines will have SUMMARY_REPR_LINELEN chars,
+            # that len(name) of those will be taken up by the name,
+            # and that 3 of those will be taken up by " = " between
+            # the name & val.  Note that if any docwriter uses a
+            # different formula for maxlen for this, then it will
+            # not get the right value for is_detailed().
+            maxlen = self.value.SUMMARY_REPR_LINELEN-3-len(self.name)
+            return (not self.value.summary_pyval_repr(maxlen).is_complete)
         else:
             return self.value.is_detailed()
 
