@@ -349,6 +349,10 @@ class HTMLWriter:
         self._graph_types = kwargs.get('graphs', ()) or ()
         """Graphs that we should include in our output."""
 
+        self._callgraph_cache = {}
+        """Map the callgraph L{uid<DotGraph.uid>} to their HTML
+        representation."""
+
         # For use with select_variables():
         if self._show_private:
             self._public_filter = None
@@ -1512,22 +1516,75 @@ class HTMLWriter:
         image_file = os.path.join(self._directory, image_url)
         return graph.to_html(image_file, image_url)
     
-    def render_callgraph(self, callgraph):
-        graph_html = self.render_graph(callgraph, css='graph-with-title')
-        if graph_html == '': return ''
-        return ('<div style="display:none" id="%s-div"><center>\n'
-                '<table border="0" cellpadding="0" cellspacing="0">\n'
-                '  <tr><td>%s</td></tr>\n'
-                '  <tr><th>Call Graph</th></tr>\n'
-                '</table><br />\n</center></div>\n' %
-                (callgraph.uid, graph_html))
+    RE_CALLGRAPH_ID = re.compile(r"""["'](.+-div)['"]""")
+    
+    def render_callgraph(self, callgraph, token=""):
+        """Render the HTML chunk of a callgraph.
 
-    def callgraph_link(self, callgraph):
+        If C{callgraph} is a string, use the L{_callgraph_cache} to return
+        a pre-rendered HTML chunk. This mostly avoids to run C{dot} twice for
+        the same callgraph. Else, run the graph and store its HTML output in
+        the cache.
+
+        @param callgraph: The graph to render or its L{uid<DotGraph.uid>}.
+        @type callgraph: L{DotGraph} or C{str}
+        @param token: A string that can be used to make the C{<div>} id
+            unambiguous, if the callgraph is used more than once in a page.
+        @type token: C{str}
+        @return: The HTML representation of the graph.
+        @rtype: C{str}
+        """
+        if callgraph is None: return ""
+        
+        if isinstance(callgraph, basestring):
+            uid = callgraph
+            rv = self._callgraph_cache.get(callgraph, "")
+
+        else:
+            uid = callgraph.uid
+            graph_html = self.render_graph(callgraph, css='graph-with-title')
+            if graph_html == '':
+                rv = ""
+            else:
+                rv = ('<div style="display:none" id="%%s-div"><center>\n'
+                      '<table border="0" cellpadding="0" cellspacing="0">\n'
+                      '  <tr><td>%s</td></tr>\n'
+                      '  <tr><th>Call Graph</th></tr>\n'
+                      '</table><br />\n</center></div>\n' % graph_html)
+
+            # Store in the cache the complete HTML chunk without the
+            # div id, which may be made unambiguous by the token
+            self._callgraph_cache[uid] = rv
+
+        # Mangle with the graph
+        if rv: rv = rv % (uid + token)
+        return rv
+
+    def callgraph_link(self, callgraph, token=""):
+        """Render the HTML chunk of a callgraph link.
+
+        The link can toggles the visibility of the callgraph rendered using
+        L{render_callgraph} with matching parameters.
+
+        @param callgraph: The graph to render or its L{uid<DotGraph.uid>}.
+        @type callgraph: L{DotGraph} or C{str}
+        @param token: A string that can be used to make the C{<div>} id
+            unambiguous, if the callgraph is used more than once in a page.
+        @type token: C{str}
+        @return: The HTML representation of the graph link.
+        @rtype: C{str}
+        """
         # Use class=codelink, to match style w/ the source code link.
         if callgraph is None: return ''
+
+        if isinstance(callgraph, basestring):
+            uid = callgraph
+        else:
+            uid = callgraph.uid
+
         return ('<br /><span class="codelink"><a href="javascript:void(0);" '
                 'onclick="toggleCallGraph(\'%s-div\');return false;">'
-                'call&nbsp;graph</a></span>&nbsp;' % callgraph.uid)
+                'call&nbsp;graph</a></span>&nbsp;' % (uid + token))
 
     #////////////////////////////////////////////////////////////
     #{ 2.11. Images
@@ -1917,8 +1974,9 @@ class HTMLWriter:
         @param container: The API documentation for the class or
             module whose summary table we're writing.
         """
-        link = None     # link to the source code
-        
+        pysrc_link = None
+        callgraph = None
+
         # If it's a private variable, then mark its <tr>.
         if var_doc.is_public: tr_class = ''
         else: tr_class = ' class="private"'
@@ -1928,7 +1986,18 @@ class HTMLWriter:
         if isinstance(var_doc.value, RoutineDoc):
             typ = self.return_type(var_doc, indent=6)
             description = self.function_signature(var_doc, True, True)
-            link = self.pysrc_link(var_doc.value)
+            pysrc_link = self.pysrc_link(var_doc.value)
+
+            # Perpare the call-graph, if requested
+            if 'callgraph' in self._graph_types:
+                linker = _HTMLDocstringLinker(self, var_doc.value)
+                callgraph = call_graph([var_doc.value], self.docindex,
+                                       linker, var_doc, add_callers=True, 
+                                       add_callees=True)
+                if callgraph and callgraph.nodes:
+                    var_doc.value.callgraph_uid = callgraph.uid
+                else:
+                    callgraph = None
         else:
             typ = self.type_descr(var_doc, indent=6)
             description = self.summary_name(var_doc, link_name=True)
@@ -1951,27 +2020,31 @@ class HTMLWriter:
                         self.href(var_doc.container) + ")</em>")
 
         # Write the summary line.
-        self._write_summary_line(out, typ, description, tr_class, link)
+        self._write_summary_line(out, typ, description, tr_class, pysrc_link,
+                                 callgraph)
 
     _write_summary_line = compile_template(
-        """
-        _write_summary_line(self, out, typ, description, tr_class, link)
-        """,
+        "_write_summary_line(self, out, typ, description, tr_class, "
+                            "pysrc_link, callgraph)",
         # /------------------------- Template -------------------------\
         '''
           <tr$tr_class$>
             <td width="15%" align="right" valign="top" class="summary">
               <span class="summary-type">$typ or "&nbsp;"$</span>
             </td><td class="summary">
-        >>> if link is not None:
+        >>> if pysrc_link is not None or callgraph is not None:
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td>$description$</td>
-                  <td align="right" valign="top">$link$</td>
+                  <td align="right" valign="top">
+                    $pysrc_link$
+                    $self.callgraph_link(callgraph, token='-summary')$
+                  </td>
                 </tr>
               </table>
+              $self.render_callgraph(callgraph, token='-summary')$
         >>> #endif
-        >>> if link is None:
+        >>> if pysrc_link is None and callgraph is None:
                 $description$
         >>> #endif
             </td>
@@ -2025,17 +2098,9 @@ class HTMLWriter:
                                  for n in arg_names])
                 rhs = self.docstring_to_html(arg_descr, var_doc.value, 10)
                 arg_descrs.append( (lhs, rhs) )
-            # Perpare the call-graph, if requested
-            if 'callgraph' in self._graph_types:
-                linker = _HTMLDocstringLinker(self, var_doc.value)
-                callgraph = call_graph([var_doc.value], self.docindex,
-                                       linker, var_doc, add_callers=True, 
-                                       add_callees=True)
-                if callgraph is not None and len(callgraph.nodes) == 0:
-                    callgraph = None
-            else:
-                callgraph = None
-            self.write_function_details_entry(out, var_doc, descr, callgraph,
+
+            self.write_function_details_entry(out, var_doc, descr,
+                                              var_doc.value.callgraph_uid,
                                               rtype, rdescr, arg_descrs,
                                               div_class)
 
