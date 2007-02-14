@@ -15,6 +15,7 @@ do syntac highlighting on doctest blocks with other output formats.
 (Both C{doctest_to_html()} and C{doctest_to_latex()} are defined using
 C{colorize_doctest()}.)
 """
+__docformat__ = 'epytext en'
 
 import re
 from epydoc.util import plaintext_to_html, plaintext_to_latex

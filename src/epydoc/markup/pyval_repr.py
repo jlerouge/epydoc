@@ -25,6 +25,7 @@ The syntax-highlighted output is encoded using a
 L{ParsedEpydocDocstring}, which can then be used to generate output in
 a variety of formats.
 """
+__docformat__ = 'epytext en'
 
 # Implementation note: we use exact tests for classes (list, etc)
 # rather than using isinstance, because subclasses might override
