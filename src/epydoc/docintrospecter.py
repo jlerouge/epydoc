@@ -59,6 +59,14 @@ _introspected_values = {}
 """A record which values we've introspected, encoded as a dictionary from
 pyid to C{bool}."""
 
+def clear_cache():
+    """
+    Discard any cached C{APIDoc} values that have been computed for
+    introspected values.
+    """
+    _valuedoc_cache.clear()
+    _introspected_values.clear()
+
 ######################################################################
 ## Introspection
 ######################################################################
