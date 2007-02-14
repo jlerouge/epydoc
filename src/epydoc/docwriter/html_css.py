@@ -183,13 +183,21 @@ table.metadata-index a:visited  { color: $table_visited_link; }
 .sig-default                { color: $sig_default; }
 .summary-sig                { font-family: monospace; }
 .summary-sig-name           { color: $summary_sig_name; font-weight: bold; }
-a.summary-sig-name:link     { color: $summary_sig_name; font-weight: bold; }
-a.summary-sig-name:visited  { color: $summary_sig_name; font-weight: bold; }
+table.summary a.summary-sig-name:link
+                            { color: $summary_sig_name; font-weight: bold; }
+table.summary a.summary-sig-name:visited
+                            { color: $summary_sig_name; font-weight: bold; }
 .summary-sig-arg            { color: $summary_sig_arg; }
 .summary-sig-default        { color: $summary_sig_default; }
 
 /* To render variables, classes etc. like functions */
-.summary-name               { color: $summary_sig_name; font-weight: bold;
+table.summary .summary-name { color: $summary_sig_name; font-weight: bold;
+                              font-family: monospace; }
+table.summary
+     a.summary-name:link    { color: $summary_sig_name; font-weight: bold;
+                              font-family: monospace; }
+table.summary
+    a.summary-name:visited  { color: $summary_sig_name; font-weight: bold;
                               font-family: monospace; }
 
 /* Variable values
@@ -281,8 +289,8 @@ div.py-highlight            { border-bottom: $pysrc_border;
 .py-keyword                 { color: $py_keyword; }
 .py-output                  { color: $py_output; }
 .py-name                    { color: $py_name; }
-.py-name:link               { color: $py_name; }
-.py-name:visited            { color: $py_name; }
+.py-name:link               { color: $py_name !important; }
+.py-name:visited            { color: $py_name !important; }
 .py-number                  { color: $py_number; }
 .py-defname                 { color: $py_def_name; font-weight: bold; }
 .py-def-name                { color: $py_def_name; font-weight: bold; }
