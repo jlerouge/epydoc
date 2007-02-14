@@ -636,9 +636,11 @@ MERGE_PRECEDENCE = {
     # Why?
     'canonical_name': 'introspect',
 
-    # The parser can tell if a variable is imported or not; the
-    # introspector must guess.
-    'is_imported': 'parse',
+    # Only fall-back on the parser for is_imported if the introspecter
+    # isn't sure.  Otherwise, we can end up thinking that vars
+    # containing modules are not imported, which can cause external
+    # modules to show up in the docs (sf bug #1653486)
+    'is_imported': 'introspect',
 
     # The parser can tell if an assignment creates an alias or not.
     'is_alias': 'parse',
