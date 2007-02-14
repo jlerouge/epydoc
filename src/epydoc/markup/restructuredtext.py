@@ -526,7 +526,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         raise SkipNode()
     
     def visit_doctest_block(self, node):
-        self.body.append(doctest_to_latex(str(node[0])))
+        self.body.append(doctest_to_latex(node[0].astext()))
         raise SkipNode()
 
 class _EpydocHTMLTranslator(HTMLTranslator):
@@ -620,11 +620,11 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         raise SkipNode()
 
     def visit_doctest_block(self, node):
-        pysrc = str(node[0])
+        pysrc = node[0].astext()
         if node.get('codeblock'):
             self.body.append(HTMLDoctestColorizer().colorize_codeblock(pysrc))
         else:
-            self.body.append(doctest_to_html(str(node[0])))
+            self.body.append(doctest_to_html(pysrc))
         raise SkipNode()
 
 
