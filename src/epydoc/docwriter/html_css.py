@@ -318,25 +318,25 @@ p.indent-wrapped-lines      { padding: 0 0 0 7em; text-indent: -7em;
 .nomargin                   { margin-top: 0; margin-bottom: 0; }
 
 /* HTML Log */
-div.log-block               { padding: 0; margin: .5em;
+div.log-block               { padding: 0; margin: .5em 0 .5em 0;
                               background: $log_bg; color: $log_fg;
                               border: $log_border; }
-div.log-error               { padding: .5em; margin: .5em;
+div.log-error               { padding: .1em .3em .1em .3em; margin: 4px;
                               background: $log_error_bg; color: $log_error_fg;
                               border: $log_error_border; }
-div.log-warning             { padding: .5em; margin: .5em;
+div.log-warning             { padding: .1em .3em .1em .3em; margin: 4px;
                               background: $log_warn_bg; color: $log_warn_fg;
                               border: $log_warn_border; }
-div.log-info               { padding: .5em; margin: .5em;
+div.log-info               { padding: .1em .3em .1em .3em; margin: 4px;
                               background: $log_info_bg; color: $log_info_fg;
                               border: $log_info_border; }
 h2.log-hdr                  { background: $log_hdr_bg; color: $log_hdr_fg;
-                              margin: 0; padding: 0.1em 0.5em 0.1em 0.5em;
-                              border-bottom: $log_border; }
-p.log                       { font-weight: bold; }
+                              margin: 0; padding: 0em 0.5em 0em 0.5em;
+                              border-bottom: $log_border; font-size: 110%; }
+p.log                       { font-weight: bold; margin: .5em 0 .5em 0; }
 tr.opt-changed              { color: $opt_changed_fg; font-weight: bold; }
 tr.opt-default              { color: $opt_default_fg; }
-pre.log                     { margin: 0; padding: 0; }
+pre.log                     { margin: 0; padding: 0; padding-left: 1em; }
 """ 
 
 ############################################################

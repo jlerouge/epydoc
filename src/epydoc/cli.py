@@ -1203,7 +1203,8 @@ class HTMLLogger(log.Logger):
         <h1 class="epydoc">Epydoc Log</h1>
         <p class="log">Epydoc started at %s</p>''')
     START_BLOCK = '<div class="log-block"><h2 class="log-hdr">%s</h2>'
-    MESSAGE = '<div class="log-%s"><pre class="log"><b>%s</b>: %s</pre></div>\n'
+    MESSAGE = ('<div class="log-%s"><b>%s</b>: \n'
+               '%s</div>\n')
     END_BLOCK = '</div>'
     FOOTER = "</body>\n</html>\n"
     
@@ -1239,11 +1240,19 @@ class HTMLLogger(log.Logger):
     def log(self, level, message):
         if message.endswith("(-v) to display markup errors."): return
         if level >= log.ERROR:
-            self.out.write(self.MESSAGE % ('error', 'Error', message))
-            self.is_empty = False
+            self.out.write(self._message('error', message))
+        elif level >= log.WARNING:
+            self.out.write(self._message('warning', message))
         elif level >= log.DOCSTRING_WARNING:
-            self.out.write(self.MESSAGE % ('warning', 'Warning', message))
-            self.is_empty = False
+            self.out.write(self._message('docstring warning', message))
+
+    def _message(self, level, message):
+        self.is_empty = False
+        message = plaintext_to_html(message)
+        if '\n' in message:
+            message = '<pre class="log">%s</pre>' % message
+        hdr = ' '.join([w.capitalize() for w in level.split()])
+        return self.MESSAGE % (level.split()[-1], hdr, message)
 
     def close(self):
         if self.is_empty:
