@@ -130,7 +130,8 @@ def print_warnings():
     Register a logger that will print warnings & errors.
     """
     from epydoc import log
-    log.register_logger(log.SimpleLogger())
+    del log._loggers[:]
+    log.register_logger(log.SimpleLogger(log.DOCSTRING_WARNING))
 
 def testencoding(s, introspect=True, parse=True, debug=False):
     """
