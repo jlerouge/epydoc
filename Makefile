@@ -44,6 +44,9 @@ export PYTHONPATH=src/
 # Options for rst->html converter
 RST2HTML = $(PYTHON) src/tools/rst2html.py
 
+DOCTEST_HTML_FILES := \
+    $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
+
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
 ##//////////////////////////////////////////////////////////////////////
@@ -104,7 +107,7 @@ checkdocs:
 	epydoc --check --tests=vars,types $(PY_SRC)
 
 .webpage.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
-		.doctest-html.up2date doc/epydoc-man.html \
+		$(DOCTEST_HTML_FILES) doc/epydoc-man.html \
 		doc/epydocgui-man.html $(DOCS)
 	rm -rf $(WEBDIR)
 	mkdir -p $(WEBDIR)
@@ -138,12 +141,11 @@ api-pdf: .api-pdf.up2date
 	touch .api-pdf.up2date
 
 # Convert doctest files to HTML, using rst2html.
-DOCTEST_HTML_FILES := \
-    $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
 doctest-html: doctest-html-mkdir $(DOCTEST_HTML_FILES)
 doctest-html-mkdir: 
 	mkdir -p $(HTML_DOCTEST)
 $(HTML_DOCTEST)/%.html: src/epydoc/test/%.doctest
+	mkdir -p $(HTML_DOCTEST)
 	$(RST2HTML) $< $@
 
 examples: .examples.up2date
