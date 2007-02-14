@@ -5,6 +5,9 @@ from epydoc 2.1.  They could use some serious updating, when I get the
 time, esp. given that it's so much easier to write tests with doctest
 than it was with unittest.
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
     >>> from epydoc.markup import epytext
     >>> import re
     >>> def testparse(s):

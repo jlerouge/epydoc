@@ -17,6 +17,9 @@ inspected; this just selects what to display).
 
     >>> from epydoc.test.util import runparser
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Module Variables from Assignment Statements
 ===========================================
 Variables are extracted from any assignment statements in the module,
@@ -390,6 +393,7 @@ constant takes precedence:
     ...     x = 12 #: comment2
     ...     '''string'''""",
     ...     attribs="variables name docstring")
+    <UNKNOWN> has both a comment-docstring and a normal (string) docstring; ignoring the comment-docstring.
     ModuleDoc for epydoc_test [0]
      +- docstring = <UNKNOWN>
      +- variables
@@ -492,6 +496,7 @@ Classes
     ...     class Z(B.__bases__[0]): "calculated base" # not handled!
     ...     """,
     ...     attribs='variables value bases docstring')
+    Unable to extract the base list for epydoc_test.Z: Bad dotted name
     ModuleDoc for epydoc_test [0]
      +- docstring = <UNKNOWN>
      +- variables

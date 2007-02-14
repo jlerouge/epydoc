@@ -17,6 +17,9 @@ instead of introspecting the whole module.
 
     >>> from epydoc.test.util import runintrospecter
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Module Variables
 ================
 Each variable defined by a module is encoded as a `VariableDoc`, whose

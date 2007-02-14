@@ -14,6 +14,9 @@ instead of bilding docs for the whole module.
 
     >>> from epydoc.test.util import runbuilder
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Docformat selection
 ===================
 
@@ -72,11 +75,7 @@ The class signature can be specified in the class docstring instead of __init__
     ...         @type a: date
     ...         """
     ...         def __init__(self, a):
-    ...             """The ctor docstring.
-    ...
-    ...             @type a: str
-    ...             """
-    ...             pass
+    ...             """The ctor docstring."""
     ...     ''',
     ...     build="Foo",
     ...     attribs="variables name value "
@@ -106,10 +105,7 @@ Also keywords arguments can be put in the constructor
     ...         @type a: str
     ...         """
     ...         def __init__(self, **kwargs):
-    ...             """The ctor docstring.
-    ...
-    ...             @type a: str
-    ...             """
+    ...             """The ctor docstring."""
     ...     ''',
     ...     build="Foo",
     ...     attribs="variables name value "
@@ -135,7 +131,7 @@ A missing docstring on the __init__ is not an issue.
     ...         @param a: a param.
     ...         @type a: str
     ...         """
-    ...         def __init__(self):
+    ...         def __init__(self, a):
     ...             pass
     ...     ''',
     ...     build="Foo",
@@ -150,7 +146,7 @@ A missing docstring on the __init__ is not an issue.
                  +- arg_descrs = [([u'a'], ...
                  +- arg_types = {u'a': ...
                  +- kwarg = None
-                 +- posargs = ['self']
+                 +- posargs = ['self', 'a']
                  +- vararg = None
 
 Exceptions can be put in the docstring class, and they are assigned to the
@@ -336,3 +332,30 @@ current behavior; but should be replaced when we change the behavior.
      h    -99   u'??'
      i      0   u'[Foo(), 1, 2]'
      j      0   u'[<epydoc_test.Foo instance at ...>, 1, 2, 3]'
+
+Merging is_imported
+===================
+When we do both parsing & introspection, and merge the result, we
+should trust the introspected APIDoc's is_imported value more than the
+parsed APIDoc.  In particular, in the following example, `x` should
+have `is_imported=True`.  But if we can't tell from introspection,
+then use parse info -- so `y` should be imported, but `z` should not.
+
+    >>> import epydoc.docintrospecter
+    >>> epydoc.docintrospecter.clear_cache()
+    >>> runbuilder(s='''
+    ...     import cStringIO
+    ...     from re import MULTILINE as y
+    ...     x = cStringIO
+    ...     z = y
+    ...     ''', attribs=("variables is_imported "))
+    ModuleDoc for epydoc_test [0]
+     +- variables
+        +- cStringIO => VariableDoc for epydoc_test.cStringIO [1]
+        |  +- is_imported = True
+        +- x => VariableDoc for epydoc_test.x [2]
+        |  +- is_imported = True
+        +- y => VariableDoc for epydoc_test.y [3]
+        |  +- is_imported = True
+        +- z => VariableDoc for epydoc_test.z [4]
+           +- is_imported = False

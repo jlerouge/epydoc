@@ -2,6 +2,9 @@ Regression Testing for restructuredtext
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 :RequireModule: docutils
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Summary
 =======
 The implementation of the summaization function works as expected.

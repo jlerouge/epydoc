@@ -1,5 +1,7 @@
-Regression Testing for plaintext
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Regression Testing for javadoc
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
 
 Summary
 =======

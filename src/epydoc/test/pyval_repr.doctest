@@ -280,6 +280,9 @@ scores; if the score is too low, then `colorize` will return `None`.
     ...
     score: 1 (ok)
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Summary
 =======
 To generate summary-reprs, use maxlines=1 and linebreakok=False:

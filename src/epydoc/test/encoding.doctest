@@ -10,7 +10,9 @@ HTML output, and displays them.  (In order to extract & display all
 docstrings, it monkey-patches the HMTLwriter.docstring_to_html()
 method.)
 
-    >>> from epydoc.test.util import print_warnings, testencoding
+    >>> from epydoc.test.util import testencoding
+
+    >>> from epydoc.test.util import print_warnings
     >>> print_warnings()
 
 Encoding Tests

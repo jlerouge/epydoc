@@ -9,6 +9,9 @@ which encodes information about a single Python variable or value.
 
     >>> from epydoc.apidoc import *
 
+    >>> from epydoc.test.util import print_warnings
+    >>> print_warnings()
+
 Unknown Value
 =============
 Epydoc defines a special object, epydoc.apidoc.UNKNOWN, which is used
