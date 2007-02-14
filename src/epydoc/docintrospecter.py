@@ -514,7 +514,16 @@ def isclass(object):
     C{__bases__} attribute, including objects that define
     C{__getattr__} to always return a value).
     """
-    return isinstance(object, (TypeType, ClassType))
+    return isinstance(object, tuple(_CLASS_TYPES))
+
+_CLASS_TYPES = set([TypeType, ClassType])
+"""A list of types that should be treated as classes."""
+
+def register_class_type(typ):
+    """Add a type to the lists of types that should be treated as
+    classes.  By default, this list contains C{TypeType} and
+    C{ClassType}."""
+    _CLASS_TYPES.add(typ)
 
 __future_check_works = None
 
@@ -598,7 +607,7 @@ def get_canonical_name(value):
     if isinstance(value, ModuleType):
         dotted_name = DottedName(value.__name__)
         
-    elif isinstance(value, (ClassType, TypeType)):
+    elif isclass(value):
         if value.__module__ == '__builtin__':
             dotted_name = DottedName(value.__name__)
         else:
@@ -961,8 +970,37 @@ class _DevNull:
     xreadlines = readlines
 _dev_null = _DevNull()
     
+######################################################################
+## Zope InterfaceClass
+######################################################################
 
+try:
+    from zope.interface.interface import InterfaceClass as _ZopeInterfaceClass
+    register_class_type(_ZopeInterfaceClass)
+except:
+    pass
 
+######################################################################
+## Zope Extension classes
+######################################################################
+
+try:
+    # Register type(ExtensionClass.ExtensionClass)
+    from ExtensionClass import ExtensionClass as _ExtensionClass
+    _ZopeType = type(_ExtensionClass)
+    def _is_zope_type(val):
+        return isinstance(val, _ZopeType)
+    register_introspecter(_is_zope_type, introspect_class)
+
+    # Register ExtensionClass.*MethodType
+    from ExtensionClass import PythonMethodType as _ZopeMethodType
+    from ExtensionClass import ExtensionMethodType as _ZopeCMethodType
+    def _is_zope_method(val):
+        return isinstance(val, (_ZopeMethodType, _ZopeCMethodType))
+    register_introspecter(_is_zope_method, introspect_routine)
+except:
+    pass
+                         
 
 
     
