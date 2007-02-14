@@ -105,7 +105,7 @@ STANDARD_FIELDS = [
     
     # If it's deprecated, put that first.
     DocstringField(['deprecated', 'depreciated'],
-             'Deprecated', multivalue=0),
+             'Deprecated', multivalue=0, varnames=['__deprecated__']),
 
     # Status info
     DocstringField(['version'], 'Version', multivalue=0,
@@ -117,10 +117,12 @@ STANDARD_FIELDS = [
     # Bibliographic Info
     DocstringField(['author', 'authors'], 'Author', 'Authors', short=1,
                    varnames=['__author__', '__authors__']),
-    DocstringField(['contact'], 'Contact', 'Contacts', short=1),
+    DocstringField(['contact'], 'Contact', 'Contacts', short=1,
+                   varnames=['__contact__']),
     DocstringField(['organization', 'org'],
                    'Organization', 'Organizations'),
-    DocstringField(['copyright', '(c)'], 'Copyright', multivalue=0),
+    DocstringField(['copyright', '(c)'], 'Copyright', multivalue=0,
+                   varnames=['__copyright__']),
     DocstringField(['license'], 'License', multivalue=0,
                    varnames=['__license__']),
 
@@ -274,22 +276,39 @@ def add_metadata_from_var(api_doc, field):
         if varname not in api_doc.variables: continue
         if api_doc.variables[varname].value is UNKNOWN: continue
         val_doc = api_doc.variables[varname].value
-        # Extract the value from the variable.
-        value = None
+        value = []
+
+        # Try extracting the value from the pyval.
+        ok_types = (basestring, int, float, bool, type(None))
         if val_doc.pyval is not UNKNOWN:
-            if isinstance(val_doc.pyval, basestring):
-                value = val_doc.pyval
+            if isinstance(val_doc.pyval, ok_types):
+                value = [val_doc.pyval]
+            elif field.multivalue:
+                if isinstance(val_doc.pyval, (tuple, list)):
+                    for elt in val_doc.pyval:
+                        if not isinstance(elt, ok_types): break
+                    else:
+                        value = list(val_doc.pyval)
+
+        # Try extracting the value from the parse tree.
         elif val_doc.toktree is not UNKNOWN:
-            try: value = epydoc.docparser.parse_string(val_doc.toktree)
+            try: value = [epydoc.docparser.parse_string(val_doc.toktree)]
             except KeyboardInterrupt: raise
             except: pass
-        # If we found a value, then add it.
-        if value is not None:
-            if isinstance(value, str):
-                value = decode_with_backslashreplace(value)
-            value = epytext.ParsedEpytextDocstring(
-                epytext.parse_as_para(value))
-            api_doc.metadata.append( (field, varname, value) )
+            if field.multivalue and not value:
+                try: value = epydoc.docparser.parse_string_list(val_doc.toktree)
+                except KeyboardInterrupt: raise
+                except: raise
+                
+        # Add any values that we found.
+        for elt in value:
+            if isinstance(elt, str):
+                elt = decode_with_backslashreplace(elt)
+            else:
+                elt = unicode(elt)
+            elt = epytext.ParsedEpytextDocstring(
+                epytext.parse_as_para(elt))
+            api_doc.metadata.append( (field, varname, elt) )
 
 def initialize_api_doc(api_doc):
     """A helper function for L{parse_docstring()} that initializes
