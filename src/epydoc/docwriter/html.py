@@ -430,7 +430,7 @@ class HTMLWriter:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
         self._num_files = (len(self.class_list) + 2*len(self.module_list) +
-                           11 + len(self.METADATA_INDICES))
+                           12 + len(self.METADATA_INDICES))
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
         if self._split_ident_index:
@@ -643,6 +643,9 @@ class HTMLWriter:
                 filename = urllib.unquote(self.pysrc_url(doc))
                 self._write(self.write_sourcecode, directory, filename, doc,
                             name_to_docs)
+
+        # Write the auto-redirect page.
+        self._write(self.write_redirect_page, directory, 'redirect.html')
 
         # Write the index.html files.
         # (this must be done last, since it might copy another file)
@@ -1402,6 +1405,8 @@ class HTMLWriter:
         print >> jsfile, self.HIDE_PRIVATE_JS
         print >> jsfile, self.TOGGLE_CALLGRAPH_JS
         print >> jsfile, html_colorize.PYSRC_JAVASCRIPTS
+        print >> jsfile, self.GET_ANCHOR_JS
+        print >> jsfile, self.REDIRECT_URL_JS
         jsfile.close()
 
     #: A javascript that is used to show or hide the API documentation
@@ -1509,6 +1514,48 @@ class HTMLWriter:
             elt.style.display = "none";
       }
     '''.strip()
+
+    GET_ANCHOR_JS = '''
+      function get_anchor() {
+          var href = location.href;
+          var start = href.indexOf("#")+1;
+          if ((start != 0) && (start != href.length))
+              return href.substring(start, href.length);
+      }
+    '''.strip()
+
+    #: A javascript that is used to implement the auto-redirect page.
+    #: When the user visits <redirect.html#dotted.name>, they will
+    #: automatically get redirected to the page for the object with
+    #: the given fully-qualified dotted name.  E.g., for epydoc,
+    #: <redirect.html#epydoc.apidoc.UNKNOWN> redirects the user to
+    #: <epydoc.apidoc-module.html#UNKNOWN>.
+    REDIRECT_URL_JS = '''
+      function redirect_url(dottedName) {
+          // Scan through each element of the "pages" list, and check
+          // if "name" matches with any of them.
+          for (var i=0; i<pages.length; i++) {
+
+              // Each page has the form "<pagename>-m" or "<pagename>-c";
+              // extract the <pagename> portion & compare it to dottedName.
+              var pagename = pages[i].substring(0, pages[i].length-2);
+              if (pagename == dottedName.substring(0,pagename.length)) {
+
+                  // We\'ve found a page that matches `dottedName`;
+                  // construct its URL, using leftover `dottedName`
+                  // content to form an anchor.
+                  var pagetype = pages[i].charAt(pages[i].length-1);
+                  var url = pagename + ((pagetype=="m")?"-module.html":
+                                                        "-class.html");
+                  if (dottedName.length > pagename.length)
+                      url += "#" + dottedName.substring(pagename.length+1,
+                                                        dottedName.length);
+                  return url;
+              }
+          }
+      }
+    '''.strip()
+          
 
     #////////////////////////////////////////////////////////////
     #{ 2.10. Graphs
@@ -2784,6 +2831,82 @@ class HTMLWriter:
         # of a python identifier.
         s = re.sub(r'\s\s+', '-', term.to_plaintext(None))
         return "index-"+re.sub("[^a-zA-Z0-9]", "_", s)
+
+    #////////////////////////////////////////////////////////////
+    #{ Redirect page
+    #////////////////////////////////////////////////////////////
+
+    def write_redirect_page(self, out):
+        """
+        Build the auto-redirect page, which translates dotted names to
+        URLs using javascript.  When the user visits
+        <redirect.html#dotted.name>, they will automatically get
+        redirected to the page for the object with the given
+        fully-qualified dotted name.  E.g., for epydoc,
+        <redirect.html#epydoc.apidoc.UNKNOWN> redirects the user to
+        <epydoc.apidoc-module.html#UNKNOWN>.
+        """
+        # Construct a list of all the module & class pages that we're
+        # documenting.  The redirect_url javascript will scan through
+        # this list, looking for a page name that matches the
+        # requested dotted name.
+        pages = (['%s-m' % val_doc.canonical_name
+                  for val_doc in self.module_list] +
+                 ['%s-c' % val_doc.canonical_name
+                  for val_doc in self.class_list])
+        # Sort the pages from longest to shortest.  This ensures that
+        # we find e.g. "x.y.z" in the list before "x.y".
+        pages = sorted(pages, key=lambda p:-len(p))
+
+        # Write the redirect page.
+        self._write_redirect_page(out, pages)
+
+    _write_redirect_page = compile_template(
+        '''
+        _write_redirect_page(self, out, pages)
+        ''',
+        # /------------------------- Template -------------------------\
+        '''
+        <html><head><title>Epydoc Redirect Page</title>
+        <meta http-equiv="cache-control" content="no-cache" />
+        <meta http-equiv="expires" content="0" />
+        <meta http-equiv="pragma" content="no-cache" />
+          <script type="text/javascript" src="epydoc.js"></script>
+        </head>
+        <body>
+        <script type="text/javascript">
+        <!--
+        var pages = $"[%s]" % ", ".join(['"%s"' % v for v in pages])$;
+        var dottedName = get_anchor();
+        if (dottedName) {
+            var target = redirect_url(dottedName);
+            if (target) window.location.replace(target);
+        }
+        // -->
+        </script>
+
+        <h3>Epydoc Auto-redirect page</h3>
+        
+        <p>When javascript is enabled, this page will redirect URLs of
+        the form <tt>redirect.html#<i>dotted.name</i></tt> to the
+        documentation for the object with the given fully-qualified
+        dotted name.</p>
+        <p><a id="message"> &nbsp; </a></p>
+        
+        <script type="text/javascript">
+        <!--
+        if (dottedName) {
+            var msg = document.getElementById("message");
+            msg.innerHTML = "No documentation found for <tt>"+
+                            dottedName+"</tt>";
+        }
+        // -->
+        </script>
+
+        </body>
+        </html>
+        ''')
+        # \------------------------------------------------------------/
 
     #////////////////////////////////////////////////////////////
     #{ Helper functions
