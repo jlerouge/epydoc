@@ -129,6 +129,7 @@ api-html: .api-html.up2date
 	$(EPYDOC) -o $(HTML_API) --name epydoc --css white \
 	       --url http://epydoc.sourceforge.net --pstat profile.out \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
+	       --include-log \
 	       --docformat plaintext -v --graph all --debug $(PY_SRC)
 	touch .api-html.up2date
 
@@ -210,6 +211,7 @@ profile.out: $(PY_SRCFILES)
 	$(EPYDOC) -o profile.tmp --name epydoc --css white --debug \
 	       --url http://epydoc.sourceforge.net --profile-epydoc \
 	       --inheritance=listed --navlink "epydoc $(VERSION)"\
+	       --include-log \
 	       --docformat plaintext -v --graph all $(PY_SRC)
 	rm -rf profile.tmp hotshot.out
 
@@ -236,7 +238,7 @@ stdlib-html: .stdlib-html.up2date
 	@echo "Building stdlib html docs..."
 	@$(EPYDOC) -o $(HTML_STDLIB) --css white --name $(SLNAME) \
 	       --url $(SLURL) --debug --no-sourcecode --debug \
-	       --show-imports $(SLBUILTINS) $(SLFILES)
+	       --include-log --show-imports $(SLBUILTINS) $(SLFILES)
 	touch .stdlib-html.up2date
 
 # (this will typically cause latex to run out of resources)
@@ -267,7 +269,7 @@ docutils-html: .docutils-html.up2date
 	mkdir -p $(HTML)/docutils
 	$(EPYDOC) -o $(HTML)/docutils -n 'Docutils' --html --debug \
 	        --docformat plaintext --ignore-param-mismatch \
-	        /usr/lib/python2.3/site-packages/docutils
+	        --include-log /usr/lib/python2.3/site-packages/docutils
 	touch .docutils-html.up2date
 
 docutils-pdf: .docutils-pdf.up2date
