@@ -396,7 +396,8 @@ def _get_docs_from_pyobject(obj, options, progress_estimator):
 def _get_docs_from_pyname(name, options, progress_estimator,
                           supress_warnings=False):
     progress_estimator.complete += 1
-    log.progress(progress_estimator.progress(), name)
+    if options.must_introspect(name) or options.must_parse(name):
+        log.progress(progress_estimator.progress(), name)
     
     introspect_doc = parse_doc = None
     introspect_error = parse_error = None
@@ -432,6 +433,8 @@ def _get_docs_from_pyscript(filename, options, progress_estimator):
     if options.introspect:
         try:
             introspect_doc = introspect_docs(filename=filename, is_script=True)
+            if introspect_doc.canonical_name is UNKNOWN:
+                introspect_doc.canonical_name = munge_script_name(filename)
         except ImportError, e:
             introspect_error = str(e)
     if options.parse:
@@ -471,8 +474,9 @@ def _get_docs_from_module_file(filename, options, progress_estimator,
         modulename = DottedName(parent_docs[0].canonical_name, modulename)
     elif parent_docs[1]:
         modulename = DottedName(parent_docs[1].canonical_name, modulename)
-    log.progress(progress_estimator.progress(),
-                 '%s (%s)' % (modulename, filename))
+    if options.must_introspect(modulename) or options.must_parse(modulename):
+        log.progress(progress_estimator.progress(),
+                     '%s (%s)' % (modulename, filename))
     progress_estimator.complete += 1
     
     # Normalize the filename.
@@ -492,6 +496,8 @@ def _get_docs_from_module_file(filename, options, progress_estimator,
         try:
             introspect_doc = introspect_docs(
                 filename=filename, context=parent_docs[0])
+            if introspect_doc.canonical_name is UNKNOWN:
+                introspect_doc.canonical_name = modulename
         except ImportError, e:
             introspect_error = str(e)
     if src_file_available and options.must_parse(modulename):
