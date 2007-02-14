@@ -31,10 +31,12 @@ __docformat__ = 'epytext en'
 
 import re, sys
 from epydoc import markup
+from epydoc.markup import epytext
 from epydoc.apidoc import *
 from epydoc.docintrospecter import introspect_docstring_lineno
 from epydoc.util import py_src_filename
 from epydoc import log
+import epydoc.docparser
 import __builtin__, exceptions
 
 ######################################################################
@@ -69,7 +71,8 @@ class DocstringField:
         added.
     """
     def __init__(self, tags, label, plural=None,
-                 short=0, multivalue=1, takes_arg=0):
+                 short=0, multivalue=1, takes_arg=0,
+                 varnames=[]):
         if type(tags) in (list, tuple):
             self.tags = tuple(tags)
         elif type(tags) is str:
@@ -81,6 +84,7 @@ class DocstringField:
         self.multivalue = multivalue
         self.short = short
         self.takes_arg = takes_arg
+        self.varnames = varnames
 
     def __cmp__(self, other):
         if not isinstance(other, DocstringField): return -1
@@ -104,17 +108,21 @@ STANDARD_FIELDS = [
              'Deprecated', multivalue=0),
 
     # Status info
-    DocstringField(['version'], 'Version', multivalue=0),
-    DocstringField(['date'], 'Date', multivalue=0),
+    DocstringField(['version'], 'Version', multivalue=0,
+                   varnames=['__version__']),
+    DocstringField(['date'], 'Date', multivalue=0,
+                   varnames=['__date__']),
     DocstringField(['status'], 'Status', multivalue=0),
     
     # Bibliographic Info
-    DocstringField(['author', 'authors'], 'Author', 'Authors', short=1),
+    DocstringField(['author', 'authors'], 'Author', 'Authors', short=1,
+                   varnames=['__author__', '__authors__']),
     DocstringField(['contact'], 'Contact', 'Contacts', short=1),
     DocstringField(['organization', 'org'],
                    'Organization', 'Organizations'),
     DocstringField(['copyright', '(c)'], 'Copyright', multivalue=0),
-    DocstringField(['license'], 'License', multivalue=0),
+    DocstringField(['license'], 'License', multivalue=0,
+                   varnames=['__license__']),
 
     # Various warnings etc.
     DocstringField(['bug'], 'Bug', 'Bugs'),
@@ -233,6 +241,11 @@ def parse_docstring(api_doc, docindex):
     # some documented parameter.
     check_type_fields(api_doc, field_warnings)
 
+    # Check for special variables (e.g., __version__)
+    if isinstance(api_doc, NamespaceDoc):
+        for field in STANDARD_FIELDS + user_docfields(api_doc, docindex):
+            add_metadata_from_var(api_doc, field)
+
     # Extract a summary
     if api_doc.summary is None and api_doc.descr is not None:
         api_doc.summary, api_doc.other_docs = api_doc.descr.summary()
@@ -250,6 +263,33 @@ def parse_docstring(api_doc, docindex):
 
     # Report any errors that occured
     report_errors(api_doc, docindex, parse_errors, field_warnings)
+
+def add_metadata_from_var(api_doc, field):
+    if not field.multivalue:
+        for (f,a,d) in api_doc.metadata:
+            if field == f:
+                return # We already have a value for this metadata.
+    for varname in field.varnames:
+        # Check if api_doc has a variable w/ the given name.
+        if varname not in api_doc.variables: continue
+        if api_doc.variables[varname].value is UNKNOWN: continue
+        val_doc = api_doc.variables[varname].value
+        # Extract the value from the variable.
+        value = None
+        if val_doc.pyval is not UNKNOWN:
+            if isinstance(val_doc.pyval, basestring):
+                value = val_doc.pyval
+        elif val_doc.toktree is not UNKNOWN:
+            try: value = epydoc.docparser.parse_string(val_doc.toktree)
+            except KeyboardInterrupt: raise
+            except: pass
+        # If we found a value, then add it.
+        if value is not None:
+            if isinstance(value, str):
+                value = decode_with_backslashreplace(value)
+            value = epytext.ParsedEpytextDocstring(
+                epytext.parse_as_para(value))
+            api_doc.metadata.append( (field, varname, value) )
 
 def initialize_api_doc(api_doc):
     """A helper function for L{parse_docstring()} that initializes
