@@ -1244,7 +1244,7 @@ def get_dot_version():
 
 def add_valdoc_nodes(graph, val_docs, linker, context):
     """
-    @todo: Use different node styles for different subclasses of APIDoc
+    :todo: Use different node styles for different subclasses of APIDoc
     """
     nodes = {}
     val_docs = sorted(val_docs, key=lambda d:d.canonical_name)
