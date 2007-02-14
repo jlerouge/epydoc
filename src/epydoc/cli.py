@@ -63,12 +63,14 @@ levels are currently defined as follows::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time, re, pickle
+import sys, os, time, re, pickle, textwrap
 from glob import glob
 from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
+import optparse
 import epydoc
 from epydoc import log
 from epydoc.util import wordwrap, run_subprocess, RunSubprocessError
+from epydoc.util import plaintext_to_html
 from epydoc.apidoc import UNKNOWN
 from epydoc.compat import *
 import ConfigParser
@@ -82,6 +84,15 @@ PROFILER = 'hotshot' #: Which profiler to use: 'hotshot' or 'profile'
 ######################################################################
 #{ Argument & Config File Parsing
 ######################################################################
+
+OPTION_DEFAULTS = dict(
+    action="html", show_frames=True, docformat=DEFAULT_DOCFORMAT, 
+    show_private=True, show_imports=False, inheritance="listed",
+    verbose=0, quiet=0, load_pickle=False, parse=True, introspect=True,
+    debug=epydoc.DEBUG, profile=False, graphs=[],
+    list_classes_separately=False, graph_font=None, graph_font_size=None,
+    include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
+    exclude=[], exclude_parse=[], exclude_introspect=[])    
 
 def parse_arguments():
     # Construct the option parser.
@@ -180,6 +191,9 @@ def parse_arguments():
     generation_group.add_option(                            # --no-imports
         "--no-imports", action="store_false", dest="show_imports",
         help="Do not list each module's imports. (default)")
+    generation_group.add_option(                            # --include-log
+        '--include-log', action='store_true', dest='include_log',
+        help=("Include a page with the process log (epydoc-log.html)"))
     generation_group.add_option(                            # --show-sourcecode
         '--show-sourcecode', action='store_true', dest='include_source_code',
         help=("Include source code with syntax highlighting in the "
@@ -285,19 +299,7 @@ def parse_arguments():
     optparser.add_option_group(return_group)
 
     # Set the option parser's defaults.
-    optparser.set_defaults(action="html", show_frames=True,
-                           docformat=DEFAULT_DOCFORMAT, 
-                           show_private=True, show_imports=False,
-                           inheritance="listed",
-                           verbose=0, quiet=0, load_pickle=False,
-                           parse=True, introspect=True,
-                           debug=epydoc.DEBUG, profile=False,
-                           graphs=[], list_classes_separately=False,
-                           graph_font=None, graph_font_size=None,
-                           include_source_code=True, pstat_files=[],
-                           simple_term=False, fail_on=None,
-                           exclude=[], exclude_parse=[],
-                           exclude_introspect=[])
+    optparser.set_defaults(**OPTION_DEFAULTS)
 
     # Parse the arguments.
     options, names = optparser.parse_args()
@@ -367,6 +369,7 @@ def parse_arguments():
         options.target = options.action
     
     # Return parsed args.
+    options.names = names
     return options, names
 
 def parse_configfiles(configfiles, options, names):
@@ -523,6 +526,12 @@ def main(options, names):
             if not os.path.isdir(options.target):
                 log.error("%s is not a directory" % options.target)
                 sys.exit(1)
+
+    if options.include_log:
+        if options.action == 'html':
+            log.register_logger(HTMLLogger(options.target, options))
+        else:
+            log.warning("--include-log requires --html")
 
     # Set the default docformat
     from epydoc import docstringparser
@@ -770,10 +779,13 @@ def cli():
     options, names = parse_arguments()
 
     try:
-        if options.profile:
-            _profile()
-        else:
-            main(options, names)
+        try:
+            if options.profile:
+                _profile()
+            else:
+                main(options, names)
+        finally:
+            log.close()
     except SystemExit:
         raise
     except KeyboardInterrupt:
@@ -1169,14 +1181,95 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
     def print_times(self):
         pass
 
+class HTMLLogger(log.Logger):
+    """
+    A logger used to generate a log of all warnings and messages to an
+    HTML file.
+    """
+    
+    FILENAME = "epydoc-log.html"
+    HEADER = textwrap.dedent('''\
+        <?xml version="1.0" encoding="ascii"?>
+        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+                  "DTD/xhtml1-transitional.dtd">
+        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+        <head>
+          <title>$title$</title>
+          <link rel="stylesheet" href="epydoc.css" type="text/css" />
+        </head>
+        
+        <body bgcolor="white" text="black" link="blue" vlink="#204080"
+              alink="#204080">
+        <h1 class="epydoc">Epydoc Log</h1>
+        <p class="log">Epydoc started at %s</p>''')
+    START_BLOCK = '<div class="log-block"><h2 class="log-hdr">%s</h2>'
+    MESSAGE = '<div class="log-%s"><pre class="log"><b>%s</b>: %s</pre></div>\n'
+    END_BLOCK = '</div>'
+    FOOTER = "</body>\n</html>\n"
+    
+    def __init__(self, directory, options):
+        self.start_time = time.time()
+        self.out = open(os.path.join(directory, self.FILENAME), 'w')
+        self.out.write(self.HEADER % time.ctime(self.start_time))
+        self.is_empty = True
+        self.options = options
+
+    def write_options(self, options):
+        self.out.write(self.START_BLOCK % 'Epydoc Options')
+        msg = '<table border="0" cellpadding="0" cellspacing="0">\n'
+        opts = [(key, getattr(options, key)) for key in dir(options)
+                if key not in dir(optparse.Values)]
+        opts = [(val==OPTION_DEFAULTS.get(key), key, val)
+                for (key, val) in opts]
+        for is_default, key, val in sorted(opts):
+            css = is_default and 'opt-default' or 'opt-changed'
+            msg += ('<tr class="%s"><td>%s</td><td><tt>&nbsp;=&nbsp;'
+                    '</tt></td><td><tt>%s</tt></td></tr>' %
+                    (css, key, plaintext_to_html(repr(val))))
+        msg += '</table>\n'
+        self.out.write('<div class="log-info">\n%s</div>\n' % msg)
+        self.out.write(self.END_BLOCK)
+
+    def start_block(self, header):
+        self.out.write(self.START_BLOCK % header)
+
+    def end_block(self):
+        self.out.write(self.END_BLOCK)
+
+    def log(self, level, message):
+        if message.endswith("(-v) to display markup errors."): return
+        if level >= log.ERROR:
+            self.out.write(self.MESSAGE % ('error', 'Error', message))
+            self.is_empty = False
+        elif level >= log.DOCSTRING_WARNING:
+            self.out.write(self.MESSAGE % ('warning', 'Warning', message))
+            self.is_empty = False
+
+    def close(self):
+        if self.is_empty:
+            self.out.write('<div class="log-info">'
+                           'No warnings or errors!</div>')
+        self.write_options(self.options)
+        self.out.write('<p class="log">Epydoc finished at %s</p>\n'
+                       '<p class="log">(Elapsed time: %s)</p>' %
+                       (time.ctime(), self._elapsed_time()))
+        self.out.write(self.FOOTER)
+        self.out.close()
+
+    def _elapsed_time(self):
+        secs = int(time.time()-self.start_time)
+        if secs < 60:
+            return '%d seconds' % secs
+        if secs < 3600:
+            return '%d minutes, %d seconds' % (secs/60, secs%60)
+        else:
+            return '%d hours, %d minutes' % (secs/3600, secs%3600)
+            
+
 ######################################################################
 ## main
 ######################################################################
 
 if __name__ == '__main__':
-    try:
-        cli()
-    except:
-        print '\n\n'
-        raise
+    cli()
 

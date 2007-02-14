@@ -316,7 +316,28 @@ p.indent-wrapped-lines      { padding: 0 0 0 7em; text-indent: -7em;
                               margin: 0; }
 .nomargin-top               { margin-top: 0; }
 .nomargin                   { margin-top: 0; margin-bottom: 0; }
-"""
+
+/* HTML Log */
+div.log-block               { padding: 0; margin: .5em;
+                              background: $log_bg; color: $log_fg;
+                              border: $log_border; }
+div.log-error               { padding: .5em; margin: .5em;
+                              background: $log_error_bg; color: $log_error_fg;
+                              border: $log_error_border; }
+div.log-warning             { padding: .5em; margin: .5em;
+                              background: $log_warn_bg; color: $log_warn_fg;
+                              border: $log_warn_border; }
+div.log-info               { padding: .5em; margin: .5em;
+                              background: $log_info_bg; color: $log_info_fg;
+                              border: $log_info_border; }
+h2.log-hdr                  { background: $log_hdr_bg; color: $log_hdr_fg;
+                              margin: 0; padding: 0.1em 0.5em 0.1em 0.5em;
+                              border-bottom: $log_border; }
+p.log                       { font-weight: bold; }
+tr.opt-changed              { color: $opt_changed_fg; font-weight: bold; }
+tr.opt-default              { color: $opt_default_fg; }
+pre.log                     { margin: 0; padding: 0; }
+""" 
 
 ############################################################
 ## Derived stylesheets
@@ -425,6 +446,23 @@ _WHITE_COLORS = dict(
     py_decorator            =  '#804020',
     # Graphs
     graph_border            =  '1px solid #000000',
+    # Log block
+    log_bg                  =  '#e8f0f8',
+    log_fg                  =  '#000000',
+    log_border              =  '1px solid #000000',
+    log_hdr_bg              =  '#70b0ff',
+    log_hdr_fg              =  '#000000',
+    log_error_bg            =  '#ffb0b0',
+    log_error_fg            =  '#000000',
+    log_error_border        =  '1px solid #000000',
+    log_warn_bg             =  '#ffffb0',
+    log_warn_fg             =  '#000000',
+    log_warn_border         =  '1px solid #000000',
+    log_info_bg             =  '#b0ffb0',
+    log_info_fg             =  '#000000',
+    log_info_border         =  '1px solid #000000',
+    opt_changed_fg          =  '#000000',
+    opt_default_fg          =  '#606060',
     )
 
 _BLUE_COLORS = _WHITE_COLORS.copy()

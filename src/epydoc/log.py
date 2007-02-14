@@ -64,6 +64,11 @@ class Logger:
         message.
         """
 
+    def close(self):
+        """
+        Perform any tasks needed to close this logger.
+        """
+
     #////////////////////////////////////////////////////////////
     # Message blocks
     #////////////////////////////////////////////////////////////
@@ -195,4 +200,5 @@ def progress(percent, message=''):
     for logger in _loggers: logger.progress(percent, '%s' % message)
 progress.__doc__ = Logger.progress.__doc__
 
-
+def close():
+    for logger in _loggers: logger.close()
