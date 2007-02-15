@@ -109,7 +109,7 @@ STANDARD_FIELDS = [
 
     # Status info
     DocstringField(['version'], 'Version', multivalue=0,
-                   varnames=['__version__']),
+                   varnames=['__version__', '__revision__']),
     DocstringField(['date'], 'Date', multivalue=0,
                    varnames=['__date__']),
     DocstringField(['status'], 'Status', multivalue=0),
