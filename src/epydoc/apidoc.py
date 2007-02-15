@@ -677,8 +677,10 @@ class VariableDoc(APIDoc):
             return [self.value]
 
     def is_detailed(self):
-        if (self.value in (None, UNKNOWN)):
-            return super(VariableDoc, self).is_detailed()
+        pval = super(VariableDoc, self).is_detailed()
+        if pval or self.value in (None, UNKNOWN):
+            return pval
+
         if isinstance(self.value, GenericValueDoc):
             # [XX] This is a little hackish -- we assume that the
             # summary lines will have SUMMARY_REPR_LINELEN chars,
