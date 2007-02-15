@@ -2040,11 +2040,16 @@ class HTMLWriter:
         if var_doc.is_public: tr_class = ''
         else: tr_class = ' class="private"'
 
+        # Decide an anchor or a link is to be generated.
+        link_name = var_doc.is_detailed()
+        anchor = not link_name
+
         # Construct the HTML code for the type (cell 1) & description
         # (cell 2).
         if isinstance(var_doc.value, RoutineDoc):
             typ = self.return_type(var_doc, indent=6)
-            description = self.function_signature(var_doc, True, True)
+            description = self.function_signature(var_doc, is_summary=True,
+                link_name=link_name, anchor=anchor)
             pysrc_link = self.pysrc_link(var_doc.value)
 
             # Perpare the call-graph, if requested
@@ -2059,7 +2064,8 @@ class HTMLWriter:
                     callgraph = None
         else:
             typ = self.type_descr(var_doc, indent=6)
-            description = self.summary_name(var_doc, link_name=True)
+            description = self.summary_name(var_doc,
+                link_name=link_name, anchor=anchor)
             if isinstance(var_doc.value, GenericValueDoc):
                 # The summary max length has been chosen setting
                 # L{ValueDoc.SUMMARY_REPR_LINELEN} in the constructor
@@ -2194,7 +2200,8 @@ class HTMLWriter:
     def property_accessor_to_html(self, val_doc):
         if val_doc not in (None, UNKNOWN):
             if isinstance(val_doc, RoutineDoc):
-                return self.function_signature(val_doc, True, True)
+                return self.function_signature(val_doc, is_summary=True,
+                                               link_name=True)
             elif isinstance(val_doc, GenericValueDoc):
                 return self.pprint_value(val_doc)
             else:
@@ -2510,7 +2517,22 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
 
     def function_signature(self, api_doc, is_summary=False, 
-                           link_name=False):
+                           link_name=False, anchor=False):
+        """Render a function signature in HTML.
+
+        @param api_doc: The object whose name is to be rendered. If a
+            C{VariableDoc}, its C{value} should be a C{RoutineDoc}
+        @type api_doc: L{VariableDoc} or L{RoutineDoc}
+        @param is_summary: True if the fuction is to be rendered in the summary.
+        type css_class: C{bool}
+        @param link_name: If True, the name is a link to the object anchor.
+        @type link_name: C{bool}
+        @param anchor: If True, the name is the object anchor.
+        @type anchor: C{bool}
+
+        @return: The HTML code for the object.
+        @rtype: C{str}
+        """
         if is_summary: css_class = 'summary-sig'
         else: css_class = 'sig'
         
@@ -2524,7 +2546,7 @@ class HTMLWriter:
                         (css_class, css_class, api_doc.name))
             # Get the function's name.
             name = self.summary_name(api_doc, css_class=css_class+'-name',
-                                     link_name=link_name)
+                                     link_name=link_name, anchor=anchor)
         else:
             func_doc = api_doc
             name = self.href(api_doc, css_class=css_class+'-name')
@@ -2547,12 +2569,33 @@ class HTMLWriter:
         return ('<span class="%s">%s(%s)</span>' %
                 (css_class, name, ',\n        '.join(args)))
 
-    def summary_name(self, api_doc, css_class='summary-name', link_name=False):
-        if link_name and api_doc.is_detailed():
-            return self.href(api_doc, css_class=css_class)
+    def summary_name(self, api_doc, css_class='summary-name',
+                     link_name=False, anchor=False):
+        """Render an object name in HTML.
+
+        @param api_doc: The object whose name is to be rendered
+        @type api_doc: L{APIDoc}
+        @param css_class: The CSS class to assign to the rendered name
+        type css_class: C{str}
+        @param link_name: If True, the name is a link to the object anchor.
+        @type link_name: C{bool}
+        @param anchor: If True, the name is the object anchor.
+        @type anchor: C{bool}
+
+        @return: The HTML code for the object.
+        @rtype: C{str}
+        """
+        if anchor:
+            rv = '<a name="%s"></a>' % api_doc.name
         else:
-            return '<a name="%s" /><span class="%s">%s</span>' % \
-                (api_doc.name, css_class, api_doc.name)
+            rv = ''
+
+        if link_name:
+            rv += self.href(api_doc, css_class=css_class)
+        else:
+            rv += '<span class="%s">%s</span>' % (css_class, api_doc.name)
+
+        return rv
 
     # [xx] tuple args???
     def func_arg(self, name, default, css_class):
