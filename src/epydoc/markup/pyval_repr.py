@@ -22,7 +22,7 @@ values).  It does I{not} bother to do automatic cycle detection,
 because maxlines is typically around 5, so it's really not worth it.
 
 The syntax-highlighted output is encoded using a
-L{ParsedEpydocDocstring}, which can then be used to generate output in
+L{ParsedEpytextDocstring}, which can then be used to generate output in
 a variety of formats.
 """
 __docformat__ = 'epytext en'
