@@ -61,6 +61,8 @@ class _ColorizerState:
         self.charpos = 0
         self.lineno = 1
         self.linebreakok = True
+        
+        #: How good this represention is?
         self.score = 0
 
     def mark(self):

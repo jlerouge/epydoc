@@ -14,12 +14,13 @@ returns a L{ParsedRstDocstring}, which supports all of the methods
 defined by L{ParsedDocstring}.
 
 L{ParsedRstDocstring} is basically just a L{ParsedDocstring} wrapper
-for the L{docutils.nodes.document} class.
+for the C{docutils.nodes.document} class.
 
 Creating C{ParsedRstDocstring}s
 ===============================
+
 C{ParsedRstDocstring}s are created by the C{parse_document} function,
-using the L{docutils.core.publish_string()} method, with the following
+using the C{docutils.core.publish_string()} method, with the following
 helpers:
 
   - An L{_EpydocReader} is used to capture all error messages as it
@@ -27,7 +28,7 @@ helpers:
   - A L{_DocumentPseudoWriter} is used to extract the document itself,
     without actually writing any output.  The document is saved for
     further processing.  The settings for the writer are copied from
-    L{docutils.writers.html4css1.Writer}, since those settings will
+    C{docutils.writers.html4css1.Writer}, since those settings will
     be used when we actually write the docstring to html.
 
 Using C{ParsedRstDocstring}s
@@ -147,11 +148,11 @@ class ParsedRstDocstring(ParsedDocstring):
 
     @ivar _document: A ReStructuredText document, encoding the
         docstring.
-    @type _document: L{docutils.nodes.document}
+    @type _document: C{docutils.nodes.document}
     """
     def __init__(self, document):
         """
-        @type document: L{docutils.nodes.document}
+        @type document: C{docutils.nodes.document}
         """
         self._document = document
         
@@ -261,7 +262,7 @@ class _DocumentPseudoWriter(Writer):
     recently processed document is available as the instance variable
     C{document}
 
-    @type document: L{docutils.nodes.document}
+    @type document: C{docutils.nodes.document}
     @ivar document: The most recently processed document.
     """
     def __init__(self):

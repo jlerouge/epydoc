@@ -10,7 +10,7 @@
 Syntax highlighting for doctest blocks.  This module defines two
 functions, L{doctest_to_html()} and L{doctest_to_latex()}, which can
 be used to perform syntax highlighting on doctest blocks.  It also
-defines the more general L{colorize_doctest()}, which could be used to
+defines the more general C{colorize_doctest()}, which could be used to
 do syntac highlighting on doctest blocks with other output formats.
 (Both C{doctest_to_html()} and C{doctest_to_latex()} are defined using
 C{colorize_doctest()}.)
