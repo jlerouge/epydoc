@@ -683,6 +683,15 @@ def add_to_group(container, api_doc, group_name):
     else:
         container.group_specs.append( (group_name, [var_name]) )
 
+def script_guard(line):
+    """Detect the idiomatic trick C{if __name__ == "__main__":}"""
+    return (len(line) == 5
+        and line[1][1] == '__name__' # this is the most selective
+        and line[0][1] == 'if'
+        and line[2][1] == '=='
+        and line[4][1] == ':'
+        and line[3][1][1:-1] == '__main__')
+
 #/////////////////////////////////////////////////////////////////
 #{ Shallow parser
 #/////////////////////////////////////////////////////////////////
@@ -787,7 +796,7 @@ def process_control_flow_line(line, parent_docs, prev_line_doc,
                                   docs_extracted_by='parser')
             set_variable(parent, var_doc)
     
-    if ((keyword == 'if' and PARSE_IF_BLOCKS) or
+    if ((keyword == 'if' and PARSE_IF_BLOCKS and not script_guard(line)) or
         (keyword == 'elif' and PARSE_ELSE_BLOCKS) or
         (keyword == 'else' and PARSE_ELSE_BLOCKS) or
         (keyword == 'while' and PARSE_WHILE_BLOCKS) or
