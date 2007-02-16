@@ -74,6 +74,7 @@ from epydoc.util import plaintext_to_html
 from epydoc.apidoc import UNKNOWN
 from epydoc.compat import *
 import ConfigParser
+from epydoc.docwriter.html_css import STYLESHEETS as CSS_STYLESHEETS
 
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
 GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
@@ -81,6 +82,42 @@ ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'
 PROFILER = 'hotshot' #: Which profiler to use: 'hotshot' or 'profile'
 
+######################################################################
+#{ Help Topics
+######################################################################
+
+DOCFORMATS = ('epytext', 'plaintext', 'restructuredtext', 'javadoc')
+HELP_TOPICS = {
+    'docformat': textwrap.dedent('''\
+        __docformat__ is a module variable that specifies the markup
+        language for the docstrings in a module.  Its value is a 
+        string, consisting the name of a markup language, optionally 
+        followed by a language code (such as "en" for English).  Epydoc
+        currently recognizes the following markup language names:
+        ''' + ', '.join(DOCFORMATS)),
+    'inheritance': textwrap.dedent('''\
+        The following inheritance formats are currently supported:
+            - grouped: inherited objects are gathered into groups,
+              based on what class they were inherited from.
+            - listed: inherited objects are listed in a short list
+              at the end of their section.
+            - included: inherited objects are mixed in with 
+              non-inherited objects.'''),
+    'css': textwrap.dedent(
+        'The following built-in CSS stylesheets are available:\n' +
+        '\n'.join(['  %10s: %s' % (key, descr)
+                   for (key, (sheet, descr))
+                   in CSS_STYLESHEETS.items()])),
+    #'checks': textwrap.dedent('''\
+    #
+    #    '''),
+    }
+        
+
+HELP_TOPICS['topics'] = wordwrap(
+    'Epydoc can provide additional help for the following topics: ' +
+    ', '.join(['%r' % topic for topic in HELP_TOPICS.keys()]))
+    
 ######################################################################
 #{ Argument & Config File Parsing
 ######################################################################
@@ -96,9 +133,9 @@ OPTION_DEFAULTS = dict(
 
 def parse_arguments():
     # Construct the option parser.
-    usage = '%prog ACTION [options] NAMES...'
+    usage = '%prog [ACTION] [options] NAMES...'
     version = "Epydoc, version %s" % epydoc.__version__
-    optparser = OptionParser(usage=usage, version=version)
+    optparser = OptionParser(usage=usage, add_help_option=False)
     action_group = OptionGroup(optparser, 'Actions')
     generation_group = OptionGroup(optparser, 'Generation options')
     output_group = OptionGroup(optparser, 'Output options')
@@ -122,7 +159,7 @@ def parse_arguments():
         "--simple-term", action="store_true", dest="simple_term",
         help="Do not try to use color or cursor control when displaying "
         "the progress bar, warnings, or errors.")
-
+    
     # Add options -- Actions
     action_group.add_option(                               # --html
         "--html", action="store_const", dest="action", const="html",
@@ -148,6 +185,15 @@ def parse_arguments():
     action_group.add_option(
         "--pickle", action="store_const", dest="action", const="pickle",
         help="Write the documentation to a pickle file.")
+    # Provide our own --help and --version options.
+    action_group.add_option(
+        "--version", action="store_const", dest="action", const="version",
+        help="Show epydoc's version number and exit.")
+    action_group.add_option(
+        "-h", "--help", action="store_const", dest="action", const="help",
+        help="Show this message and exit.  For help on specific "
+        "topics, use \"--help TOPIC\".  Use \"--help topics\" for a "
+        "list of available help topics")
 
     # Add options -- Generation
     generation_group.add_option(                            # --docformat
@@ -191,9 +237,6 @@ def parse_arguments():
     generation_group.add_option(                            # --no-imports
         "--no-imports", action="store_false", dest="show_imports",
         help="Do not list each module's imports. (default)")
-    generation_group.add_option(                            # --include-log
-        '--include-log', action='store_true', dest='include_log',
-        help=("Include a page with the process log (epydoc-log.html)"))
     generation_group.add_option(                            # --show-sourcecode
         '--show-sourcecode', action='store_true', dest='include_source_code',
         help=("Include source code with syntax highlighting in the "
@@ -202,6 +245,9 @@ def parse_arguments():
         '--no-sourcecode', action='store_false', dest='include_source_code',
         help=("Do not include source code with syntax highlighting in the "
               "HTML output."))
+    generation_group.add_option(                            # --include-log
+        '--include-log', action='store_true', dest='include_log',
+        help=("Include a page with the process log (epydoc-log.html)"))
 
     # Add options -- Output
     output_group.add_option(                                # --output
@@ -303,6 +349,22 @@ def parse_arguments():
 
     # Parse the arguments.
     options, names = optparser.parse_args()
+
+    # Print help message, if requested.  We also provide support for
+    # --help [topic]
+    if options.action == 'help':
+        names = set([n.lower() for n in names])
+        for (topic, msg) in HELP_TOPICS.items():
+            if topic.lower() in names:
+                print '\n' + msg.rstrip() + '\n'
+                sys.exit(0)
+        optparser.print_help()
+        sys.exit(0)
+
+    # Print version message, if requested.
+    if options.action == 'version':
+        print version
+        sys.exit(0)
     
     # Process any config files.
     if options.configfiles:
@@ -529,6 +591,8 @@ def main(options, names):
 
     if options.include_log:
         if options.action == 'html':
+            if not os.path.exists(options.target):
+                os.mkdir(options.target)
             log.register_logger(HTMLLogger(options.target, options))
         else:
             log.warning("--include-log requires --html")
@@ -628,11 +692,11 @@ def main(options, names):
         logger.print_times()
 
     # If we encountered any message types that we were requested to
-    # fail on, then exit with status 1.
+    # fail on, then exit with status 2.
     if options.fail_on is not None:
         max_reported_message_level = max(logger.reported_message_levels)
         if max_reported_message_level >= options.fail_on:
-            sys.exit(1)
+            sys.exit(2)
 
 def write_html(docindex, options):
     from epydoc.docwriter.html import HTMLWriter
@@ -800,6 +864,7 @@ def cli():
         print >>sys.stderr, ('\nUNEXPECTED ERROR:\n'
                              '%s\n' % (str(e) or e.__class__.__name__))
         print >>sys.stderr, 'Use --debug to see trace information.'
+        sys.exit(3)
     
 def _profile():
     # Hotshot profiler.
