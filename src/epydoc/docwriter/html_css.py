@@ -129,7 +129,8 @@ th.group-header             { background: $group_hdr_bg; color: $group_hdr_fg;
  */
 table.summary               { border-collapse: collapse;
                               background: $table_bg; color: $table_fg;
-                              border: $table_border; }
+                              border: $table_border;
+                              margin-bottom: 0.5em; }
 td.summary                  { border: $table_border; }
 code.summary-type           { font-size: 85%; }
 table.summary a:link        { color: $table_link; }
@@ -137,7 +138,7 @@ table.summary a:visited     { color: $table_visited_link; }
 
 
 /* Details Tables (functions, variables, etc)
- *   - Each object is described in its own single-celled table.
+ *   - Each object is described in its own div.
  *   - A single-row summary table w/ table-header is used as
  *     a header for each details section (CSS style for table-header
  *     is defined above, under 'Table Headers').
@@ -149,6 +150,13 @@ table.details               { border-collapse: collapse;
 table.details table         { color: $table_fg; }
 table.details a:link        { color: $table_link; }
 table.details a:visited     { color: $table_visited_link; }
+
+/* Fields */
+dl.fields                   { margin-left: 2em; margin-top: 1em;
+                              margin-bottom: 1em; }
+dl.fields dd ul             { margin-left: -2em; }
+div.fields                  { margin-left: 2em; }
+div.fields p                { margin-bottom: 0.5em; }
 
 /* Index tables (identifier index, term index, etc)
  *   - link-index is used for indices containing lists of links

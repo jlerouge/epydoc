@@ -1957,7 +1957,6 @@ class HTMLWriter:
 
         # Write a footer for the table.
         out(self.TABLE_FOOTER)
-        out('\n<br />\n')
 
     def write_summary_group(self, out, doc, name, var_docs, grouped_inh_vars):
         # Split up the var_docs list, according to the way each var
@@ -2136,7 +2135,7 @@ class HTMLWriter:
         if not var_docs: return
 
         # Write a header
-        self.write_table_header(out, "summary", heading)
+        self.write_table_header(out, "details", heading)
         out(self.TABLE_FOOTER)
 
         for var_doc in var_docs:
@@ -2145,9 +2144,7 @@ class HTMLWriter:
         out('<br />\n')
 
     def write_details_entry(self, out, var_doc):
-        descr = self.descr(var_doc, indent=2)
-        if descr: descr = '<br />'+descr
-        else: descr = ''
+        descr = self.descr(var_doc, indent=2) or ''
         if var_doc.is_public: div_class = ''
         else: div_class = ' class="private"'
 
@@ -2255,25 +2252,25 @@ class HTMLWriter:
           </table>
           $self.render_callgraph(callgraph)$
           $descr$
-          <dl><dt></dt><dd>
+          <dl class="fields">
         >>> # === parameters ===
         >>> if arg_descrs:
-            <dl><dt>Parameters:</dt></dl>
-            <ul class="nomargin">
+            <dt>Parameters:</dt>
+            <dd><ul class="nomargin-top">
         >>>   for lhs, rhs in arg_descrs:
                 $self.labelled_list_item(lhs, rhs)$
         >>>   #endfor
-            </ul>
+            </ul></dd>
         >>> #endif
         >>> # === return type ===
         >>> if rdescr and rtype:
-            <dl><dt>Returns: $rtype$</dt>
-                <dd>$rdescr$</dd></dl>
+            <dt>Returns: $rtype$</dt>
+                <dd>$rdescr$</dd>
         >>> elif rdescr:
-            <dl><dt>Returns:</dt>
-                <dd>$rdescr$</dd></dl>
+            <dt>Returns:</dt>
+                <dd>$rdescr$</dd>
         >>> elif rtype:
-            <dl><dt>Returns: $rtype$</dt></dl>
+            <dt>Returns: $rtype$</dt>
         >>> #endif
         >>> # === decorators ===
         >>> if func_doc.decorators not in (None, UNKNOWN):
@@ -2288,17 +2285,17 @@ class HTMLWriter:
         >>>   decos = None
         >>> #endif
         >>> if decos:
-            <dl><dt>Decorators:</dt></dl>
-            <ul class="nomargin">
+            <dt>Decorators:</dt>
+            <dd><ul class="nomargin-top">
         >>>   for deco in decos:
                 <li><code>@$deco$</code></li>
         >>>   #endfor
-            </ul>
+            </ul></dd>
         >>> #endif
         >>> # === exceptions ===
         >>> if func_doc.exception_descrs not in (None, UNKNOWN, (), []):
-            <dl><dt>Raises:</dt></dl>
-            <ul class="nomargin">
+            <dt>Raises:</dt>
+            <dd><ul class="nomargin-top">
         >>>   for name, descr in func_doc.exception_descrs:
         >>>     exc_name = self.docindex.find(name, func_doc)
         >>>     if exc_name is not None:
@@ -2309,21 +2306,21 @@ class HTMLWriter:
                     str(name) + "</strong></code>",
                     self.docstring_to_html(descr, func_doc, 8))$
         >>>   #endfor
-            </ul>
+            </ul></dd>
         >>> #endif
         >>> # === overrides ===
         >>> if var_doc.overrides not in (None, UNKNOWN):
-            <dl><dt>Overrides:
+            <dt>Overrides:
               $self.href(var_doc.overrides.value, context=var_doc)$
         >>>   if (func_doc.docstring in (None, UNKNOWN) and
         >>>       var_doc.overrides.value.docstring not in (None, UNKNOWN)):
                 <dd><em class="note">(inherited documentation)</em></dd>
         >>>   #endif
-            </dt></dl>
+            </dt>
         >>> #endif
+          </dl>
         >>> # === metadata ===
         >>> self.write_standard_fields(out, func_doc)
-          </dd></dl>
         </td></tr></table>
         </div>
         ''')
@@ -2375,21 +2372,21 @@ class HTMLWriter:
         <tr><td>
           <h3 class="epydoc">$var_doc.name$</h3>
           $descr$
-          <dl><dt></dt><dd>
+          <dl class="fields">
         >>> for (name, val, summary) in accessors:
-            <dl><dt>$name$ Method:</dt>
-            <dd>$val$
+            <dt>$name$ Method:</dt>
+            <dd class="value">$val$
         >>>     if summary:
                 - $summary$
         >>>     #endif
-            </dd></dl>
+            </dd>
         >>> #endfor
         >>> if prop_doc.type_descr not in (None, UNKNOWN):
-            <dl><dt>Type:</dt>
-              <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
+            <dt>Type:</dt>
+              <dd>$self.type_descr(var_doc, indent=6)$</dd>
         >>> #endif
+          </dl>
         >>> self.write_standard_fields(out, prop_doc)
-          </dd></dl>
         </td></tr></table>
         </div>
         ''')
@@ -2407,18 +2404,19 @@ class HTMLWriter:
         <tr><td>
           <h3 class="epydoc">$var_doc.name$</h3>
           $descr$
-          <dl><dt></dt><dd>
+          <dl class="fields">
         >>> if var_doc.type_descr not in (None, UNKNOWN):
-            <dl><dt>Type:</dt>
-              <dd>$self.type_descr(var_doc, indent=6)$</dd></dl>
+            <dt>Type:</dt>
+              <dd>$self.type_descr(var_doc, indent=6)$</dd>
         >>> #endif
+          </dl>
         >>> self.write_standard_fields(out, var_doc)
         >>> if var_doc.value is not UNKNOWN:
-            <dl><dt>Value:</dt>
+          <dl class="fields">
+            <dt>Value:</dt>
               <dd>$self.pprint_value(var_doc.value)$</dd>
-            </dl>
+          </dl>
         >>> #endif
-          </dd></dl>
         </td></tr></table>
         </div>
         ''')
@@ -2729,8 +2727,6 @@ class HTMLWriter:
         fields = []
         field_values = {}
         
-        #if _sort_fields: fields = STANDARD_FIELD_NAMES [XX]
-        
         for (field, arg, descr) in doc.metadata:
             if field not in field_values:
                 fields.append(field)
@@ -2740,6 +2736,9 @@ class HTMLWriter:
             else:
                 field_values.setdefault(field,[]).append(descr)
 
+        if not fields: return
+
+        out('<div class="fields">')
         for field in fields:
             if field.takes_arg:
                 for arg, descrs in field_values[field].items():
@@ -2747,6 +2746,8 @@ class HTMLWriter:
                                               
             else:
                 self.write_standard_field(out, doc, field, field_values[field])
+
+        out('</div>')
 
     write_standard_field = compile_template(
         """
@@ -2771,7 +2772,7 @@ class HTMLWriter:
                 </dd>
               </dl>
         >>>   else:
-              <p><strong>$field.plural+arglabel$:</strong>
+              <strong>$field.plural+arglabel$:</strong>
               <ul class="nomargin-top">
         >>>     for descr in descrs:
                 <li>
@@ -3206,7 +3207,6 @@ class HTMLWriter:
             s = '<span class="docstring">%s</span><!--end docstring-->' % s
         return s
 
-    # [XX] Just use docstring_to_html???
     def description(self, parsed_docstring, where=None, indent=0):
         assert isinstance(where, (APIDoc, type(None)))
         if parsed_docstring in (None, UNKNOWN): return ''
