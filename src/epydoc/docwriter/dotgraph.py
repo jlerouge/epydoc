@@ -478,7 +478,13 @@ class DotGraphUmlClassNode(DotGraphNode):
                 self.attributes.append(var)
 
         # Initialize our dot node settings.
-        DotGraphNode.__init__(self, tooltip=class_doc.canonical_name,
+        tooltip = self._summary(class_doc)
+        if tooltip:
+            # dot chokes on a \n in the attribute...
+            tooltip = " ".join(tooltip.split())
+        else:
+            tooltip = class_doc.canonical_name
+        DotGraphNode.__init__(self, tooltip=tooltip,
                               width=0, height=0, shape='plaintext',
                               href=linker.url_for(class_doc) or NOOP_URL)
 
@@ -634,8 +640,10 @@ class DotGraphUmlClassNode(DotGraphNode):
         """Return a plaintext summary for `api_doc`"""
         if not isinstance(api_doc, APIDoc): return ''
         if api_doc.summary in (None, UNKNOWN): return ''
-        summary = api_doc.summary.to_plaintext(self.linker).strip()
+        summary = api_doc.summary.to_plaintext(None).strip()
         return plaintext_to_html(summary)
+
+    _summary = classmethod(_summary)
 
     def _type_descr(self, api_doc):
         """Return a plaintext type description for `api_doc`"""
