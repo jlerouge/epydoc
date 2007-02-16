@@ -1289,8 +1289,9 @@ class HTMLLogger(log.Logger):
                 for (key, val) in opts]
         for is_default, key, val in sorted(opts):
             css = is_default and 'opt-default' or 'opt-changed'
-            msg += ('<tr class="%s"><td>%s</td><td><tt>&nbsp;=&nbsp;'
-                    '</tt></td><td><tt>%s</tt></td></tr>' %
+            msg += ('<tr valign="top" class="%s"><td valign="top">%s</td>'
+                    '<td valign="top"><tt>&nbsp;=&nbsp;</tt></td>'
+                    '<td valign="top"><tt>%s</tt></td></tr>' %
                     (css, key, plaintext_to_html(repr(val))))
         msg += '</table>\n'
         self.out.write('<div class="log-info">\n%s</div>\n' % msg)
