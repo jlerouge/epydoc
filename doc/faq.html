@@ -30,6 +30,8 @@
   </a></li>
   <li><a href="#is_epydoc_running">How can I test whether
   epydoc is currently running?</a></li>
+  <li><a href="#speed">I'm documenting a large project.  How can I make
+    epydoc go faster?</a></li>
 </ul></p>
 <p><b>Generated Output</b>
 <ul class="nomargin">
@@ -41,13 +43,17 @@
     generated documentation?</a></li>
   <li><a href="#graphs">How can I include graphs in the generated output?
     </a></li>
+  <li><a href="#urls">Why does epydoc add "<tt>-module</tt>" and
+    "<tt>-class</tt>" to the names of the HTML pages it generates?
+    </a></li>
+  <li><a href="#redirect">Is there a way to link to the API documentation
+    for objects using a simple URL based on the object's dotted name?
+    </a></li>
 </ul></p>
 <p><b>Development of Epydoc</b>
 <ul class="nomargin">
   <li><a href="#bug">I've found a bug in epydoc!  Where should I report it?</a></li>
   <li><a href="#help">I'd like to help!  What can I do?</a></li>
-  <li><a href="#speed">I'm documenting a large project.  How can I make
-    epydoc go faster?</a></li>
 <!--  <li><a href="#"></a></li>-->
 </ul></p>
 <p><b><a href="mailto:edloper@gradient.cis.upenn.edu">Ask a new question...</a></b></p>
@@ -82,7 +88,7 @@
    <dd><p>For many modules, <a href="epytextintro.html">epytext</a>
    works well: it is very lightweight, so it won't get in the way; but
    it lets you mark important information about objects.  If you would
-   like to use a more expressive markup language, then I recommend
+   like to use a more expressive markup language, then we recommend
    using <a href="othermarkup.html">reStructuredText</a>, which is
    easy to write, easy to read, and has support for a very wide array
    of constructs.</p></dd>
@@ -197,6 +203,39 @@
 </pre></div>
   </dd>
 
+  <!-- QUESTION --><a name="speed" />
+  <dt><p><b>Q:</b> I'm documenting a large project.  How can I make
+    epydoc go faster? </p></dt>
+  <dd><p>Try the following options: </p>
+    <table border="1" cellspacing="0" cellpadding="3">
+
+      <tr>
+      <th align="left"><code>&#8722;&#8722;no-sourcecode</code></th>
+      <td>Don't generate pages containing source code with syntax
+      highlighting.</td></tr>
+
+      <tr>
+      <th align="left"><code>&#8722;&#8722;no&#8722;private</code></th>
+      <td> Don't generate documentation for private objects.</td></tr>
+
+      <tr>
+      <th align="left"><code>&#8722;&#8722;introspect&#8722;only</code> or
+                       <code>&#8722;&#8722;parse&#8722;only</code></th>
+      <td> Extract information about objects using introspection
+      <i>or</i> parsing (but not both).  This may decrease the amount
+      of information that epydoc can extract from your
+      project.</td></tr>
+
+      <tr>
+      <th align="left"><code>&#8722;&#8722;docformat=plaintext</code></th>
+      <td> Format docstrings as plaintext, instead of epytext.
+      (Docstrings will be rendered verbatim).</td></tr>
+
+    </table>
+
+    <p>Also, note that including graphs in the output can
+    slow epydoc down significantly. </p></dd></dl>
+
 </dl>
 
 <!-- ==================== GENERATED OUTPUT ========================= -->
@@ -272,6 +311,38 @@
   href="fields.html">fields</a> for
   more information. </p></dd>
 
+  <!-- QUESTION --><a name="urls" />
+  <dt><p><b>Q:</b> Why does epydoc add "<tt>-module</tt>" and
+    "<tt>-class</tt>" to the names of the HTML pages it generates?
+    </p></dt>
+  <dd><p>There are two reasons.  First, this ensures that the names of
+  module and class pages do not conflict with the names of existing
+  special pages.  For example, if a module were named
+  "<tt>index</tt>", then naming its documentation page
+  "<tt>index.html</tt>" would interfere with the use of that name for
+  the documentation's main page.  Second, it is possible to define a
+  package where a module and a class share the same name.  In those
+  cases, this naming scheme ensures that the two object's pages do not
+  conflict.</p></dd>
+
+  <!-- QUESTION --><a name="redirect" />
+  <dt><p><b>Q:</b> Is there a way to link to the API documentation
+    for objects using a simple URL based on the object's dotted name?
+    </p></dt>
+
+  <dd><p>Epydoc creates a page named "<tt>redirect.html</tt>" that
+  uses javascript to automatically convert dotted names to the
+  corresponding URLs.  In particular, loading the page
+  "<tt>redirect.html#<i>dotted.name</i></tt>" will automatically
+  redirect the user's browser to the URL for the object whose dotted
+  name is <tt><i>dotted.name</i></tt>.  For example, a link to
+  <tt>&lt;<a href="api/redirect.html#epydoc.cli.HELP_TOPICS"
+  >redirect.html#epydoc.cli.HELP_TOPICS</a>&gt;</tt> automatically
+  redirects the browser to <tt>&lt;<a
+  href="api/epydoc.cli-module.html#HELP_TOPICS"
+  >epydoc.cli-module.html#HELP_TOPICS</a>&gt;</tt>.  The redirect page can
+  be used for any object documented by epydoc, including modules,
+  classes, functions, varaibles, properties, etc. </p></dd>
 </dl>
 
 <!-- ==================== DEVELOPMENT ========================= -->
@@ -282,7 +353,7 @@
     </p></dt>
   <dd><p> Use the <a
   href="http://sourceforge.net/tracker/?func=add&group_id=32455&atid=405618">Sourceforge
-  bug tracker</a> to report bugs.  If you want to hear back when I fix
+  bug tracker</a> to report bugs.  If you want to hear back when we fix
   it, be sure to either log in to Sourceforge, or include your email
   address in the bug report.
     </p></dd>
@@ -290,53 +361,20 @@
   <dt><p><b>Q:</b> I'd like to help!  What can I do?
     </p></dt>
   <dd><p> If there are any features that you want to add to Epydoc,
-    I'd be happy to accept patches.  Patches should be submitted with
+    we'd be happy to accept patches.  Patches should be submitted with
     the <a
     href="http://sourceforge.net/tracker/?func=add&group_id=32455&atid=405620">Sourceforge
     patch tracker</a> (be sure to describe what your patch does!).  If
-    you plan to make several changes, I could also add you as a
+    you plan to make several changes, we could also add you as a
     developer on Sourceforge.  Email me if you're interested. </p>
 
-    <p> For a list of additions that I'd like to make to Epydoc, see
+    <p> For a list of additions that we'd like to make to Epydoc, see
     the todo list in the <a href="api/">Epydoc reference
     documentation</a>; or the SourceForge <a
     href="http://sourceforge.net/tracker/?group_id=32455&atid=405621">feature
     request tracker</a> and <a
     href="http://sourceforge.net/tracker/?group_id=32455&atid=405618">bug
     tracker</a> </p></dd>
-
-  <!-- QUESTION --><a name="speed" />
-  <dt><p><b>Q:</b> I'm documenting a large project.  How can I make
-    epydoc go faster? </p></dt>
-  <dd><p>Try the following options: </p>
-    <table border="1" cellspacing="0" cellpadding="3">
-
-      <tr>
-      <th align="left"><code>&#8722;&#8722;no-sourcecode</code></th>
-      <td>Don't generate pages containing source code with syntax
-      highlighting.</td></tr>
-
-      <tr>
-      <th align="left"><code>&#8722;&#8722;no&#8722;private</code></th>
-      <td> Don't generate documentation for private objects.</td></tr>
-
-      <tr>
-      <th align="left"><code>&#8722;&#8722;introspect&#8722;only</code> or
-                       <code>&#8722;&#8722;parse&#8722;only</code></th>
-      <td> Extract information about objects using introspection
-      <i>or</i> parsing (but not both).  This may decrease the amount
-      of information that epydoc can extract from your
-      project.</td></tr>
-
-      <tr>
-      <th align="left"><code>&#8722;&#8722;docformat=plaintext</code></th>
-      <td> Format docstrings as plaintext, instead of epytext.
-      (Docstrings will be rendered verbatim).</td></tr>
-
-    </table>
-
-    <p>Also, note that including graphs in the output can
-    slow epydoc down significantly. </p></dd></dl>
 
   <!-- QUESTION TEMPLATE
   <dt><p><b>Q: </b> ...</p></dt>
