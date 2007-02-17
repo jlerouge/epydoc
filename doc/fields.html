@@ -33,33 +33,34 @@ for each markup language. </p>
 <table border="1" cellspacing="0" cellpadding="3">
   <tr>
     <th width="33%">Epytext</th>
-    <th width="33%">ReStructuredText</th>
+    <th width="33%">reStructuredText</th>
     <th width="33%">Javadoc</th>
   </tr>
   <tr>
     <td>
-      <code>@<i>tag</i>: <i>body</i></code>...</br>
-      <code>@<i>tag</i> <i>arg</i>: <i>body</i></code>...</br>
+      <code>@<i>tag</i>: <i>body</i></code>...<br/>
+      <code>@<i>tag</i> <i>arg</i>: <i>body</i></code>...<br/>
     </td>
     <td>
-      <code>:<i>tag</i>: <i>body</i></code>...</br>
-      <code>:<i>tag</i> <i>arg</i>: <i>body</i></code>...</br>
+      <code>:<i>tag</i>: <i>body</i></code>...<br/>
+      <code>:<i>tag</i> <i>arg</i>: <i>body</i></code>...<br/>
     </td>
     <td>
-      <code>@<i>tag</i> <i>body</i></code>...</br>
-      <code>@<i>tag</i> <i>arg</i> <i>body</i></code>...</br>
+      <code>@<i>tag</i> <i>body</i></code>...<br/>
+      <code>@<i>tag</i> <i>arg</i> <i>body</i></code>...<br/>
     </td>
   </tr>
 <tr>
 <td align="center"><a
 href="epytext.html#fieldlist">Definition of<br/>epytext fields</a></td>
 <td align="center"><a
-href="http://docutils.sourceforge.net/spec/rst/reStructuredText.html#field-lists">Definition of<br/>ReStructuredText fields</a></td>
+href="http://docutils.sourceforge.net/spec/rst/reStructuredText.html#field-lists">Definition of<br/>reStructuredText fields</a></td>
 <td align="center"><a
 href="http://java.sun.com/j2se/1.4.2/docs/tooldocs/solaris/javadoc.html#javadoctags">Definition of<br/>Javadoc fields</a></td>
 </tr>
 </table>
 </center>
+
 
 <a name="fields"></a>
 <h2> 2. Supported Fields</h2>
@@ -77,11 +78,12 @@ accordingly. </p>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>param</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
     A description of the parameter <code><i>p</i></code> for a
-    function or method. </td></tr>
+    function or method.  It may appear in the class docstring to describe
+    a costructor parameter: mostly useful for C extensions.</td></tr>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>type</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
-    The expected type for the parameter
+    The expected type for the parameter.
     <code><i>p</i></code>. </td></tr>
   
   <tr><td width="10%" align="left" valign="top">
@@ -95,16 +97,19 @@ accordingly. </p>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>keyword</b>&nbsp;<i>p</i>:</code>&nbsp;... </td><td>
     A description of the keyword parameter <code><i>p</i></code>.
-    </td></tr>
+    It may appear in the class docstring to describe
+    a costructor keyword parameter.</td></tr>
   
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>raise</b>&nbsp;<i>e</i>:</code>&nbsp;... </td><td>
     A description of the circumstances under which a function or
-    method raises exception <code><i>e</i></code>. </td></tr>
+    method raises exception <code><i>e</i></code>.
+    It may appear in the class docstring to describe
+    an exception that can be raised by the costructor.</td></tr>
 
   <!-- ========== Variables ========== -->
   <tr><th colspan="2" align="left">Variables
-  <i>(module or class docstrings)</i></th></tr>
+  <i>(module, class or <a href="#variable-docstring">variable</a> docstrings)</i></th></tr>
   <tr><td width="10%" align="left" valign="top">
   <code>@<b>ivar</b>&nbsp;<i>v</i>:</code>&nbsp;... </td><td>
     A description of the class instance variable
@@ -308,7 +313,7 @@ keyword parameters: </p>
 
     <code class="field">@keyword dig_deep:</code> Plant the seed deep under ground.
     <code class="field">@keyword soak:</code> Soak the seed before planting it.
-    """</code>
+    <code class="string">"""</code>
     <i>[...]</i>
 </pre></div>
 </li>
@@ -323,7 +328,7 @@ once.  An asterisk in a child name will match any substring: </p>
     <code class="field">@group Tools:</code> zip, zap, *_tool
     <code class="field">@group Accessors:</code> get_*
     <code class="field">@sort:</code> get_*, set_*, unpack_*, cut
-    """</code>
+    <code class="string">"""</code>
     <i>[...]</i>
 </pre></div>
 </li>
@@ -341,14 +346,89 @@ type in a fixed-width font, then you must use inline markup: </p>
     <code class="field">@type person:</code> L{Person} or L{Animal}
     <code class="field">@param time:</code> How long they should think.
     <code class="field">@type time:</code> C{int} or C{float}
-    """</code>
+    <code class="string">"""</code>
     <i>[...]</i>
 </pre></div>
 
 </li>
 </ul>
 
-<h2>3. Field Synonyms</h2>
+
+<a name="locations"></a>
+<h2> 3. Where to Write Fields</h2>
+
+<p> Normally the fields are written in the docstring of the documented
+objects: this allows to add fields to modules, classes, function, properties.
+Where a docstring is not allowed, usually alternative options do exist.
+</p>
+
+<a name="variable-docstring"></a>
+<h3> 3.1. Variable docstrings </h3>
+
+<p> Python variables don't support docstrings. The variable can be described
+in the module or class where it is defined using the tags <code>@var</code>,
+<code>@ivar</code>, <code>@cvar</code>; but this only allows for a textual
+description: no further metadata can be added to the variable (except for the
+type, using the <code>@type</code> tag. </p>
+
+<p> Epydoc supports <i>variable docstrings</i>:  if a variable
+assignment statement is immediately followed by a bare string literal,
+then that assignment is treated as a docstring for that variable.  In
+classes, variable assignments at the class definition level are
+considered class variables; and assignments to instance variables in
+the constructor (<code>__init__</code>) are considered instance variables:<p>
+
+<div class="screen2"><pre>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="keyword">class</code> A:
+<code class="prompt">...</code>     x = 22
+<code class="prompt">...</code>     <code class="string">"""Docstring for class variable A.x"""</code>
+<code class="prompt">...</code>
+<code class="prompt">...</code>     <code class="keyword">def</code> <code class="function">__init__</code>(self, a):
+<code class="prompt">...</code>         self.y = a
+<code class="prompt">...</code>         <code class="string">"""Docstring for instance variable A.y</code>
+</pre></div>
+
+<p> Variables may also be documented using <i>comment docstrings</i>.
+If a variable assignment is immediately preceeded by a comment whose
+lines begin with the special marker "<code><b>#:</b></code>", or is
+followed on the same line by such a comment, then it is treated as a
+docstring for that variable: </p>
+
+<div class="screen2"><pre>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="comment">#: docstring for x</code>
+<code class="prompt">...</code> x = 22
+<code class="prompt">&gt;&gt;&gt;</code> x = 22 <code class="comment">#: docstring for x</code>
+</pre></div>
+
+<p> A common Python idiom is to create instance variables settings their
+default value in the class instead of the constructor (hopefully if the default
+is immutable...). To avoid Epydoc to interpret such variable as a class
+variable, you can describe it using the tag <code>@ivar</code> in the
+context of a variable docstring:</p>
+
+<div class="screen2"><pre>
+<code class="prompt">&gt;&gt;&gt;</code> <code class="keyword">class</code> B:
+<code class="prompt">...</code>     y = 42
+<code class="prompt">...</code>     <code class="string">"""@ivar: This is an instance variable."""</code>
+</pre></div>
+
+<p> Notice that variable docstrings are only available for documentation
+when the source code is available for parsing: it is not possible to retrieve
+variable docstrings from introspection informations only. </p>
+
+
+<h3> 3.2. C Extensions </h3>
+
+<p> In a C extension module, extension classes cannot have a docstring attached
+to the <code>__init__</code> function; consequently it is not possible to
+document parameters and exceptions raised by the class constructor. To overcome
+this shortcoming, the tags <code>@param</code>, <code>@keyword</code>,
+<code>@type</code>, <code>@exception</code> are allowed to appear in the class
+docstring to refer to constructor parameters.
+</p>
+
+
+<h2>4. Field Synonyms</h2>
 
 <p> Several fields have "synonyms," or alternate tags.  The following
 table lists all field synonyms.  Field tags are written using epytext
@@ -362,8 +442,8 @@ adjust the markup accordingly. </p>
     <tr><th width="50%">Name</th><th width="50%">Synonyms</th></tr>
     <tr><td align="left" valign="top">
       <b><code>@param&nbsp;<i>p</i>:</code>&nbsp;...</b> </td>
-      <td><code>@parameter&nbsp;<i>p</i>:</code>&nbsp;...</br>
-      <code>@arg&nbsp;<i>p</i>:</code>&nbsp;...</br>
+      <td><code>@parameter&nbsp;<i>p</i>:</code>&nbsp;...<br/>
+      <code>@arg&nbsp;<i>p</i>:</code>&nbsp;...<br/>
       <code>@argument&nbsp;<i>p</i>:</code>&nbsp;...</td></tr>
     
     <tr><td align="left" valign="top">
@@ -376,8 +456,8 @@ adjust the markup accordingly. </p>
     
     <tr><td align="left" valign="top">
       <b><code>@raise&nbsp;<i>e</i>:</code>&nbsp;...</b> </td>
-      <td><code>@raises&nbsp;<i>e</i>:</code>&nbsp;...</br>
-      <code>@except&nbsp;<i>e</i>:</code>&nbsp;...</br>
+      <td><code>@raises&nbsp;<i>e</i>:</code>&nbsp;...<br/>
+      <code>@except&nbsp;<i>e</i>:</code>&nbsp;...<br/>
       <code>@exception&nbsp;<i>e</i>:</code>&nbsp;...</td></tr>
     
     <tr><td align="left" valign="top">
@@ -412,7 +492,7 @@ adjust the markup accordingly. </p>
     
     <tr><td align="left" valign="top">
       <b><code>@requires:</code>&nbsp;...</b> </td><td>
-      <code>@require:</code>&nbsp;... </br>
+      <code>@require:</code>&nbsp;... <br/>
       <code>@requirement:</code>&nbsp;... </td></tr>
     
     <tr><td align="left" valign="top">
@@ -438,8 +518,54 @@ adjust the markup accordingly. </p>
 </td></tr></table>
 </center>
 
-<a name="newfield">
-<h2> 4. Adding New Fields</h2></a>
+
+<a name="metadata-variable"></a>
+<h3> 4.1. Metadata variables </h3>
+
+<p> Some module variables are commonly used as module metadata. Epydoc can
+use the value provided by these variables as alternate form for tags. The
+following table lists the recognized variables and the tag they replace. </p>
+
+<center>
+  <table border="1" cellspacing="0" cellpadding="3">
+    <tr><th width="50%">Variable</th><th width="50%">Tag</th></tr>
+    <tr><td align="left" valign="top">
+      <b><code>@deprecated</code></b></td>
+      <td><code>__deprecated__</code></td></tr>
+      
+    <tr><td align="left" valign="top">
+      <b><code>@version</code></b></td>
+      <td><code>__version__</code><br/>
+      <code>__revision__</code></td></tr>
+    
+    <tr><td align="left" valign="top">
+      <b><code>@date</code></b></td>
+      <td><code>__date__</code></td></tr>
+      
+    <tr><td align="left" valign="top">
+      <b><code>@author</code></b><br/>
+      <b><code>@authors</code></b></td>
+      <td><code>__author__</code><br/>
+      <code>__authors__</code></td></tr>
+      
+    <tr><td align="left" valign="top">
+      <b><code>@contact</code></b></td>
+      <td><code>__contact__</code></td></tr>
+      
+    <tr><td align="left" valign="top">
+      <b><code>@copyright</code></b></td>
+      <td><code>__copyright__</code></td></tr>
+      
+    <tr><td align="left" valign="top">
+      <b><code>@license</code></b></td>
+      <td><code>__license__</code></td></tr>
+
+  </table>
+</center>
+
+
+<a name="newfield"></a>
+<h2> 5. Adding New Fields</h2>
 
 <p> New fields can be defined for the docstrings in a module using the
 special <code>@newfield</code> tag (or its synonym,
@@ -464,10 +590,10 @@ example illustrates how the <code>@newfield</code> can be used: </p>
 """
 
 <code class="keyword">def</code> <code class="function">example</code>():
-    <code class="string">"""
+    <code class="string">"""</code>
     <code class="field">@corpus:</code> Bob's wordlist.
     <code class="field">@corpus:</code> The British National Corpus.
-    """</code>
+    <code class="string">"""</code>
     <i>[...]</i>
 </pre>
 </td><td>
@@ -484,7 +610,7 @@ example illustrates how the <code>@newfield</code> can be used: </p>
 <code>__extra_epydoc_fields__</code> is deprecated; use
 <code>@newfield</code> instead.</p>
 
-<h2> 5. Markup-Specific Notes </h2>
+<h2> 6. Markup-Specific Notes </h2>
 
 <p> For the most part, fields are treated identically, regardless of
 what markup language is used to encode them.  However, there are a few
@@ -492,7 +618,7 @@ minor differences, which are intended to accomodate existing standards
 for each markup language.  In particular: </p>
 
 <ul>
-  <li> ReStructuredText supports an extra group of fields, called
+  <li> reStructuredText supports an extra group of fields, called
   <i>consolidated fields</i>, which combine the documentation for
   several objects into a single field. </li>
   <li> Javadoc uses a special syntax for the body of the
@@ -504,9 +630,9 @@ for each markup language.  In particular: </p>
 below. </p>
 
 <a name="rst"></a>
-<h3> 5.1. ReStructuredText Fields </h3>
+<h3> 6.1. reStructuredText Fields </h3>
 
-<p> In ReStructuredText, a single field can be used to encode the
+<p> In reStructuredText, a single field can be used to encode the
 documentation for a group of related items.  For example, a single
 <code>:Parameters:</code> field is often used to describe all of the
 parameters for a function or method: </p>
@@ -592,7 +718,7 @@ fields are currently supported by epydoc: </p>
 </center>
 
 
-<h3> 5.2. Javadoc Fields </h3>
+<h3> 6.2. Javadoc Fields </h3>
 
 <p> For compatibility with Javadoc, every <code>@see</code> field is
 assumed to contain a single crossreference link, unless its body
