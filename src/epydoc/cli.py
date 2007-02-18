@@ -76,6 +76,12 @@ from epydoc.compat import *
 import ConfigParser
 from epydoc.docwriter.html_css import STYLESHEETS as CSS_STYLESHEETS
 
+# This module is only available if Docutils are in the system
+try:
+    from epydoc.docwriter import xlink
+except:
+    xlink = None
+
 INHERITANCE_STYLES = ('grouped', 'listed', 'included')
 GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
@@ -129,7 +135,8 @@ OPTION_DEFAULTS = dict(
     debug=epydoc.DEBUG, profile=False, graphs=[],
     list_classes_separately=False, graph_font=None, graph_font_size=None,
     include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
-    exclude=[], exclude_parse=[], exclude_introspect=[])    
+    exclude=[], exclude_parse=[], exclude_introspect=[],
+    external_api=[],external_api_file=[],external_api_root=[])
 
 def parse_arguments():
     # Construct the option parser.
@@ -212,7 +219,7 @@ def parse_arguments():
         "list of available help topics")
 
 
-    generation_group = OptionGroup(optparser, 'Generation options')
+    generation_group = OptionGroup(optparser, 'Generation Options')
     optparser.add_option_group(generation_group)
 
     generation_group.add_option("--docformat",
@@ -279,7 +286,7 @@ def parse_arguments():
         help=("Include a page with the process log (epydoc-log.html)"))
 
 
-    output_group = OptionGroup(optparser, 'Output options')
+    output_group = OptionGroup(optparser, 'Output Options')
     optparser.add_option_group(output_group)
 
     output_group.add_option("--name",
@@ -325,7 +332,19 @@ def parse_arguments():
               "its own section, instead of listing them under their "
               "containing module."))
 
-    graph_group = OptionGroup(optparser, 'Graph options')
+    # The group of external API options.
+    # Skip if the module couldn't be imported (usually missing docutils)
+    if xlink is not None:
+        link_group = OptionGroup(optparser,
+                                 xlink.ApiLinkReader.settings_spec[0])
+        optparser.add_option_group(link_group)
+
+        for help, names, opts in xlink.ApiLinkReader.settings_spec[2]:
+            opts = opts.copy()
+            opts['help'] = help
+            link_group.add_option(*names, **opts)
+
+    graph_group = OptionGroup(optparser, 'Graph Options')
     optparser.add_option_group(graph_group)
 
     graph_group.add_option('--graph',
@@ -363,7 +382,7 @@ def parse_arguments():
               "will be written to profile.out."))
 
 
-    return_group = OptionGroup(optparser, 'Return value options')
+    return_group = OptionGroup(optparser, 'Return Value Options')
     optparser.add_option_group(return_group)
 
     return_group.add_option("--fail-on-error",
@@ -547,6 +566,14 @@ def parse_configfiles(configfiles, options, names):
         elif optname in ('separate-classes', 'separate_classes'):
             options.list_classes_separately = _str_to_bool(val, optname)
 
+        # External API
+        elif optname in ('external-api', 'external_api'):
+            options.external_api.extend(val.replace(',', ' ').split())
+        elif optname in ('external-api-file', 'external_api_file'):
+            options.external_api_file.append(val)
+        elif optname in ('external-api-root', 'external_api_root'):
+            options.external_api_root.append(val)
+
         # Graph options
         elif optname == 'graph':
             graphtypes = val.replace(',', '').split()
@@ -661,6 +688,14 @@ def main(options, names):
     # Set the default docformat
     from epydoc import docstringparser
     docstringparser.DEFAULT_DOCFORMAT = options.docformat
+
+    # Configure the external API linking
+    if xlink is not None:
+        try:
+            xlink.ApiLinkReader.read_configuration(options, problematic=False)
+        except Exception, exc:
+            log.error("Error while configuring external API linking: %s: %s"
+                % (exc.__class__.__name__, exc))
 
     # Set the dot path
     if options.dotpath:

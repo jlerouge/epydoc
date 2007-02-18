@@ -430,7 +430,7 @@ class HTMLWriter:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
         self._num_files = (len(self.class_list) + 2*len(self.module_list) +
-                           12 + len(self.METADATA_INDICES))
+                           13 + len(self.METADATA_INDICES))
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
         if self._split_ident_index:
@@ -647,6 +647,9 @@ class HTMLWriter:
         # Write the auto-redirect page.
         self._write(self.write_redirect_page, directory, 'redirect.html')
 
+        # Write the mapping object name -> URL
+        self._write(self.write_api_list, directory, 'api-objects.txt')
+        
         # Write the index.html files.
         # (this must be done last, since it might copy another file)
         self._files_written += 1
@@ -2951,6 +2954,35 @@ class HTMLWriter:
         </html>
         ''')
         # \------------------------------------------------------------/
+
+    #////////////////////////////////////////////////////////////
+    #{ URLs list
+    #////////////////////////////////////////////////////////////
+
+    def write_api_list(self, out):
+        """
+        Write a list of mapping name->url for all the documented objects.
+        """
+        # Construct a list of all the module & class pages that we're
+        # documenting.  The redirect_url javascript will scan through
+        # this list, looking for a page name that matches the
+        # requested dotted name.
+        skip = (ModuleDoc, ClassDoc, type(UNKNOWN))
+        for val_doc in self.module_list:
+            self.write_url_record(out, val_doc)
+            for var in val_doc.variables.itervalues():
+                if not isinstance(var.value, skip):
+                    self.write_url_record(out, var)
+
+        for val_doc in self.class_list:
+            self.write_url_record(out, val_doc)
+            for var in val_doc.variables.itervalues():
+                self.write_url_record(out, var)
+
+    def write_url_record(self, out, obj):
+        url = self.url(obj)
+        if url is not None:
+            out("%s\t%s\n" % (obj.canonical_name, url))
 
     #////////////////////////////////////////////////////////////
     #{ Helper functions
