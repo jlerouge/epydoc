@@ -72,7 +72,7 @@ class DocstringField:
     """
     def __init__(self, tags, label, plural=None,
                  short=0, multivalue=1, takes_arg=0,
-                 varnames=[]):
+                 varnames=None):
         if type(tags) in (list, tuple):
             self.tags = tuple(tags)
         elif type(tags) is str:
@@ -84,7 +84,7 @@ class DocstringField:
         self.multivalue = multivalue
         self.short = short
         self.takes_arg = takes_arg
-        self.varnames = varnames
+        self.varnames = varnames or []
 
     def __cmp__(self, other):
         if not isinstance(other, DocstringField): return -1
@@ -109,7 +109,7 @@ STANDARD_FIELDS = [
 
     # Status info
     DocstringField(['version'], 'Version', multivalue=0,
-                   varnames=['__version__', '__revision__']),
+                   varnames=['__version__']),
     DocstringField(['date'], 'Date', multivalue=0,
                    varnames=['__date__']),
     DocstringField(['status'], 'Status', multivalue=0),
@@ -274,8 +274,9 @@ def add_metadata_from_var(api_doc, field):
     for varname in field.varnames:
         # Check if api_doc has a variable w/ the given name.
         if varname not in api_doc.variables: continue
-        if api_doc.variables[varname].value is UNKNOWN: continue
-        val_doc = api_doc.variables[varname].value
+        var_doc = api_doc.variables[varname]
+        if var_doc.value is UNKNOWN: continue
+        val_doc = var_doc.value
         value = []
 
         # Try extracting the value from the pyval.
@@ -308,7 +309,11 @@ def add_metadata_from_var(api_doc, field):
                 elt = unicode(elt)
             elt = epytext.ParsedEpytextDocstring(
                 epytext.parse_as_para(elt))
+
+            # Add in the metadata and remove from the variables
             api_doc.metadata.append( (field, varname, elt) )
+            if var_doc.docstring in (None, UNKNOWN):
+                del api_doc.variables[varname]
 
 def initialize_api_doc(api_doc):
     """A helper function for L{parse_docstring()} that initializes
@@ -664,6 +669,7 @@ def process_deffield_field(api_doc, docindex, tag, arg, descr):
         api_doc.extra_docstring_fields = []
     try:
         docstring_field = _descr_to_docstring_field(arg, descr)
+        docstring_field.varnames.append("__%s__" % arg)
         api_doc.extra_docstring_fields.append(docstring_field)
     except ValueError, e:
         raise ValueError('Bad %s: %s' % (tag, e))

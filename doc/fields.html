@@ -530,19 +530,20 @@ adjust the markup accordingly. </p>
 
 <p> Some module variables are commonly used as module metadata. Epydoc can
 use the value provided by these variables as alternate form for tags. The
-following table lists the recognized variables and the tag they replace. </p>
+following table lists the recognized variables and the tag they replace.
+Customized metadata variables can be added using the method described
+in <a href="newfield">Adding New Fields</a>.</p>
 
 <center>
   <table border="1" cellspacing="0" cellpadding="3">
-    <tr><th width="50%">Variable</th><th width="50%">Tag</th></tr>
+    <tr><th width="50%">Tag</th><th width="50%">Variable</th></tr>
     <tr><td align="left" valign="top">
       <b><code>@deprecated</code></b></td>
       <td><code>__deprecated__</code></td></tr>
       
     <tr><td align="left" valign="top">
       <b><code>@version</code></b></td>
-      <td><code>__version__</code><br/>
-      <code>__revision__</code></td></tr>
+      <td><code>__version__</code></td></tr>
     
     <tr><td align="left" valign="top">
       <b><code>@date</code></b></td>
@@ -584,7 +585,12 @@ special <code>@newfield</code> tag (or its synonym,
 <p>Where <code><i>tag</i></code> is the new tag that's being defined;
 <code><i>label</i></code> is a string that will be used to mark this
 field in the generated output; and <code><i>plural</i></code> is the
-plural form of <code><i>label</i></code>, if different.  The following
+plural form of <code><i>label</i></code>, if different.</p>
+
+<p>It will also be possibile to use the module variable
+<code>__<i>tag</i>__</code> to set the value for the newly defined tag.</p>
+
+<p>The following
 example illustrates how the <code>@newfield</code> can be used: </p>
 
 <table border="1" cellspacing="0" cellpadding="3" width="95%">
