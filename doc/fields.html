@@ -665,7 +665,7 @@ each list item must begin with the field's argument, marked as <a
 href="http://docutils.sourceforge.net/docs/user/rst/quickref.html#inline-markup">interpreted
 text</a>, and followed by a colon or dash.  If a consolidated field is
 written as a definition list, then each definition item's term should
-contain the field's argument, marked as interpreted text.  The term
+contain the field's argument, (it is not mandatory for it being marked as interpreted text).  The term
 classifier, if present, is used to specify the associated type.  The
 following example shows the use of a definition list to define a
 consolidated field.  (Note that docutils requires a space before and
@@ -678,11 +678,11 @@ after the ":" used to mark classifiers.)
     Return the maximum speed for a fox.
 
     <code class="field">:Parameters:</code>
-      `size`
+      size
           The size of the fox (in meters)
-      `weight` : float
+      weight : float
           The weight of the fox (in stones)
-      `age` : int
+      age : int
           The age of the fox (in years)
     """</code>
     <i>[...]</i>
