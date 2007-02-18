@@ -136,213 +136,252 @@ def parse_arguments():
     usage = '%prog [ACTION] [options] NAMES...'
     version = "Epydoc, version %s" % epydoc.__version__
     optparser = OptionParser(usage=usage, add_help_option=False)
-    action_group = OptionGroup(optparser, 'Actions')
-    generation_group = OptionGroup(optparser, 'Generation options')
-    output_group = OptionGroup(optparser, 'Output options')
-    graph_group = OptionGroup(optparser, 'Graph options')
-    return_group = OptionGroup(optparser, 'Return value options')
 
-    optparser.add_option(
-        '--config', action='append', dest="configfiles", metavar='FILE',
+    optparser.add_option('--config',
+        action='append', dest="configfiles", metavar='FILE',
         help=("A configuration file, specifying additional OPTIONS "
               "and/or NAMES.  This option may be repeated."))
-    optparser.add_option(                               # --quiet
-        "--quiet", "-q", action="count", dest="quiet",
+
+    optparser.add_option("--output", "-o",
+        dest="target", metavar="PATH",
+        help="The output directory.  If PATH does not exist, then "
+        "it will be created.")
+
+    optparser.add_option("--quiet", "-q",
+        action="count", dest="quiet",
         help="Decrease the verbosity.")
-    optparser.add_option(                               # --verbose
-        "--verbose", "-v", action="count", dest="verbose",
+
+    optparser.add_option("--verbose", "-v",
+        action="count", dest="verbose",
         help="Increase the verbosity.")
-    optparser.add_option(                               # --debug
-        "--debug", action="store_true", dest="debug",
+
+    optparser.add_option("--debug",
+        action="store_true", dest="debug",
         help="Show full tracebacks for internal errors.")
-    optparser.add_option(
-        "--simple-term", action="store_true", dest="simple_term",
+
+    optparser.add_option("--simple-term",
+        action="store_true", dest="simple_term",
         help="Do not try to use color or cursor control when displaying "
         "the progress bar, warnings, or errors.")
-    
-    # Add options -- Actions
-    action_group.add_option(                               # --html
-        "--html", action="store_const", dest="action", const="html",
+
+
+    action_group = OptionGroup(optparser, 'Actions')
+    optparser.add_option_group(action_group)
+
+    action_group.add_option("--html",
+        action="store_const", dest="action", const="html",
         help="Write HTML output.")
-    action_group.add_option(                               # --latex
-        "--text", action="store_const", dest="action", const="text",
+
+    action_group.add_option("--text",
+        action="store_const", dest="action", const="text",
         help="Write plaintext output. (not implemented yet)")
-    action_group.add_option(                               # --latex
-        "--latex", action="store_const", dest="action", const="latex",
+
+    action_group.add_option("--latex",
+        action="store_const", dest="action", const="latex",
         help="Write LaTeX output.")
-    action_group.add_option(                               # --dvi
-        "--dvi", action="store_const", dest="action", const="dvi",
+
+    action_group.add_option("--dvi",
+        action="store_const", dest="action", const="dvi",
         help="Write DVI output.")
-    action_group.add_option(                               # --ps
-        "--ps", action="store_const", dest="action", const="ps",
+
+    action_group.add_option("--ps",
+        action="store_const", dest="action", const="ps",
         help="Write Postscript output.")
-    action_group.add_option(                               # --pdf
-        "--pdf", action="store_const", dest="action", const="pdf",
+
+    action_group.add_option("--pdf",
+        action="store_const", dest="action", const="pdf",
         help="Write PDF output.")
-    action_group.add_option(                               # --check
-        "--check", action="store_const", dest="action", const="check",
+
+    action_group.add_option("--check",
+        action="store_const", dest="action", const="check",
         help="Check completeness of docs.")
-    action_group.add_option(
-        "--pickle", action="store_const", dest="action", const="pickle",
+
+    action_group.add_option("--pickle",
+        action="store_const", dest="action", const="pickle",
         help="Write the documentation to a pickle file.")
+
     # Provide our own --help and --version options.
-    action_group.add_option(
-        "--version", action="store_const", dest="action", const="version",
+    action_group.add_option("--version",
+        action="store_const", dest="action", const="version",
         help="Show epydoc's version number and exit.")
-    action_group.add_option(
-        "-h", "--help", action="store_const", dest="action", const="help",
+
+    action_group.add_option("-h", "--help",
+        action="store_const", dest="action", const="help",
         help="Show this message and exit.  For help on specific "
         "topics, use \"--help TOPIC\".  Use \"--help topics\" for a "
         "list of available help topics")
 
-    # Add options -- Generation
-    generation_group.add_option(                            # --docformat
-        "--docformat", dest="docformat", metavar="NAME",
+
+    generation_group = OptionGroup(optparser, 'Generation options')
+    optparser.add_option_group(generation_group)
+
+    generation_group.add_option("--docformat",
+        dest="docformat", metavar="NAME",
         help="The default markup language for docstrings.  Defaults "
         "to \"%s\"." % DEFAULT_DOCFORMAT)
-    generation_group.add_option(                            # --parse-only
-        "--parse-only", action="store_false", dest="introspect",
+
+    generation_group.add_option("--parse-only",
+        action="store_false", dest="introspect",
         help="Get all information from parsing (don't introspect)")
-    generation_group.add_option(                            # --introspect-only
-        "--introspect-only", action="store_false", dest="parse",
+
+    generation_group.add_option("--introspect-only",
+        action="store_false", dest="parse",
         help="Get all information from introspecting (don't parse)")
-    generation_group.add_option(                        # --exclude-introspect
-        "--exclude", dest="exclude", metavar="PATTERN",
-        action="append",
+
+    generation_group.add_option("--exclude",
+        dest="exclude", metavar="PATTERN", action="append",
         help="Exclude modules whose dotted name matches "
              "the regular expression PATTERN")
-    generation_group.add_option(                        # --exclude-introspect
-        "--exclude-introspect", dest="exclude_introspect", metavar="PATTERN",
-        action="append",
+
+    generation_group.add_option("--exclude-introspect",
+        dest="exclude_introspect", metavar="PATTERN", action="append",
         help="Exclude introspection of modules whose dotted name matches "
              "the regular expression PATTERN")
-    generation_group.add_option(                        # --exclude-parse
-        "--exclude-parse", dest="exclude_parse", metavar="PATTERN",
-        action="append",
+
+    generation_group.add_option("--exclude-parse",
+        dest="exclude_parse", metavar="PATTERN", action="append",
         help="Exclude parsing of modules whose dotted name matches "
              "the regular expression PATTERN")
-    generation_group.add_option(                            # --inheritance
-        "--inheritance", dest="inheritance", metavar="STYLE",
+
+    generation_group.add_option("--inheritance",
+        dest="inheritance", metavar="STYLE",
         help="The format for showing inheritance objects.  STYLE "
         "should be one of: %s." % ', '.join(INHERITANCE_STYLES))
-    generation_group.add_option(                            # --show-private
-        "--show-private", action="store_true", dest="show_private",
+
+    generation_group.add_option("--show-private",
+        action="store_true", dest="show_private",
         help="Include private variables in the output. (default)")
-    generation_group.add_option(                            # --no-private
-        "--no-private", action="store_false", dest="show_private",
+
+    generation_group.add_option("--no-private",
+        action="store_false", dest="show_private",
         help="Do not include private variables in the output.")
-    generation_group.add_option(                            # --show-imports
-        "--show-imports", action="store_true", dest="show_imports",
+
+    generation_group.add_option("--show-imports",
+        action="store_true", dest="show_imports",
         help="List each module's imports.")
-    generation_group.add_option(                            # --no-imports
-        "--no-imports", action="store_false", dest="show_imports",
+
+    generation_group.add_option("--no-imports",
+        action="store_false", dest="show_imports",
         help="Do not list each module's imports. (default)")
-    generation_group.add_option(                            # --show-sourcecode
-        '--show-sourcecode', action='store_true', dest='include_source_code',
+
+    generation_group.add_option('--show-sourcecode',
+        action='store_true', dest='include_source_code',
         help=("Include source code with syntax highlighting in the "
               "HTML output. (default)"))
-    generation_group.add_option(                            # --no-sourcecode
-        '--no-sourcecode', action='store_false', dest='include_source_code',
+
+    generation_group.add_option('--no-sourcecode',
+        action='store_false', dest='include_source_code',
         help=("Do not include source code with syntax highlighting in the "
               "HTML output."))
-    generation_group.add_option(                            # --include-log
-        '--include-log', action='store_true', dest='include_log',
+
+    generation_group.add_option('--include-log',
+        action='store_true', dest='include_log',
         help=("Include a page with the process log (epydoc-log.html)"))
 
-    # Add options -- Output
-    output_group.add_option(                                # --output
-        "--output", "-o", dest="target", metavar="PATH",
-        help="The output directory.  If PATH does not exist, then "
-        "it will be created.")
-    output_group.add_option(                                # --css
-        "--css", dest="css", metavar="STYLESHEET",
+
+    output_group = OptionGroup(optparser, 'Output options')
+    optparser.add_option_group(output_group)
+
+    output_group.add_option("--name",
+        dest="prj_name", metavar="NAME",
+        help="The documented project's name (for the navigation bar).")
+
+    output_group.add_option("--css",
+        dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
-    output_group.add_option(                                # --name
-        "--name", dest="prj_name", metavar="NAME",
-        help="The documented project's name (for the navigation bar).")
-    output_group.add_option(                                # --url
-        "--url", dest="prj_url", metavar="URL",
+
+    output_group.add_option("--url",
+        dest="prj_url", metavar="URL",
         help="The documented project's URL (for the navigation bar).")
-    output_group.add_option(                                # --navlink
-        "--navlink", dest="prj_link", metavar="HTML",
+
+    output_group.add_option("--navlink",
+        dest="prj_link", metavar="HTML",
         help="HTML code for a navigation link to place in the "
         "navigation bar.")
-    output_group.add_option(                                # --top
-        "--top", dest="top_page", metavar="PAGE",
+
+    output_group.add_option("--top",
+        dest="top_page", metavar="PAGE",
         help="The \"top\" page for the HTML documentation.  PAGE can "
         "be a URL, the name of a module or class, or one of the "
         "special names \"trees.html\", \"indices.html\", or \"help.html\"")
-    output_group.add_option(                                # --help-file
-        "--help-file", dest="help_file", metavar="FILE",
+
+    output_group.add_option("--help-file",
+        dest="help_file", metavar="FILE",
         help="An alternate help file.  FILE should contain the body "
         "of an HTML file -- navigation bars will be added to it.")
-    output_group.add_option(                                # --frames
-        "--show-frames", action="store_true", dest="show_frames",
+
+    output_group.add_option("--show-frames",
+        action="store_true", dest="show_frames",
         help="Include frames in the HTML output. (default)")
-    output_group.add_option(                                # --no-frames
-        "--no-frames", action="store_false", dest="show_frames",
+
+    output_group.add_option("--no-frames",
+        action="store_false", dest="show_frames",
         help="Do not include frames in the HTML output.")
-    output_group.add_option(                                # --separate-classes
-        '--separate-classes', action='store_true',
-        dest='list_classes_separately',
+
+    output_group.add_option('--separate-classes',
+        action='store_true', dest='list_classes_separately',
         help=("When generating LaTeX or PDF output, list each class in "
               "its own section, instead of listing them under their "
               "containing module."))
 
-    # Add options -- Graph options
-    graph_group.add_option(
-        '--graph', action='append', dest='graphs', metavar='GRAPHTYPE',
+    graph_group = OptionGroup(optparser, 'Graph options')
+    optparser.add_option_group(graph_group)
+
+    graph_group.add_option('--graph',
+        action='append', dest='graphs', metavar='GRAPHTYPE',
         help=("Include graphs of type GRAPHTYPE in the generated output.  "
               "Graphs are generated using the Graphviz dot executable.  "
               "If this executable is not on the path, then use --dotpath "
               "to specify its location.  This option may be repeated to "
               "include multiple graph types in the output.  GRAPHTYPE "
               "should be one of: all, %s." % ', '.join(GRAPH_TYPES)))
-    graph_group.add_option(
-        "--dotpath", dest="dotpath", metavar='PATH',
+
+    graph_group.add_option("--dotpath",
+        dest="dotpath", metavar='PATH',
         help="The path to the Graphviz 'dot' executable.")
-    graph_group.add_option(
-        '--graph-font', dest='graph_font', metavar='FONT',
+
+    graph_group.add_option('--graph-font',
+        dest='graph_font', metavar='FONT',
         help=("Specify the font used to generate Graphviz graphs.  (e.g., "
               "helvetica or times)."))
-    graph_group.add_option(
-        '--graph-font-size', dest='graph_font_size', metavar='SIZE',
+
+    graph_group.add_option('--graph-font-size',
+        dest='graph_font_size', metavar='SIZE',
         help=("Specify the font size used to generate Graphviz graphs, "
               "in points."))
-    graph_group.add_option(
-        '--pstat', action='append', dest='pstat_files', metavar='FILE',
+
+    graph_group.add_option('--pstat',
+        action='append', dest='pstat_files', metavar='FILE',
         help="A pstat output file, to be used in generating call graphs.")
+
     # this option is for developers, not users.
-    graph_group.add_option(
-        "--profile-epydoc", action="store_true", dest="profile",
+    graph_group.add_option("--profile-epydoc",
+        action="store_true", dest="profile",
         help=SUPPRESS_HELP or
              ("Run the hotshot profiler on epydoc itself.  Output "
               "will be written to profile.out."))
 
-    return_group.add_option(
-        "--fail-on-error", action="store_const", dest="fail_on",
-        const=log.ERROR,
+
+    return_group = OptionGroup(optparser, 'Return value options')
+    optparser.add_option_group(return_group)
+
+    return_group.add_option("--fail-on-error",
+        action="store_const", dest="fail_on", const=log.ERROR,
         help="Return a non-zero exit status, indicating failure, if any "
         "errors are encountered.")
-    return_group.add_option(
-        "--fail-on-warning", action="store_const", dest="fail_on",
-        const=log.WARNING,
+
+    return_group.add_option("--fail-on-warning",
+        action="store_const", dest="fail_on", const=log.WARNING,
         help="Return a non-zero exit status, indicating failure, if any "
         "errors or warnings are encountered (not including docstring "
         "warnings).")
-    return_group.add_option(
-        "--fail-on-docstring-warning", action="store_const", dest="fail_on",
-        const=log.DOCSTRING_WARNING,
+
+    return_group.add_option("--fail-on-docstring-warning",
+        action="store_const", dest="fail_on", const=log.DOCSTRING_WARNING,
         help="Return a non-zero exit status, indicating failure, if any "
         "errors or warnings are encountered (including docstring "
         "warnings).")
-    # Add the option groups.
-    optparser.add_option_group(action_group)
-    optparser.add_option_group(generation_group)
-    optparser.add_option_group(output_group)
-    optparser.add_option_group(graph_group)
-    optparser.add_option_group(return_group)
 
     # Set the option parser's defaults.
     optparser.set_defaults(**OPTION_DEFAULTS)
@@ -445,27 +484,56 @@ def parse_configfiles(configfiles, options, names):
     for optname in configparser.options('epydoc'):
         val = configparser.get('epydoc', optname, vars=os.environ).strip()
         optname = optname.lower().strip()
+
         if optname in ('modules', 'objects', 'values',
                        'module', 'object', 'value'):
             names.extend(val.replace(',', ' ').split())
+        elif optname == 'target':
+            options.target = val
         elif optname == 'output':
             if val.lower() not in ACTIONS:
                 raise ValueError('"%s" expected one of: %s' %
                                  (optname, ', '.join(ACTIONS)))
             options.action = val.lower()
-        elif optname == 'target':
-            options.target = val
+        elif optname == 'verbosity':
+            options.verbosity = _str_to_int(val, optname)
+        elif optname == 'debug':
+            options.debug = _str_to_bool(val, optname)
+        elif optname in ('simple-term', 'simple_term'):
+            options.simple_term = _str_to_bool(val, optname)
+
+        # Generation options
+        elif optname == 'docformat':
+            options.docformat = val
+        elif optname == 'parse':
+            options.parse = _str_to_bool(val, optname)
+        elif optname == 'introspect':
+            options.introspect = _str_to_bool(val, optname)
+        elif optname == 'exclude':
+            options.exclude.append(val)
+        elif optname in ('exclude-parse', 'exclude_parse'):
+            options.exclude_parse.append(val)
+        elif optname in ('exclude-introspect', 'exclude_introspect'):
+            options.exclude_introspect.append(val)
         elif optname == 'inheritance':
             if val.lower() not in INHERITANCE_STYLES:
                 raise ValueError('"%s" expected one of: %s.' %
                                  (optname, ', '.join(INHERITANCE_STYLES)))
             options.inerhitance = val.lower()
-        elif optname == 'docformat':
-            options.docformat = val
-        elif optname == 'css':
-            options.css = val
+        elif optname =='private':
+            options.private = _str_to_bool(val, optname)
+        elif optname =='imports':
+            options.imports = _str_to_bool(val, optname)
+        elif optname == 'sourcecode':
+            options.include_source_code = _str_to_bool(val, optname)
+        elif optname in ('include-log', 'include_log'):
+            options.include_log = _str_to_bool(val, optname)
+
+        # Output options
         elif optname == 'name':
             options.prj_name = val
+        elif optname == 'css':
+            options.css = val
         elif optname == 'url':
             options.prj_url = val
         elif optname == 'link':
@@ -476,21 +544,10 @@ def parse_configfiles(configfiles, options, names):
             options.help_file = val
         elif optname =='frames':
             options.show_frames = _str_to_bool(val, optname)
-        elif optname =='private':
-            options.private = _str_to_bool(val, optname)
-        elif optname =='imports':
-            options.imports = _str_to_bool(val, optname)
-        elif optname == 'verbosity':
-            try:
-                options.verbosity = int(val)
-            except ValueError:
-                raise ValueError('"%s" expected an int' % optname)
-        elif optname == 'parse':
-            options.parse = _str_to_bool(val, optname)
-        elif optname == 'introspect':
-            options.introspect = _str_to_bool(val, optname)
-        elif optname == 'dotpath':
-            options.dotpath = val
+        elif optname in ('separate-classes', 'separate_classes'):
+            options.list_classes_separately = _str_to_bool(val, optname)
+
+        # Graph options
         elif optname == 'graph':
             graphtypes = val.replace(',', '').split()
             for graphtype in graphtypes:
@@ -498,18 +555,16 @@ def parse_configfiles(configfiles, options, names):
                     raise ValueError('"%s" expected one of: all, %s.' %
                                      (optname, ', '.join(GRAPH_TYPES)))
             options.graphs.extend(graphtypes)
+        elif optname == 'dotpath':
+            options.dotpath = val
         elif optname in ('graph-font', 'graph_font'):
             options.graph_font = val
         elif optname in ('graph-font-size', 'graph_font_size'):
-            options.graph_font_size = int(val)
-        elif optname in ('separate-classes', 'separate_classes'):
-            options.list_classes_separately = _str_to_bool(val, optname)
-        elif optname == 'sourcecode':
-            options.include_source_code = _str_to_bool(val, optname)
+            options.graph_font_size = _str_to_int(val)
         elif optname == 'pstat':
             options.pstat_files.extend(val.replace(',', ' ').split())
-        elif optname in ('simple-term', 'simple_term'):
-            options.simple_term = _str_to_bool(val, optname)
+
+        # Return value options
         elif optname in ('failon', 'fail-on', 'fail_on'):
             if val.lower.strip() in ('error', 'errors'):
                 options.fail_on = log.ERROR
@@ -532,6 +587,12 @@ def _str_to_bool(val, optname):
     else:
         raise ValueError('"%s" option expected a boolean' % optname)
         
+def _str_to_int(val, optname):
+    try:
+        return int(val)
+    except ValueError:
+        raise ValueError('"%s" option expected an int' % optname)
+
 ######################################################################
 #{ Interface
 ######################################################################
