@@ -2,16 +2,16 @@ Regression Testing for epydoc.docintrospecter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `epydoc.docintrospecter` module is used to extract API documentation
 by introspecting Python objects directy.  Its primary interface is
-`introspect_docs()`, which takes a Python object, and returns a
+`docintrospecter.introspect_docs()`, which takes a Python object, and returns a
 `ValueDoc` describing that value.
 
 Test Function
 =============
 This test function takes a string containing the contents of a module.
 It writes the string contents to a file, imports the file as a module,
-and uses `introspect_docs` to introspect it, and pretty prints the resulting
-ModuleDoc object.  The `attribs` argument specifies which attributes
-of the `APIDoc`s should be displayed.  The `introspect` argument gives the
+and uses `docintrospecter.introspect_docs` to introspect it, and pretty prints the resulting
+`ModuleDoc` object.  The ``attribs`` argument specifies which attributes
+of the `APIDoc`s should be displayed.  The ``introspect`` argument gives the
 name of a variable in the module whose value should be introspected,
 instead of introspecting the whole module.
 
@@ -43,7 +43,7 @@ an entry in a module's dictionary.
         +- x => VariableDoc for epydoc_test.x [5]
         +- y => VariableDoc for epydoc_test.y [6]
 
-If two variables share the same value, then their `VariableDoc`s will
+If two variables share the same value, then their `VariableDoc`\ s will
 share a `ValueDoc`:
 
     >>> runintrospecter(s="""
@@ -143,8 +143,8 @@ or not, so it sets `is_imported` to `UNKNOWN` when it can't decide:
 
 Variable Docstrings
 ===================
-The DocIntrospecter is unable extract docstrings for variables.  These
-docstrings can only be detected if the DocParser is used.
+The `docintrospecter` is unable extract docstrings for variables.  These
+docstrings can only be detected if the `docparser` is used.
 
     >>> runintrospecter(s="""
     ...     x = 12
@@ -188,12 +188,12 @@ Introspected functions are represented by `RoutineDoc` objects:
      +- pyval = <function f at ...>
      +- vararg = None
 
-The function's arguments are described by the properties `posargs`,
-`posarg_defaults`, `kwarg`, and `vararg`.  `posargs` is a list of
+The function's arguments are described by the properties ``posargs``,
+``posarg_defaults``, ``kwarg``, and ``vararg``.  ``posargs`` is a list of
 argument names (or nested tuples of names, for tuple-unpacking args).
-`posarg_defaults` is a list of `ValueDoc`s for default values,
-corresponding 1:1 with `posargs`.  `posarg_defaults` is None for
-arguments with no default value.  `vararg` and `kwarg` are the names
+``posarg_defaults`` is a list of `ValueDoc`\ s for default values,
+corresponding 1:1 with ``posargs``.  ``posarg_defaults`` is None for
+arguments with no default value.  ``vararg`` and ``kwarg`` are the names
 of the variable argument and keyword argument, respectively:
 
     >>> runintrospecter(s="""
@@ -388,7 +388,7 @@ Deleting variables:
            +- value
               +- GenericValueDoc [2]
 
-The right-hand side of a `del` statement may contain a nested
+The right-hand side of a ``del`` statement may contain a nested
 combination of lists, tuples, and parenthases.  All variables found
 anywhere in this nested structure should be deleted:
     
@@ -424,7 +424,7 @@ anywhere in this nested structure should be deleted:
      +- variables
         +- g => VariableDoc for epydoc_test.g [1]
 
-The right-hand side of a `del` statement may contain a dotted name, in
+The right-hand side of a ``del`` statement may contain a dotted name, in
 which case the named variable should be deleted from its containing
 namespace.
 
@@ -595,10 +595,10 @@ Closed Bugs
 
 SF Bug [ 1657050 ] Builtins not resolved in "os"
 ------------------------------------------------
-If a variable is listed in __all__, then we need to introspect it,
+If a variable is listed in ``__all__``, then we need to introspect it,
 even if we know for certain that it's imported.  Before this bug
-was fixed, the following test generated a generic 'ValueDoc' value
-instead of a 'RoutineDoc' value, because it didn't introspect the
+was fixed, the following test generated a generic `ValueDoc` value
+instead of a `RoutineDoc` value, because it didn't introspect the
 value of getcwd.
 
     >>> x = runintrospecter(s="""

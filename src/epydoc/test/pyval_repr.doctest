@@ -206,7 +206,7 @@ Regular Expressions
 Line Wrapping
 =============
 If a line goes beyond linelen, it is wrapped using ``&crarr;`` (which
-gets translated to ``\\`` by `to_plaintext()`).
+gets translated to ``\\`` by `ParsedEpytextDocstring.to_plaintext()`).
 
     >>> colorizer = PyvalColorizer(linelen=40)
     >>> print colorizer.colorize('x'*100).to_plaintext(None)
@@ -233,8 +233,8 @@ If linebreakok is False, then line wrapping gives an ellipsis instead:
 Representation Scores
 =====================
 When colorized representations are built, a score is computed
-evaluating how helpful the repr is.  E.g., unhelpful values like `<Foo
-instance at 0x12345>` get low scores.  Currently, the scoring
+evaluating how helpful the repr is.  E.g., unhelpful values like ``<Foo
+instance at 0x12345>`` get low scores.  Currently, the scoring
 algorithm is:
 
 - [+1] for each object colorized.  When the colorizer recurses into
@@ -244,8 +244,8 @@ algorithm is:
 - [-100] if repr(obj) raises an exception, for any colorized object
   (including objects in structures).
 
-The `min_score` arg to colorize can be used to set a cutoff-point for
-scores; if the score is too low, then `colorize` will return `None`.
+The ``min_score`` arg to colorize can be used to set a cutoff-point for
+scores; if the score is too low, then `PyvalColorizer.colorize` will return ``None``.
 
     >>> def color2(v):
     ...     colorizer = PyvalColorizer(linelen=40)

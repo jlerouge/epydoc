@@ -338,9 +338,9 @@ Merging is_imported
 ===================
 When we do both parsing & introspection, and merge the result, we
 should trust the introspected APIDoc's is_imported value more than the
-parsed APIDoc.  In particular, in the following example, `x` should
+parsed APIDoc.  In particular, in the following example, ``x`` should
 have `is_imported=True`.  But if we can't tell from introspection,
-then use parse info -- so `y` should be imported, but `z` should not.
+then use parse info -- so ``y`` should be imported, but ``z`` should not.
 
     >>> import epydoc.docintrospecter
     >>> epydoc.docintrospecter.clear_cache()

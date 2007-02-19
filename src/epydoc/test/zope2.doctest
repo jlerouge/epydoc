@@ -52,6 +52,6 @@ We treat extension classes as if they were classes:
               +- RoutineDoc [18]
                  +- pyval = <CMethod object at ...>
 
-(If we didn't add special support, `ExtensionClass` would be a
+(If we didn't add special support, ``ExtensionClass`` would be a
 `GenericValueDoc`.)
 

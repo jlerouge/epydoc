@@ -23,5 +23,5 @@ We treat zope interface objects as if they were classes:
      +- canonical_name = DottedName('epydoc_test', 'IExample')
      +- pyval = <InterfaceClass epydoc_test.IExample>
 
-(If we didn't add special support, `IExample` would be a
+(If we didn't add special support, ``IExample`` would be a
 `GenericValueDoc`.)

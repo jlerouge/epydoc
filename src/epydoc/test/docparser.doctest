@@ -2,16 +2,16 @@ Regression Testing for epydoc.docparser
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The `epydoc.docparser` module is used to extract API documentation by
 parsing the source code of Python files.  Its primary interface is
-`parse_docs()`, which takes a module's filename, and returns a
+`docparser.parse_docs()`, which takes a module's filename, and returns a
 ModuleDoc describing that module and its contents.
 
 Test Function
 =============
 This test function takes a string containing the contents of a module,
-and writes it to a file, uses `parse_docs` to parse it, and pretty
-prints the resulting ModuleDoc object.  The `attribs` argument
+and writes it to a file, uses `docparser.parse_docs()` to parse it, and pretty
+prints the resulting ModuleDoc object.  The ``attribs`` argument
 specifies which attributes of the `APIDoc`s should be displayed.  The
-`show` argument, if specifies, gives the name of the object in the
+``show`` argument, if specifies, gives the name of the object in the
 module that should be displayed (but the whole module will always be
 inspected; this just selects what to display).
 
@@ -27,7 +27,7 @@ including statements contained inside of top-level if statements, for
 loops, while loops, and try/except/finally blocks.  Tuple assignments
 are unpacked, when possible.
 
-For simple variable assignments, DocParser creates VariableDoc objects
+For simple variable assignments, DocParser creates `VariableDoc` objects
 containing the name; a valuedoc with the value (as both an abstract
 syntax tree and a string representation); and information about
 whether we think the value was imported; is an alias; and is an
@@ -424,12 +424,12 @@ VariableDoc object in the module's children list).
      +- posargs = [u'x']
      +- vararg = None
 
-The function's arguments are described by the properties `posargs`,
-`posarg_defaults`, `kwarg`, and `vararg`.  `posargs` is a list of
+The function's arguments are described by the properties ``posargs``,
+``posarg_defaults``, ``kwarg``, and ``vararg``.  ``posargs`` is a list of
 argument names (or nested tuples of names, for tuple-unpacking args).
-`posarg_defaults` is a list of `ValueDoc`s for default values,
-corresponding 1:1 with `posargs`.  `posarg_defaults` is None for
-arguments with no default value.  `vararg` and `kwarg` are the names
+``posarg_defaults`` is a list of `ValueDoc`\ s for default values,
+corresponding 1:1 with ``posargs``.  ``posarg_defaults`` is None for
+arguments with no default value.  ``vararg`` and ``kwarg`` are the names
 of the variable argument and keyword argument, respectively:
 
     >>> runparser(s="""
@@ -587,7 +587,7 @@ Deleting variables:
               +- GenericValueDoc [2]
                  +- parse_repr = u'12'
 
-The right-hand side of a `del` statement may contain a nested
+The right-hand side of a ``del`` statement may contain a nested
 combination of lists, tuples, and parenthases.  All variables found
 anywhere in this nested structure should be deleted:
     
@@ -623,7 +623,7 @@ anywhere in this nested structure should be deleted:
      +- variables
         +- g => VariableDoc for epydoc_test.g [1]
 
-The right-hand side of a `del` statement may contain a dotted name, in
+The right-hand side of a ``del`` statement may contain a dotted name, in
 which case the named variable should be deleted from its containing
 namespace.
 
