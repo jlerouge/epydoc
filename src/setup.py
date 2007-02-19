@@ -19,6 +19,8 @@ if '--format=wininst' in sys.argv:
 else:
     SCRIPTS = ['scripts/epydoc', 'scripts/epydocgui']
 
+SCRIPTS.append('scripts/apirst2html.py')
+
 setup(name="epydoc",
       description="Edward Loper's API Documentation Generation Tool",
       version=VERSION,
