@@ -283,6 +283,10 @@ class DocUrlGenerator(UrlGenerator):
                     % (self._filename, name))
                 continue
 
+            # discard duplicates
+            if name in self._exact_matches:
+                continue
+
             self._exact_matches[name] = url
             self._exact_matches[cname] = url
 
