@@ -365,7 +365,7 @@ def create_api_role(name, problematic):
 
         # Get the resolver from the register and create an url from it.
         try:
-            url = api_register[n].get_url(text)
+            url = api_register[name].get_url(text)
         except IndexError, exc:
             msg = inliner.reporter.warning(str(exc), line=lineno)
             if problematic:
