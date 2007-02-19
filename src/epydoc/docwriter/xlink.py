@@ -79,6 +79,8 @@ import sys
 from docutils.parsers.rst import roles
 from docutils import nodes, utils
 
+from epydoc import log
+
 class UrlGenerator:
     """
     Generate URL from an object name.
@@ -199,6 +201,11 @@ class DocUrlGenerator(UrlGenerator):
         Prefix portion for the URL's returned by `get_url()`.
         """
 
+        self._filename = None
+        """
+        Not very important: only for logging.
+        """
+
     def get_url(self, name):
         cname = self.get_canonical_name(name)
         url = self._exact_matches.get(cname, None)
@@ -206,12 +213,12 @@ class DocUrlGenerator(UrlGenerator):
 
             # go for a partial match
             vals = self._partial_names.get(cname)
-            if len(vals) == 1:
-                url = self._exact_matches[vals[0]]
-
-            elif not vals:
+            if vals is None:
                 raise IndexError(
                     "no object named '%s' found" % (name))
+
+            elif len(vals) == 1:
+                url = self._exact_matches[vals[0]]
 
             else:
                 raise self.IndexAmbiguous(
@@ -240,15 +247,26 @@ class DocUrlGenerator(UrlGenerator):
           f : `str` or file
             a file name or file-like object fron which read the index.
         """
+        self._filename = str(f)
+
         if isinstance(f, basestring):
-            f = file(f)
+            f = open(f)
 
         self.load_records(self._iter_tuples(f))
 
     def _iter_tuples(self, f):
         """Iterate on a file returning 2-tuples."""
-        for row in f:
-            yield row.rstrip().split('\t', 1)
+        for nrow, row in enumerate(f):
+            # skip blank lines
+            row = row.rstrip()
+            if not row: continue
+
+            rec = row.split('\t', 2)
+            if len(rec) == 2:
+                yield rec
+            else:
+                log.warning("invalid row in '%s' row %d: '%s'"
+                            % (self._filename, nrow+1, row))
 
     def load_records(self, records):
         """
@@ -261,8 +279,9 @@ class DocUrlGenerator(UrlGenerator):
         for name, url in records:
             cname = self.get_canonical_name(name)
             if not cname:
-                # Have to decide how to warn.
-                raise NotImplementedError("WARNING NAME NOT VALID")
+                log.warning("invalid object name in '%s': '%s'"
+                    % (self._filename, name))
+                continue
 
             self._exact_matches[name] = url
             self._exact_matches[cname] = url
