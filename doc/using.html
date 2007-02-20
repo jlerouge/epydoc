@@ -388,18 +388,18 @@ class directly. </p>
   options enabled when the documentation was created. </li>
 
   <li><b><code>api-objects.txt</code></b>
-  A text file containing each available item and the url where it is
-  documented. Each item takes a file line and it is separated by the URL
-  by a <code>tab</code> charecter. Such file can be used to create documents
-  linkig to the API: see the <code>--external-api</code> documentation for
-  details.</li>
+  A text file containing each available item and the URL where it is
+  documented. Each item dotted name takes a file line and it is separated by
+  the URL by a <code>tab</code> charecter. Such file can be used to create
+  documents linkig to the API: see the <code>--external-api</code>
+  documentation for details.</li>
 
   <li><b><code>redirect.html</code></b>
   A page containing Javascript code that redirect the browser to the
-  documetation page indicated by the accessed fragment. For example opening
+  documentation page indicated by the accessed fragment. For example opening
   the page <code>redirect.html#epydoc.apidoc.DottedName</code> the browser
   will be redirected to the page
-  <code>/epydoc.apidoc.DottedName-class.html</code>.</li>
+  <code>epydoc.apidoc.DottedName-class.html</code>.</li>
 
   <li><b><code>frames.html</code></b>
   The main frames file.  Two frames on the left side of the window
@@ -433,7 +433,7 @@ class directly. </p>
 
 <p> Epydoc creates a CSS stylesheet (<code>epydoc.css</code>) when it
 builds the API documentation for a project.  You can specify which
-stylesheet should be used using the <code>-c</code> command-line
+stylesheet should be used using the <code>--css</code> command-line
 option.  If you do not specify a stylesheet, and one is already
 present, epydoc will use that stylesheet; otherwise, it will use the
 default stylesheet.  For a list of the CSS classes used by epydoc, see
