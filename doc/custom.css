@@ -1,0 +1,56 @@
+/*
+:Author: Edward Loper
+:Copyright: This stylesheet has been placed in the public domain.
+
+Stylesheet for use with Docutils.
+*/
+
+@import url("docutils.css");
+
+/*======================================================================*/
+/* Source code colorization */
+pre.py-doctest              { padding: .5em; margin: 1em;
+                              background: #e8f0f8; color: #000000;
+                              border: 1px solid #708890; }
+table pre.py-doctest        { background: #dce4ec;
+                              color: #000000; }
+.py-prompt                  { color: #005050; font-weight: bold;}
+.py-string                  { color: #006030; }
+.py-comment                 { color: #003060; }
+.py-keyword                 { color: #600000; }
+.py-output                  { color: #404040; }
+.py-name                    { color: #000050; }
+.py-name:link               { color: #000050; }
+.py-name:visited            { color: #000050; }
+.py-number                  { color: #005000; }
+.py-def-name                { color: #000060; font-weight: bold; }
+.py-base-class              { color: #000060; }
+.py-param                   { color: #000060; }
+.py-docstring               { color: #006030; }
+.py-decorator               { color: #804020; }
+
+/*======================================================================*/
+/* Document formatting */
+
+@media screen {
+  body    { background: #204060; color: #000000; }
+  div.document { 
+    background: white; color: black;
+    padding: 0 1em 0 1em;
+    border: 2px solid black;
+  }
+}
+
+h1.title { font-size: 180%; font-weight: bold; text-align: center;
+           padding: .1em; margin: 0; border-bottom: 2px solid black;}
+
+pre.literal-block           { padding: .5em; margin: 1em;
+                              background: #e8f0f8; color: #000000;
+                              border: 1px solid #708890; }
+
+table.docutils          { background: #e8f0f8; border: 1px solid black; }
+table.docutils th       { background: #70b0ff; }
+
+/* For the "Sections" example in the manual */
+p.h1                    { font-size: 150%; font-weight: bold;  }
+p.h2                    { font-size: 125%; font-weight: bold;  }
