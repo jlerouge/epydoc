@@ -311,6 +311,20 @@ def _get_docs_from_items(items, options):
     log.start_progress('Building documentation')
     progress_estimator = _ProgressEstimator(items)
 
+    # Check for duplicate item names.
+    item_set = set()
+    for item in items[:]:
+        if item in item_set:
+            log.warning("Name %r given multiple times" % item)
+            items.remove(item)
+        item_set.add(item)
+
+    # Keep track of what top-level canonical names we've assigned, to
+    # make sure there are no naming conflicts.  This dict maps
+    # canonical names to the item names they came from (so we can print
+    # useful error messages).
+    canonical_names = {}
+
     # Collect (introspectdoc, parsedoc) pairs for each item.
     doc_pairs = []
     for item in items:
@@ -345,6 +359,20 @@ def _get_docs_from_items(items, options):
         else:
             doc_pairs.append(_get_docs_from_pyobject(
                 item, options, progress_estimator))
+
+        # Make sure there are no naming conflicts.
+        name = (getattr(doc_pairs[-1][0], 'canonical_name', None) or
+                getattr(doc_pairs[-1][1], 'canonical_name', None))
+        if name in canonical_names:
+            log.error(
+                'Two of the specified items, %r and %r, have the same '
+                'canonical name ("%s").  This may mean that you specified '
+                'two different files that both use the same module name.  '
+                'Ignoring the second item (%r)' %
+                (canonical_names[name], item, name, canonical_names[name]))
+            doc_pairs.pop()
+        else:
+            canonical_names[name] = item                
 
         # This will only have an effect if doc_pairs[-1] contains a
         # package's docs.  The 'not is_module_file(item)' prevents
