@@ -14,6 +14,7 @@ PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*)
 DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
+MANUAL_SRC = $(wildcard doc/manual*.txt)
 
 # What version of python to use?
 PYTHON = python
@@ -46,6 +47,9 @@ RST2HTML = $(PYTHON) src/tools/rst2html.py
 
 DOCTEST_HTML_FILES := \
     $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
+
+manual-html: $(MANUAL_SRC)
+	$(RST2HTML) doc/manual.txt $(HTML)/epydoc.html
 
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
