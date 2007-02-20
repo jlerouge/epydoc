@@ -7,8 +7,8 @@ Test Function
 This test function takes a string containing the contents of a module.
 It writes the string contents to a file, imports the file as a module,
 and uses build_doc to build documentation, and pretty prints the resulting
-ModuleDoc object.  The `attribs` argument specifies which attributes
-of the `APIDoc`s should be displayed.  The `build` argument gives the
+ModuleDoc object.  The ``attribs`` argument specifies which attributes
+of the `APIDoc` s should be displayed.  The `build` argument gives the
 name of a variable in the module whose documentation should be built,
 instead of bilding docs for the whole module.
 
