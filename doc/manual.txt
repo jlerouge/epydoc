@@ -42,5 +42,6 @@ Automatic API Documentation Generation for Python
 .. include:: manual-usage.txt
 .. include:: manual-epytext.txt
 .. include:: manual-fields.txt
+.. include:: manual-othermarkup.txt
 .. include:: manual-docstring.txt
 .. include:: manual-reference.txt

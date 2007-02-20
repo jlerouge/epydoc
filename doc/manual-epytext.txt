@@ -51,10 +51,10 @@ used:
 .. list-table::
    :header-rows: 1
 
-   * - Docstring Input
-     - Rendered Output
+   *  - Docstring Input
+      - Rendered Output
 
-   * - .. python::
+   *  - .. python::
 
             def example():
                 """
@@ -67,11 +67,11 @@ used:
                 """
                 *[...]*
 
-     -  This is a paragraph. Paragraphs can span multiple lines,
+      - This is a paragraph. Paragraphs can span multiple lines,
         and contain *inline markup*.
 
         This is another paragraph. Paragraphs are separated from each
-        other by blank lines. 
+        other by blank lines.
 
 Lists
 '''''
