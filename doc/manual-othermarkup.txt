@@ -3,10 +3,12 @@ Alternate Markup Languages
 
 .. $Id$
 
-Epydoc's default markup language is epytext_, a lightweight markup language
+Epydoc's default markup language is epytext__, a lightweight markup language
 that's easy to write and to understand. But if epytext is not powerful enough
 for you, or doesn't suit your needs, epydoc also supports three alternate
 markup languages:
+
+.. __: `The Epytext Markup Language`_
 
 reStructuredText__
     is an "easy-to-read, what-you-see-is-what-you-get plaintext markup syntax".

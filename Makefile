@@ -14,7 +14,7 @@ PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
 DOCS = $(wildcard doc/*)
 DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
-MANUAL_SRC = $(wildcard doc/manual*.txt)
+MANUAL_SRC = $(wildcard doc/manual-*.txt)
 
 # What version of python to use?
 PYTHON = python
@@ -32,6 +32,7 @@ LATEX         = latex
 HTML          = html
 
 # Output subdirectories
+HTML_MANUAL   = $(HTML)
 HTML_API      = $(HTML)/api
 HTML_EXAMPLES = $(HTML)/examples
 HTML_STDLIB   = $(HTML)/stdlib
@@ -44,12 +45,13 @@ export PYTHONPATH=src/
 
 # Options for rst->html converter
 RST2HTML = $(PYTHON) src/tools/rst2html.py
+MKDISPATCH = $(PYTHON) src/tools/mkdispatch.py
 
 DOCTEST_HTML_FILES := \
     $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
 
-manual-html: $(MANUAL_SRC)
-	$(RST2HTML) doc/manual.txt $(HTML)/epydoc.html
+MANUAL_HTML_FILES := $(HTML_MANUAL)/epydoc.html \
+    $(MANUAL_SRC:doc/manual-%.txt=$(HTML_MANUAL)/manual-%.html)
 
 ##//////////////////////////////////////////////////////////////////////
 ## Usage
@@ -106,16 +108,29 @@ local: .webpage.up2date
 	rm -rf /var/www/epydoc/*
 	cp -r $(WEBDIR)/* /var/www/epydoc
 
+manual-html: $(MANUAL_HTML_FILES)
+
+$(HTML_MANUAL)/epydoc.html: doc/manual.txt $(MANUAL_SRC)
+	$(RST2HTML) doc/manual.txt $@
+
+$(HTML_MANUAL)/manual-%.html: doc/manual-%.txt
+	echo .. contents::               > doc/tmp.txt
+	echo .. include:: ../$<         >> doc/tmp.txt
+	$(MKDISPATCH) $(MANUAL_SRC)     >> doc/tmp.txt
+	$(RST2HTML) doc/tmp.txt $@
+	
 checkdoc: checkdocs
 checkdocs:
 	epydoc --check --tests=vars,types $(PY_SRC)
 
 .webpage.up2date: .api-html.up2date .examples.up2date .api-pdf.up2date \
 		$(DOCTEST_HTML_FILES) doc/epydoc-man.html \
-		doc/epydocgui-man.html $(DOCS)
+		doc/epydocgui-man.html $(DOCS) $(MANUAL_HTML_FILES)
 	rm -rf $(WEBDIR)
 	mkdir -p $(WEBDIR)
 	cp -r $(DOCS) $(WEBDIR)
+	cp -r $(HTML_MANUAL)/epydoc.html $(WEBDIR)
+	cp -r $(HTML_MANUAL)/manual*.html $(WEBDIR)
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
 	cp -r $(HTML_DOCTEST)/* $(WEBDIR)/doctest
@@ -151,7 +166,7 @@ doctest-html-mkdir:
 	mkdir -p $(HTML_DOCTEST)
 $(HTML_DOCTEST)/%.html: src/epydoc/test/%.doctest
 	mkdir -p $(HTML_DOCTEST)
-	$(RST2HTML) $< $@
+	$(RST2HTML) --stylesheet=../custom.css $< $@
 
 examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)

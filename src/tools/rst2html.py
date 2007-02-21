@@ -32,9 +32,9 @@ class CustomizedReader(ApiLinkReader):
 class CustomizedHTMLWriter(HTMLWriter):
     settings_defaults = (HTMLWriter.settings_defaults or {}).copy()
     settings_defaults.update({
-        'stylesheet_path': os.path.normpath(os.path.join(
-            os.path.split(__file__)[0], '../../doc/custom.css')),
-            'output_encoding': 'ascii',
+        'stylesheet': 'custom.css',
+        'stylesheet_path': None,
+        'output_encoding': 'ascii',
         'output_encoding_error_handler': 'xmlcharrefreplace',
         'embed_stylesheet': False,
         })

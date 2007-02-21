@@ -25,7 +25,7 @@ Automatic API Documentation Generation for Python
 
 .. _html:       http://epydoc.sourceforge.net/api/
 .. _pdf:        http://epydoc.sourceforge.net/epydoc.pdf
-.. _epytext:    http://epydoc.sourceforge.net/epytextintro.html
+.. _epytext:    `The Epytext Markup Language`_
 .. _reStructuredText:
                 http://docutils.sourceforge.net/rst.html
 .. _JavaDoc:    http://java.sun.com/j2se/javadoc/

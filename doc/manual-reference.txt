@@ -140,6 +140,8 @@ ConfigParser_ module. The following example configuration file demonstrates the
 various options that you can set. Lines beginning with ``#`` or ``;`` are
 treated as comments.
 
+.. _ConfigParser: http://docs.python.org/lib/module-ConfigParser.html
+
 .. parsed-literal::
 
     **[epydoc]** *# Epydoc section marker (required by ConfigParser)*
