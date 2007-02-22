@@ -1,4 +1,4 @@
-Epydoc fields
+Epydoc Fields
 =============
 
 .. $Id$
@@ -149,9 +149,24 @@ Variables parameters
 ``@type`` *v*: ...
     The type of the variable *v*.
 
-These tags are usually put in a module or class docstring. If fthe sources can
+These tags are usually put in a module or class docstring. If the sources can
 be parsed by Epydoc it is also possible to document the variable in their own
 docstrings: see `variable docstrings`_
+
+Epydoc considers class variables the ones defined directly defined in the
+class body. A common Python idiom is to create instance variables settings
+their default value in the class instead of the constructor (hopefully if the
+default is immutable...).
+
+If you want to force Epydoc to classify as instance variable one whose default
+value is set at class level, you can describe it using the tag ``@ivar`` in the
+context of a variable docstring:
+
+.. python::
+
+    class B:
+        y = 42
+        """@ivar: This is an instance variable."""
 
 
 Properties parameters

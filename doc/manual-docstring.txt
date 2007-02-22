@@ -1,66 +1,72 @@
-Docstrings and coding issues
-============================
+Python Docstrings
+=================
 
 .. $Id$
 
-..
-    This paragraph is introdictory: this chapter should explain advanced details.
+Python documentation strings (or *docstrings*) provide a convenient way of
+associating documentation with Python modules, functions, classes, and methods.
+An object's docsting is defined by including a string constant as the first
+statement in the object's definition. For example, the following function
+defines a docstring:
 
+.. python::
 
-    Python docstrings
-    -----------------
-
-    Docstrings are a standard method that can be used by Python developers to
-    attach documentation pieces to most Python objects.
-
-    Here is an example module showing different docstrings:
-
-    .. python::
-
-        #!/usr/bin/python
-        # -*- coding: latin-1 -*-
-        """A Sample Module.
-
-        The first string in the module, starting after the *hashbang* and the
-        encoding definition comment, is the module docstring.
+    def x_intercept(m, b):
         """
+        Return the x intercept of the line y=m*x+b.  The x intercept of a
+        line is the point at which it crosses the x axis (y=0).
+        """
+        return -b/m
 
-        class Foo:
-            """
-            This is a testing class.
+Docstrings can be accessed from the interpreter and from Python programs
+using the "``__doc__``" attribute:
 
-            It doesn't do much stuff, but it's pretty documented. This, for
-            example, is the class docstring.
-            """
+.. python::
 
-            def getMagic(self):
-                """
-                A function returning a magic number.
+    >>> print x_intercept.__doc__
+        Return the x intercept of the line y=m*x+b.  The x intercept of a
+        line is the point at which it crosses the x axis (y=0).
 
-                This is the function documentation.
-                """
-                return 42
+The pydoc_ module, which became part of `the standard library`__ in Python 2.1,
+can be used to display information about a Python object, including its
+docstring:
 
-            the_number = property(
-                fget=getMagic,
-                doc="""This is the property docstring.""")
+.. _pydoc: http://web.lfw.org/python/pydoc.html
+.. __: http://www.python.org/doc/current/lib/module-pydoc.html
 
-    Some guidelines for docstring standardization have been published, see for
-    example :PEP:`257` for some higl-level convention. No docstring structure
-    is enforced anyway by official documentation.
+.. python::
+
+    >>> from pydoc import help
+
+    >>> help(x_intercept)
+    Help on function x_intercept in module __main__:
+
+    x_intercept(m, b)
+        Return the x intercept of the line y=m*x+b.  The x intercept of a
+        line is the point at which it crosses the x axis (y=0).
+
+For more information about Python docstrings, see the `Python Tutorial`__ or
+the O'Reilly Network article `Python Documentation Tips and Tricks`__.
+
+.. __: http://www.python.org/doc/current/tut/node6.html#docstrings
+.. __: http://www.onlamp.com/lpt/a/python/2001/05/17/docstrings.html
 
 
 Variable docstrings
 -------------------
 
-Python variables don't support docstrings. The variable can be described in the
-module or class where it is defined using the tags ``@var``, ``@ivar``,
-``@cvar``; but this only allows for a textual description: no further metadata
-can be added to the variable (except for the type, using the ``@type`` tag).
+..
+    [xx] this should be somewhere else, i guess...
 
-Epydoc supports *variable docstrings*: if a variable assignment statement is
-immediately followed by a bare string literal, then that assignment is treated
-as a docstring for that variable. In classes, variable assignments at the class definition level are considered class variables; and assignments to instance
+Python don't support directly docstrings on variables: there is no attribute
+that can be attached to variables and retrieved interactively like the
+``__doc__`` attribute on modules, classes and functions.
+
+While the language doesn't directly provides for them, Epydoc supports
+*variable docstrings*: if a variable assignment statement is immediately
+followed by a bare string literal, then that assignment is treated as a
+docstring for that variable. In classes, variable assignments at the class
+definition level are considered class variables; and assignments to instance
 variables in the constructor (``__init__``) are considered instance variables:
 
 .. python::
@@ -84,21 +90,8 @@ then it is treated as a docstring for that variable:
     x = 22
     x = 22 #: docstring for x
 
-A common Python idiom is to create instance variables settings their default
-value in the class instead of the constructor (hopefully if the default is
-immutable...). To avoid Epydoc to interpret such variable as a class variable,
-you can describe it using the tag ``@ivar`` in the context of a variable
-docstring:
-
-.. python::
-
-    class B:
-        y = 42
-        """@ivar: This is an instance variable."""
-
 Notice that variable docstrings are only available for documentation when the
 source code is available for *parsing*: it is not possible to retrieve variable
-docstrings from introspection informations only.
 
 
 Items visibility

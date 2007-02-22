@@ -9,9 +9,7 @@ Automatic API Documentation Generation for Python
 
 :Author: `Edward Loper <edloper@gradient.cis.upenn.edu>`__
 
-:Data: $Date$
-:Versione: 3.0b1
-:Revisione: $Revision$
+:Version: 3.0b1
 
 :Abstract:
     Epydoc is a tool for generating API documentation for Python modules,
@@ -40,8 +38,8 @@ Automatic API Documentation Generation for Python
 
 .. include:: manual-install.txt
 .. include:: manual-usage.txt
+.. include:: manual-docstring.txt
 .. include:: manual-epytext.txt
 .. include:: manual-fields.txt
 .. include:: manual-othermarkup.txt
-.. include:: manual-docstring.txt
 .. include:: manual-reference.txt
