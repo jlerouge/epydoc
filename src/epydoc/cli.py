@@ -587,18 +587,18 @@ def parse_configfiles(configfiles, options, names):
         elif optname in ('graph-font', 'graph_font'):
             options.graph_font = val
         elif optname in ('graph-font-size', 'graph_font_size'):
-            options.graph_font_size = _str_to_int(val)
+            options.graph_font_size = _str_to_int(val, optname)
         elif optname == 'pstat':
             options.pstat_files.extend(val.replace(',', ' ').split())
 
         # Return value options
         elif optname in ('failon', 'fail-on', 'fail_on'):
-            if val.lower.strip() in ('error', 'errors'):
+            if val.lower().strip() in ('error', 'errors'):
                 options.fail_on = log.ERROR
-            elif val.lower.strip() in ('warning', 'warnings'):
+            elif val.lower().strip() in ('warning', 'warnings'):
                 options.fail_on = log.WARNING
-            elif val.lower.strip() in ('docstring_warning',
-                                       'docstring_warnings'):
+            elif val.lower().strip() in ('docstring_warning',
+                                         'docstring_warnings'):
                 options.fail_on = log.DOCSTRING_WARNING
             else:
                 raise ValueError("%r expected one of: error, warning, "

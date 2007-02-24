@@ -219,28 +219,28 @@ treated as comments.
     **### Output options**
 
     *# The documented project's name.*
-    **name: Example**
+    **#name: Example**
 
     *# The CSS stylesheet for HTML output.  Can be the name of a builtin*
     *# stylesheet, or the name of a file.*
     **css: white**
 
     *# The documented project's URL.*
-    **url: http://some.project/**
+    **#url: http://some.project/**
 
     *# HTML code for the project link in the navigation bar.  If left*
     *# unspecified, the project link will be generated based on the*
     *# project's name and URL.*
-    **link: <a href="somewhere">My Cool Project</a>**
+    **#link: <a href="somewhere">My Cool Project</a>**
 
     *# The "top" page for the documentation.  Can be a URL, the name*
     *# of a module or class, or one of the special names "trees.html",*
     *# "indices.html", or "help.html"*
-    **top: os.path**
+    **#top: os.path**
 
     *# An alternative help file.  The named file should contain the*
     *# body of an HTML file; navigation bars will be added to it.*
-    **help: my_helpfile.html**
+    **#help: my_helpfile.html**
 
     *# Whether or not to include a frames-based table of contents.*
     **frames: yes**
@@ -283,25 +283,15 @@ treated as comments.
     *# (e.g., helvetica or times).*
     **graph-font: Helvetica**
 
-    *# Specify the font size used to generate Graphviz*
+    *# Specify the font size used to generate Graphviz graphs.*
     **graph-font-size: 10**
 
 
     **### Return value options**
 
-    *# If true, return a non-zero exit status, indicating failure,*
-    *# if any errors are encountered.*
-    **fail-on-error: false**
-
-    *# If true, return a non-zero exit status, indicating failure,*
-    *# if any errors or warnings are encountered (not including*
-    *# docstring warnings).*
-    **fail-on-warning: false**
-    
-    *# Return a non-zero exit status, indicating failure, if any*
-    *# errors or warnings are encountered (including docstring*
-    *# warnings).*
-    **fail-on-docstring-warning: false**
+    *# The condition upon which Epydoc should exit with a non-zero*
+    *# exit status. Possible values are error, warning, docstring_warning*
+    **#fail-on: error**
 
 
 Warnings and Errors
