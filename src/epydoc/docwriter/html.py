@@ -429,8 +429,11 @@ class HTMLWriter:
         for doc in self.module_list:
             if isinstance(doc, ModuleDoc) and is_src_filename(doc.filename):
                 self.modules_with_sourcecode.add(doc)
-        self._num_files = (len(self.class_list) + 2*len(self.module_list) +
-                           13 + len(self.METADATA_INDICES))
+        self._num_files = (len(self.class_list) + len(self.module_list) +
+                           10 + len(self.METADATA_INDICES))
+        if self._frames_index:
+            self._num_files += len(self.module_list) + 3
+
         if self._incl_sourcecode:
             self._num_files += len(self.modules_with_sourcecode)
         if self._split_ident_index:
@@ -610,12 +613,13 @@ class HTMLWriter:
         self._write(self.write_help, directory,'help.html')
         
         # Write the frames-based table of contents.
-        self._write(self.write_frames_index, directory, 'frames.html')
-        self._write(self.write_toc, directory, 'toc.html')
-        self._write(self.write_project_toc, directory, 'toc-everything.html')
-        for doc in self.module_list:
-            filename = 'toc-%s' % urllib.unquote(self.url(doc))
-            self._write(self.write_module_toc, directory, filename, doc)
+        if self._frames_index:
+            self._write(self.write_frames_index, directory, 'frames.html')
+            self._write(self.write_toc, directory, 'toc.html')
+            self._write(self.write_project_toc, directory, 'toc-everything.html')
+            for doc in self.module_list:
+                filename = 'toc-%s' % urllib.unquote(self.url(doc))
+                self._write(self.write_module_toc, directory, filename, doc)
 
         # Write the object documentation.
         for doc in self.module_list:
@@ -1426,15 +1430,15 @@ class HTMLWriter:
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "privatelink") {
             cmd = elts[i].innerHTML;
-            elts[i].innerHTML = ((cmd=="show private")?"hide private":
-                                                       "show private");
+            elts[i].innerHTML = ((cmd && cmd.substr(0,4)=="show")?
+                                    "hide&nbsp;private":"show&nbsp;private");
           }
         }
         // Update all DIVs containing private objects.
         var elts = document.getElementsByTagName("div");
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
-            elts[i].style.display = ((cmd=="hide private")?"none":"block");
+            elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"none":"block");
           }
         }
         // Update all table rowss containing private objects.  Note, we
@@ -1444,21 +1448,22 @@ class HTMLWriter:
         var elts = document.getElementsByTagName("tr");
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
-            elts[i].style.display = ((cmd=="hide private")?"none":"");
+            elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"none":"");
           }
         }
         // Update all list items containing private objects.
         var elts = document.getElementsByTagName("li");
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
-            elts[i].style.display = ((cmd=="hide private")?"none":"list-item");
+            elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?
+                                        "none":"list-item");
           }
         }
         // Update all list items containing private objects.
         var elts = document.getElementsByTagName("ul");
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
-            elts[i].style.display = ((cmd=="hide private")?"none":"block");
+            elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"none":"block");
           }
         }
         // Set a cookie to remember the current option.
@@ -1503,7 +1508,7 @@ class HTMLWriter:
     HIDE_PRIVATE_JS = '''
       function checkCookie() {
         var cmd=getCookie("EpydocPrivate");
-        if (cmd!="show private" && location.href.indexOf("#_") < 0)
+        if (cmd && cmd.substr(0,4)!="show" && location.href.indexOf("#_") < 0)
             toggle_private();
       }
     '''.strip()
@@ -1860,10 +1865,12 @@ class HTMLWriter:
         >>> if self._show_private:
                 <tr><td align="right">$self.PRIVATE_LINK$</td></tr>
         >>> #endif
+        >>> if self._frames_index:
                 <tr><td align="right"><span class="options"
                     >[<a href="frames.html" target="_top">frames</a
                     >]&nbsp;|&nbsp;<a href="$context_url$"
                     target="_top">no&nbsp;frames</a>]</span></td></tr>
+        >>> #endif
               </table>
             </td>
           </tr>
@@ -3007,7 +3014,7 @@ class HTMLWriter:
                cellspacing="0" width="100%" bgcolor="white">
         >>> if heading is not None:
         <tr bgcolor="#70b0f0" class="table-header">
-        >>>     if private_link:
+        >>>     if private_link and self._show_private:
           <td colspan="$colspan$" class="table-header">
             <table border="0" cellpadding="0" cellspacing="0" width="100%">
               <tr valign="top">
@@ -3032,7 +3039,7 @@ class HTMLWriter:
 
     PRIVATE_LINK = '''
     <span class="options">[<a href="javascript:void(0);" class="privatelink"
-    onclick="toggle_private();">hide private</a>]</span>
+    onclick="toggle_private();">hide&nbsp;private</a>]</span>
     '''.strip()
 
     write_group_header = compile_template(
