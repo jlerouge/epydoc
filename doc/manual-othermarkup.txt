@@ -390,6 +390,41 @@ With such tool you will be able to create hypertextual documentation of your
 package with direct links to its API.
 
 
+Indexed Terms in reStructuredText
+'''''''''''''''''''''''''''''''''
+
+Epydoc uses `indexed terms`_ to create a table of terms definitions. Indexed
+terms are created using the epytext markup ``X{...}``.
+
+If you want to create indexed terms in reStructuredText modules,
+you can use the ``term`` `interpreted text role`_. For example:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Docstring Input
+     - Rendered Output
+
+   * - .. python::
+
+        def example():
+            """
+            An :term:`index term` is a term that
+            should be included in the index.
+            """
+            #[...]
+
+     -  An *index term* is a term that should be included in the index.
+   
+            ============ ==============
+                      Index
+            ===========================
+            index term   *example*
+            x intercept  *x_intercept*
+            y intercept  *x_intercept*
+            ============ ==============
+
+
 Javadoc
 -------
 
