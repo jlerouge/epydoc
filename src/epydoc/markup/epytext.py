@@ -1861,6 +1861,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             from epydoc.docwriter.dotgraph import class_tree_graph
             return class_tree_graph(bases, linker, context)
         elif graph_type == 'packagetree':
+            from epydoc.apidoc import ModuleDoc
             if graph_args:
                 packages = [docindex.find(name, context)
                             for name in graph_args]
@@ -1873,6 +1874,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             from epydoc.docwriter.dotgraph import package_tree_graph
             return package_tree_graph(packages, linker, context)
         elif graph_type == 'importgraph':
+            from epydoc.apidoc import ModuleDoc
             modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
             from epydoc.docwriter.dotgraph import import_graph
             return import_graph(modules, docindex, linker, context)
