@@ -83,7 +83,8 @@ table.docutils th       { background: #70b0ff; }
 
 div.epydoc-usage { border: 1px solid #708890; 
                    background: #e8f0f8; margin: 1em; padding: 0.5em}
-table.option-list { background: none !important; }
+table.option-list { background: none !important;
+                    border: 0px solid black; }
 table.option-list td { border: none !important; }
 
 div.note {  
