@@ -111,14 +111,13 @@ local: .webpage.up2date
 manual-html: $(MANUAL_HTML_FILES)
 
 $(HTML_MANUAL)/epydoc.html: doc/manual.txt $(MANUAL_SRC)
-	$(RST2HTML) doc/manual.txt $@
+	$(RST2HTML) doc/manual.txt $@ --template=doc/rst-template.txt
 
 $(HTML_MANUAL)/manual-%.html: doc/manual-%.txt
-	echo .. contents::               > doc/tmp.txt
-	echo .. include:: ../$<         >> doc/tmp.txt
+	echo ".. include:: ../$<"        > doc/tmp.txt
 	$(MKDISPATCH) $(MANUAL_SRC)     >> doc/tmp.txt
-	$(RST2HTML) doc/tmp.txt $@
-	
+	$(RST2HTML) doc/tmp.txt $@ --template=doc/rst-template.txt
+
 checkdoc: checkdocs
 checkdocs:
 	epydoc --check --tests=vars,types $(PY_SRC)
@@ -166,7 +165,8 @@ doctest-html-mkdir:
 	mkdir -p $(HTML_DOCTEST)
 $(HTML_DOCTEST)/%.html: src/epydoc/test/%.doctest
 	mkdir -p $(HTML_DOCTEST)
-	$(RST2HTML) --stylesheet=../custom.css $< $@
+	$(RST2HTML) --stylesheet=../custom.css $< $@ \
+		 --template=doc/rst-template2.txt
 
 examples: .examples.up2date
 .examples.up2date: $(EXAMPLES_SRC) $(PY_SRCFILES)

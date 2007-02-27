@@ -90,7 +90,7 @@ These tags can be used to specify attributes of parameters and return value
 of function and methods. These tags are usually put in the the docstring of the
 function to be documented.
 
-.. note:: constructor parameters
+.. note:: **constructor parameters**
 
     In C extension modules, extension classes cannot have a docstring attached
     to the ``__init__`` function; consequently it is not possible to document
@@ -210,7 +210,7 @@ any substring:
         """
         #[...]
 
-.. note:: group markers
+.. note:: **group markers**
 
     It is also possible to group set of related items enclosing them
     into special comment starting with the *group markers* '``#{``' and '``#}``'
