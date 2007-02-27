@@ -56,7 +56,7 @@ docstring for that variable: </p>
 <code class="prompt">&gt;&gt;&gt;</code> <code class="comment">#: docstring for x</code>
 <code class="prompt">...</code> x = 22
 <code class="prompt">&gt;&gt;&gt;</code> x = 22 <code class="comment">#: docstring for x</code>
-</pre></div>
+</pre></div> <!-- " -->
 
 <h3> Graphs &amp; Diagrams </h3>
 
@@ -132,10 +132,20 @@ source</i> link from any documented module, class, or function).
   generated, reporting all the errors and warning raised during documentation
   generation. </li>
 
-  <li> Improved variable values representation, using the parsed values if
-  the standard representation is not informative (such as <code>&lt;Foo
-  instance at ...&gt;</code>). Syntax highlight is used for values too,
-  including colorization for regular expressions. </li>
+  <li> Improved variable values representation, using the parsed
+  values if the standard representation is not informative (such
+  as <code>&lt;Foo instance at 0x...&gt;</code>).  Syntax highlighting
+  is used for introspected values, including colorization for regular
+  expressions. </li>
+
+  <li> Improved support for adding links into the generated
+  documentation.  A new API,
+  <a href="api/epydoc.docwriter.xlink-module.html"
+  ><code>epydoc.docwriter.xlink</code></a>, can be used to determine
+  the correct URL for any object name; and a new redirect page named 
+  named "<code>redirect.html"</code> uses javascript to automatically
+  redirect the user to the correct URL for any given object name.  See
+  the <a href="faq.html#redirect">FAQ</a> for more information.
 </ul>
 
 <h3>Improved Documentation Extraction</h3>
@@ -151,7 +161,10 @@ source</i> link from any documented module, class, or function).
   keeping the API safe from implementation changes.</li>
   <li> Increased robustness in the face of a variety of "magic"
   manipulations of namespaces.</li>
-  <li>Parsing or introspection can be prevented for problematic modules.</li>
+  <li> Fine-grained control over exactly which modules should be parsed,
+  introspected, or both. </li>
+  <li> Support for Zope 3.x InterfaceClass and Zope 2.x ExtensionClass
+  objects. </li>
 </ul>
 
 </div>
