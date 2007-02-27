@@ -75,9 +75,7 @@ __docformat__ = 'reStructuredText en'
 
 import re
 import sys
-
-from docutils.parsers.rst import roles
-from docutils import nodes, utils
+from optparse import OptionValueError
 
 from epydoc import log
 
@@ -353,6 +351,17 @@ def set_api_root(name, prefix):
     """
     api_register[name].prefix = prefix
 
+######################################################################
+# Below this point requires docutils.
+try:
+    import docutils
+    from docutils.parsers.rst import roles
+    from docutils import nodes, utils
+    from docutils.readers.standalone import Reader
+except ImportError:
+    docutils = roles = nodes = utils = None
+    class Reader: settings_spec = ()
+
 def create_api_role(name, problematic):
     """
     Create and register a new role to create links for an API documentation.
@@ -362,6 +371,8 @@ def create_api_role(name, problematic):
     """
     def resolve_api_name(n, rawtext, text, lineno, inliner,
                 options={}, content=[]):
+        if docutils is None:
+            raise AssertionError('requires docutils')
 
         # node in monotype font
         text = utils.unescape(text)
@@ -388,8 +399,6 @@ def create_api_role(name, problematic):
 #{ Command line parsing
 #  --------------------
 
-#from docutils import SettingsSpec
-from optparse import OptionValueError
 
 def split_name(value):
     """
@@ -410,7 +419,6 @@ def split_name(value):
 
     return (name, val)
 
-from docutils.readers.standalone import Reader
 
 class ApiLinkReader(Reader):
     """
@@ -437,6 +445,11 @@ class ApiLinkReader(Reader):
         ['--external-api-root'],
         {'metavar': 'NAME:STRING', 'action': 'append'}
     ),)) + Reader.settings_spec
+
+    def __init__(self, *args, **kwargs):
+        if docutils is None:
+            raise AssertionError('requires docutils')
+        Reader.__init__(self, *args, **kwargs)
 
     def read(self, source, parser, settings):
         self.read_configuration(settings, problematic=True)
