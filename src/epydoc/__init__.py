@@ -167,7 +167,7 @@ information about the submodules and subpackages.
 
 :author: `Edward Loper <edloper@gradient.cis.upenn.edu>`__
 :requires: Python 2.3+
-:version: 3.0 alpha 2
+:version: 3.0 beta 1
 :see: `The epydoc webpage <http://epydoc.sourceforge.net>`__
 :see: `The epytext markup language
     manual <http://epydoc.sourceforge.net/epytext.html>`__
@@ -200,7 +200,7 @@ information about the submodules and subpackages.
 """
 __docformat__ = 'restructuredtext en'
 
-__version__ = '3.0alpha3'
+__version__ = '3.0beta1'
 """The version of epydoc"""
 
 __author__ = 'Edward Loper <edloper@gradient.cis.upenn.edu>'
