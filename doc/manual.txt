@@ -32,7 +32,6 @@ Automatic API Documentation Generation for Python
 
 .. contents::
 .. section-numbering::
-.. def:: singlepage
 
 
 .. Include the document chapters
