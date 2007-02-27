@@ -681,6 +681,10 @@ class VariableDoc(APIDoc):
         if pval or self.value in (None, UNKNOWN):
             return pval
 
+        if (self.overrides not in (None, UNKNOWN) and
+            isinstance(self.value, RoutineDoc)):
+            return True
+
         if isinstance(self.value, GenericValueDoc):
             # [XX] This is a little hackish -- we assume that the
             # summary lines will have SUMMARY_REPR_LINELEN chars,
