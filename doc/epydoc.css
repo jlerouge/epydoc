@@ -64,7 +64,18 @@ th.index { background: red; }
 /*===================================================================*/
 /* Lists. */
 
-ul.nomargin { margin-top: 0; margin-bottom: 0em; }
+ul.nomargin { margin-top: 0; margin-bottom: 0; }
+
+/*===================================================================*/
+/* Index page. */
+
+#documentation-box table { margin-top: 0.7em; }
+#documentation-box ul, #documentation-box ol
+  { margin: 0; padding: 0 0 0 2em; font-size: 90%;}
+#documentation-box td { padding: 0 0 1em 0; }
+#documentation-box p { margin: 0; padding: 0; }
+#feedback-box ul
+  { margin: 0.5em 0 0.7em 2em; padding: 0; }
 
 /*===================================================================*/
 /* Link colors. */
