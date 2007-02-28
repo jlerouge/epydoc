@@ -213,9 +213,9 @@ class PyvalColorizer:
                 state.score -= 100
 
             if pyval_repr_ok:
-                self._output(pyval_repr, None, state)
                 if self.GENERIC_OBJECT_RE.match(pyval_repr):
                     state.score -= 5
+                self._output(pyval_repr, None, state)
             else:
                 state.result.append(self.UNKNOWN_REPR)
 
