@@ -184,7 +184,7 @@ class DotGraph:
                 s += ' -- '
             if caption:
                 s += '<span class="graph-caption">%s</span>' % caption
-            s += '\n  </td></tr>\n</table><br/>'
+            s += '\n  </td></tr>\n</table><br />'
         if center: s += '</center>'
         return s
 
@@ -1004,8 +1004,8 @@ def uml_package_tree_graph(packages, linker, context=None, **options):
 ######################################################################
 def class_tree_graph(bases, linker, context=None, **options):
     """
-    Return a `DotGraph` that graphically displays the package
-    hierarchies for the given packages.
+    Return a `DotGraph` that graphically displays the class
+    hierarchy for the given classes.
     """
     graph = DotGraph('Class Hierarchy for %s' % name_list(bases, context),
                      body='ranksep=0.3\n',
@@ -1263,7 +1263,7 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
         specialize_valdoc_node(node, val_doc, context, linker.url_for(val_doc))
     return nodes
 
-NOOP_URL = 'javascript: void(0);'
+NOOP_URL = 'javascript:void(0);'
 MODULE_NODE_HTML = '''
   <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"
          CELLPADDING="0" PORT="table" ALIGN="LEFT">

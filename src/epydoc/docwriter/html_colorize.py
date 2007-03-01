@@ -52,7 +52,7 @@ function collapse(id) {
   var elt = document.getElementById(id+"-expanded-linenums");
   if (elt) elt.style.display = "none";
   var elt = document.getElementById(id+"-collapsed-linenums");
-  if (elt) { elt.innerHTML = "<br/>"; elt.style.display="block"; }
+  if (elt) { elt.innerHTML = "<br />"; elt.style.display="block"; }
   var elt = document.getElementById(id+"-toggle");
   if (elt) { elt.innerHTML = "+"; }
   var elt = document.getElementById(id+"-collapsed");

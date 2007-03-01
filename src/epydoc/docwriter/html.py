@@ -1013,15 +1013,15 @@ class HTMLWriter:
         # Alphabetical sections.
         sections = [s for s in sections if s in index_by_section]
         if sections:
-            out('<table border="0" width="100%"><tr valign="top">\n')
+            out('<table border="0" width="100%">\n')
             for section in sorted(sections):
-                out('<td valign="top" width="1%">')
-                out('<a name="%s"><h2 class="epydoc">%s</h2></a></td>\n' %
+                out('<tr valign="top"><td valign="top" width="1%">')
+                out('<h2 class="epydoc"><a name="%s">%s</a></h2></td>\n' %
                     (section, section))
                 out('<td valign="top">\n')
                 self.write_index_section(out, index_by_section[section], True)
                 out('</td></tr>\n')
-            out('</table>\n</br />')
+            out('</table>\n<br />')
 
         # Footer material.
         out('<br />')
@@ -1040,7 +1040,7 @@ class HTMLWriter:
                                     '%s-index.html' % field)
 
         # Page title.
-        out('<a name="%s"><h1 class="epydoc">%s</h1></a>\n<br />\n' %
+        out('<h1 class="epydoc"><a name="%s">%s</a></h1>\n<br />\n' %
             (field, title))
 
         # Index (one section per arg)
@@ -1070,7 +1070,6 @@ class HTMLWriter:
                         self.docstring_to_html(descr,doc,4))
                 out('    </ul>\n')
                 out('</table></div>\n')
-            out('</dl>\n')
 
         # Footer material.
         out('<br />')
@@ -1117,7 +1116,7 @@ class HTMLWriter:
                         else:
                             label = container.canonical_name[-1]
                         out('<span class="index-where">(in&nbsp;%s)'
-                            '</font>' % self.href(container, label))
+                            '</span>' % self.href(container, label))
                 else:
                     out('&nbsp;')
                 out('</td>\n')
