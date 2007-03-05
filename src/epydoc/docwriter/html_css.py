@@ -155,6 +155,7 @@ table.details a:visited     { color: $table_visited_link; }
 dl.fields                   { margin-left: 2em; margin-top: 1em;
                               margin-bottom: 1em; }
 dl.fields dd ul             { margin-left: 0em; padding-left: 0em; }
+dl.fields dd ul li ul       { margin-left: 2em; padding-left: 0em; }
 div.fields                  { margin-left: 2em; }
 div.fields p                { margin-bottom: 0.5em; }
 
