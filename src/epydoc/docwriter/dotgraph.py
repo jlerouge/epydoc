@@ -864,7 +864,7 @@ class DotGraphUmlModuleNode(DotGraphNode):
           - ``label`` is the HTML label
           - ``depth`` is the depth of the package tree (for coloring)
           - ``width`` is the max width of the HTML label, roughly in
-             units of characters.
+            units of characters.
         """
         MAX_ROW_WIDTH = 80 # unit is roughly characters.
         pkg_name = package.canonical_name
