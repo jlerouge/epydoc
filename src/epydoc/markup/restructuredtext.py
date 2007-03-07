@@ -291,6 +291,7 @@ class _SummaryExtractor(NodeVisitor):
     def visit_document(self, node):
         self.summary = None
         
+    _SUMMARY_RE = re.compile(r'(\s*[\w\W]*?\.)(\s|$)')
     def visit_paragraph(self, node):
         if self.summary is not None:
             # found a paragraph after the first one
@@ -302,7 +303,7 @@ class _SummaryExtractor(NodeVisitor):
         # Extract the first sentence.
         for child in node:
             if isinstance(child, docutils.nodes.Text):
-                m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', child.data)
+                m = self._SUMMARY_RE.match(child.data)
                 if m:
                     summary_pieces.append(docutils.nodes.Text(m.group(1)))
                     other = child.data[m.end():]

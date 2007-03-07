@@ -219,13 +219,15 @@ class ParsedJavadocDocstring(ParsedDocstring):
     def to_plaintext(self, docstring_linker, **options):
         return self._docstring
 
+    _SUMMARY_RE = re.compile(r'(\s*[\w\W]*?\.)(\s|$)')
+
     # Jeff's hack to get summary working
     def summary(self):
         # Drop tags
         doc = "\n".join([ row for row in self._docstring.split('\n')
                           if not row.lstrip().startswith('@') ])
 
-        m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', doc)
+        m = self._SUMMARY_RE.match(doc)
         if m:
             other = doc[m.end():]
             return (ParsedJavadocDocstring(m.group(1)),

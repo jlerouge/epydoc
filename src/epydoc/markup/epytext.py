@@ -1969,6 +1969,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
             # Assume that anything else can be passed through.
             return childstr
 
+    _SUMMARY_RE = re.compile(r'(\s*[\w\W]*?\.)(\s|$)')
+
     def summary(self):
         if self._tree is None: return self, False
         tree = self._tree
@@ -2008,7 +2010,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         doc.children.append(para)
         for parachild in parachildren:
             if isinstance(parachild, basestring):
-                m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', parachild)
+                m = self._SUMMARY_RE.match(parachild)
                 if m:
                     para.children.append(m.group(1))
                     long_docs |= parachild is not parachildren[-1]

@@ -52,3 +52,19 @@ Let's not lose anything!
 ... This is detached
 ... """)
 ('Other lines without period...', True)
+
+In 3.0beta1 docstrings such this were not correctly summarized.
+
+>>> getsummary("""A user-defined wrapper around string objects
+...
+... Note: string objects have grown methods in Python 1.6
+... This module requires Python 1.6 or later.
+... """)
+('A user-defined wrapper around string objects', True)
+
+>>> getsummary("""This is more tricky
+... than the test before
+...
+... but i am looking for the same bug.
+... """)
+('This is more tricky\nthan the test before', True)

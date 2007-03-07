@@ -50,8 +50,10 @@ class ParsedPlaintextDocstring(ParsedDocstring):
             return '\n'.join([' '*indent+l for l in lines])+'\n'
         return self._text+'\n'
     
+    _SUMMARY_RE = re.compile(r'(\s*[\w\W]*?(?:\.(\s|$)|[\n][\t ]*[\n]))')
+
     def summary(self):
-        m = re.match(r'(\s*[\w\W]*?\.)(\s|$)', self._text)
+        m = self._SUMMARY_RE.match(self._text)
         if m:
             other = self._text[m.end():]
             return (ParsedPlaintextDocstring(m.group(1), verbatim=0),
