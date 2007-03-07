@@ -367,6 +367,8 @@ def _add_para(doc, para_token, stack, indent_stack, errors):
     if para_token.indent == indent_stack[-1]:
         # Colorize the paragraph and add it.
         para = _colorize(doc, para_token, errors)
+        if para_token.inline:
+            para.attribs['inline'] = True
         stack[-1].children.append(para)
     else:
         estr = "Improper paragraph indentation."
@@ -554,6 +556,11 @@ class Token:
         heading; C{None}, otherwise.  Valid heading levels are 0, 1,
         and 2.
 
+    @type inline: C{bool}
+    @ivar inline: If True, the element is an inline level element, comparable
+        to an HTML C{<span>} tag. Else, it is a block level element, comparable
+        to an HTML C{<div>}.
+
     @type PARA: C{string}
     @cvar PARA: The C{tag} value for paragraph C{Token}s.
     @type LBLOCK: C{string}
@@ -574,7 +581,8 @@ class Token:
     HEADING = "heading"
     BULLET = "bullet"
 
-    def __init__(self, tag, startline, contents, indent, level=None):
+    def __init__(self, tag, startline, contents, indent, level=None,
+                 inline=False):
         """
         Create a new C{Token}.
 
@@ -591,12 +599,15 @@ class Token:
         @param level: The heading-level of this C{Token} if it is a
             heading; C{None}, otherwise.
         @type level: C{int} or C{None}
+        @param inline: Is this C{Token} inline as a C{<span>}?.
+        @type inline: C{bool}
         """
         self.tag = tag
         self.startline = startline
         self.contents = contents
         self.indent = indent
         self.level = level
+        self.inline = inline
 
     def __repr__(self):
         """
@@ -794,14 +805,16 @@ def _tokenize_listart(lines, start, bullet_indent, tokens, errors):
         linenum += 1
 
     # Add the bullet token.
-    tokens.append(Token(Token.BULLET, start, bcontents, bullet_indent))
+    tokens.append(Token(Token.BULLET, start, bcontents, bullet_indent,
+                        inline=True))
 
     # Add the paragraph token.
     pcontents = ([lines[start][para_start:].strip()] + 
                  [line.strip() for line in lines[start+1:linenum]])
     pcontents = ' '.join(pcontents).strip()
     if pcontents:
-        tokens.append(Token(Token.PARA, start, pcontents, para_indent))
+        tokens.append(Token(Token.PARA, start, pcontents, para_indent,
+                            inline=True))
 
     # Return the linenum after the paragraph token ends.
     return linenum
@@ -1768,25 +1781,14 @@ class ParsedEpytextDocstring(ParsedDocstring):
                                    indent+2, seclevel)
                     for c in tree.children]
     
-        # Get rid of unnecessary <P>...</P> tags; they introduce extra
-        # space on most browsers that we don't want.
-        for i in range(len(variables)-1):
-            if (not isinstance(tree.children[i], basestring) and
-                tree.children[i].tag == 'para' and
-                (isinstance(tree.children[i+1], basestring) or
-                 tree.children[i+1].tag != 'para')):
-                variables[i] = ' '*(indent+2)+variables[i][5+indent:-5]+'\n'
-        if (tree.children and
-            not isinstance(tree.children[-1], basestring) and
-            tree.children[-1].tag == 'para'):
-            variables[-1] = ' '*(indent+2)+variables[-1][5+indent:-5]+'\n'
-    
         # Construct the HTML string for the variables.
         childstr = ''.join(variables)
     
         # Perform the approriate action for the DOM tree type.
         if tree.tag == 'para':
-            return wordwrap('<p>%s</p>' % childstr, indent)
+            return wordwrap(
+                (tree.attribs.get('inline') and '%s' or '<p>%s</p>') % childstr,
+                indent)
         elif tree.tag == 'code':
             style = tree.attribs.get('style')
             if style:
@@ -2002,7 +2004,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         
         # Extract the first sentence.
         parachildren = variables[0].children
-        para = Element('para')
+        para = Element('para', inline=True)
         doc.children.append(para)
         for parachild in parachildren:
             if isinstance(parachild, basestring):

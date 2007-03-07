@@ -60,6 +60,7 @@ TEMPLATE = """
  *     defined below).
  */
 body                        { background: $body_bg; color: $body_fg; }
+p                           { margin-top: 0.5em; margin-bottom: 0.5em; }
 a:link                      { color: $body_link; }
 a:visited                   { color: $body_visited_link; }
 dt                          { font-weight: bold; }
@@ -84,7 +85,8 @@ code                        { font-size: 100%; }
  */ 
 h1.epydoc                   { margin: 0; font-size: +140%; font-weight: bold; }
 h2.epydoc                   { font-size: +130%; font-weight: bold; }
-h3.epydoc                   { font-size: +115%; font-weight: bold; }
+h3.epydoc                   { font-size: +115%; font-weight: bold;
+                              margin-top: 0.2em; }
 td h3.epydoc                { font-size: +115%; font-weight: bold;
                               margin-bottom: 0; }
 table.navbar                { background: $navbar_bg; color: $navbar_fg;

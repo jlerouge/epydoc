@@ -507,6 +507,7 @@ RETURN_PDS = markup.parse('Returns:', markup='epytext')
 """A ParsedDocstring containing the text 'Returns'.  This is used to
 construct summary descriptions for routines that have empty C{descr},
 but non-empty C{return_descr}."""
+RETURN_PDS._tree.children[0].attribs['inline'] = True
 
 ######################################################################
 #{ Field Processing Error Messages

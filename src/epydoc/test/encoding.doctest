@@ -27,27 +27,27 @@ Tests for several Microsoft codepges:
     >>> testencoding('''# -*- coding: cp874 -*-
     ... """abc ABC 123 \x80 \x85"""
     ... ''')
-    abc ABC 123 &#8364; &#8230;
+    <p>abc ABC 123 &#8364; &#8230;</p>
 
     >>> testencoding('''# -*- coding: cp1250 -*-
     ... """abc ABC 123 \x80 \x82 \x84 \x85 \xff"""
     ... ''')
-    abc ABC 123 &#8364; &#8218; &#8222; &#8230; &#729;
+    <p>abc ABC 123 &#8364; &#8218; &#8222; &#8230; &#729;</p>
 
     >>> testencoding('''# -*- coding: cp1251 -*-
     ... """abc ABC 123 \x80 \x81 \x82 \xff"""
     ... ''')
-    abc ABC 123 &#1026; &#1027; &#8218; &#1103;
+    <p>abc ABC 123 &#1026; &#1027; &#8218; &#1103;</p>
 
     >>> testencoding('''# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    abc ABC 123 &#8364; &#8218; &#402; &#255;
+    <p>abc ABC 123 &#8364; &#8218; &#402; &#255;</p>
 
     >>> testencoding('''# -*- coding: cp1253 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xfe"""
     ... ''')
-    abc ABC 123 &#8364; &#8218; &#402; &#974;
+    <p>abc ABC 123 &#8364; &#8218; &#402; &#974;</p>
 
 Unicode tests:
 
@@ -71,52 +71,52 @@ Unicode tests:
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
     >>> # UTF-8 with a BOM & a coding directive:
     >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
     >>> # UTF-8 with a BOM & no coding directive:
     >>> testencoding(utf8_bom+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
 Tests for KOI8-R:
 
     >>> testencoding('''# -*- coding: koi8-r -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    abc ABC 123 &#9472; &#9484; &#9488; &#1066;
+    <p>abc ABC 123 &#9472; &#9484; &#9488; &#1066;</p>
 
 Tests for 'coding' directive on the second line:
 
     >>> testencoding('''\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    abc ABC 123 &#8364; &#8218; &#402; &#255;
+    <p>abc ABC 123 &#8364; &#8218; &#402; &#255;</p>
     
     >>> testencoding('''# comment on the first line.\n# -*- coding: cp1252 -*-
     ... """abc ABC 123 \x80 \x82 \x83 \xff"""
     ... ''')
-    abc ABC 123 &#8364; &#8218; &#402; &#255;
+    <p>abc ABC 123 &#8364; &#8218; &#402; &#255;</p>
 
     >>> testencoding("\n# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
     >>> testencoding("# comment\n# -*- coding: utf-8 -*-\n"+utf8_test)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
 Tests for shift-jis
 
@@ -132,12 +132,12 @@ Make sure that we use the coding for both str and unicode docstrings.
     >>> testencoding('''# -*- coding: utf-8 -*-
     ... """abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
-    abc ABC 123 &#128; &#2047; &#2048;
+    <p>abc ABC 123 &#128; &#2047; &#2048;</p>
 
     >>> testencoding('''# -*- coding: utf-8 -*-
     ... u"""abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80"""
     ... ''')
-    abc ABC 123 &#128; &#2047; &#2048;
+    <p>abc ABC 123 &#128; &#2047; &#2048;</p>
 
 Under special circumstances, we may not be able to tell what the
 proper encoding for a docstring is.  This happens if:
@@ -166,33 +166,33 @@ getting the right results.
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
     >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, introspect=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
     >>> testencoding(utf8_bom+utf8_test, introspect=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
     >>> testencoding("# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
     >>> testencoding(utf8_bom+"# -*- coding: utf-8 -*-\n"+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
     >>> testencoding(utf8_bom+utf8_test, parse=False)
     <p>abc ABC 123</p>
     <p>0x80-0x7ff range: &#128; &#129; &#2046; &#2047;</p>
     <p>0x800-0xffff range: &#2048; &#2049; &#65534; &#65535;</p>
-    0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;
+    <p>0x10000-0x10ffff range: &#65536; &#65537; &#1114110; &#1114111;</p>
 
 Context checks
 ==============
@@ -219,7 +219,7 @@ Make sure that docstrings are rendered correctly in different contexts.
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
+    <p>abc ABC 123 &#128; &#2047; &#2048;</p>
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
@@ -238,7 +238,7 @@ Make sure that docstrings are rendered correctly in different contexts.
     ...     z = property(doc=u"abc ABC 123 \xc2\x80 \xdf\xbf \xe0\xa0\x80")
     ... ''')
     abc ABC 123 &#128; &#2047; &#2048;
-    abc ABC 123 &#128; &#2047; &#2048;
+    <p>abc ABC 123 &#128; &#2047; &#2048;</p>
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;
     abc ABC 123 &#128; &#2047; &#2048;

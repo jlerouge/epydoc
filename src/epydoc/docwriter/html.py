@@ -739,11 +739,11 @@ class HTMLWriter:
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
         out('<h1 class="epydoc">%s %s</h1>' % (typ, shortname))
-        out(self.pysrc_link(doc) + '<br /><br />\n')
+        out('<p class="nomargin-top">%s</p>\n' % self.pysrc_link(doc))
         
         # If the module has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
-            out(self.descr(doc, 2)+'<br /><br />\n\n')
+            out(self.descr(doc, 2)+'\n\n')
 
         # Write any standarad metadata (todo, author, etc.)
         if doc.metadata is not UNKNOWN and doc.metadata:
@@ -830,7 +830,7 @@ class HTMLWriter:
         out('<!-- ==================== %s ' % typ.upper() +
             'DESCRIPTION ==================== -->\n')
         out('<h1 class="epydoc">%s %s</h1>' % (typ, shortname))
-        out(self.pysrc_link(doc) + '<br /><br />\n')
+        out('<p class="nomargin-top">%s</p>\n' % self.pysrc_link(doc))
 
         if ((doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0) or
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
@@ -864,7 +864,7 @@ class HTMLWriter:
         
         # If the class has a description, then list it.
         if doc.descr not in (None, UNKNOWN):
-            out(self.descr(doc, 2)+'<br /><br />\n\n')
+            out(self.descr(doc, 2)+'\n\n')
 
         # Write any standarad metadata (todo, author, etc.)
         if doc.metadata is not UNKNOWN and doc.metadata:

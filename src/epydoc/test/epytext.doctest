@@ -45,14 +45,14 @@ Make sure that unindented fields are allowed:
     ...     @foo: This is a field.""")
     <para>This is a paragraph.</para>
     <fieldlist><field><tag>foo</tag>
-    <para>This is a field.</para></field></fieldlist>
+    <para inline=True>This is a field.</para></field></fieldlist>
 
     >>> print testparse("""
     ...     This is a paragraph.
     ...     @foo: This is a field.""")
     <para>This is a paragraph.</para>
     <fieldlist><field><tag>foo</tag>
-    <para>This is a field.</para></field></fieldlist>
+    <para inline=True>This is a field.</para></field></fieldlist>
 
     >>> print testparse("""
     ...     This is a paragraph.
@@ -60,23 +60,23 @@ Make sure that unindented fields are allowed:
     ...         Hello.""")
     <para>This is a paragraph.</para>
     <fieldlist><field><tag>foo</tag>
-    <para>This is a field. Hello.</para></field></fieldlist>
-    
+    <para inline=True>This is a field. Hello.</para></field>
+    </fieldlist>
 
     >>> print testparse("""Paragraph\n@foo: field""")
     <para>Paragraph</para>
     <fieldlist><field><tag>foo</tag>
-    <para>field</para></field></fieldlist>
+    <para inline=True>field</para></field></fieldlist>
 
     >>> print testparse("""Paragraph\n\n@foo: field""")
     <para>Paragraph</para>
     <fieldlist><field><tag>foo</tag>
-    <para>field</para></field></fieldlist>
+    <para inline=True>field</para></field></fieldlist>
 
     >>> print testparse("""\nParagraph\n@foo: field""")
     <para>Paragraph</para>
     <fieldlist><field><tag>foo</tag>
-    <para>field</para></field></fieldlist>
+    <para inline=True>field</para></field></fieldlist>
 
 Make sure thta unindented lists are not allowed:
 
@@ -122,20 +122,22 @@ Special case if there's text on the same line as the opening quote:
 
     >>> print testparse("""Paragraph\n- list item""")
     <para>Paragraph</para>
-    <ulist><li><para>list item</para></li></ulist>
+    <ulist><li><para inline=True>list item</para></li></ulist>
 
 Make sure that indented lists are allowed:
 
     >>> print testparse('This is a paragraph.\n  - This is a list item.\n'+
     ...           'This is a paragraph')
     <para>This is a paragraph.</para>
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     <para>This is a paragraph</para>
     
     >>> print testparse('This is a paragraph.\n\n  - This is a list item.'+
     ...           '\n\nThis is a paragraph')
     <para>This is a paragraph.</para>
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     <para>This is a paragraph</para>
     
     >>> print testparse("""
@@ -145,7 +147,8 @@ Make sure that indented lists are allowed:
     ...
     ...     This is a paragraph""")
     <para>This is a paragraph.</para>
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     <para>This is a paragraph</para>
     
     >>> print testparse("""
@@ -154,18 +157,22 @@ Make sure that indented lists are allowed:
     ...           - This is a list item.
     ...     This is a paragraph""")
     <para>This is a paragraph.</para>
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     <para>This is a paragraph</para>
     
     >>> print testparse("""
     ...       - This is a list item.""")
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     
     >>> print testparse("""- This is a list item.""")
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
     
     >>> print testparse("""\n- This is a list item.""")
-    <ulist><li><para>This is a list item.</para></li></ulist>
+    <ulist><li><para inline=True>This is a list item.</para></li>
+    </ulist>
 
 Basic list tests:
 
@@ -176,10 +183,10 @@ Basic list tests:
     >>> LI3 = "  - This is a list\n  item."
     >>> LI4 = "\n  - This is a list\n  item."
     >>> PARA = ('<para>This is a paragraph.</para>')
-    >>> ONELIST = ('<ulist><li><para>This is a '+
+    >>> ONELIST = ('<ulist><li><para inline=True>This is a '+
     ...            'list item.</para></li></ulist>')
-    >>> TWOLIST = ('<ulist><li><para>This is a '+
-    ...            'list item.</para></li><li><para>This is a '+
+    >>> TWOLIST = ('<ulist><li><para inline=True>This is a '+
+    ...            'list item.</para></li><li><para inline=True>This is a '+
     ...            'list item.</para></li></ulist>')
 
     >>> for p in (P1, P2):
@@ -198,7 +205,7 @@ Basic list tests:
     ...                             PARA+TWOLIST+PARA)
 
     >>> LI5 = "  - This is a list item.\n\n    It contains two paragraphs."
-    >>> LI5LIST = ('<ulist><li><para>This is a list item.</para>'+
+    >>> LI5LIST = ('<ulist><li><para inline=True>This is a list item.</para>'+
     ...            '<para>It contains two paragraphs.</para></li></ulist>')
     >>> checkparse(LI5, LI5LIST)
     >>> checkparse('%s\n%s' % (P1, LI5), PARA+LI5LIST)
@@ -206,7 +213,7 @@ Basic list tests:
 
     >>> LI6 = ("  - This is a list item with a literal block::\n" +
     ...        "    hello\n      there")
-    >>> LI6LIST = ('<ulist><li><para>This is a list item with a literal '+
+    >>> LI6LIST = ('<ulist><li><para inline=True>This is a list item with a literal '+
     ...            'block:</para><literalblock> hello\n   there'+
     ...            '</literalblock></li></ulist>')
     >>> checkparse(LI6, LI6LIST)
@@ -216,10 +223,10 @@ Basic list tests:
 Item wrap tests:
 
     >>> LI = "- This is a list\n  item."
-    >>> ONELIST = ('<ulist><li><para>This is a '+
+    >>> ONELIST = ('<ulist><li><para inline=True>This is a '+
     ...            'list item.</para></li></ulist>')
-    >>> TWOLIST = ('<ulist><li><para>This is a '+
-    ...            'list item.</para></li><li><para>This is a '+
+    >>> TWOLIST = ('<ulist><li><para inline=True>This is a '+
+    ...            'list item.</para></li><li><para inline=True>This is a '+
     ...            'list item.</para></li></ulist>')
     >>> for indent in ('', '  '):
     ...     for nl1 in ('', '\n'):
@@ -229,7 +236,7 @@ Item wrap tests:
 
 Summary
 =======
-The implementation of the summaization function works as expected.
+The implementation of the summarization function works as expected.
 
 >>> from epydoc.markup import epytext
 >>> def getsummary(s):
@@ -298,14 +305,14 @@ tests make sure that braces are getting rendered as desired.
 ...     return (v or '').rstrip()
 
 >>> print epytext2html("{1:{2:3}}")
-{1:{2:3}}
+<p>{1:{2:3}}</p>
 >>> print epytext2html("C{{1:{2:3}}}")
-<code>{1:{2:3}}</code>
+<p><code>{1:{2:3}}</code></p>
 >>> print epytext2html("{1:C{{2:3}}}")
-{1:<code>{2:3}</code>}
+<p>{1:<code>{2:3}</code>}</p>
 >>> print epytext2html("{{{}{}}{}}")
-{{{}{}}{}}
+<p>{{{}{}}{}}</p>
 >>> print epytext2html("{{E{lb}E{lb}E{lb}}}")
-{{{{{}}
+<p>{{{{{}}</p>
 
 
