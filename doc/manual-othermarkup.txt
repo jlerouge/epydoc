@@ -381,7 +381,7 @@ names, a warning is raised and the name is rendered as literal text.
 Linking from standalone documents
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Epydoc provides the script ``apirst2html.py`` which allows to use the
+Epydoc provides the script ``apirst2html.py`` which allows you to use the
 previously described interpreted text roles from any reST document. The script
 exposes the same interface of the standard Docutils script ``rst2html.py`` but
 provides the extra command line options described in `External API links`_.

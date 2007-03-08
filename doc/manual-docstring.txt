@@ -104,7 +104,7 @@ considered private. All the other objects (including the "magic functions" such
 as ``__add__``) are public.
 
 For each module and class, Epydoc generates pages with both public and private
-methods. A Javascript snippet allows to toggle the visibility of private
+methods. A Javascript snippet allows you to toggle the visibility of private
 objects.
 
 If a module wants to hide some of the objects it contains (either defined in
