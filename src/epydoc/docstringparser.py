@@ -218,7 +218,7 @@ def parse_docstring(api_doc, docindex):
 
         # Parse ahead the __init__ docstring for this class
         initvar = api_doc.variables.get('__init__')
-        if initvar and initvar.value not in (None, UNKNOWN):
+        if initvar and isinstance(initvar.value, RoutineDoc):
             init_api_doc = initvar.value
             parse_docstring(init_api_doc, docindex)
 
