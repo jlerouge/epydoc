@@ -200,7 +200,7 @@ def _parse_warn(estr):
     printed, then do nothing.
     """
     global _parse_warnings
-    if _parse_warnings.has_key(estr): return
+    if estr in _parse_warnings: return
     _parse_warnings[estr] = 1
     log.warning(estr)
 

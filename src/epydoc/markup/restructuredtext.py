@@ -413,7 +413,7 @@ class _SplitFieldsTranslator(NodeVisitor):
                                                        is_fatal=0))
                         
                         # Use a @newfield to let it be displayed as-is.
-                        if not self._newfields.has_key(tagname.lower()):
+                        if tagname.lower() not in self._newfields:
                             newfield = Field('newfield', tagname.lower(),
                                              parse(tagname, 'plaintext'))
                             self.fields.append(newfield)

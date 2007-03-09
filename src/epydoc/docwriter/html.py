@@ -1389,7 +1389,7 @@ class HTMLWriter:
             if os.path.exists(cssname):
                 try: css = open(cssname).read()
                 except: raise IOError("Can't open CSS file: %r" % cssname)
-            elif STYLESHEETS.has_key(cssname):
+            elif cssname in STYLESHEETS:
                 css = STYLESHEETS[cssname][0]
             else:
                 raise IOError("Can't find CSS file: %r" % cssname)

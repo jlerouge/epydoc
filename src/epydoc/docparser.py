@@ -230,7 +230,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
             except ValueError, e: raise ImportError('%s' % e)
 
         # Check the cache, first.
-        if _moduledoc_cache.has_key(filename):
+        if filename in _moduledoc_cache:
             return _moduledoc_cache[filename]
         
         log.info("Parsing %s" % filename)
@@ -1871,18 +1871,18 @@ def lookup_name(identifier, parent_docs):
 
     # Locals
     if isinstance(parent_docs[-1], NamespaceDoc):
-        if parent_docs[-1].variables.has_key(identifier):
+        if identifier in parent_docs[-1].variables:
             return parent_docs[-1].variables[identifier]
 
     # Globals (aka the containing module)
     if isinstance(parent_docs[0], NamespaceDoc):
-        if parent_docs[0].variables.has_key(identifier):
+        if identifier in parent_docs[0].variables:
             return parent_docs[0].variables[identifier]
 
     # Builtins
     builtins = epydoc.docintrospecter.introspect_docs(__builtin__)
     if isinstance(builtins, NamespaceDoc):
-        if builtins.variables.has_key(identifier):
+        if identifier in builtins.variables:
             return builtins.variables[identifier]
 
     # We didn't find it; return None.

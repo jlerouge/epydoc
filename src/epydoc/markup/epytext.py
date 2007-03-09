@@ -1021,7 +1021,7 @@ def _colorize(doc, token, errors, tagName='para'):
             if (end>0) and 'A' <= str[end-1] <= 'Z':
                 if (end-1) > start:
                     stack[-1].children.append(str[start:end-1])
-                if not _COLORIZING_TAGS.has_key(str[end-1]):
+                if str[end-1] not in _COLORIZING_TAGS:
                     estr = "Unknown inline markup tag."
                     errors.append(ColorizingError(estr, token, end-1))
                     stack.append(Element('unknown'))
@@ -1056,7 +1056,7 @@ def _colorize(doc, token, errors, tagName='para'):
                     errors.append(ColorizingError(estr, token, end))
                 else:
                     symb = stack[-1].children[0]
-                    if _SYMBOLS.has_key(symb):
+                    if symb in _SYMBOLS:
                         # It's a symbol
                         stack[-2].children[-1] = Element('symbol', symb)
                     else:
@@ -1071,7 +1071,7 @@ def _colorize(doc, token, errors, tagName='para'):
                     errors.append(ColorizingError(estr, token, end))
                 else:
                     escp = stack[-1].children[0]
-                    if _ESCAPES.has_key(escp):
+                    if escp in _ESCAPES:
                         # It's an escape from _ESCPAES
                         stack[-2].children[-1] = _ESCAPES[escp]
                     elif len(escp) == 1:
