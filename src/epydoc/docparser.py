@@ -865,7 +865,9 @@ def process_from_import(line, parent_docs, prev_line_doc, lineno,
 
     # >>> from os.path import join, split
     else:
-        src_name = parse_dotted_name(lhs)
+        # Allow relative imports in this case, as per PEP 328
+        src_name = parse_dotted_name(lhs, 
+            parent_name=parent_docs[-1].canonical_name)
         parts = split_on(rhs, (token.OP, ','))
         for part in parts:
             # from m import x
@@ -1668,8 +1670,11 @@ def parse_name(elt, strip_parens=False):
         raise ParseError("Bad name")
     return elt[1]
 
-def parse_dotted_name(elt_list, strip_parens=True):
+def parse_dotted_name(elt_list, strip_parens=True, parent_name=None):
     """
+    @param parent_name: canonical name of referring module, to resolve
+        relative imports.
+    @type parent_name: L{DottedName}
     @bug: does not handle 'x.(y).z'
     """
     if len(elt_list) == 0: raise ParseError("Bad dotted name")
@@ -1683,8 +1688,25 @@ def parse_dotted_name(elt_list, strip_parens=True):
            elt_list[0][-1] == (token.OP, ')')):
         elt_list[:1] = elt_list[0][1:-1]
 
+    # Convert a relative import into an absolute name.
+    prefix_name = None
+    if parent_name is not None and elt_list[0][-1] == '.':
+        items = 1
+        while len(elt_list) > items and elt_list[items][-1] == '.':
+            items += 1
+            
+        elt_list = elt_list[items:]
+        prefix_name = parent_name[:-items]
+            
+        # >>> from . import foo
+        if not elt_list:
+            return prefix_name
+
     if len(elt_list) % 2 != 1: raise ParseError("Bad dotted name")
     name = DottedName(parse_name(elt_list[0], True))
+    if prefix_name is not None:
+        name = prefix_name + name
+        
     for i in range(2, len(elt_list), 2):
         dot, identifier = elt_list[i-1], elt_list[i]
         if  dot != (token.OP, '.'):
