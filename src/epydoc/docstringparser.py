@@ -267,13 +267,18 @@ def parse_docstring(api_doc, docindex):
     report_errors(api_doc, docindex, parse_errors, field_warnings)
 
 def add_metadata_from_var(api_doc, field):
-    if not field.multivalue:
-        for (f,a,d) in api_doc.metadata:
-            if field == f:
-                return # We already have a value for this metadata.
     for varname in field.varnames:
         # Check if api_doc has a variable w/ the given name.
         if varname not in api_doc.variables: continue
+
+        # Check moved here from before the for loop because we expect to
+        # reach rarely this point. The loop below is to be performed more than
+        # once only for fields with more than one varname, which currently is
+        # only 'author'.
+        for md in api_doc.metadata:
+            if field == md[0]:
+                return # We already have a value for this metadata.
+
         var_doc = api_doc.variables[varname]
         if var_doc.value is UNKNOWN: continue
         val_doc = var_doc.value
