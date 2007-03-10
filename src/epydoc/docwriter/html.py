@@ -959,7 +959,7 @@ class HTMLWriter:
                             #class_set.add(base)
  
         out('<ul class="nomargin-top">\n')
-        for doc in sorted(class_set):
+        for doc in sorted(class_set, key=lambda c:c.canonical_name[-1]):
             if doc.bases != UNKNOWN and len(doc.bases)==0:
                 self.write_class_tree_item(out, doc, class_set)
         out('</ul>\n')
@@ -2714,7 +2714,7 @@ class HTMLWriter:
         >>> # endif
         >>> if doc.subclasses:
             <ul>
-        >>>   for subclass in set(doc.subclasses):
+        >>>   for subclass in sorted(set(doc.subclasses), key=lambda c:c.canonical_name[-1]):
         >>>     if subclass in class_set:
         >>>       self.write_class_tree_item(out, subclass, class_set)
         >>>     #endif
