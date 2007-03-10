@@ -2178,10 +2178,12 @@ class HTMLWriter:
         # Properties
         elif isinstance(var_doc.value, PropertyDoc):
             prop_doc = var_doc.value
-            accessors = [(name, self.property_accessor_to_html(val_doc),
-                          self.summary(val_doc)) for (name, val_doc) in
-                         [('Get', prop_doc.fget), ('Set', prop_doc.fset),
-                          ('Delete', prop_doc.fdel)]
+            accessors = [ (name,
+                           self.property_accessor_to_html(val_doc, prop_doc),
+                           self.summary(val_doc))
+                         for (name, val_doc) in
+                            [('Get', prop_doc.fget), ('Set', prop_doc.fset),
+                             ('Delete', prop_doc.fdel)]
                             if val_doc not in (None, UNKNOWN)
                             and val_doc.pyval is not None ]
 
@@ -2203,15 +2205,15 @@ class HTMLWriter:
 
         return '<li>%s - %s</li>' % (lhs, rhs)
 
-    def property_accessor_to_html(self, val_doc):
+    def property_accessor_to_html(self, val_doc, context=None):
         if val_doc not in (None, UNKNOWN):
             if isinstance(val_doc, RoutineDoc):
                 return self.function_signature(val_doc, is_summary=True,
-                                               link_name=True)
+                                               link_name=True, context=context)
             elif isinstance(val_doc, GenericValueDoc):
                 return self.pprint_value(val_doc)
             else:
-                return self.href(val_doc)
+                return self.href(val_doc, context=context)
         else:
             return '??'
         
@@ -2524,7 +2526,7 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
 
     def function_signature(self, api_doc, is_summary=False, 
-                           link_name=False, anchor=False):
+                           link_name=False, anchor=False, context=None):
         """Render a function signature in HTML.
 
         @param api_doc: The object whose name is to be rendered. If a
@@ -2536,6 +2538,9 @@ class HTMLWriter:
         @type link_name: C{bool}
         @param anchor: If True, the name is the object anchor.
         @type anchor: C{bool}
+        @param context: If set, represent the function name from this context.
+            Only useful when C{api_doc} is a L{RoutineDoc}.
+        @type context: L{DottedName}
 
         @return: The HTML code for the object.
         @rtype: C{str}
@@ -2556,7 +2561,8 @@ class HTMLWriter:
                                      link_name=link_name, anchor=anchor)
         else:
             func_doc = api_doc
-            name = self.href(api_doc, css_class=css_class+'-name')
+            name = self.href(api_doc, css_class=css_class+'-name',
+                             context=context)
 
         if func_doc.posargs == UNKNOWN:
             args = ['...']
