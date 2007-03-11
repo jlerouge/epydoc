@@ -2322,7 +2322,13 @@ class HTMLWriter:
         >>> # === overrides ===
         >>> if var_doc.overrides not in (None, UNKNOWN):
             <dt>Overrides:
-              $self.href(var_doc.overrides.value, context=var_doc)$
+        >>>   # Avoid passing GenericValueDoc to href()
+        >>>   if isinstance(var_doc.overrides.value, RoutineDoc):
+                $self.href(var_doc.overrides.value, context=var_doc)$
+        >>>   else:
+        >>>     # In this case, a less interesting label is generated.
+                $self.href(var_doc.overrides, context=var_doc)$
+        >>>   #endif
         >>>   if (func_doc.docstring in (None, UNKNOWN) and
         >>>       var_doc.overrides.value.docstring not in (None, UNKNOWN)):
                 <dd><em class="note">(inherited documentation)</em></dd>
