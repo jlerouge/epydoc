@@ -118,7 +118,7 @@ class LatexWriter:
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
-        self._encoding = kwargs.get('encoding', 'latin1')
+        self._encoding = kwargs.get('encoding', 'utf-8')
         self.valdocs = sorted(docindex.reachable_valdocs(
             imports=False, packages=False, bases=False, submodules=False, 
             subclasses=False, private=self._show_private))
@@ -180,7 +180,7 @@ class LatexWriter:
         log.progress(self._files_written/self._num_files, filename)
         
         path = os.path.join(directory, filename)
-        if self._encoding == 'utf8':
+        if self._encoding == 'utf-8':
             f = codecs.open(path, 'w', 'utf-8')
             write_func(f.write, *args)
             f.close()
@@ -194,8 +194,9 @@ class LatexWriter:
                 log.error("Output could not be represented with the "
                           "given encoding (%r).  Unencodable characters "
                           "will be displayed as '?'.  It is recommended "
-                          "that you use a different output encoding (utf8, "
-                          "if it's supported by latex on your system).")
+                          "that you use a different output encoding (utf-8, "
+                          "if it's supported by latex on your system)."
+                          % self._encoding)
                 s = s.encode(self._encoding, 'replace')
             f = open(path, 'w')
             f.write(s)
