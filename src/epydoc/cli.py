@@ -506,7 +506,7 @@ def parse_configfiles(configfiles, options, names):
 
         if optname in ('modules', 'objects', 'values',
                        'module', 'object', 'value'):
-            names.extend(val.replace(',', ' ').split())
+            names.extend(_str_to_list(val))
         elif optname == 'target':
             options.target = val
         elif optname == 'output':
@@ -529,11 +529,11 @@ def parse_configfiles(configfiles, options, names):
         elif optname == 'introspect':
             options.introspect = _str_to_bool(val, optname)
         elif optname == 'exclude':
-            options.exclude.append(val)
+            options.exclude.extend(_str_to_list(val))
         elif optname in ('exclude-parse', 'exclude_parse'):
-            options.exclude_parse.append(val)
+            options.exclude_parse.extend(_str_to_list(val))
         elif optname in ('exclude-introspect', 'exclude_introspect'):
-            options.exclude_introspect.append(val)
+            options.exclude_introspect.extend(_str_to_list(val))
         elif optname == 'inheritance':
             if val.lower() not in INHERITANCE_STYLES:
                 raise ValueError('"%s" expected one of: %s.' %
@@ -568,15 +568,15 @@ def parse_configfiles(configfiles, options, names):
 
         # External API
         elif optname in ('external-api', 'external_api'):
-            options.external_api.extend(val.replace(',', ' ').split())
+            options.external_api.extend(_str_to_list(val))
         elif optname in ('external-api-file', 'external_api_file'):
-            options.external_api_file.append(val)
+            options.external_api_file.extend(_str_to_list(val))
         elif optname in ('external-api-root', 'external_api_root'):
-            options.external_api_root.append(val)
+            options.external_api_root.extend(_str_to_list(val))
 
         # Graph options
         elif optname == 'graph':
-            graphtypes = val.replace(',', '').split()
+            graphtypes = _str_to_list(val)
             for graphtype in graphtypes:
                 if graphtype not in GRAPH_TYPES + ('all',):
                     raise ValueError('"%s" expected one of: all, %s.' %
@@ -589,7 +589,7 @@ def parse_configfiles(configfiles, options, names):
         elif optname in ('graph-font-size', 'graph_font_size'):
             options.graph_font_size = _str_to_int(val, optname)
         elif optname == 'pstat':
-            options.pstat_files.extend(val.replace(',', ' ').split())
+            options.pstat_files.extend(_str_to_list(val))
 
         # Return value options
         elif optname in ('failon', 'fail-on', 'fail_on'):
@@ -619,6 +619,9 @@ def _str_to_int(val, optname):
         return int(val)
     except ValueError:
         raise ValueError('"%s" option expected an int' % optname)
+
+def _str_to_list(val):
+    return val.replace(',', ' ').split()
 
 ######################################################################
 #{ Interface
