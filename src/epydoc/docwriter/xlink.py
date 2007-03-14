@@ -298,12 +298,14 @@ class DocUrlGenerator(UrlGenerator):
 api_register = {}
 """
 Mapping from the API name to the `UrlGenerator` to be used.
+
+Use `register_api()` to add new generators to the register.
 """
 
 def register_api(name, generator=None):
     """Register the API `name` into the `api_register`.
 
-    A registered API is available to the markup as the interpreted text
+    A registered API will be available to the markup as the interpreted text
     role ``name``.
 
     If a `generator` is not provided, register a `VoidUrlGenerator` instance:
@@ -366,8 +368,16 @@ def create_api_role(name, problematic):
     """
     Create and register a new role to create links for an API documentation.
 
-    Create a role called `name`, which will use the ``name`` registered
-    URL resolver to create a link for an object.
+    Create a role called `name`, which will use the URL resolver registered as
+    ``name`` in `api_register` to create a link for an object.
+
+    :Parameters:
+      `name` : `str`
+        name of the role to create.
+      `problematic` : `bool`
+        if True, the registered role will create problematic nodes in
+        case of failed references. If False, a warning will be raised
+        anyway, but the output will appear as an ordinary literal.
     """
     def resolve_api_name(n, rawtext, text, lineno, inliner,
                 options={}, content=[]):
