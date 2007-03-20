@@ -118,7 +118,12 @@ class LatexWriter:
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
+
+        #: The Python representation of the encoding.
+        #: Update L{latex_encodings} in case of mismatch between it and
+        #: the C{inputenc} LaTeX package.
         self._encoding = kwargs.get('encoding', 'utf-8')
+
         self.valdocs = sorted(docindex.reachable_valdocs(
             imports=False, packages=False, bases=False, submodules=False, 
             subclasses=False, private=self._show_private))
@@ -226,7 +231,7 @@ class LatexWriter:
             os.mkdir(directory)
             
     #////////////////////////////////////////////////////////////
-    # Main Doc File
+    #{ Main Doc File
     #////////////////////////////////////////////////////////////
 
     def write_topfile(self, out):
@@ -274,7 +279,7 @@ class LatexWriter:
         out('\n')
         
         # Set the encoding.
-        out('\\usepackage[%s]{inputenc}' % self._encoding)
+        out('\\usepackage[%s]{inputenc}' % self.get_latex_encoding())
 
         # If we're generating hyperrefs, add the appropriate packages.
         if self._hyperref:
@@ -309,7 +314,7 @@ class LatexWriter:
 
         
     #////////////////////////////////////////////////////////////
-    # Chapters
+    #{ Chapters
     #////////////////////////////////////////////////////////////
 
     def write_module(self, out, doc):
@@ -405,7 +410,7 @@ class LatexWriter:
         out('    ' + self.indexterm(doc, 'end'))
 
     #////////////////////////////////////////////////////////////
-    # Module hierarchy trees
+    #{ Module hierarchy trees
     #////////////////////////////////////////////////////////////
     
     def write_module_tree(self, out):
@@ -463,7 +468,7 @@ class LatexWriter:
             out(' '*depth + '  \\end{itemize}\n')
 
     #////////////////////////////////////////////////////////////
-    # Base class trees
+    #{ Base class trees
     #////////////////////////////////////////////////////////////
 
     def base_tree(self, doc, width=None, linespec=None):
@@ -539,7 +544,7 @@ class LatexWriter:
         return s
         
     #////////////////////////////////////////////////////////////
-    # Class List
+    #{ Class List
     #////////////////////////////////////////////////////////////
     
     def write_class_list(self, out, doc):
@@ -583,7 +588,7 @@ class LatexWriter:
             out((', p.~\\pageref{%s})}\n\n' % self.label(doc)))
         
     #////////////////////////////////////////////////////////////
-    # Function List
+    #{ Function List
     #////////////////////////////////////////////////////////////
     
     def write_func_list(self, out, heading, doc, value_type, seclevel=1):
@@ -752,7 +757,7 @@ class LatexWriter:
             return '(%s)' % (', '.join([self._arg_name(a) for a in arg]))
 
     #////////////////////////////////////////////////////////////
-    # Variable List
+    #{ Variable List
     #////////////////////////////////////////////////////////////
 
     # Also used for the property list.
@@ -848,7 +853,7 @@ class LatexWriter:
         out('\\cline{1-2}\n')
 
     #////////////////////////////////////////////////////////////
-    # Standard Fields
+    #{ Standard Fields
     #////////////////////////////////////////////////////////////
 
     # Copied from HTMLWriter:
@@ -903,7 +908,7 @@ class LatexWriter:
 
 
     #////////////////////////////////////////////////////////////
-    # Docstring -> LaTeX Conversion
+    #{ Docstring -> LaTeX Conversion
     #////////////////////////////////////////////////////////////
 
     # We only need one linker, since we don't use context:
@@ -922,7 +927,7 @@ class LatexWriter:
                                   hyperref=self._hyperref)
     
     #////////////////////////////////////////////////////////////
-    # Helpers
+    #{ Helpers
     #////////////////////////////////////////////////////////////
 
     def write_header(self, out, where):
@@ -1002,6 +1007,15 @@ class LatexWriter:
     def label(self, doc):
         return ':'.join(doc.canonical_name)
 
+    #: Map the Python encoding representation into mismatching LaTeX ones.
+    latex_encodings = {
+        'utf-8': 'utf8',
+    }
 
-
-
+    def get_latex_encoding(self):
+        """
+        @return: The LaTeX representation of the selected encoding.
+        @rtype: C{str}
+        """
+        enc = self._encoding.lower()
+        return self.latex_encodings.get(enc, enc)
