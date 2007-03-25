@@ -1010,7 +1010,7 @@ class NamespaceDoc(ValueDoc):
         L{sorted_variables} and L{group_specs} attributes.
         """
         if self.sorted_variables is UNKNOWN:
-            self.init_sorted_variables
+            self.init_sorted_variables()
         assert len(self.sorted_variables) == len(self.variables)
 
         elts = [(v.name, v) for v in self.sorted_variables]
