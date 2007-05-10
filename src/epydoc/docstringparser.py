@@ -968,8 +968,8 @@ _SIGNATURE_RE = re.compile(
     # The function name (must match exactly) [XX] not anymore!
     r'(?P<func>\w+)' +
     # The parameters
-    r'\((?P<params>(\s*\[?\s*\*{0,2}[\w\-\.]+(=.+?)?'+
-    r'(\s*\[?\s*,\s*\]?\s*\*{0,2}[\w\-\.]+(=.+?)?)*\]*)?)\s*\)' +
+    r'\((?P<params>(\s*\[?\s*\*{0,2}[\w\-\.]+(\s*=.+?)?'+
+    r'(\s*\[?\s*,\s*\]?\s*\*{0,2}[\w\-\.]+(\s*=.+?)?)*\]*)?)\s*\)' +
     # The return value (optional)
     r'(\s*(->)\s*(?P<return>\S.*?))?'+
     # The end marker
