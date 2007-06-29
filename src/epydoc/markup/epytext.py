@@ -1851,6 +1851,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                      docindex, context):
         # Generate the graph
         if graph_type == 'classtree':
+            from epydoc.apidoc import ClassDoc
             if graph_args:
                 bases = [docindex.find(name, context)
                          for name in graph_args]
