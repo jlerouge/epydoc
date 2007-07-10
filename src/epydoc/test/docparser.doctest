@@ -785,3 +785,9 @@ Assignments Into Namespaces
                           +- GenericValueDoc [4]
 
 
+    >>> runparser(s="""
+    ...     Exception.x = 10
+    ...     """,
+    ...     attribs='variables value local_variables')
+    ModuleDoc for epydoc_test [0]
+     +- variables = {}
