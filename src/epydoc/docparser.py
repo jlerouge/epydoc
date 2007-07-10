@@ -1839,6 +1839,12 @@ def set_variable(namespace, var_doc, preserve_docstring=False):
     # Choose which dictionary we'll be storing the variable in.
     if not isinstance(namespace, NamespaceDoc):
         return
+
+    # This happens when the class definition has not been parsed, e.g. in
+    # sf bug #1693253 on ``Exception.x = y``
+    if namespace.sort_spec is UNKNOWN:
+        namespace.sort_spec = namespace.variables.keys()
+
     # If we already have a variable with this name, then remove the
     # old VariableDoc from the sort_spec list; and if we gave its
     # value a canonical name, then delete it.
