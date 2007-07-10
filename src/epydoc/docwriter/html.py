@@ -2351,6 +2351,7 @@ class HTMLWriter:
     '__sub__': 'Subtraction operator',
     '__and__': 'And operator',
     '__or__': 'Or operator',
+    '__xor__': 'Exclusive-Or operator',
     '__repr__': 'Representation operator',
     '__call__': 'Call operator',
     '__getattr__': 'Qualification operator',
