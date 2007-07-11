@@ -1310,5 +1310,5 @@ def _inherit_info(var_doc):
         elif (src_val is not None and
               hasattr(val_doc, attrib) and hasattr(src_val, attrib) and
               getattr(src_val, attrib) not in (None, UNKNOWN) and
-              getattr(val_doc, attrib) in (None, UNKNOWN)):
+              getattr(val_doc, attrib) in (None, UNKNOWN, [])):
             setattr(val_doc, attrib, getattr(src_val, attrib))
