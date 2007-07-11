@@ -165,6 +165,7 @@ class ParsedRstDocstring(ParsedDocstring):
 
     def split_fields(self, errors=None):
         # Inherit docs
+        if errors is None: errors = []
         visitor = _SplitFieldsTranslator(self._document, errors)
         self._document.walk(visitor)
         if len(self._document.children) > 0:
