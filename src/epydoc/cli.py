@@ -289,16 +289,16 @@ def parse_arguments():
     output_group = OptionGroup(optparser, 'Output Options')
     optparser.add_option_group(output_group)
 
-    output_group.add_option("--name",
+    output_group.add_option("--name", "-n",
         dest="prj_name", metavar="NAME",
         help="The documented project's name (for the navigation bar).")
 
-    output_group.add_option("--css",
+    output_group.add_option("--css", "-c",
         dest="css", metavar="STYLESHEET",
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
 
-    output_group.add_option("--url",
+    output_group.add_option("--url", "-u",
         dest="prj_url", metavar="URL",
         help="The documented project's URL (for the navigation bar).")
 
@@ -440,7 +440,7 @@ def parse_arguments():
     for name in names:
         if name.endswith('.pickle'):
             if len(names) != 1:
-                optparse.error("When a pickle file is specified, no other "
+                optparser.error("When a pickle file is specified, no other "
                                "input files may be specified.")
             options.load_pickle = True
     
