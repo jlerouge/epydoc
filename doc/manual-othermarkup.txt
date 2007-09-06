@@ -148,7 +148,7 @@ The following consolidated fields are currently supported by epydoc:
      - Corresponding Base Field Tag
    * - ``:Parameters:``
      - ``:param:``
-   * - ``:Exception:``
+   * - ``:Exceptions:``
      - ``:except:``
    * - ``:Groups:``
      - ``:group:``
