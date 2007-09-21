@@ -332,10 +332,10 @@ def introspect_class(cls, class_doc, module_name=None):
     class_doc.docstring = get_docstring(cls)
 
     # Record the class's __all__ attribute (public names).
+    public_names = None
     if hasattr(cls, '__all__'):
         try:
-            public_names = [str(name) for name in cls.__all__]
-            class_doc.public_names = public_names
+            public_names = set([str(name) for name in cls.__all__])
         except KeyboardInterrupt: raise
         except: pass
 
@@ -394,13 +394,13 @@ def introspect_class(cls, class_doc, module_name=None):
             if child_name.startswith(private_prefix):
                 child_name = child_name[len(private_prefix)-2:]
             if child_name in UNDOCUMENTED_CLASS_VARS: continue
-            #try: child = getattr(cls, child_name)
-            #except: continue
             val_doc = introspect_docs(child, context=class_doc,
                                       module_name=module_name)
             var_doc = VariableDoc(name=child_name, value=val_doc,
                                   container=class_doc,
                                   docs_extracted_by='introspecter')
+            if public_names is not None:
+                var_doc.is_public = (child_name in public_names)
             class_doc.variables[child_name] = var_doc
 
     return class_doc
