@@ -1120,7 +1120,7 @@ def gui():
     modules = []
     for arg in sys.argv[1:]:
         if arg[0] == '-':
-            arg = arg.lower()
+            if arg != '-V': arg = arg.lower()
             if arg in ('-h', '--help', '-?', '--usage'): _usage()
             elif arg in ('-V', '--version'): _version()
             elif arg in ('--debug',): DEBUG = 1
