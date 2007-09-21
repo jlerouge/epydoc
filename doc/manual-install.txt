@@ -29,7 +29,7 @@ Getting Epydoc from Subversion
 If you wish to keep up on the latest developments, you can get the latest
 version of epydoc from the `subversion repository`_::
 
-    [/home/edloper]$ svn co https://svn.sourceforge.net/svnroot/epydoc/trunk/epydoc epydoc
+    [/home/edloper]$ svn co https://epydoc.svn.sourceforge.net/svnroot/epydoc/trunk/epydoc epydoc
     [/home/edloper]$ ls epydoc
     Makefile  doc  man  sandbox  src
 
@@ -44,7 +44,7 @@ have all the latest changes::
 You can browse the subversion repository here__.
 
 .. _subversion repository: http://sourceforge.net/svn/?group_id=32455
-.. __: http://svn.sourceforge.net/viewcvs.cgi/epydoc/trunk/epydoc/
+.. __: http://epydoc.svn.sourceforge.net/viewcvs.cgi/epydoc/trunk/epydoc/
 
 
 Installing from the RPM File
