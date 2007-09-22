@@ -21,6 +21,8 @@
   <li><a href="#new_markup">Will you
   add support for my favorite markup language <i>xyz</i>?</a></li>
   <li><a href="#new_field">Is there a way to define a new field?</a></li>
+  <li><a href="#epytext_fail">Why does epydoc render one of my epytext-formatted
+  docstrings as plaintext?</a></li>
 </ul></p>
 <p><b>Extracting Documentation</b>
 <ul class="nomargin">
@@ -111,7 +113,28 @@
   <dd><p>You can add new fields that describe simple metadata using
   the <code>@newfield</code> field.  See the documentation for <a
   href="fields.html#newfield">fields</a>
-  for more information. </p></dd> </p></dd>
+  for more information. </p></dd>
+
+</dl>
+
+  <!-- QUESTION --><a name="epytext_fail" />
+  <dt><p><b>Q:</b> Why does epydoc render one of my
+  epytext-formatted docstrings as plaintext? </p></dt>
+
+  <dd><p>Since epytext is used as the default markup language for
+  epydoc, it needs to be very conservative -- it will be used to
+  display many docstrings that are not explicitly written using
+  epytext, and it needs to display those docstrings in a readable way.
+  Therefore, whenever epytext encounters a docstring that doesn't
+  strictly conform to the epytext markup language, it renders it as
+  plaintext. </p>
+
+  <p>If you expect one of your docstrings to be processed using
+  epytext, but it gets rendered as plaintext, then the docstring most
+  likely contains one or more markup errors.  Run epydoc with the
+  <code>-v</code> option to see markup errors, and check for an error
+  in the docstring in question.  Once you fix the markup errors, the
+  docstring will be processed as expected.</p></dd>
 
 </dl>
 
