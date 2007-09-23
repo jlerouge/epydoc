@@ -211,6 +211,7 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
     # anything else.  (Typically this is true if this module was
     # imported, but is not included in the set of modules we're
     # documenting.)
+    module_doc.variables = {}
     if preliminary: return
 
     # Record the module's docstring
