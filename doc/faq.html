@@ -51,6 +51,8 @@
   <li><a href="#redirect">Is there a way to link to the API documentation
     for objects using a simple URL based on the object's dotted name?
     </a></li>
+  <li><a href="#redundant-details">Why are some values listed in the details
+    section, but not others?</a></li>
 </ul></p>
 <p><b>Development of Epydoc</b>
 <ul class="nomargin">
@@ -366,6 +368,28 @@
   >epydoc.cli-module.html#HELP_TOPICS</a>&gt;</tt>.  The redirect page can
   be used for any object documented by epydoc, including modules,
   classes, functions, varaibles, properties, etc. </p></dd>
+</dl>
+
+  <!-- QUESTION --><a name="redundant-details" />
+  <dt><p><b>Q:</b> Why are some values listed in the details
+    section, but not others?
+    </p></dt>
+
+  <dd><p>By default, epydoc will only list a value in the details
+  section if there's additional information beyond what's listed in
+  the summary section.  For example, if you define a function but
+  don't give it a docstring, then all API information about that
+  function can be shown in the summary table, so no details entry will
+  be created for it.  This helps keep the generated documentation
+  consise, and the information density high.  However if you prefer,
+  the command-line option "<code>--redundant-details</code>" can be
+  used to tell epydoc to display all values in the details lists, even
+  if all info about them is already provided by the summary table.
+  The corresponding config file option is
+  <code>redundant-details</code>.  <i>This option was added in svn
+  revision 1613, and is not yet available in the most recent
+  release.</i>
+  </p></dd>
 </dl>
 
 <!-- ==================== DEVELOPMENT ========================= -->
