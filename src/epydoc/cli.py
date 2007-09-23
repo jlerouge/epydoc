@@ -538,11 +538,11 @@ def parse_configfiles(configfiles, options, names):
             if val.lower() not in INHERITANCE_STYLES:
                 raise ValueError('"%s" expected one of: %s.' %
                                  (optname, ', '.join(INHERITANCE_STYLES)))
-            options.inerhitance = val.lower()
+            options.inheritance = val.lower()
         elif optname =='private':
-            options.private = _str_to_bool(val, optname)
+            options.show_private = _str_to_bool(val, optname)
         elif optname =='imports':
-            options.imports = _str_to_bool(val, optname)
+            options.show_imports = _str_to_bool(val, optname)
         elif optname == 'sourcecode':
             options.include_source_code = _str_to_bool(val, optname)
         elif optname in ('include-log', 'include_log'):
