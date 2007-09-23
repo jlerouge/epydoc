@@ -653,13 +653,20 @@ class LatexWriter:
             out(' '*6+'\\textbf{Parameters}\n')
             out(' '*6+'\\begin{quote}\n')
             out('        \\begin{Ventry}{%s}\n\n' % (longest*'x'))
-            # Params that have @type but not @param info:
-            unseen_types = set(func_doc.arg_types)
-            # List everything that has a @param:
-            for (arg_names, arg_descr) in func_doc.arg_descrs:
+            # Add params that have @type but not @param info:
+            arg_descrs = list(func_doc.arg_descrs)
+            args = set()
+            for arg_names, arg_descr in arg_descrs:
+                args.update(arg_names)
+            for arg in var_doc.value.arg_types:
+                if arg not in args:
+                    arg_descrs.append( ([arg],None) )
+            # Display params
+            for (arg_names, arg_descr) in arg_descrs:
                 arg_name = plaintext_to_latex(', '.join(arg_names))
                 out('%s\\item[%s]\n\n' % (' '*10, arg_name))
-                out(self.docstring_to_latex(arg_descr, 10))
+                if arg_descr:
+                    out(self.docstring_to_latex(arg_descr, 10))
                 for arg_name in arg_names:
                     arg_typ = func_doc.arg_types.get(arg_name)
                     if arg_typ is not None:
@@ -668,7 +675,7 @@ class LatexWriter:
                         else:
                             lhs = 'type of %s' % arg_name
                         rhs = self.docstring_to_latex(arg_typ).strip()
-                        out('%s\\textit{(%s=%s)}\n\n' % (' '*12, lhs, rhs))
+                        out('%s{\\it (%s=%s)}\n\n' % (' '*12, lhs, rhs))
             out('        \\end{Ventry}\n\n')
             out(' '*6+'\\end{quote}\n\n')
             out('    \\vspace{1ex}\n\n')
@@ -682,7 +689,7 @@ class LatexWriter:
             if rdescr not in (None, UNKNOWN):
                 out(self.docstring_to_latex(rdescr, 6))
                 if rtype not in (None, UNKNOWN):
-                    out(' '*6+'\\textit{(type=%s)}\n\n' %
+                    out(' '*6+'{\\it (type=%s)}\n\n' %
                         self.docstring_to_latex(rtype, 6).strip())
             elif rtype not in (None, UNKNOWN):
                 out(self.docstring_to_latex(rtype, 6))
@@ -745,7 +752,7 @@ class LatexWriter:
     def func_arg(self, name, default):
         s = '\\textit{%s}' % plaintext_to_latex(self._arg_name(name))
         if default is not None:
-            s += '=\\texttt{%s}' % default.summary_pyval_repr().to_latex(None)
+            s += '={\\tt %s}' % default.summary_pyval_repr().to_latex(None)
         return s
     
     def _arg_name(self, arg):
@@ -829,7 +836,7 @@ class LatexWriter:
                 var_doc.value.summary_pyval_repr().to_latex(None))
         if has_type:
             ptype = self.docstring_to_latex(var_doc.type_descr, 12).strip()
-            out('%s\\textit{(type=%s)}' % (' '*12, ptype))
+            out('%s{\\it (type=%s)}' % (' '*12, ptype))
         out('&\\\\\n')
         out('\\cline{1-2}\n')
 
@@ -847,7 +854,7 @@ class LatexWriter:
             if has_type: out('\n\n')
         if has_type:
             ptype = self.docstring_to_latex(prop_doc.type_descr, 12).strip()
-            out('%s\\textit{(type=%s)}' % (' '*12, ptype))
+            out('%s{\\it (type=%s)}' % (' '*12, ptype))
         # [xx] List the fget/fset/fdel functions?
         out('&\\\\\n')
         out('\\cline{1-2}\n')
