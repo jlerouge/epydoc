@@ -136,7 +136,8 @@ OPTION_DEFAULTS = dict(
     list_classes_separately=False, graph_font=None, graph_font_size=None,
     include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
     exclude=[], exclude_parse=[], exclude_introspect=[],
-    external_api=[],external_api_file=[],external_api_root=[])
+    external_api=[],external_api_file=[],external_api_root=[],
+    redundant_details=False)
 
 def parse_arguments():
     # Construct the option parser.
@@ -285,6 +286,11 @@ def parse_arguments():
         action='store_true', dest='include_log',
         help=("Include a page with the process log (epydoc-log.html)"))
 
+    generation_group.add_option(
+        '--redundant-details',
+        action='store_true', dest='redundant_details',
+        help=("Include values in the details lists even if all info "
+              "about them is already provided by the summary table."))
 
     output_group = OptionGroup(optparser, 'Output Options')
     optparser.add_option_group(output_group)
@@ -547,6 +553,8 @@ def parse_configfiles(configfiles, options, names):
             options.include_source_code = _str_to_bool(val, optname)
         elif optname in ('include-log', 'include_log'):
             options.include_log = _str_to_bool(val, optname)
+        elif optname in ('redundant-details', 'redundant_details'):
+            options.redundant_details = _str_to_bool(val, optname)
 
         # Output options
         elif optname == 'name':

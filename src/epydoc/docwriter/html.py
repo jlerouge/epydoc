@@ -359,6 +359,10 @@ class HTMLWriter:
         """Map the callgraph L{uid<DotGraph.uid>} to their HTML
         representation."""
 
+        self._redundant_details = kwargs.get('redundant_details', False)
+        """If true, then include objects in the details list even if all
+        info about them is already provided by the summary table."""
+
         # For use with select_variables():
         if self._show_private:
             self._public_filter = None
@@ -2049,7 +2053,7 @@ class HTMLWriter:
         else: tr_class = ' class="private"'
 
         # Decide an anchor or a link is to be generated.
-        link_name = var_doc.is_detailed()
+        link_name = self._redundant_details or var_doc.is_detailed()
         anchor = not link_name
 
         # Construct the HTML code for the type (cell 1) & description
@@ -2131,16 +2135,20 @@ class HTMLWriter:
 
     def write_details_list(self, out, heading, doc, value_type):
         # Get a list of the VarDocs we should describe.
+        if self._redundant_details:
+            detailed = None
+        else:
+            detailed = True
         if isinstance(doc, ClassDoc):
             var_docs = doc.select_variables(value_type=value_type,
                                             imported=False, inherited=False,
                                             public=self._public_filter,
-                                            detailed=True)
+                                            detailed=detailed)
         else:
             var_docs = doc.select_variables(value_type=value_type,
                                             imported=False,
                                             public=self._public_filter,
-                                            detailed=True)
+                                            detailed=detailed)
         if not var_docs: return
 
         # Write a header
