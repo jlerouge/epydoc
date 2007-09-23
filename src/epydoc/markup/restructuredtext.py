@@ -545,6 +545,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         # Set the document's settings.
         if self.settings is None:
             settings = OptionParser([LaTeXWriter()]).get_default_values()
+            settings.output_encoding = 'utf-8'
             self.__class__.settings = settings
         document.settings = self.settings
 
