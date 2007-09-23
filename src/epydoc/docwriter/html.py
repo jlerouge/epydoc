@@ -32,7 +32,7 @@ from epydoc.compat import * # Backwards compatibility
 ######################################################################
 ## Template Compiler
 ######################################################################
-# The compile_tempalte() method defined in this section is used to
+# The compile_template() method defined in this section is used to
 # define several of HTMLWriter's methods.
 
 def compile_template(docstring, template_string,
