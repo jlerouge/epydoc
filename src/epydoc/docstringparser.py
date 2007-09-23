@@ -192,15 +192,19 @@ def parse_docstring(api_doc, docindex):
     # Remove leading indentation from the docstring.
     api_doc.docstring = unindent_docstring(api_doc.docstring)
 
+    # Decide which docformat is used by this module.
+    docformat = get_docformat(api_doc, docindex)
+
+    # A list of markup errors from parsing.
+    parse_errors = []
+    
     # Extract a signature from the docstring, if it has one.  This
     # overrides any signature we got via introspection/parsing.
     if isinstance(api_doc, RoutineDoc):
-        parse_function_signature(api_doc)
+        parse_function_signature(api_doc, None, docformat, parse_errors)
 
     # Parse the docstring.  Any errors encountered are stored as
     # `ParseError` objects in the errors list.
-    docformat = get_docformat(api_doc, docindex)
-    parse_errors = []
     parsed_docstring = markup.parse(api_doc.docstring, docformat,
                                     parse_errors)
         
@@ -222,7 +226,8 @@ def parse_docstring(api_doc, docindex):
             init_api_doc = initvar.value
             parse_docstring(init_api_doc, docindex)
 
-            parse_function_signature(init_api_doc, api_doc)
+            parse_function_signature(init_api_doc, api_doc,
+                                     docformat, parse_errors)
             init_fields = split_init_fields(fields, field_warnings)
 
             # Process fields
@@ -981,7 +986,7 @@ _SIGNATURE_RE = re.compile(
 """A regular expression that is used to extract signatures from
 docstrings."""
     
-def parse_function_signature(func_doc, doc_source=None):
+def parse_function_signature(func_doc, doc_source, docformat, parse_errors):
     """
     Construct the signature for a builtin function or method from
     its docstring.  If the docstring uses the standard convention
@@ -1061,7 +1066,8 @@ def parse_function_signature(func_doc, doc_source=None):
 
     # Extract the return type/value from the signature
     if rtype:
-        func_doc.return_type = markup.parse(rtype, 'plaintext')
+        func_doc.return_type = markup.parse(rtype, docformat, parse_errors,
+                                            inline=True)
 
     # Add the self parameter, if it was specified.
     if selfparam:
