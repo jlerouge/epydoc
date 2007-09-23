@@ -111,11 +111,12 @@ class DottedName:
             elif isinstance(piece, basestring):
                 for subpiece in piece.split('.'):
                     if piece not in self._ok_identifiers:
-                        if self._IDENTIFIER_RE.match(subpiece):
-                            self._ok_identifiers.add(piece)
-                        else:
-                            raise DottedName.InvalidDottedName(
-                                'Bad identifier %r' % (piece,))
+                        if not self._IDENTIFIER_RE.match(subpiece):
+                            #raise DottedName.InvalidDottedName(
+                            #    'Bad identifier %r' % (piece,))
+                            log.warning("Identifier %r looks suspicious; "
+                                        "using it anyway." % piece)
+                        self._ok_identifiers.add(piece)
                     self._identifiers.append(subpiece)
             else:
                 raise TypeError('Bad identifier %r: expected '
