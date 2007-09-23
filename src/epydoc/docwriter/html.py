@@ -2866,7 +2866,7 @@ class HTMLWriter:
         if parsed_docstring in (None, UNKNOWN): return []
         terms = []
         # Strip any existing anchor off:
-        base_url = re.sub('#.*', '', base_url)
+        base_url = re.sub('#.*', '', '%s' % (base_url,))
         for term in parsed_docstring.index_terms():
             anchor = self._term_index_to_anchor(term)
             url = '%s#%s' % (base_url, anchor)
