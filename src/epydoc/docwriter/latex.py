@@ -279,7 +279,7 @@ class LatexWriter:
         out('\n')
         
         # Set the encoding.
-        out('\\usepackage[%s]{inputenc}' % self.get_latex_encoding())
+        out('\\usepackage[%s]{inputenc}\n' % self.get_latex_encoding())
 
         # If we're generating hyperrefs, add the appropriate packages.
         if self._hyperref:
@@ -301,16 +301,17 @@ class LatexWriter:
         if 'restructuredtext' in epydoc.markup.MARKUP_LANGUAGES_USED:
             from epydoc.markup import restructuredtext
             rst_head = restructuredtext.latex_head_prefix()
+            rst_head = ''.join(rst_head).split('\n')
             for line in rst_head[1:]:
                 m = re.match(r'\\usepackage(\[.*?\])?{(.*?)}', line)
                 if m and m.group(2) in (
                     'babel', 'hyperref', 'color', 'alltt', 'parskip',
                     'fancyhdr', 'boxedminipage', 'makeidx',
                     'multirow', 'longtable', 'tocbind', 'assymb',
-                    'fullpage'):
+                    'fullpage', 'inputenc'):
                     pass
                 else:
-                    out(line)
+                    out(line+'\n')
 
         
     #////////////////////////////////////////////////////////////
