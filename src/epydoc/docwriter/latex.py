@@ -84,6 +84,25 @@ class LatexWriter:
         "% Exceptions",
         "\\newcommand{\\pysrcexcept}[1]{\\textcolor{py@exceptcolour}"
             "{\\small\\textbf{#1}}}",
+        # Size of the function description boxes.
+        "\\newlength{\\funcindent}",
+        "\\newlength{\\funcwidth}",
+        "\\setlength{\\funcindent}{1cm}",
+        "\\setlength{\\funcwidth}{\\textwidth}",
+        "\\addtolength{\\funcwidth}{-2\\funcindent}",
+        # Size of the var description tables.
+        "\\newlength{\\varindent}",
+        "\\newlength{\\varnamewidth}",
+        "\\newlength{\\vardescrwidth}",
+        "\\newlength{\\varwidth}",
+        "\\setlength{\\varindent}{1cm}",
+        "\\setlength{\\varnamewidth}{.3\\textwidth}",
+        "\\setlength{\\varwidth}{\\textwidth}",
+        "\\addtolength{\\varwidth}{-4\\tabcolsep}",
+        "\\addtolength{\\varwidth}{-3\\arrayrulewidth}",
+        "\\addtolength{\\varwidth}{-2\\varindent}",
+        "\\setlength{\\vardescrwidth}{\\varwidth}",
+        "\\addtolength{\\vardescrwidth}{-\\varnamewidth}",
         # Define new environment for displaying parameter lists.
         textwrap.dedent("""\
         \\newenvironment{Ventry}[1]%
@@ -124,7 +143,7 @@ class LatexWriter:
         #: the C{inputenc} LaTeX package.
         self._encoding = kwargs.get('encoding', 'utf-8')
 
-        self.valdocs = sorted(docindex.reachable_valdocs(
+        self.valdocs = valdocs = sorted(docindex.reachable_valdocs(
             imports=False, packages=False, bases=False, submodules=False, 
             subclasses=False, private=self._show_private))
         self._num_files = self.num_files()
@@ -132,6 +151,11 @@ class LatexWriter:
         if self._show_private: self._public_filter = None
         else: self._public_filter = True
 
+        self.class_list = [d for d in valdocs if isinstance(d, ClassDoc)]
+        """The list of L{ClassDoc}s for the documented classes."""
+        self.class_set = set(self.class_list)
+        """The set of L{ClassDoc}s for the documented classes."""
+        
     def write(self, directory=None):
         """
         Write the API documentation for the entire project to the
@@ -591,8 +615,10 @@ class LatexWriter:
     #////////////////////////////////////////////////////////////
     #{ Function List
     #////////////////////////////////////////////////////////////
+    _FUNC_GROUP_HEADER = '\n\\large{\\textbf{\\textit{%s}}}\n\n'
     
     def write_func_list(self, out, heading, doc, value_type, seclevel=1):
+        # Divide all public variables of the given type into groups.
         groups = [(plaintext_to_latex(group_name),
                    doc.select_variables(group=group_name, imported=False,
                                         value_type=value_type,
@@ -607,15 +633,75 @@ class LatexWriter:
         self.write_start_of(out, heading)
         out('  '+self.section(heading, seclevel))
 
+        # Write a section for each group.
+        grouped_inh_vars = {}
         for name, var_docs in groups:
-            if name:
-                out('\n%s\\large{%s}\n' % (self.HRULE, name))
-            for var_doc in var_docs:
-                self.write_func_list_box(out, var_doc)
-            # [xx] deal with inherited methods better????
-            #if (self._inheritance == 'listed' and
-            #    isinstance(container, ClassDoc)):
-            #    out(self._inheritance_list(group, container.uid()))
+            self.write_func_group(out, doc, name, var_docs, grouped_inh_vars)
+
+        # Write a section for each inheritance pseudo-group (used if
+        # inheritance=='grouped')
+        if grouped_inh_vars:
+            for base in doc.mro():
+                if base in grouped_inh_vars:
+                    hdr = ('Inherited from %s' %
+                           plaintext_to_latex('%s' % base.canonical_name))
+                    if self._crossref and base in self.class_set:
+                        hdr += ('\\textit{(Section \\ref{%s})}' %
+                                self.label(base))
+                    out(self._FUNC_GROUP_HEADER % (hdr))
+                    for var_doc in grouped_inh_vars[base]:
+                        self.write_func_list_box(out, var_doc)
+
+    def write_func_group(self, out, doc, name, var_docs, grouped_inh_vars):
+        # Split up the var_docs list, according to the way each var
+        # should be displayed:
+        #   - listed_inh_vars -- for listed inherited variables.
+        #   - grouped_inh_vars -- for grouped inherited variables.
+        #   - normal_vars -- for all other variables.
+        listed_inh_vars = {}
+        normal_vars = []
+        for var_doc in var_docs:
+            if var_doc.container != doc:
+                base = var_doc.container
+                if (base not in self.class_set or
+                    self._inheritance == 'listed'):
+                    listed_inh_vars.setdefault(base,[]).append(var_doc)
+                elif self._inheritance == 'grouped':
+                    grouped_inh_vars.setdefault(base,[]).append(var_doc)
+                else:
+                    normal_vars.append(var_doc)
+            else:
+                normal_vars.append(var_doc)
+            
+        # Write a header for the group.
+        if name:
+            out(self._FUNC_GROUP_HEADER % name)
+        # Write an entry for each normal var:
+        for var_doc in normal_vars:
+            self.write_func_list_box(out, var_doc)
+        # Write a subsection for inherited vars:
+        if listed_inh_vars:
+            self.write_func_inheritance_list(out, doc, listed_inh_vars)
+
+    def write_func_inheritance_list(self, out, doc, listed_inh_vars):
+        for base in doc.mro():
+            if base not in listed_inh_vars: continue
+            #if str(base.canonical_name) == 'object': continue
+            var_docs = listed_inh_vars[base]
+            if self._public_filter:
+                var_docs = [v for v in var_docs if v.is_public]
+            if var_docs:
+                hdr = ('Inherited from %s' %
+                       plaintext_to_latex('%s' % base.canonical_name))
+                if self._crossref and base in self.class_set:
+                    hdr += ('\\textit{(Section \\ref{%s})}' %
+                            self.label(base))
+                out(self._FUNC_GROUP_HEADER % hdr)
+                out('\\begin{quote}\n')
+                out('%s\n' % ', '.join(
+                    ['%s()' % plaintext_to_latex(var_doc.name)
+                     for var_doc in var_docs]))
+                out('\\end{quote}\n')
             
     def write_func_list_box(self, out, var_doc):
         func_doc = var_doc.value
@@ -629,7 +715,8 @@ class LatexWriter:
 
         # Start box for this function.
         out('    \\vspace{0.5ex}\n\n')
-        out('    \\begin{boxedminipage}{\\textwidth}\n\n')
+        out('\\hspace{.8\\funcindent}')
+        out('\\begin{boxedminipage}{\\funcwidth}\n\n')
 
         # Function signature.
         out('    %s\n\n' % self.function_signature(var_doc))
@@ -767,6 +854,7 @@ class LatexWriter:
     #////////////////////////////////////////////////////////////
     #{ Variable List
     #////////////////////////////////////////////////////////////
+    _VAR_GROUP_HEADER = '\\multicolumn{2}{|l|}{\\textit{%s}}\\\\\n'
 
     # Also used for the property list.
     def write_var_list(self, out, heading, doc, value_type, seclevel=1):
@@ -784,9 +872,13 @@ class LatexWriter:
         self.write_start_of(out, heading)
         out('  '+self.section(heading, seclevel))
 
+        # [xx] without this, there's a huge gap before the table -- why??
+        out('    \\vspace{-1cm}\n')
+        
+        out('\\hspace{\\varindent}')
         out('\\begin{longtable}')
-        out('{|p{.30\\textwidth}|')
-        out('p{.62\\textwidth}|l}\n')
+        out('{|p{\\varnamewidth}|')
+        out('p{\\vardescrwidth}|l}\n')
         out('\\cline{1-2}\n')
 
         # Set up the headers & footer (this makes the table span
@@ -803,23 +895,87 @@ class LatexWriter:
         out('\\cline{1-2}\n')
         out('\\endlastfoot')
 
+        # Write a section for each group.
+        grouped_inh_vars = {}
         for name, var_docs in groups:
-            if name:
-                out('\\multicolumn{2}{|l|}{')
-                out('\\textbf{%s}}\\\\\n' % name)
-                out('\\cline{1-2}\n')
-            for var_doc in var_docs:
-                if isinstance(var_doc, PropertyDoc):
-                    self.write_property_list_line(out, var_doc)
-                else:
-                    self.write_var_list_line(out, var_doc)
-            # [xx] deal with inherited methods better????
-            #if (self._inheritance == 'listed' and
-            #    isinstance(container, ClassDoc)):
-            #    out(self._inheritance_list(group, container.uid()))
+            self.write_var_group(out, doc, name, var_docs, grouped_inh_vars)
 
-        out('\\end{longtable}\n\n')
+        # Write a section for each inheritance pseudo-group (used if
+        # inheritance=='grouped')
+        if grouped_inh_vars:
+            for base in doc.mro():
+                if base in grouped_inh_vars:
+                    hdr = ('Inherited from %s' %
+                           plaintext_to_latex('%s' % base.canonical_name))
+                    if self._crossref and base in self.class_set:
+                        hdr += (' \\textit{(Section \\ref{%s})}' %
+                                self.label(base))
+                    out(self._VAR_GROUP_HEADER % (hdr))
+                    out('\\cline{1-2}\n')
+                    for var_doc in grouped_inh_vars[base]:
+                        if isinstance(var_doc, PropertyDoc):
+                            self.write_property_list_line(out, var_doc)
+                        else:
+                            self.write_var_list_line(out, var_doc)
     
+        out('\\end{longtable}\n\n')
+        
+    def write_var_group(self, out, doc, name, var_docs, grouped_inh_vars):
+        # Split up the var_docs list, according to the way each var
+        # should be displayed:
+        #   - listed_inh_vars -- for listed inherited variables.
+        #   - grouped_inh_vars -- for grouped inherited variables.
+        #   - normal_vars -- for all other variables.
+        listed_inh_vars = {}
+        normal_vars = []
+        for var_doc in var_docs:
+            if var_doc.container != doc:
+                base = var_doc.container
+                if (base not in self.class_set or
+                    self._inheritance == 'listed'):
+                    listed_inh_vars.setdefault(base,[]).append(var_doc)
+                elif self._inheritance == 'grouped':
+                    grouped_inh_vars.setdefault(base,[]).append(var_doc)
+                else:
+                    normal_vars.append(var_doc)
+            else:
+                normal_vars.append(var_doc)
+            
+        # Write a header for the group.
+        if name:
+            out(self._VAR_GROUP_HEADER % name)
+            out('\\cline{1-2}\n')
+        # Write an entry for each normal var:
+        for var_doc in normal_vars:
+            if isinstance(var_doc, PropertyDoc):
+                self.write_property_list_line(out, var_doc)
+            else:
+                self.write_var_list_line(out, var_doc)
+        # Write a subsection for inherited vars:
+        if listed_inh_vars:
+            self.write_var_inheritance_list(out, doc, listed_inh_vars)
+
+    def write_var_inheritance_list(self, out, doc, listed_inh_vars):
+        for base in doc.mro():
+            if base not in listed_inh_vars: continue
+            #if str(base.canonical_name) == 'object': continue
+            var_docs = listed_inh_vars[base]
+            if self._public_filter:
+                var_docs = [v for v in var_docs if v.is_public]
+            if var_docs:
+                hdr = ('Inherited from %s' %
+                       plaintext_to_latex('%s' % base.canonical_name))
+                if self._crossref and base in self.class_set:
+                    hdr += (' \\textit{(Section \\ref{%s})}' %
+                            self.label(base))
+                out(self._VAR_GROUP_HEADER % hdr)
+                out('\\multicolumn{2}{|p{\\varwidth}|}{'
+                    '\\raggedright %s}\\\\\n' %
+                    ', '.join(['%s' % plaintext_to_latex(var_doc.name)
+                               for var_doc in var_docs]))
+                out('\\cline{1-2}\n')
+
+        
     def write_var_list_line(self, out, var_doc):
         out('\\raggedright ')
         out(plaintext_to_latex(var_doc.name, nbsp=True, breakany=True))
