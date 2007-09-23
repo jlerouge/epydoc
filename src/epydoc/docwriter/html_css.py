@@ -201,6 +201,11 @@ table.summary a.summary-sig-name:visited
 .summary-sig-arg            { color: $summary_sig_arg; }
 .summary-sig-default        { color: $summary_sig_default; }
 
+/* Subclass list
+ */
+ul.subclass-list { display: inline; }
+ul.subclass-list li { display: inline; }
+
 /* To render variables, classes etc. like functions */
 table.summary .summary-name { color: $summary_sig_name; font-weight: bold;
                               font-family: monospace; }

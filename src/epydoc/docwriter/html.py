@@ -860,9 +860,15 @@ class HTMLWriter:
                 if (doc.subclasses not in (UNKNOWN, None) and
                     len(doc.subclasses) > 0):
                     out('<dl><dt>Known Subclasses:</dt>\n<dd>\n    ')
-                    out(',\n    '.join([self.href(c, context=doc)
-                                        for c in doc.subclasses]))
-                    out('\n</dd></dl>\n\n')
+                    out('  <ul class="subclass-list">\n')
+                    for i, subclass in enumerate(doc.subclasses):
+                        href = self.href(subclass, context=doc)
+                        if self._val_is_public(subclass): css = ''
+                        else: css = ' class="private"'
+                        if i > 0: href = ', '+href
+                        out('<li%s>%s</li>' % (css, href))
+                    out('  </ul>\n')
+                    out('</dd></dl>\n\n')
 
             out('<hr />\n')
         
@@ -1444,7 +1450,7 @@ class HTMLWriter:
             elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"none":"block");
           }
         }
-        // Update all table rowss containing private objects.  Note, we
+        // Update all table rows containing private objects.  Note, we
         // use "" instead of "block" becaue IE & firefox disagree on what
         // this should be (block vs table-row), and "" just gives the
         // default for both browsers.
@@ -1459,7 +1465,7 @@ class HTMLWriter:
         for(var i=0; i<elts.length; i++) {
           if (elts[i].className == "private") {
             elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?
-                                        "none":"list-item");
+                                        "none":"");
           }
         }
         // Update all list items containing private objects.
@@ -3027,6 +3033,16 @@ class HTMLWriter:
     #////////////////////////////////////////////////////////////
     #{ Helper functions
     #////////////////////////////////////////////////////////////
+
+    def _val_is_public(self, valdoc):
+        """Make a best-guess as to whether the given class is public."""
+        container = self.docindex.container(valdoc)
+        if container is not None:
+            for vardoc in container.variables.values():
+                if vardoc in (UNKNOWN, None): continue
+                if vardoc.value is valdoc:
+                    return vardoc.is_public
+        return True
 
     # [XX] Is it worth-while to pull the anchor tricks that I do here?
     # Or should I just live with the fact that show/hide private moves
