@@ -1623,7 +1623,7 @@ def parse_docstring(docstring, errors, **options):
         Currently, no extra options are defined.
     @rtype: L{ParsedDocstring}
     """
-    return ParsedEpytextDocstring(parse(docstring, errors))
+    return ParsedEpytextDocstring(parse(docstring, errors), **options)
     
 class ParsedEpytextDocstring(ParsedDocstring):
     SYMBOL_TO_HTML = {
@@ -1726,11 +1726,15 @@ class ParsedEpytextDocstring(ParsedDocstring):
         r'\(\prod\)', '<=': r'\(\le\)', '>=': r'\(\ge\)',
         }
     
-    def __init__(self, dom_tree):
+    def __init__(self, dom_tree, **options):
         self._tree = dom_tree
         # Caching:
         self._html = self._latex = self._plaintext = None
         self._terms = None
+        # inline option -- mark top-level children as inline.
+        if options.get('inline'):
+            for elt in self._tree.children:
+                elt.attribs['inline'] = True
 
     def __str__(self):
         return str(self._tree)
