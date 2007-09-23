@@ -38,6 +38,7 @@ class LatexWriter:
         "\\setlength{\\topmargin}{-\\headsep}",
         # By default, do not indent paragraphs.
         "\\setlength{\\parindent}{0ex}",
+        "\\setlength{\\parskip}{2ex}",
         # Double the standard size boxedminipage outlines.
         "\\setlength{\\fboxrule}{2\\fboxrule}",
         # Create a 'base class' length named BCL for use in base trees.
@@ -272,9 +273,9 @@ class LatexWriter:
 
         # Add a table of contents.
         self.write_start_of(out, 'Table of Contents')
-        out('\\addtolength{\\parskip}{-1ex}\n')
+        out('\\addtolength{\\parskip}{-2ex}\n')
         out('\\tableofcontents\n')
-        out('\\addtolength{\\parskip}{1ex}\n')
+        out('\\addtolength{\\parskip}{2ex}\n')
 
         # Include documentation files.
         self.write_start_of(out, 'Includes')
@@ -727,11 +728,12 @@ class LatexWriter:
             out('    \\rule{\\textwidth}{0.5\\fboxrule}\n')
         
         # Description
+        out("\\setlength{\\parskip}{2ex}\n")
         if func_doc.descr not in (None, UNKNOWN):
             out(self.docstring_to_latex(func_doc.descr, 4))
-            out('    \\vspace{1ex}\n\n')
 
         # Parameters
+        out("\\setlength{\\parskip}{1ex}\n")
         if func_doc.arg_descrs or func_doc.arg_types:
             # Find the longest name.
             longest = max([0]+[len(n) for n in func_doc.arg_types])
@@ -739,6 +741,7 @@ class LatexWriter:
                 longest = max([longest]+[len(n) for n in names])
             # Table header.
             out(' '*6+'\\textbf{Parameters}\n')
+            out('      \\vspace{-1ex}\n\n')
             out(' '*6+'\\begin{quote}\n')
             out('        \\begin{Ventry}{%s}\n\n' % (longest*'x'))
             # Add params that have @type but not @param info:
@@ -766,13 +769,13 @@ class LatexWriter:
                         out('%s{\\it (%s=%s)}\n\n' % (' '*12, lhs, rhs))
             out('        \\end{Ventry}\n\n')
             out(' '*6+'\\end{quote}\n\n')
-            out('    \\vspace{1ex}\n\n')
                 
         # Returns
         rdescr = func_doc.return_descr
         rtype = func_doc.return_type
         if rdescr not in (None, UNKNOWN) or rtype not in (None, UNKNOWN):
             out(' '*6+'\\textbf{Return Value}\n')
+            out('    \\vspace{-1ex}\n\n')
             out(' '*6+'\\begin{quote}\n')
             if rdescr not in (None, UNKNOWN):
                 out(self.docstring_to_latex(rdescr, 6))
@@ -782,11 +785,11 @@ class LatexWriter:
             elif rtype not in (None, UNKNOWN):
                 out(self.docstring_to_latex(rtype, 6))
             out(' '*6+'\\end{quote}\n\n')
-            out('    \\vspace{1ex}\n\n')
 
         # Raises
         if func_doc.exception_descrs not in (None, UNKNOWN, [], ()):
             out(' '*6+'\\textbf{Raises}\n')
+            out('    \\vspace{-1ex}\n\n')
             out(' '*6+'\\begin{quote}\n')
             out('        \\begin{description}\n\n')
             for name, descr in func_doc.exception_descrs:
@@ -795,7 +798,6 @@ class LatexWriter:
                 out(self.docstring_to_latex(descr, 10))
             out('        \\end{description}\n\n')
             out(' '*6+'\\end{quote}\n\n')
-            out('    \\vspace{1ex}\n\n')
 
         ## Overrides
         if var_doc.overrides not in (None, UNKNOWN):
@@ -913,7 +915,7 @@ class LatexWriter:
                     out(self._VAR_GROUP_HEADER % (hdr))
                     out('\\cline{1-2}\n')
                     for var_doc in grouped_inh_vars[base]:
-                        if isinstance(var_doc, PropertyDoc):
+                        if isinstance(var_doc.value3, PropertyDoc):
                             self.write_property_list_line(out, var_doc)
                         else:
                             self.write_var_list_line(out, var_doc)
@@ -947,7 +949,7 @@ class LatexWriter:
             out('\\cline{1-2}\n')
         # Write an entry for each normal var:
         for var_doc in normal_vars:
-            if isinstance(var_doc, PropertyDoc):
+            if isinstance(var_doc.value, PropertyDoc):
                 self.write_property_list_line(out, var_doc)
             else:
                 self.write_var_list_line(out, var_doc)
