@@ -133,6 +133,8 @@ class PyvalColorizer:
     
     GENERIC_OBJECT_RE = re.compile(r'^<.* at 0x[0-9a-f]+>$', re.IGNORECASE)
 
+    ESCAPE_UNICODE = False # should we escape non-ascii unicode chars?
+
     #////////////////////////////////////////////////////////////
     # Entry Point
     #////////////////////////////////////////////////////////////
@@ -184,7 +186,10 @@ class PyvalColorizer:
         elif pyval_type is str:
             self._colorize_str(pyval, state, '', 'string-escape')
         elif pyval_type is unicode:
-            self._colorize_str(pyval, state, 'u', 'unicode-escape')
+            if self.ESCAPE_UNICODE:
+                self._colorize_str(pyval, state, 'u', 'unicode-escape')
+            else:
+                self._colorize_str(pyval, state, 'u', None)
         elif pyval_type is list:
             self._multiline(self._colorize_iter, pyval, state, '[', ']')
         elif pyval_type is tuple:
@@ -306,7 +311,8 @@ class PyvalColorizer:
         # Body
         for i, line in enumerate(lines):
             if i>0: self._output('\n', None, state)
-            self._output(line.encode(encoding), self.STRING_TAG, state)
+            if encoding: line = line.encode(encoding)
+            self._output(line, self.STRING_TAG, state)
         # Close quote.
         self._output(quote, self.QUOTE_TAG, state)
 
