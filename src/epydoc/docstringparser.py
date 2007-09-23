@@ -1061,7 +1061,7 @@ def parse_function_signature(func_doc, doc_source=None):
 
     # Extract the return type/value from the signature
     if rtype:
-        func_doc.return_descr = markup.parse(rtype, 'plaintext')
+        func_doc.return_type = markup.parse(rtype, 'plaintext')
 
     # Add the self parameter, if it was specified.
     if selfparam:
