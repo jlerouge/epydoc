@@ -451,12 +451,16 @@ def report_errors(api_doc, docindex, parse_errors, field_warnings):
         filename = '??'
 
     # [xx] Don't report markup errors for standard builtins.
-    if (isinstance(api_doc, ValueDoc) and api_doc != module and
-        (api_doc.pyval in __builtin__.__dict__.values() or
-         (module not in (None, UNKNOWN) and 
-          module.pyval in (__builtin__, exceptions)))):
-        return
-
+    # n.b. that we must use 'is' to compare pyvals here -- if we use
+    # 'in' or '==', then a user __cmp__ method might raise an
+    # exception, or lie.
+    if isinstance(api_doc, ValueDoc) and api_doc != module:
+        if module not in (None, UNKNOWN) and module.pyval is exceptions:
+            return
+        for builtin_val in __builtin__.__dict__.values():
+            if builtin_val is api_doc.pyval:
+                return
+        
     # Get the start line of the docstring containing the error.
     startline = api_doc.docstring_lineno
     if startline in (None, UNKNOWN):
