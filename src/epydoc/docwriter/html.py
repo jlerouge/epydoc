@@ -2162,13 +2162,21 @@ class HTMLWriter:
             rtype = self.return_type(var_doc, indent=10)
             rdescr = self.return_descr(var_doc, indent=10)
             arg_descrs = []
-            # [xx] if we have a @type but no @param, this won't list it!
-            # [xx] put them in the right order??
+            args = set()
+            # Find the description for each arg.  (Leave them in the
+            # same order that they're listed in the docstring.)
             for (arg_names, arg_descr) in var_doc.value.arg_descrs:
+                args.update(arg_names)
                 lhs = ', '.join([self.arg_name_to_html(var_doc.value, n)
                                  for n in arg_names])
                 rhs = self.docstring_to_html(arg_descr, var_doc.value, 10)
                 arg_descrs.append( (lhs, rhs) )
+            # Check for arguments for which we have @type but not @param;
+            # and add them to the arg_descrs list.
+            for arg in var_doc.value.arg_types:
+                if arg not in args:
+                    argname = self.arg_name_to_html(var_doc.value, arg)
+                    arg_descrs.append( (argname,'') )
 
             self.write_function_details_entry(out, var_doc, descr,
                                               var_doc.value.callgraph_uid,
@@ -2203,7 +2211,10 @@ class HTMLWriter:
             lhs = m.group() + lhs
             rhs = rhs[m.end():]
 
-        return '<li>%s - %s</li>' % (lhs, rhs)
+        if rhs:
+            return '<li>%s - %s</li>' % (lhs, rhs)
+        else:
+            return '<li>%s</li>' % (lhs,)
 
     def property_accessor_to_html(self, val_doc, context=None):
         if val_doc not in (None, UNKNOWN):
