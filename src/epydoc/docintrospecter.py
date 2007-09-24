@@ -157,7 +157,7 @@ def _get_valuedoc(value):
     pyid = id(value)
     val_doc = _valuedoc_cache.get(pyid)
     if val_doc is None:
-        try: canonical_name = get_canonical_name(value)
+        try: canonical_name = get_canonical_name(value, strict=True)
         except DottedName.InvalidDottedName: canonical_name = UNKNOWN
         val_doc = ValueDoc(pyval=value, canonical_name = canonical_name,
                            docs_extracted_by='introspecter')
@@ -592,7 +592,7 @@ def get_docstring(value, module_name=None):
                     name)
         return None
 
-def get_canonical_name(value):
+def get_canonical_name(value, strict=False):
     """
     @return: the canonical name for C{value}, or C{UNKNOWN} if no
     canonical name can be found.  Currently, C{get_canonical_name}
@@ -606,30 +606,31 @@ def get_canonical_name(value):
 
     # Get the name via introspection.
     if isinstance(value, ModuleType):
-        dotted_name = DottedName(value.__name__)
+        dotted_name = DottedName(value.__name__, strict=strict)
         
     elif isclass(value):
         if value.__module__ == '__builtin__':
-            dotted_name = DottedName(value.__name__)
+            dotted_name = DottedName(value.__name__, strict=strict)
         else:
-            dotted_name = DottedName(value.__module__, value.__name__)
+            dotted_name = DottedName(value.__module__, value.__name__,
+                                     strict=strict)
             
     elif (inspect.ismethod(value) and value.im_self is not None and
           value.im_class is ClassType and
           not value.__name__.startswith('<')): # class method.
         class_name = get_canonical_name(value.im_self)
         if class_name is UNKNOWN: return UNKNOWN
-        dotted_name = DottedName(class_name, value.__name__)
+        dotted_name = DottedName(class_name, value.__name__, strict=strict)
     elif (inspect.ismethod(value) and
           not value.__name__.startswith('<')):
         class_name = get_canonical_name(value.im_class)
         if class_name is UNKNOWN: return UNKNOWN
-        dotted_name = DottedName(class_name, value.__name__)
+        dotted_name = DottedName(class_name, value.__name__, strict=strict)
     elif (isinstance(value, FunctionType) and
           not value.__name__.startswith('<')):
         module_name = _find_function_module(value)
         if module_name is None: return UNKNOWN
-        dotted_name = DottedName(module_name, value.__name__)
+        dotted_name = DottedName(module_name, value.__name__, strict=strict)
     else:
         return UNKNOWN
 

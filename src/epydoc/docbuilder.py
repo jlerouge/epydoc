@@ -1213,7 +1213,7 @@ def _unreachable_name_for(val_doc, docindex):
           hasattr(val_doc.pyval, '__name__')):
         try:
             name = DottedName(DottedName.UNREACHABLE,
-                              val_doc.pyval.__name__)
+                              val_doc.pyval.__name__, strict=True)
         except DottedName.InvalidDottedName:
             name = DottedName(DottedName.UNREACHABLE)
     else:

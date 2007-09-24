@@ -693,7 +693,7 @@ def process_raise_field(api_doc, docindex, tag, arg, descr):
     """Record the fact that C{api_doc} can raise the exception named
     C{tag} in C{api_doc.exception_descrs}."""
     _check(api_doc, tag, arg, context=RoutineDoc, expect_arg='single')
-    try: name = DottedName(arg)
+    try: name = DottedName(arg, strict=True)
     except DottedName.InvalidDottedName: name = arg
     api_doc.exception_descrs.append( (name, descr) )
 
