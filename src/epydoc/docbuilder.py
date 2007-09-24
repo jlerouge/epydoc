@@ -665,6 +665,12 @@ MERGE_PRECEDENCE = {
     # can actually use -- i.e., they take magic into account.
     'canonical_name': 'introspect',
 
+    # Only fall-back on the parser for is_imported if the introspecter
+    # isn't sure.  Otherwise, we can end up thinking that vars
+    # containing modules are not imported, which can cause external
+    # modules to show up in the docs (sf bug #1653486)
+    'is_imported': 'introspect',
+
     # The parser can tell if an assignment creates an alias or not.
     'is_alias': 'parse',
 
@@ -946,19 +952,6 @@ def merge_fset(v1, v2, precedence, cyclecheck, path):
 def merge_fdel(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.fdel')
 
-def merge_is_imported(v1, v2, precedence, cyclecheck, path):
-    # Always assume that modules are imported.  Other than that,
-    # give precedence to the parser over the introspector.
-    # This lets us avoid (sf bug #1653486), where external modules
-    # end up in our docs; and (sf bug #1685385), where decorated
-    # functions have the wrong module.
-    if isinstance(v1, ModuleDoc) or isinstance(v2, ModuleDoc):
-        return True
-    elif v2 in (None, UNKNOWN):
-        return v1
-    else:
-        return v2
-
 def merge_proxy_for(v1, v2, precedence, cyclecheck, path):
     # Anything we got from introspection shouldn't have a proxy_for
     # attribute -- it should be the actual object's documentation.
@@ -1034,7 +1027,6 @@ register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 register_attribute_mergefunc('docstring', merge_docstring)
 register_attribute_mergefunc('docs_extracted_by', merge_docs_extracted_by)
-register_attribute_mergefunc('is_imported', merge_is_imported)
 
 ######################################################################
 ## Import Linking
