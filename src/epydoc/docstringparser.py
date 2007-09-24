@@ -318,7 +318,7 @@ def add_metadata_from_var(api_doc, field):
             else:
                 elt = unicode(elt)
             elt = epytext.ParsedEpytextDocstring(
-                epytext.parse_as_para(elt))
+                epytext.parse_as_para(elt), inline=True)
 
             # Add in the metadata and remove from the variables
             api_doc.metadata.append( (field, varname, elt) )
