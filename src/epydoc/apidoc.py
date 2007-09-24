@@ -83,7 +83,7 @@ class DottedName:
     """A cache of identifier strings that have been checked against
     _IDENTIFIER_RE and found to be acceptable."""
     
-    def __init__(self, *pieces):
+    def __init__(self, *pieces, **options):
         """
         Construct a new dotted name from the given sequence of pieces,
         each of which can be either a C{string} or a C{DottedName}.
@@ -98,6 +98,9 @@ class DottedName:
         of values.  In that case, that tuple will be used as the
         C{DottedName}'s identifiers; it will I{not} be checked to
         see if it's valid.
+
+        @kwparam strict: if true, then raise an L{InvalidDottedName}
+        if the given name is invalid.
         """
         if len(pieces) == 1 and isinstance(pieces[0], tuple):
             self._identifiers = pieces[0] # Optimization
@@ -112,10 +115,14 @@ class DottedName:
                 for subpiece in piece.split('.'):
                     if piece not in self._ok_identifiers:
                         if not self._IDENTIFIER_RE.match(subpiece):
-                            #raise DottedName.InvalidDottedName(
-                            #    'Bad identifier %r' % (piece,))
-                            log.warning("Identifier %r looks suspicious; "
-                                        "using it anyway." % piece)
+                            if options.get('strict'):
+                                raise DottedName.InvalidDottedName(
+                                    'Bad identifier %r' % (piece,))
+                            else:
+                                raise DottedName.InvalidDottedName(
+                                    'Bad identifier %r' % (piece,))
+                                log.warning("Identifier %r looks suspicious; "
+                                            "using it anyway." % piece)
                         self._ok_identifiers.add(piece)
                     self._identifiers.append(subpiece)
             else:
