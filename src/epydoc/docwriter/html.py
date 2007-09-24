@@ -2692,10 +2692,14 @@ class HTMLWriter:
 
     def _import(self, var_doc, context):
         if var_doc.imported_from not in (None, UNKNOWN):
-            return self.href(var_doc.imported_from, context=context)
+            return self.href(var_doc.imported_from,
+                             var_doc.name, context=context,
+                             tooltip='%s' % var_doc.imported_from)
         elif (var_doc.value not in (None, UNKNOWN) and not
               isinstance(var_doc.value, GenericValueDoc)):
-            return self.href(var_doc.value, context=context)
+            return self.href(var_doc.value,
+                             var_doc.name, context=context,
+                             tooltip='%s' % var_doc.value.canonical_name)
         else:
             return plaintext_to_html(var_doc.name)
             
@@ -3223,7 +3227,8 @@ class HTMLWriter:
         return None
 
     # [xx] add code to automatically do <code> wrapping or the like?
-    def href(self, target, label=None, css_class=None, context=None):
+    def href(self, target, label=None, css_class=None, context=None,
+             tooltip=None):
         """
         Return the HTML code for an HREF link to the given target
         (which can be a C{VariableDoc}, a C{ValueDoc}, or a
@@ -3263,7 +3268,9 @@ class HTMLWriter:
 
         # Get the url for the target.
         url = self.url(target)
-        if url is None: return label
+        if url is None:
+            if tooltip: return '<span title="%s">%s</span>' % (tooltip, label)
+            else: return label
 
         # Construct a string for the class attribute.
         if css_class is None:
@@ -3278,7 +3285,12 @@ class HTMLWriter:
              not self._val_is_public(target))):
             onclick = ' onclick="show_private();"'
 
-        return '<a href="%s"%s%s>%s</a>' % (url, css, onclick, label)
+        if tooltip:
+            tooltip = ' title="%s"' % tooltip
+        else:
+            tooltip = ''
+
+        return '<a href="%s"%s%s%s>%s</a>' % (url, css, onclick, tooltip, label)
 
     def _attr_to_html(self, attr, api_doc, indent):
         if api_doc in (None, UNKNOWN):
