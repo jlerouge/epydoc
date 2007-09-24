@@ -1416,6 +1416,7 @@ class HTMLWriter:
     def write_javascript(self, directory):
         jsfile = open(os.path.join(directory, 'epydoc.js'), 'w')
         print >> jsfile, self.TOGGLE_PRIVATE_JS
+        print >> jsfile, self.SHOW_PRIVATE_JS
         print >> jsfile, self.GET_COOKIE_JS
         print >> jsfile, self.SET_FRAME_JS
         print >> jsfile, self.HIDE_PRIVATE_JS
@@ -1529,6 +1530,19 @@ class HTMLWriter:
             elt.style.display = "block";
         else
             elt.style.display = "none";
+      }
+    '''.strip()
+
+    SHOW_PRIVATE_JS = '''
+      function show_private() {
+        var elts = document.getElementsByTagName("a");
+        for(var i=0; i<elts.length; i++) {
+          if (elts[i].className == "privatelink") {
+            cmd = elts[i].innerHTML;
+            if (cmd && cmd.substr(0,4)=="show")
+                toggle_private();
+          }
+        }
       }
     '''.strip()
 
@@ -1744,10 +1758,9 @@ class HTMLWriter:
           // javascript is turned off then we want them to be
           // visible); but by default, we want to hide them.  So hide
           // them unless we have a cookie that says to show them.
-          checkCookie()
+          checkCookie();
           // -->
         </script>
-          
         </body>
         </html>
         ''')
@@ -3258,7 +3271,14 @@ class HTMLWriter:
         else:
             css = ' class="%s"' % css_class
 
-        return '<a href="%s"%s>%s</a>' % (url, css, label)
+        onclick = ''
+        if ((isinstance(target, VariableDoc) and not target.is_public) or
+            (isinstance(target, ValueDoc) and
+             not isinstance(target, GenericValueDoc) and
+             not self._val_is_public(target))):
+            onclick = ' onclick="show_private();"'
+
+        return '<a href="%s"%s%s>%s</a>' % (url, css, onclick, label)
 
     def _attr_to_html(self, attr, api_doc, indent):
         if api_doc in (None, UNKNOWN):
