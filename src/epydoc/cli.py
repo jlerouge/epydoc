@@ -86,7 +86,7 @@ INHERITANCE_STYLES = ('grouped', 'listed', 'included')
 GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'
-PROFILER = 'hotshot' #: Which profiler to use: 'hotshot' or 'profile'
+PROFILER = 'profile' #: Which profiler to use: 'hotshot' or 'profile'
 
 ######################################################################
 #{ Help Topics
@@ -992,16 +992,21 @@ def _profile():
 
     # Standard 'profile' profiler.
     elif PROFILER == 'profile':
-        try: from profile import Profile
+        # cProfile module was added in Python 2.5 -- use it if its'
+        # available, since it's faster.
+        try: from cProfile import Profile
         except ImportError:
-            print >>sys.stderr, "Could not import profile module!"
-            return
+            try: from profile import Profile
+            except ImportError:
+                print >>sys.stderr, "Could not import profile module!"
+                return
 
         # There was a bug in Python 2.4's profiler.  Check if it's
         # present, and if so, fix it.  (Bug was fixed in 2.4maint:
         # <http://mail.python.org/pipermail/python-checkins/
         #                         2005-September/047099.html>)
-        if (Profile.dispatch['c_exception'] is
+        if (hasattr(Profile, 'dispatch') and
+            Profile.dispatch['c_exception'] is
             Profile.trace_dispatch_exception.im_func):
             trace_dispatch_return = Profile.trace_dispatch_return.im_func
             Profile.dispatch['c_exception'] = trace_dispatch_return
