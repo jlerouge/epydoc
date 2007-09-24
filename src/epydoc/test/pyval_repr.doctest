@@ -6,7 +6,10 @@ Regression Testing for epydoc.markup.pyval_repr
     >>> def color(v, linebreakok=True):
     ...     colorizer = PyvalColorizer(linelen=40, linebreakok=linebreakok)
     ...     pds = colorizer.colorize(v, None)
-    ...     print pds.to_html(None).rstrip()
+    ...     s = pds.to_html(None).rstrip()
+    ...     if isinstance(s, unicode):
+    ...         s = s.encode('ascii', 'xmlcharrefreplace')
+    ...     print s
 
 Simple Types
 ============
@@ -78,7 +81,7 @@ Unicode strings are handled properly.
     >>> color(u"Hello world")
     <code class="variable-quote">u'</code><code class="variable-string">Hello world</code><code class="variable-quote">'</code>
     >>> color(u"\uaaaa And \ubbbb")
-    <code class="variable-quote">u'</code><code class="variable-string">\uaaaa And \ubbbb</code><code class="variable-quote">'</code>
+    <code class="variable-quote">u'</code><code class="variable-string">&#43690; And &#48059;</code><code class="variable-quote">'</code>
 
 Lists, Tuples, etc.
 ===================
@@ -263,15 +266,15 @@ scores; if the score is too low, then `PyvalColorizer.colorize` will return ``No
     repr: ['hello', 123]
     score: 3 (ok)
 
-    >>> color2(A())
+    >>> color2(A()) # doctest: +ELLIPSIS
     repr: <__builtin__.A instance at ...>
     score: -4 (bad)
 
-    >>> color2([A()])
+    >>> color2([A()]) # doctest: +ELLIPSIS
     repr: [<__builtin__.A instance at ...>]
     score: -3 (bad)
 
-    >>> color2([A(),1,2,3,4,5,6])
+    >>> color2([A(),1,2,3,4,5,6]) # doctest: +ELLIPSIS
     repr: [<__builtin__.A instance at ...>,
      1,
      2,
