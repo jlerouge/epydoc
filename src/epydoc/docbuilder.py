@@ -661,19 +661,15 @@ class _ProgressEstimator:
 MERGE_PRECEDENCE = {
     'repr': 'parse',
 
-    # Why?
+    # The names we get from introspection match the names that users
+    # can actually use -- i.e., they take magic into account.
     'canonical_name': 'introspect',
-
-    # Only fall-back on the parser for is_imported if the introspecter
-    # isn't sure.  Otherwise, we can end up thinking that vars
-    # containing modules are not imported, which can cause external
-    # modules to show up in the docs (sf bug #1653486)
-    'is_imported': 'introspect',
 
     # The parser can tell if an assignment creates an alias or not.
     'is_alias': 'parse',
 
-    # Why?
+    # The parser is better able to determine what text file something
+    # came from; e.g., it can't be fooled by 'covert' imports.
     'docformat': 'parse',
 
     # The parse should be able to tell definitively whether a module
@@ -941,17 +937,6 @@ def merge_value(value1, value2, precedence, cyclecheck, path):
     assert value1 is not None and value2 is not None
     return merge_docs(value1, value2, cyclecheck, path)
 
-# [xx] are these really necessary or useful??
-def merge_package(v1, v2, precedence, cyclecheck, path):
-    if v1 is None or v2 is None:
-        if precedence == 'introspect': return v1
-        else: return v2
-    return merge_value(v1, v2, precedence, cyclecheck, path+'.<package>')
-def merge_container(v1, v2, precedence, cyclecheck, path):
-    if v1 is None or v2 is None:
-        if precedence == 'introspect': return v1
-        else: return v2
-    return merge_value(v1, v2, precedence, cyclecheck, path+'.<container>')
 def merge_overrides(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.<overrides>')
 def merge_fget(v1, v2, precedence, cyclecheck, path):
@@ -960,6 +945,19 @@ def merge_fset(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.fset')
 def merge_fdel(v1, v2, precedence, cyclecheck, path):
     return merge_value(v1, v2, precedence, cyclecheck, path+'.fdel')
+
+def merge_is_imported(v1, v2, precedence, cyclecheck, path):
+    # Always assume that modules are imported.  Other than that,
+    # give precedence to the parser over the introspector.
+    # This lets us avoid (sf bug #1653486), where external modules
+    # end up in our docs; and (sf bug #1685385), where decorated
+    # functions have the wrong module.
+    if isinstance(v1, ModuleDoc) or isinstance(v2, ModuleDoc):
+        return True
+    elif v2 in (None, UNKNOWN):
+        return v1
+    else:
+        return v2
 
 def merge_proxy_for(v1, v2, precedence, cyclecheck, path):
     # Anything we got from introspection shouldn't have a proxy_for
@@ -1027,9 +1025,6 @@ def merge_docs_extracted_by(v1, v2, precedence, cyclecheck, path):
 
 register_attribute_mergefunc('variables', merge_variables)
 register_attribute_mergefunc('value', merge_value)
-# [xx] are these useful/necessary?
-#register_attribute_mergefunc('package', merge_package)
-#register_attribute_mergefunc('container', merge_container)
 register_attribute_mergefunc('overrides', merge_overrides)
 register_attribute_mergefunc('fget', merge_fget)
 register_attribute_mergefunc('fset', merge_fset)
@@ -1039,6 +1034,7 @@ register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 register_attribute_mergefunc('docstring', merge_docstring)
 register_attribute_mergefunc('docs_extracted_by', merge_docs_extracted_by)
+register_attribute_mergefunc('is_imported', merge_is_imported)
 
 ######################################################################
 ## Import Linking
