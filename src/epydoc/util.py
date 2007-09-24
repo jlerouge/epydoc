@@ -42,7 +42,7 @@ def is_src_filename(filename):
 def is_package_dir(dirname):
     """
     Return true if the given directory is a valid package directory
-    (i.e., it names a directory that contsains a valid __init__ file,
+    (i.e., it names a directory that contains a valid __init__ file,
     and its name is a valid identifier).
     """
     # Make sure it's a directory name.
