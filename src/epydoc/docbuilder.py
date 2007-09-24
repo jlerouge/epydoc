@@ -801,20 +801,13 @@ def merge_docs(introspect_doc, parse_doc, cyclecheck=None, path=None):
 
     # If both values are GenericValueDoc, then we don't want to merge
     # them.  E.g., we don't want to merge 2+2 with 4.  So just copy
-    # the inspect_doc's pyval to the parse_doc, and return the parse_doc.
-    #
-    # This operation has been suspended for the reason explained in
-    # SF bug 1678046: the values can be totally uncorrelated if the
-    # introspected value has been changed as collateral effect by a function
-    # executed at runtime.
-    #
-    #if type(introspect_doc) == type(parse_doc) == GenericValueDoc:
-        #if introspect_doc.pyval is not UNKNOWN:
-            #parse_doc.pyval = introspect_doc.pyval
-        #if introspect_doc.parse_repr is not UNKNOWN:
-            #parse_doc.parse_repr = introspect_doc.parse_repr
-        #parse_doc.docs_extracted_by = 'both'
-        #return parse_doc.merge_and_overwrite(introspect_doc)
+    # the parse_doc's parse_repr to introspect_doc, & return it.
+    # (In particular, do *not* call merge_and_overwrite.)
+    if type(introspect_doc) == type(parse_doc) == GenericValueDoc:
+        if parse_doc.parse_repr is not UNKNOWN:
+            introspect_doc.parse_repr = parse_doc.parse_repr
+        introspect_doc.docs_extracted_by = 'both'
+        return introspect_doc
 
     # Perform several sanity checks here -- if we accidentally
     # merge values that shouldn't get merged, then bad things can
