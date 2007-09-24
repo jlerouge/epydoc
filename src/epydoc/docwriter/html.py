@@ -3054,7 +3054,7 @@ class HTMLWriter:
     def _val_is_public(self, valdoc):
         """Make a best-guess as to whether the given class is public."""
         container = self.docindex.container(valdoc)
-        if container is not None:
+        if isinstance(container, NamespaceDoc):
             for vardoc in container.variables.values():
                 if vardoc in (UNKNOWN, None): continue
                 if vardoc.value is valdoc:
