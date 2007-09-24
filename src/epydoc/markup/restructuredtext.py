@@ -676,6 +676,16 @@ class _EpydocHTMLTranslator(HTMLTranslator):
             self.body.append(doctest_to_html(pysrc))
         raise SkipNode()
 
+    def visit_emphasis(self, node):
+        # Generate a corrent index term anchor
+        if 'term' in node.get('classes') and node.children:
+            doc = self.document.copy()
+            doc[:] = [node.children[0].copy()]
+            self.body.append(
+                self._linker.translate_indexterm(ParsedRstDocstring(doc)))
+            raise SkipNode()
+
+        HTMLTranslator.visit_emphasis(self, node)
 
 def python_code_directive(name, arguments, options, content, lineno,
                           content_offset, block_text, state, state_machine):
