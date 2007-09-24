@@ -1732,7 +1732,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
         self._html = self._latex = self._plaintext = None
         self._terms = None
         # inline option -- mark top-level children as inline.
-        if options.get('inline'):
+        if options.get('inline') and self._tree is not None:
             for elt in self._tree.children:
                 elt.attribs['inline'] = True
 
