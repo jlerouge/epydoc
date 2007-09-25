@@ -840,15 +840,10 @@ class HTMLWriter:
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
             # Display bases graphically, if requested.
             if 'umlclasstree' in self._graph_types:
-                linker = _HTMLDocstringLinker(self, doc)
-                graph = uml_class_tree_graph(doc, linker, doc)
-                out('<center>\n%s</center>\n' % self.render_graph(graph))
-                
+                self.write_class_tree_graph(out, doc, uml_class_tree_graph)
             elif 'classtree' in self._graph_types:
-                linker = _HTMLDocstringLinker(self, doc)
-                graph = class_tree_graph([doc], linker, doc)
-                out('<center>\n%s</center>\n' % self.render_graph(graph))
-
+                self.write_class_tree_graph(out, doc, class_tree_graph)
+                
             # Otherwise, use ascii-art.
             else:
                 # Write the base class tree.
@@ -913,6 +908,32 @@ class HTMLWriter:
         # Write the page footer (including navigation bar)
         self.write_navbar(out, doc)
         self.write_footer(out)
+
+    def write_class_tree_graph(self, out, doc, graphmaker):
+        """
+        Write HTML code for a class tree graph of C{doc} (a classdoc),
+        using C{graphmaker} to draw the actual graph.  C{graphmaker}
+        should be L{class_tree_graph()}, or L{uml_class_tree_graph()},
+        or any other function with a compatible signature.
+
+        If the given class has any private sublcasses (including
+        recursive subclasses), then two graph images will be generated
+        -- one to display when private values are shown, and the other
+        to display when private values are hidden.
+        """
+        linker = _HTMLDocstringLinker(self, doc)
+        private_subcls = self._private_subclasses(doc)
+        if private_subcls:
+            out('<center>\n'
+                '  <div class="private">%s</div>\n'
+                '  <div class="public" style="display:none">%s</div>\n'
+                '</center>\n' %
+                (self.render_graph(graphmaker(doc, linker, doc)),
+                 self.render_graph(graphmaker(doc, linker, doc,
+                                              exclude=private_subcls))))
+        else:
+            out('<center>\n%s\n</center>\n' %
+                self.render_graph(graphmaker(doc, linker, doc)))
 
     #////////////////////////////////////////////////////////////
     #{ 2.3. Trees pages
@@ -1450,6 +1471,9 @@ class HTMLWriter:
           if (elts[i].className == "private") {
             elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"none":"block");
           }
+          else if (elts[i].className == "public") {
+            elts[i].style.display = ((cmd && cmd.substr(0,4)=="hide")?"block":"none");
+          }
         }
         // Update all table rows containing private objects.  Note, we
         // use "" instead of "block" becaue IE & firefox disagree on what
@@ -1592,8 +1616,7 @@ class HTMLWriter:
     #{ 2.10. Graphs
     #////////////////////////////////////////////////////////////
 
-    # [xx] use DotGraph.to_html??
-    def render_graph(self, graph, css='graph-without-title'):
+    def render_graph(self, graph):
         if graph is None: return ''
         graph.caption = graph.title = None
         image_url = '%s.gif' % graph.uid
@@ -1626,7 +1649,7 @@ class HTMLWriter:
 
         else:
             uid = callgraph.uid
-            graph_html = self.render_graph(callgraph, css='graph-with-title')
+            graph_html = self.render_graph(callgraph)
             if graph_html == '':
                 rv = ""
             else:
@@ -3375,6 +3398,20 @@ class HTMLWriter:
                 return True
         return False
 
+    def _private_subclasses(self, class_doc):
+        """Return a list of all subclasses of the given class that are
+        private, as determined by L{_val_is_private}.  Recursive
+        subclasses are included in this list."""
+        queue = [class_doc]
+        private = set()
+        for cls in queue:
+            if (isinstance(cls, ClassDoc) and
+                cls.subclasses not in (None, UNKNOWN)):
+                queue.extend(cls.subclasses)
+                private.update([c for c in cls.subclasses if
+                                not self._val_is_public(c)])
+        return private
+                
 class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
     def __init__(self, htmlwriter, container):
         self.htmlwriter = htmlwriter
