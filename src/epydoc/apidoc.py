@@ -994,17 +994,22 @@ class NamespaceDoc(ValueDoc):
     
         # Add any variables that are listed in sort_spec
         if self.sort_spec is not UNKNOWN:
+            unused_idents = set(self.sort_spec)
             for ident in self.sort_spec:
                 if ident in unsorted:
-                    self.sorted_variables.append(unsorted[ident])
-                    del unsorted[ident]
+                    self.sorted_variables.append(unsorted.pop(ident))
+                    unused_idents.discard(ident)
                 elif '*' in ident:
                     regexp = re.compile('^%s$' % ident.replace('*', '(.*)'))
                     # sort within matching group?
                     for name, var_doc in unsorted.items():
                         if regexp.match(name):
-                            self.sorted_variables.append(var_doc)
-                            unsorted.remove(var_doc)
+                            self.sorted_variables.append(unsorted.pop(name))
+                            unused_idents.discard(ident)
+            for ident in unused_idents:
+                log.warning("@sort: %s.%s not found" %
+                            (self.canonical_name, ident))
+                    
     
         # Add any remaining variables in alphabetical order.
         var_docs = unsorted.items()
@@ -1022,6 +1027,7 @@ class NamespaceDoc(ValueDoc):
         assert len(self.sorted_variables) == len(self.variables)
 
         elts = [(v.name, v) for v in self.sorted_variables]
+        self._unused_groups = dict([(n,set(i)) for (n,i) in self.group_specs])
         self.variable_groups = self._init_grouping(elts)
 
     def group_names(self):
@@ -1057,27 +1063,37 @@ class NamespaceDoc(ValueDoc):
             return {'': [elt[1] for elt in elts]}
 
         ungrouped = set([elt_doc for (elt_name, elt_doc) in elts])
+
+        ungrouped = dict(elts)
         groups = {}
-        for (group_name, elt_names) in self.group_specs:
-            group_re = re.compile('|'.join([n.replace('*','.*')+'$'
-                                            for n in elt_names]))
-            group = groups.get(group_name, [])
-            for elt_name, elt_doc in list(elts):
-                if group_re.match(elt_name):
-                    group.append(elt_doc)
-                    if elt_doc in ungrouped:
-                        ungrouped.remove(elt_doc)
-                    else:
-                        # [xx] might just be listed in the same group twice!
-                        log.warning("%s.%s is in multiple groups" %
-                                    (self.canonical_name, elt_name))
-            groups[group_name] = group
+        for elt_name, elt_doc in elts:
+            for (group_name, idents) in self.group_specs:
+                group = groups.setdefault(group_name, [])
+                unused_groups = self._unused_groups[group_name]
+                for ident in idents:
+                    if re.match('^%s$' % ident.replace('*', '(.*)'), elt_name):
+                        unused_groups.discard(ident)
+                        if elt_name in ungrouped:
+                            group.append(ungrouped.pop(elt_name))
+                        else:
+                            log.warning("%s.%s in multiple groups" %
+                                        (self.canonical_name, elt_name))
 
         # Convert ungrouped from an unordered set to an ordered list.
         groups[''] = [elt_doc for (elt_name, elt_doc) in elts
-                      if elt_doc in ungrouped]
+                      if elt_name in ungrouped]
         return groups
     
+    def report_unused_groups(self):
+        """
+        Issue a warning for any @group items that were not used by
+        L{_init_grouping()}.
+        """
+        for (group, unused_idents) in self._unused_groups.items():
+            for ident in unused_idents:
+                log.warning("@group %s: %s.%s not found" %
+                            (group, self.canonical_name, ident))
+                        
 class ModuleDoc(NamespaceDoc):
     """
     API documentation information about a single module.

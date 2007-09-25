@@ -291,6 +291,7 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
             val_doc.init_variable_groups()
             if isinstance(val_doc, ModuleDoc):
                 val_doc.init_submodule_groups()
+            val_doc.report_unused_groups()
     log.end_progress()
 
     return docindex
