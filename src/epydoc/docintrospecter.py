@@ -613,7 +613,7 @@ def get_canonical_name(value, strict=False):
             # differentiate it from the variable that shadows it.
             if verify_name(value, dotted_name) is UNKNOWN:
                 log.warning("Module %s is shadowed by a variable with "
-                            "the same name." % shadowed_name)
+                            "the same name." % dotted_name)
                 # Note -- this return bypasses verify_name check:
                 return DottedName(value.__name__+"'")
         except DottedName.InvalidDottedName:
