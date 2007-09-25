@@ -232,6 +232,7 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
     dotted_name = module_doc.canonical_name
     if dotted_name is UNKNOWN:
         dotted_name = DottedName(module.__name__)
+    name_without_primes = DottedName(str(dotted_name).replace("'", ""))
         
     # Record the module's parent package, if it has one.
     if len(dotted_name) > 1:
@@ -267,7 +268,7 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
         # value if it's defined in this module.
         container = get_containing_module(child)
         if ((container is not None and
-             container == module_doc.canonical_name) or
+             container == name_without_primes) or
             (public_names is not None and
              child_name in public_names)):
             # Local variable.
