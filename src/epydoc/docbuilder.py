@@ -1131,8 +1131,10 @@ def assign_canonical_names(val_doc, name, docindex, score=0):
                 or isinstance(var_doc.value, GenericValueDoc)):
                 continue
             
-            # This check is for cases like curses.wrapper, where an
-            # imported variable shadows its value's "real" location.
+            # [XX] After svn commit 1644-1647, I'm not sure if this
+            # ever gets used:  This check is for cases like
+            # curses.wrapper, where an imported variable shadows its
+            # value's "real" location.
             if _var_shadows_self(var_doc, varname):
                 _fix_self_shadowing_var(var_doc, varname, docindex)
     
@@ -1169,10 +1171,10 @@ def _fix_self_shadowing_var(var_doc, varname, docindex):
             var_doc.value = val_doc
             return
 
-    # If we couldn't find the actual value, then at least
-    # invalidate the canonical name.
-    log.warning('%s shadows itself' % varname)
-    del var_doc.value.canonical_name
+    # If we couldn't find the actual value, use an unreachable name.
+    name = _unreachable_name_for(var_doc.value, docindex)
+    log.warning('%s shadows itself -- using %s instead' % (varname, name))
+    var_doc.value.canonical_name = name
 
 def _unreachable_name_for(val_doc, docindex):
     assert isinstance(val_doc, ValueDoc)
