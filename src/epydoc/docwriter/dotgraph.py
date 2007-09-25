@@ -1007,7 +1007,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     Return a `DotGraph` that graphically displays the class
     hierarchy for the given classes.  Options:
 
-      - show_private_subclasses
+      - exclude
       - dir: LR|RL|BT requests a left-to-right, right-to-left, or
         bottom-to- top, drawing.  (corresponds to the dot option
         'rankdir'
@@ -1020,7 +1020,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     # Options
     if options.get('dir', 'TB') != 'TB': # default: top-down
         graph.body += 'rankdir=%s\n' % options.get('dir', 'TB')
-    show_private_subclasses = options.get('show_private_subclasses', True)
+    exclude = options.get('exclude', ())
 
     # Find all superclasses & subclasses of the given classes.
     classes = set(bases)
@@ -1028,19 +1028,20 @@ def class_tree_graph(bases, linker, context=None, **options):
     for cls in queue:
         if isinstance(cls, ClassDoc):
             if cls.subclasses not in (None, UNKNOWN):
-                if show_private_subclasses:
-                    subclasses = cls.subclasses
-                else:
-                    subclasses = [c for c in cls.subclasses
-                                  if not c.canonical_name[-1].startswith('_')]
+                subclasses = cls.subclasses
+                if exclude:
+                    subclasses = [d for d in subclasses if d not in exclude]
                 queue.extend(subclasses)
                 classes.update(subclasses)
     queue = list(bases)
     for cls in queue:
         if isinstance(cls, ClassDoc):
             if cls.bases not in (None, UNKNOWN):
-                queue.extend(cls.bases)
-                classes.update(cls.bases)
+                bases = cls.bases
+                if exclude:
+                    bases = [d for d in bases if d not in exclude]
+                queue.extend(bases)
+                classes.update(bases)
 
     # Add a node for each cls.
     classes = [d for d in classes if isinstance(d, ClassDoc)
@@ -1063,20 +1064,19 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
     Return a `DotGraph` that graphically displays the class hierarchy
     for the given class, using UML notation.  Options:
 
-      - show_private_subclasses
       - max_attributes
       - max_operations
       - show_private_vars
       - show_magic_vars
       - link_attributes
     """
-    show_private_subclasses = options.get('show_private_subclasses', True)
-    
     nodes = {} # ClassDoc -> DotGraphUmlClassNode
+    exclude = options.get('exclude', ())
         
     # Create nodes for class_doc and all its bases.
     for cls in class_doc.mro():
         if cls.pyval is object: continue # don't include `object`.
+        if cls in exclude: break # stop if we get to an excluded class.
         if cls == class_doc: color = SELECTED_BG
         else: color = BASECLASS_BG
         nodes[cls] = DotGraphUmlClassNode(cls, linker, context,
@@ -1088,12 +1088,10 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
     for cls in queue:
         if (isinstance(cls, ClassDoc) and
             cls.subclasses not in (None, UNKNOWN)):
-            queue.extend(cls.subclasses)
             for subcls in cls.subclasses:
                 subcls_name = subcls.canonical_name[-1]
-                if ( (subcls not in nodes) and
-                     (show_private_subclasses or
-                      not subcls_name.startswith('_')) ):
+                if subcls not in nodes and subcls not in exclude:
+                    queue.append(subcls)
                     nodes[subcls] = DotGraphUmlClassNode(
                         subcls, linker, context, collapsed=True,
                         bgcolor=SUBCLASS_BG)
