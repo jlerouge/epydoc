@@ -116,6 +116,10 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     # If we've already introspected this value, then simply return
     # its ValueDoc from our cache.
     if pyid in _introspected_values:
+        # If the file is a script, then adjust its name.
+        if is_script and filename is not None:
+            _valuedoc_cache[pyid].canonical_name = DottedName(
+                munge_script_name(str(filename)))
         return _valuedoc_cache[pyid]
 
     # Create an initial value doc for this value & add it to the cache.
@@ -130,11 +134,7 @@ def introspect_docs(value=None, name=None, filename=None, context=None,
     if val_doc.canonical_name is UNKNOWN and name is not None:
         val_doc.canonical_name = DottedName(name)
 
-    # If we were given a filename, but didn't manage to get a
-    # canonical name, then the module defined by the given file
-    # must be shadowed by a variable in its parent package(s).
-    # E.g., this happens with `curses.wrapper`.  Add a "'" to
-    # the end of the name to distinguish it from the variable.
+    # If the file is a script, then adjust its name.
     if is_script and filename is not None:
         val_doc.canonical_name = DottedName(munge_script_name(str(filename)))
         
@@ -606,7 +606,21 @@ def get_canonical_name(value, strict=False):
 
     # Get the name via introspection.
     if isinstance(value, ModuleType):
-        dotted_name = DottedName(value.__name__, strict=strict)
+        try:
+            dotted_name = DottedName(value.__name__, strict=strict)
+            # If the module is shadowed by a variable in its parent
+            # package(s), then add a prime mark to the end, to
+            # differentiate it from the variable that shadows it.
+            if verify_name(value, dotted_name) is UNKNOWN:
+                log.warning("Module %s is shadowed by a variable with "
+                            "the same name." % shadowed_name)
+                # Note -- this return bypasses verify_name check:
+                return DottedName(value.__name__+"'")
+        except DottedName.InvalidDottedName:
+            # Name is not a valid Python identifier -- treat as script.
+            if hasattr(value, '__file__'):
+                filename = '%s' % value.__str__
+                dotted_name = DottedName(munge_script_name(filename))
         
     elif isclass(value):
         if value.__module__ == '__builtin__':
@@ -945,6 +959,9 @@ def introspect_docstring_lineno(api_doc):
                     return lineno + 1
         except IOError: pass
         except TypeError: pass
+        except IndexError:
+            log.warning('inspect.findsource(%s) raised IndexError'
+                        % api_doc.canonical_name)
     return None
 
 class _DevNull:
