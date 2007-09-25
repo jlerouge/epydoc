@@ -1005,8 +1005,14 @@ def uml_package_tree_graph(packages, linker, context=None, **options):
 def class_tree_graph(bases, linker, context=None, **options):
     """
     Return a `DotGraph` that graphically displays the class
-    hierarchy for the given classes.
+    hierarchy for the given classes.  Options:
+
+      - show_private_subclasses
+      - dir: LR|RL|BT requests a left-to-right, right-to-left, or
+        bottom-to- top, drawing.  (corresponds to the dot option
+        'rankdir'
     """
+    if isinstance(bases, ClassDoc): bases = [bases]
     graph = DotGraph('Class Hierarchy for %s' % name_list(bases, context),
                      body='ranksep=0.3\n',
                      edge_defaults={'sametail':True, 'dir':'none'})
@@ -1014,6 +1020,7 @@ def class_tree_graph(bases, linker, context=None, **options):
     # Options
     if options.get('dir', 'TB') != 'TB': # default: top-down
         graph.body += 'rankdir=%s\n' % options.get('dir', 'TB')
+    show_private_subclasses = options.get('show_private_subclasses', True)
 
     # Find all superclasses & subclasses of the given classes.
     classes = set(bases)
@@ -1021,8 +1028,13 @@ def class_tree_graph(bases, linker, context=None, **options):
     for cls in queue:
         if isinstance(cls, ClassDoc):
             if cls.subclasses not in (None, UNKNOWN):
-                queue.extend(cls.subclasses)
-                classes.update(cls.subclasses)
+                if show_private_subclasses:
+                    subclasses = cls.subclasses
+                else:
+                    subclasses = [c for c in cls.subclasses
+                                  if not c.canonical_name[-1].startswith('_')]
+                queue.extend(subclasses)
+                classes.update(subclasses)
     queue = list(bases)
     for cls in queue:
         if isinstance(cls, ClassDoc):
@@ -1050,15 +1062,18 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
     """
     Return a `DotGraph` that graphically displays the class hierarchy
     for the given class, using UML notation.  Options:
-    
+
+      - show_private_subclasses
       - max_attributes
       - max_operations
       - show_private_vars
       - show_magic_vars
       - link_attributes
     """
+    show_private_subclasses = options.get('show_private_subclasses', True)
+    
     nodes = {} # ClassDoc -> DotGraphUmlClassNode
-
+        
     # Create nodes for class_doc and all its bases.
     for cls in class_doc.mro():
         if cls.pyval is object: continue # don't include `object`.
@@ -1074,11 +1089,14 @@ def uml_class_tree_graph(class_doc, linker, context=None, **options):
         if (isinstance(cls, ClassDoc) and
             cls.subclasses not in (None, UNKNOWN)):
             queue.extend(cls.subclasses)
-            for cls in cls.subclasses:
-                if cls not in nodes:
-                    nodes[cls] = DotGraphUmlClassNode(cls, linker, context,
-                                                      collapsed=True,
-                                                      bgcolor=SUBCLASS_BG)
+            for subcls in cls.subclasses:
+                subcls_name = subcls.canonical_name[-1]
+                if ( (subcls not in nodes) and
+                     (show_private_subclasses or
+                      not subcls_name.startswith('_')) ):
+                    nodes[subcls] = DotGraphUmlClassNode(
+                        subcls, linker, context, collapsed=True,
+                        bgcolor=SUBCLASS_BG)
                     
     # Only show variables in the class where they're defined for
     # *class_doc*.
