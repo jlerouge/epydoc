@@ -316,6 +316,14 @@ def parse(str, errors = None):
                         "epytext string.")
                 errors.append(StructuringError(estr, token.startline))
 
+    # Graphs use inline markup (G{...}) but are really block-level
+    # elements; so "raise" any graphs we generated.  This is a bit of
+    # a hack, but the alternative is to define a new markup for
+    # block-level elements, which I'd rather not do.  (See sourceforge
+    # bug #1673017.)
+    for child in doc.children:
+        _raise_graphs(child, doc)
+
     # If there was an error, then signal it!
     if len([e for e in errors if e.is_fatal()]) > 0:
         if raise_on_error:
@@ -325,6 +333,32 @@ def parse(str, errors = None):
         
     # Return the top-level epytext DOM element.
     return doc
+
+def _raise_graphs(tree, parent):
+    # Recurse to children.
+    have_graph_child = False
+    for elt in tree.children:
+        if isinstance(elt, Element):
+            _raise_graphs(elt, tree)
+            if elt.tag == 'graph': have_graph_child = True
+
+    block = ('section', 'fieldlist', 'field', 'ulist', 'olist', 'li')
+    if have_graph_child and tree.tag not in block:
+        child_index = 0
+        for elt in tree.children:
+            if isinstance(elt, Element) and elt.tag == 'graph':
+                # We found a graph: splice it into the parent.
+                parent_index = parent.children.index(tree)
+                left = tree.children[:child_index]
+                right = tree.children[child_index+1:]
+                parent.children[parent_index:parent_index+1] = [
+                    Element(tree.tag, *left, **tree.attribs),
+                    elt,
+                    Element(tree.tag, *right, **tree.attribs)]
+                child_index = 0
+                parent_index += 2
+            else:
+                child_index += 1
 
 def _pop_completed_blocks(token, stack, indent_stack):
     """
