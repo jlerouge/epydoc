@@ -1321,8 +1321,14 @@ class ClassDoc(NamespaceDoc):
 
     def _report_bad_base(self, base):
         if not isinstance(base, ClassDoc):
+            if not isinstance(base, GenericValueDoc):
+                base_name = base.canonical_name
+            elif base.parse_repr is not UNKNOWN:
+                base_name = base.parse_repr
+            else:
+                base_name = '%r' % base
             log.warning("%s's base %s is not a class" %
-                        (self.canonical_name, base.canonical_name))
+                        (self.canonical_name, base_name))
         elif base.proxy_for is not None:
             log.warning("No information available for %s's base %s" %
                         (self.canonical_name, base.proxy_for))
