@@ -1007,8 +1007,9 @@ class NamespaceDoc(ValueDoc):
                             self.sorted_variables.append(unsorted.pop(name))
                             unused_idents.discard(ident)
             for ident in unused_idents:
-                log.warning("@sort: %s.%s not found" %
-                            (self.canonical_name, ident))
+                if ident not in ['__all__', '__docformat__', '__path__']:
+                    log.warning("@sort: %s.%s not found" %
+                                (self.canonical_name, ident))
                     
     
         # Add any remaining variables in alphabetical order.
