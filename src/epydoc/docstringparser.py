@@ -185,8 +185,12 @@ def parse_docstring(api_doc, docindex):
         
     initialize_api_doc(api_doc)
 
-    # If there's no docstring, then there's nothing more to do.
+    # If there's no docstring, then check for special variables (e.g.,
+    # __version__), and then return -- there's nothing else to do.
     if (api_doc.docstring in (None, UNKNOWN)):
+        if isinstance(api_doc, NamespaceDoc):
+            for field in STANDARD_FIELDS + user_docfields(api_doc, docindex):
+                add_metadata_from_var(api_doc, field)
         return
 
     # Remove leading indentation from the docstring.
@@ -324,6 +328,9 @@ def add_metadata_from_var(api_doc, field):
             api_doc.metadata.append( (field, varname, elt) )
             if var_doc.docstring in (None, UNKNOWN):
                 del api_doc.variables[varname]
+                if api_doc.sort_spec is not UNKNOWN:
+                    try: api_doc.sort_spec.remove(varname)
+                    except ValueError: pass
 
 def initialize_api_doc(api_doc):
     """A helper function for L{parse_docstring()} that initializes
