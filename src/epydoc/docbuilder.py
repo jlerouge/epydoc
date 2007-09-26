@@ -1010,6 +1010,16 @@ def merge_docstring(docstring1, docstring2, precedence, cyclecheck, path):
 def merge_docs_extracted_by(v1, v2, precedence, cyclecheck, path):
     return 'both'
 
+def merge_submodules(v1, v2, precedence, cyclecheck, path):
+    n1 = sorted([m.canonical_name for m in v1])
+    n2 = sorted([m.canonical_name for m in v2])
+    if (n1 != n2) and (n2 != []):
+        log.warning('Introspector & parser disagree about submodules '
+                    'for %s: %s vs %s' % (path, n1, n2))
+        return v1 + [m for m in v2 if m.canonical_name not in n1]
+                
+    return v1
+
 register_attribute_mergefunc('variables', merge_variables)
 register_attribute_mergefunc('value', merge_value)
 register_attribute_mergefunc('overrides', merge_overrides)
@@ -1021,6 +1031,7 @@ register_attribute_mergefunc('bases', merge_bases)
 register_attribute_mergefunc('posarg_defaults', merge_posarg_defaults)
 register_attribute_mergefunc('docstring', merge_docstring)
 register_attribute_mergefunc('docs_extracted_by', merge_docs_extracted_by)
+register_attribute_mergefunc('submodules', merge_submodules)
 
 ######################################################################
 ## Import Linking
