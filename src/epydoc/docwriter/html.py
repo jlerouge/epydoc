@@ -1769,7 +1769,8 @@ class HTMLWriter:
         >>>   #endif
             </td>
             <td align="right" class="footer">
-              <a href="http://epydoc.sourceforge.net">http://epydoc.sourceforge.net</a>
+              <a target="mainFrame" href="http://epydoc.sourceforge.net"
+                >http://epydoc.sourceforge.net</a>
             </td>
           </tr>
         </table>
