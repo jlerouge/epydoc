@@ -2024,7 +2024,11 @@ class HTMLWriter:
         for var_doc in var_docs:
             if var_doc.container != doc:
                 base = var_doc.container
-                if (base not in self.class_set or
+                if not isinstance(base, ClassDoc):
+                    # This *should* never happen:
+                    log.warning("%s's container is not a class!" % var_doc)
+                    normal_vars.append(var_doc)
+                elif (base not in self.class_set or
                     self._inheritance == 'listed'):
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
