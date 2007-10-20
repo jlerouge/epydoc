@@ -467,7 +467,8 @@ class DotGraphUmlClassNode(DotGraphNode):
         show_private = options.get('show_private_vars', False)
         show_magic = options.get('show_magic_vars', True)
         show_inherited = options.get('show_inherited_vars', False)
-        for name, var in class_doc.variables.iteritems():
+        for var in class_doc.sorted_variables:
+            name = var.canonical_name[-1]
             if ((not show_private and var.is_public == False) or
                 (not show_magic and re.match('__\w+__$', name)) or
                 (not show_inherited and var.container != class_doc)):
