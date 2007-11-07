@@ -1163,7 +1163,7 @@ def import_graph(modules, docindex, linker, context=None, **options):
         if dst.imports in (None, UNKNOWN): continue
         for var_name in dst.imports:
             for i in range(len(var_name), 0, -1):
-                val_doc = docindex.get_valdoc(var_name[:i])
+                val_doc = docindex.find(var_name[:i], context)
                 if isinstance(val_doc, ModuleDoc):
                     if val_doc in nodes and dst in nodes:
                         edges.add((nodes[val_doc], nodes[dst]))
