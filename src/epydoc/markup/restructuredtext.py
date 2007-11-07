@@ -868,13 +868,20 @@ def _construct_packagetree(docindex, context, linker, arguments, options):
 def importgraph_directive(name, arguments, options, content, lineno,
                         content_offset, block_text, state, state_machine):
     return [ dotgraph(_construct_importgraph, arguments, options) ]
+importgraph_directive.arguments = (0, 1, True)
 importgraph_directive.options = {'dir': _dir_option}
 importgraph_directive.content = False
 directives.register_directive('importgraph', importgraph_directive)
 
 def _construct_importgraph(docindex, context, linker, arguments, options):
     """Graph generator for L{importgraph_directive}"""
-    modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
+    if len(arguments) == 1:
+        modules = [ docindex.find(name, context)
+                    for name in arguments[0].replace(',',' ').split() ]
+        modules = [d for d in modules if isinstance(d, ModuleDoc)]
+    else:
+        modules = [d for d in docindex.root if isinstance(d, ModuleDoc)]
+
     return import_graph(modules, docindex, linker, context, **options)
 
 def callgraph_directive(name, arguments, options, content, lineno,
