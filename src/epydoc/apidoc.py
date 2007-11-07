@@ -1201,7 +1201,7 @@ class ModuleDoc(NamespaceDoc):
         
         if group is None: var_list = self.sorted_variables
         else:
-            var_list = self.variable_groups[group]
+            var_list = self.variable_groups.get(group, self.sorted_variables)
 
         # Public/private filter (Count UNKNOWN as public)
         if public is True:
