@@ -119,8 +119,6 @@ class DottedName:
                                 raise DottedName.InvalidDottedName(
                                     'Bad identifier %r' % (piece,))
                             else:
-                                raise DottedName.InvalidDottedName(
-                                    'Bad identifier %r' % (piece,))
                                 log.warning("Identifier %r looks suspicious; "
                                             "using it anyway." % piece)
                         self._ok_identifiers.add(piece)
