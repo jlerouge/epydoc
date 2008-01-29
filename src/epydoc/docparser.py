@@ -902,14 +902,15 @@ def _process_fromstar_import(src, parent_docs):
     list of exports is found by importing and introspecting
     C{M{<src>}}.
     """
-    # Record the import
-    parent_docs[0].imports.append(src) # mark that it's .*??
-    
+    # This is redundant: already checked by caller.
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If src is package-local, then convert it to a global name.
     src = _global_name(src, parent_docs)
 
+    # Record the import
+    parent_docs[0].imports.append(src) # mark that it's .*??
+    
     # [xx] add check for if we already have the source docs in our
     # cache??
 
@@ -956,15 +957,16 @@ def _import_var(name, parent_docs):
     we need to create a variable C{'a'} in parentdoc containing a
     proxy module; and a variable C{'b'} in the proxy module.
     """
-    # Record the import
-    parent_docs[0].imports.append(name)
-    
+    # This is redundant: already checked by caller.
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If name is package-local, then convert it to a global name.
     src = _global_name(name, parent_docs)
     src_prefix = src[:len(src)-len(name)]
 
+    # Record the import
+    parent_docs[0].imports.append(name)
+    
     # [xx] add check for if we already have the source docs in our
     # cache??
 
@@ -1012,13 +1014,14 @@ def _import_var_as(src, name, parent_docs):
     Otherwise, create a variables with its C{imported_from} attribute
     pointing to the imported object.
     """
-    # Record the import
-    parent_docs[0].imports.append(src)
-    
+    # This is redundant: already checked by caller.
     if not isinstance(parent_docs[-1], NamespaceDoc): return
     
     # If src is package-local, then convert it to a global name.
     src = _global_name(src, parent_docs)
+    
+    # Record the import
+    parent_docs[0].imports.append(src)
     
     if IMPORT_HANDLING == 'parse':
         # Parse the value and create a variable for it.
