@@ -442,6 +442,7 @@ class PythonSourceColorizer:
         self.lineno = 1
         self.def_name = None
         self.def_type = None
+        self.has_decorators = False
 
         # Cache, used so we only need to list the target elements once
         # for each variable.
@@ -465,6 +466,8 @@ class PythonSourceColorizer:
             self.out = output.write
             tokenize.tokenize(StringIO(self.text).readline, self.tokeneater)
             html = output.getvalue()
+            if self.has_decorators:
+                html = self._FIX_DECORATOR_RE.sub(r'\2\1', html)
         except tokenize.TokenError, ex:
             html = self.text
 
@@ -654,6 +657,7 @@ class PythonSourceColorizer:
                   ((i>0 and line[i-1][1]=='@') or
                    (i>1 and line[i-1][0]==None and line[i-2][1] == '@'))):
                 css_class = self.CSS_CLASSES['DECORATOR']
+                self.has_decorators = True
 
             # If it's a name, try to link it.
             elif toktype == token.NAME:
@@ -868,6 +872,14 @@ class PythonSourceColorizer:
         else:
             return '%s-module.html#%s' % (self.module_name, func_name)
 
+    #: A regexp used to move the <div> that marks the beginning of a
+    #: function or method to just before the decorators.
+    _FIX_DECORATOR_RE = re.compile(
+        r'((?:^<a name="L\d+"></a><tt class="py-lineno">\s*\d+</tt>'
+        r'\s*<tt class="py-line">(?:<tt class="py-decorator">.*|\s*</tt>|'
+        r'\s*<tt class="py-comment">.*)\n)+)'
+        r'(<a name="\w+"></a><div id="\w+-def">)', re.MULTILINE)
+    
 _HDR = '''\
 <?xml version="1.0" encoding="ascii"?>
         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
