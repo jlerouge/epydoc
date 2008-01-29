@@ -544,6 +544,8 @@ class APIDoc(object):
           - C{subclasses}: Subclasses for classes.
           - C{variables}: All variables.
           - C{private}: Private variables.
+          - C{overrides}: Points from class variables to the variables
+            they override.  This filter is False by default.
         """
         return []
 
@@ -677,10 +679,16 @@ class VariableDoc(APIDoc):
     of the variable's container.""")
 
     def apidoc_links(self, **filters):
-        if self.value in (None, UNKNOWN):
-            return []
+        # nb: overrides filter is *False* by default.
+        if (filters.get('overrides', False) and
+            (self.overrides not in (None, UNKNOWN))):
+            overrides = [self.overrides]
         else:
-            return [self.value]
+            overrides = []
+        if self.value in (None, UNKNOWN):
+            return []+overrides
+        else:
+            return [self.value]+overrides
 
     def is_detailed(self):
         pval = super(VariableDoc, self).is_detailed()
