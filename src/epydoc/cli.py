@@ -667,6 +667,7 @@ def main(options, names):
                   7,   # Merging parsed & introspected information
                   1,   # Linking imported variables
                   3,   # Indexing documentation
+                  1,   # Checking for overridden methods
                   30,  # Parsing Docstrings
                   1,   # Inheriting documentation
                   2]   # Sorting & Grouping

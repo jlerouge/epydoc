@@ -198,7 +198,8 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
         options = BuildOptions(parse=parse, introspect=introspect,
             exclude_introspect=exclude_introspect, exclude_parse=exclude_parse,
             add_submodules=add_submodules)
-    except Exception:
+    except Exception, e:
+        # log.error already reported by constructor.
         return None
 
     # Get the basic docs for each item.
@@ -251,14 +252,27 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
         assign_canonical_names(val_doc, val_doc.canonical_name, docindex)
     log.end_progress()
 
+    # Set overrides pointers
+    log.start_progress('Checking for overridden methods')
+    for i, val_doc in enumerate(valdocs):
+        if isinstance(val_doc, ClassDoc):
+            percent = float(i)/len(valdocs)
+            log.progress(percent, val_doc.canonical_name)
+            find_overrides(val_doc)
+    log.end_progress()
+    
     # Parse the docstrings for each object.
     log.start_progress('Parsing docstrings')
     valdocs = sorted(docindex.reachable_valdocs(
         imports=False, submodules=False, packages=False, subclasses=False))
+    supress_warnings = set(valdocs).difference(
+        docindex.reachable_valdocs(
+            imports=False, submodules=False, packages=False, subclasses=False,
+            bases=False, overrides=True))
     for i, val_doc in enumerate(valdocs):
         _report_valdoc_progress(i, val_doc, valdocs)
         # the value's docstring
-        parse_docstring(val_doc, docindex)
+        parse_docstring(val_doc, docindex, supress_warnings)
         # the value's variables' docstrings
         if (isinstance(val_doc, NamespaceDoc) and
             val_doc.variables not in (None, UNKNOWN)):
@@ -269,7 +283,7 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
                 if (isinstance(var_doc.value, ValueDoc)
                     and var_doc.value.defining_module is UNKNOWN):
                     var_doc.value.defining_module = val_doc.defining_module
-                parse_docstring(var_doc, docindex)
+                parse_docstring(var_doc, docindex, supress_warnings)
     log.end_progress()
 
     # Take care of inheritance.
@@ -1229,6 +1243,24 @@ def _unreachable_name_for(val_doc, docindex):
 ## Documentation Inheritance
 ######################################################################
 
+def find_overrides(class_doc):
+    """
+    Set the C{overrides} attribute for all variables in C{class_doc}.
+    This needs to be done early (before docstring parsing), so we can
+    know which docstrings to supress warnings for.
+    """
+    for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
+        if base_class == class_doc: continue
+        if base_class.variables is UNKNOWN: continue
+        for name, var_doc in base_class.variables.items():
+            if ( not (name.startswith('__') and not name.endswith('__')) and
+                 base_class == var_doc.container and
+                 name in class_doc.variables and 
+                 class_doc.variables[name].container==class_doc and
+                 class_doc.variables[name].overrides is UNKNOWN ):
+                class_doc.variables[name].overrides = var_doc
+    
+    
 def inherit_docs(class_doc):
     for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
         if base_class == class_doc: continue
