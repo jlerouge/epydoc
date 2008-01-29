@@ -326,11 +326,13 @@ def add_metadata_from_var(api_doc, field):
 
             # Add in the metadata and remove from the variables
             api_doc.metadata.append( (field, varname, elt) )
-            if var_doc.docstring in (None, UNKNOWN):
-                del api_doc.variables[varname]
-                if api_doc.sort_spec is not UNKNOWN:
-                    try: api_doc.sort_spec.remove(varname)
-                    except ValueError: pass
+
+        # Remove the variable itself (unless it's documented)
+        if var_doc.docstring in (None, UNKNOWN):
+            del api_doc.variables[varname]
+            if api_doc.sort_spec is not UNKNOWN:
+                try: api_doc.sort_spec.remove(varname)
+                except ValueError: pass
 
 def initialize_api_doc(api_doc):
     """A helper function for L{parse_docstring()} that initializes
