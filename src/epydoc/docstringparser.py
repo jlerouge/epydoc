@@ -167,7 +167,7 @@ DEFAULT_DOCFORMAT = 'epytext'
 # asked to process one twice?  e.g., for @include we might have to
 # parse the included docstring earlier than we might otherwise..??
 
-def parse_docstring(api_doc, docindex):
+def parse_docstring(api_doc, docindex, supress_warnings=[]):
     """
     Process the given C{APIDoc}'s docstring.  In particular, populate
     the C{APIDoc}'s C{descr} and C{summary} attributes, and add any
@@ -176,11 +176,14 @@ def parse_docstring(api_doc, docindex):
     @param docindex: A DocIndex, used to find the containing
         module (to look up the docformat); and to find any
         user docfields defined by containing objects.
+    @param supress_warnings: A set of objects for which docstring
+        warnings should be supressed.
     """
     if api_doc.metadata is not UNKNOWN:
         if not (isinstance(api_doc, RoutineDoc)
                 and api_doc.canonical_name[-1] == '__init__'):
-            log.debug("%s's docstring processed twice" % api_doc.canonical_name)
+            log.debug("%s's docstring processed twice" %
+                      api_doc.canonical_name)
         return
         
     initialize_api_doc(api_doc)
@@ -228,7 +231,7 @@ def parse_docstring(api_doc, docindex):
         initvar = api_doc.variables.get('__init__')
         if initvar and isinstance(initvar.value, RoutineDoc):
             init_api_doc = initvar.value
-            parse_docstring(init_api_doc, docindex)
+            parse_docstring(init_api_doc, docindex, supress_warnings)
 
             parse_function_signature(init_api_doc, api_doc,
                                      docformat, parse_errors)
@@ -273,7 +276,13 @@ def parse_docstring(api_doc, docindex):
     # vars/params?
 
     # Report any errors that occured
-    report_errors(api_doc, docindex, parse_errors, field_warnings)
+    if api_doc in supress_warnings:
+        if parse_errors or field_warnings:
+            log.info("Supressing docstring warnings for %s, since it "
+                     "is not included in the documented set." %
+                     api_doc.canonical_name)
+    else:
+        report_errors(api_doc, docindex, parse_errors, field_warnings)
 
 def add_metadata_from_var(api_doc, field):
     for varname in field.varnames:
