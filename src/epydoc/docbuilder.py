@@ -1294,8 +1294,7 @@ def inherit_docs(class_doc):
             # that shadows var_doc.  But if class_doc's var is
             # local, then record the fact that it overrides
             # var_doc.
-            elif (class_doc.variables[name].container==class_doc and
-                  class_doc.variables[name].overrides is UNKNOWN):
+            elif class_doc.variables[name].container==class_doc:
                 class_doc.variables[name].overrides = var_doc
                 _inherit_info(class_doc.variables[name])
 
@@ -1303,6 +1302,8 @@ _INHERITED_ATTRIBS = [
     'descr', 'summary', 'metadata', 'extra_docstring_fields',
     'type_descr', 'arg_descrs', 'arg_types', 'return_descr',
     'return_type', 'exception_descrs']
+
+_method_descriptor = type(list.append)
 
 def _inherit_info(var_doc):
     """
@@ -1313,25 +1314,25 @@ def _inherit_info(var_doc):
     src_val = var_doc.overrides.value
     val_doc = var_doc.value
 
-    # If the new variable has a docstring, then don't inherit
-    # anything, even if the docstring is blank.
-    if var_doc.docstring not in (None, UNKNOWN):
-        inherited_attribs = set()
-    else:
-        inherited_attribs = set(_INHERITED_ATTRIBS)
-    
     # Special case: if the source value and target values are both c
     # extension methods, and the target value's signature is not
     # specified, then inherit the source value's signature.
     if (isinstance(val_doc, RoutineDoc) and
         isinstance(src_val, RoutineDoc) and
-        inspect.isbuiltin(val_doc.pyval) and
-        inspect.isbuiltin(src_val.pyval) and
+        (inspect.isbuiltin(val_doc.pyval) or
+         isinstance(val_doc.pyval, _method_descriptor)) and
+        (inspect.isbuiltin(src_val.pyval) or
+         isinstance(src_val.pyval, _method_descriptor)) and
         val_doc.all_args() in (['...'], UNKNOWN) and
         src_val.all_args() not in (['...'], UNKNOWN)):
-        inherited_attribs.update(['posargs', 'posarg_defaults', 'vararg',
-                                  'kwarg', 'return_type'])
+        for attrib in ['posargs', 'posarg_defaults', 'vararg',
+                       'kwarg', 'return_type']:
+            setattr(val_doc, attrib, getattr(src_val, attrib))
     
+    # If the new variable has a docstring, then don't inherit
+    # anything, even if the docstring is blank.
+    if var_doc.docstring not in (None, UNKNOWN):
+        return
     # [xx] Do I want a check like this:?
 #     # If it's a method and the signature doesn't match well enough,
 #     # then give up.
@@ -1346,7 +1347,7 @@ def _inherit_info(var_doc):
 #             return
 
     # Inherit attributes!
-    for attrib in inherited_attribs:
+    for attrib in _INHERITED_ATTRIBS:
         if (hasattr(var_doc, attrib) and hasattr(src_var, attrib) and
             getattr(src_var, attrib) not in (None, UNKNOWN)):
             setattr(var_doc, attrib, getattr(src_var, attrib))
