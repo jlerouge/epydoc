@@ -1028,10 +1028,10 @@ def merge_submodules(v1, v2, precedence, cyclecheck, path):
     n1 = sorted([m.canonical_name for m in v1])
     n2 = sorted([m.canonical_name for m in v2])
     if (n1 != n2) and (n2 != []):
-        log.warning('Introspector & parser disagree about submodules '
-                    'for %s: (%s) vs (%s)' % (path,
-                                              ', '.join(str(n) for n in n1),
-                                              ', '.join(str(n) for n in n2)))
+        log.info('Introspector & parser disagree about submodules '
+                 'for %s: (%s) vs (%s)' % (path,
+                                           ', '.join(str(n) for n in n1),
+                                           ', '.join(str(n) for n in n2)))
         return v1 + [m for m in v2 if m.canonical_name not in n1]
                 
     return v1
