@@ -254,6 +254,8 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
 
     # Set overrides pointers
     log.start_progress('Checking for overridden methods')
+    valdocs = sorted(docindex.reachable_valdocs(
+        imports=False, submodules=False, packages=False, subclasses=False))
     for i, val_doc in enumerate(valdocs):
         if isinstance(val_doc, ClassDoc):
             percent = float(i)/len(valdocs)
@@ -263,8 +265,6 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
     
     # Parse the docstrings for each object.
     log.start_progress('Parsing docstrings')
-    valdocs = sorted(docindex.reachable_valdocs(
-        imports=False, submodules=False, packages=False, subclasses=False))
     suppress_warnings = set(valdocs).difference(
         docindex.reachable_valdocs(
             imports=False, submodules=False, packages=False, subclasses=False,
