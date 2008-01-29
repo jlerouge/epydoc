@@ -67,7 +67,7 @@ __docformat__ = 'epytext en'
 ## Imports
 ######################################################################
 
-import sys, os, os.path, __builtin__, imp, re
+import sys, os, os.path, __builtin__, imp, re, inspect
 from epydoc.apidoc import *
 from epydoc.docintrospecter import introspect_docs
 from epydoc.docparser import parse_docs, ParseError
@@ -1275,15 +1275,29 @@ def _inherit_info(var_doc):
     Copy any relevant documentation information from the variable that
     C{var_doc} overrides into C{var_doc} itself.
     """
-    # If the new variable has a docstring, then don't inherit
-    # anything, even if the docstring is blank.
-    if var_doc.docstring not in (None, UNKNOWN):
-        return
-    
     src_var = var_doc.overrides
     src_val = var_doc.overrides.value
     val_doc = var_doc.value
 
+    # If the new variable has a docstring, then don't inherit
+    # anything, even if the docstring is blank.
+    if var_doc.docstring not in (None, UNKNOWN):
+        inerited_attribs = set()
+    else:
+        inherited_attribs = set(_INHERITED_ATTRIBS)
+    
+    # Special case: if the source value and target values are both c
+    # extension methods, and the target value's signature is not
+    # specified, then inherit the source value's signature.
+    if (isinstance(val_doc, RoutineDoc) and
+        isinstance(src_val, RoutineDoc) and
+        inspect.isbuiltin(val_doc.pyval) and
+        inspect.isbuiltin(src_val.pyval) and
+        val_doc.all_args() in (['...'], UNKNOWN) and
+        src_val.all_args() not in (['...'], UNKNOWN)):
+        inherited_attribs.update(['posargs', 'posarg_defaults', 'vararg',
+                                  'kwarg', 'return_type'])
+    
     # [xx] Do I want a check like this:?
 #     # If it's a method and the signature doesn't match well enough,
 #     # then give up.
@@ -1298,7 +1312,7 @@ def _inherit_info(var_doc):
 #             return
 
     # Inherit attributes!
-    for attrib in _INHERITED_ATTRIBS:
+    for attrib in inherited_attribs:
         if (hasattr(var_doc, attrib) and hasattr(src_var, attrib) and
             getattr(src_var, attrib) not in (None, UNKNOWN)):
             setattr(var_doc, attrib, getattr(src_var, attrib))
