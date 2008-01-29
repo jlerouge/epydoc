@@ -56,8 +56,11 @@ def is_package_dir(dirname):
     # "foo/", where os.path.split -> ("foo", "").)
     (parent, dir) = os.path.split(dirname)
     if dir == '': (parent, dir) = os.path.split(parent)
-    if not re.match('\w+$', dir):
-        return False
+    
+    # The following constraint was removed because of sourceforge
+    # bug #1787028 -- in some cases (eg eggs), it's too strict.
+    #if not re.match('\w+$', dir):
+    #    return False
     
     for name in os.listdir(dirname):
         filename = os.path.join(dirname, name)
