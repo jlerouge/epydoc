@@ -792,13 +792,13 @@ def main(options, names):
     else:
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
-    # If we supressed docstring warnings, then let the user know.
-    if logger is not None and logger.supressed_docstring_warning:
-        if logger.supressed_docstring_warning == 1:
+    # If we suppressed docstring warnings, then let the user know.
+    if logger is not None and logger.suppressed_docstring_warning:
+        if logger.suppressed_docstring_warning == 1:
             prefix = '1 markup error was found'
         else:
             prefix = ('%d markup errors were found' %
-                      logger.supressed_docstring_warning)
+                      logger.suppressed_docstring_warning)
         log.warning("%s while processing docstrings.  Use the verbose "
                     "switch (-v) to display markup errors." % prefix)
 
@@ -1125,7 +1125,7 @@ class ConsoleLogger(log.Logger):
         etc) that have been reported.  It is used by the options
         --fail-on-warning etc to determine the return value."""
         
-        self.supressed_docstring_warning = 0
+        self.suppressed_docstring_warning = 0
         """This variable will be incremented once every time a
         docstring warning is reported tothe logger, but the verbosity
         level is too low for it to be displayed."""
@@ -1202,7 +1202,7 @@ class ConsoleLogger(log.Logger):
             message = self._format('  Debug: ', message, self.term.CYAN)
         else:
             if level >= log.DOCSTRING_WARNING:
-                self.supressed_docstring_warning += 1
+                self.suppressed_docstring_warning += 1
             return
             
         self._report(message)

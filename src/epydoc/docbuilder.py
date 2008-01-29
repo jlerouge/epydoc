@@ -265,14 +265,14 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
     log.start_progress('Parsing docstrings')
     valdocs = sorted(docindex.reachable_valdocs(
         imports=False, submodules=False, packages=False, subclasses=False))
-    supress_warnings = set(valdocs).difference(
+    suppress_warnings = set(valdocs).difference(
         docindex.reachable_valdocs(
             imports=False, submodules=False, packages=False, subclasses=False,
             bases=False, overrides=True))
     for i, val_doc in enumerate(valdocs):
         _report_valdoc_progress(i, val_doc, valdocs)
         # the value's docstring
-        parse_docstring(val_doc, docindex, supress_warnings)
+        parse_docstring(val_doc, docindex, suppress_warnings)
         # the value's variables' docstrings
         if (isinstance(val_doc, NamespaceDoc) and
             val_doc.variables not in (None, UNKNOWN)):
@@ -283,7 +283,7 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
                 if (isinstance(var_doc.value, ValueDoc)
                     and var_doc.value.defining_module is UNKNOWN):
                     var_doc.value.defining_module = val_doc.defining_module
-                parse_docstring(var_doc, docindex, supress_warnings)
+                parse_docstring(var_doc, docindex, suppress_warnings)
     log.end_progress()
 
     # Take care of inheritance.
@@ -422,7 +422,7 @@ def _get_docs_from_pyobject(obj, options, progress_estimator):
             try:
                 _, parse_docs = _get_docs_from_pyname(
                     str(introspect_doc.canonical_name), options,
-                    progress_estimator, supress_warnings=True)
+                    progress_estimator, suppress_warnings=True)
             finally:
                 options.introspect = prev_introspect
 
@@ -437,7 +437,7 @@ def _get_docs_from_pyobject(obj, options, progress_estimator):
     return (introspect_doc, parse_doc)
 
 def _get_docs_from_pyname(name, options, progress_estimator,
-                          supress_warnings=False):
+                          suppress_warnings=False):
     progress_estimator.complete += 1
     if options.must_introspect(name) or options.must_parse(name):
         log.progress(progress_estimator.progress(), name)
@@ -460,7 +460,7 @@ def _get_docs_from_pyname(name, options, progress_estimator,
             pass
         
     # Report any errors we encountered.
-    if not supress_warnings:
+    if not suppress_warnings:
         _report_errors(name, introspect_doc, parse_doc,
                        introspect_error, parse_error)
 
@@ -1247,7 +1247,7 @@ def find_overrides(class_doc):
     """
     Set the C{overrides} attribute for all variables in C{class_doc}.
     This needs to be done early (before docstring parsing), so we can
-    know which docstrings to supress warnings for.
+    know which docstrings to suppress warnings for.
     """
     for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
         if base_class == class_doc: continue

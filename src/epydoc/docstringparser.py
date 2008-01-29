@@ -167,7 +167,7 @@ DEFAULT_DOCFORMAT = 'epytext'
 # asked to process one twice?  e.g., for @include we might have to
 # parse the included docstring earlier than we might otherwise..??
 
-def parse_docstring(api_doc, docindex, supress_warnings=[]):
+def parse_docstring(api_doc, docindex, suppress_warnings=[]):
     """
     Process the given C{APIDoc}'s docstring.  In particular, populate
     the C{APIDoc}'s C{descr} and C{summary} attributes, and add any
@@ -176,8 +176,8 @@ def parse_docstring(api_doc, docindex, supress_warnings=[]):
     @param docindex: A DocIndex, used to find the containing
         module (to look up the docformat); and to find any
         user docfields defined by containing objects.
-    @param supress_warnings: A set of objects for which docstring
-        warnings should be supressed.
+    @param suppress_warnings: A set of objects for which docstring
+        warnings should be suppressed.
     """
     if api_doc.metadata is not UNKNOWN:
         if not (isinstance(api_doc, RoutineDoc)
@@ -231,7 +231,7 @@ def parse_docstring(api_doc, docindex, supress_warnings=[]):
         initvar = api_doc.variables.get('__init__')
         if initvar and isinstance(initvar.value, RoutineDoc):
             init_api_doc = initvar.value
-            parse_docstring(init_api_doc, docindex, supress_warnings)
+            parse_docstring(init_api_doc, docindex, suppress_warnings)
 
             parse_function_signature(init_api_doc, api_doc,
                                      docformat, parse_errors)
@@ -276,9 +276,9 @@ def parse_docstring(api_doc, docindex, supress_warnings=[]):
     # vars/params?
 
     # Report any errors that occured
-    if api_doc in supress_warnings:
+    if api_doc in suppress_warnings:
         if parse_errors or field_warnings:
-            log.info("Supressing docstring warnings for %s, since it "
+            log.info("Suppressing docstring warnings for %s, since it "
                      "is not included in the documented set." %
                      api_doc.canonical_name)
     else:

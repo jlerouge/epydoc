@@ -893,7 +893,7 @@ def _import(name, filename=None):
     """
     Run the given callable in a 'sandboxed' environment.
     Currently, this includes saving and restoring the contents of
-    sys and __builtins__; and supressing stdin, stdout, and stderr.
+    sys and __builtins__; and suppressing stdin, stdout, and stderr.
     """
     # Note that we just do a shallow copy of sys.  In particular,
     # any changes made to sys.modules will be kept.  But we do
@@ -908,7 +908,7 @@ def _import(name, filename=None):
     # in get_value_from_filename might get overwritten
     sys.path.append('')
 
-    # Supress input and output.  (These get restored when we restore
+    # Suppress input and output.  (These get restored when we restore
     # sys to old_sys).  
     sys.stdin = sys.stdout = sys.stderr = _dev_null
     sys.__stdin__ = sys.__stdout__ = sys.__stderr__ = _dev_null
