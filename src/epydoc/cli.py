@@ -136,8 +136,8 @@ OPTION_DEFAULTS = dict(
     list_classes_separately=False, graph_font=None, graph_font_size=None,
     include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
     exclude=[], exclude_parse=[], exclude_introspect=[],
-    external_api=[],external_api_file=[],external_api_root=[],
-    redundant_details=False)
+    external_api=[], external_api_file=[], external_api_root=[],
+    redundant_details=False, src_code_tab_width=8)
 
 def parse_arguments():
     # Construct the option parser.
@@ -338,6 +338,11 @@ def parse_arguments():
               "its own section, instead of listing them under their "
               "containing module."))
 
+    output_group.add_option('--src-code-tab-width',
+        action='store', type='int', dest='src_code_tab_width',
+        help=("When generating HTML output, sets the number of spaces "
+              "each tab in source code listings is replaced with."))
+    
     # The group of external API options.
     # Skip if the module couldn't be imported (usually missing docutils)
     if xlink is not None:
@@ -573,6 +578,8 @@ def parse_configfiles(configfiles, options, names):
             options.show_frames = _str_to_bool(val, optname)
         elif optname in ('separate-classes', 'separate_classes'):
             options.list_classes_separately = _str_to_bool(val, optname)
+        elif optname in ('src-code-tab-width', 'src_code_tab_width'):
+            options.src_code_tab_width = _str_to_int(val, optname)
 
         # External API
         elif optname in ('external-api', 'external_api'):

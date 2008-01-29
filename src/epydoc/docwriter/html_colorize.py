@@ -324,7 +324,8 @@ class PythonSourceColorizer:
     GUESS_LINK_TARGETS = False
 
     def __init__(self, module_filename, module_name,
-                 docindex=None, url_func=None, name_to_docs=None):
+                 docindex=None, url_func=None, name_to_docs=None,
+                 tab_width=8):
         """
         Create a new HTML colorizer for the specified module.
 
@@ -406,6 +407,9 @@ class PythonSourceColorizer:
         #: Can be C{'func'}, C{'class'}, C{None}.
         self.def_type = None
 
+        #: The number of spaces to replace each tab in source code with
+        self.tab_width = tab_width
+
         
     def find_line_offsets(self):
         """
@@ -450,7 +454,7 @@ class PythonSourceColorizer:
 
         # Load the module's text.
         self.text = open(self.module_filename).read()
-        self.text = self.text.expandtabs().rstrip()+'\n'
+        self.text = self.text.expandtabs(self.tab_width).rstrip()+'\n'
 
         # Construct the line_offsets table.
         self.find_line_offsets()

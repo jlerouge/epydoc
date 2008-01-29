@@ -291,6 +291,9 @@ class HTMLWriter:
         @type include_log: C{boolean}
         @keyword include_log: If true, the the footer will include an
               href to the page 'epydoc-log.html'.
+        @type src_code_tab_width: C{int}
+        @keyword src_code_tab_width: Number of spaces to replace each tab
+            with in source code listings.
         """
         self.docindex = docindex
 
@@ -354,6 +357,10 @@ class HTMLWriter:
 
         self._include_log = kwargs.get('include_log', False)
         """Are we generating an HTML log page?"""
+
+        self._src_code_tab_width = kwargs.get('src_code_tab_width', 8)
+        """Number of spaces to replace each tab with in source code
+        listings."""
         
         self._callgraph_cache = {}
         """Map the callgraph L{uid<DotGraph.uid>} to their HTML
@@ -797,7 +804,8 @@ class HTMLWriter:
             self.href(doc, label='%s %s' % (self.doc_kind(doc), name)))
         out('<pre class="py-src">\n')
         out(PythonSourceColorizer(filename, name, self.docindex,
-                                  self.url, name_to_docs).colorize())
+                                  self.url, name_to_docs,
+                                  self._src_code_tab_width).colorize())
         out('</pre>\n<br />\n')
 
         # Footer
