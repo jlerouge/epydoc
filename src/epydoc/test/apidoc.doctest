@@ -7,6 +7,8 @@ documentation about Python programs.  The API documentation for a
 Python program is encoded using a graph of `APIDoc` objects, each of
 which encodes information about a single Python variable or value.
 
+    >>> import epydoc; epydoc.DEBUG = True
+
     >>> from epydoc.apidoc import *
 
     >>> from epydoc.test.util import print_warnings
@@ -158,12 +160,15 @@ contains a string that's not a valid python identifier:
     >>> DottedName()
     Traceback (most recent call last):
     InvalidDottedName: Empty DottedName
-    >>> DottedName('1+2')
+    >>> DottedName('1+2', strict=True)
     Traceback (most recent call last):
     InvalidDottedName: Bad identifier '1+2'
     >>> DottedName({})
     Traceback (most recent call last):
     TypeError: Bad identifier {}: expected DottedName or str
+    >>> DottedName('1+2', strict=False)
+    Identifier '1+2' looks suspicious; using it anyway.
+    DottedName('1+2')
 
 The one exception is that '??' is treated as if it were a valid python
 identifier:
