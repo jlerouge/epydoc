@@ -279,8 +279,8 @@ def run_subprocess(cmd, data=None):
             except IOError, e:
                 raise OSError(e)
         to_child.close()
-        err = child_err.read()
         out = from_child.read()
+        err = child_err.read()
         # Assume that there was an error iff anything was written
         # to the child's stderr.
         if err == '':
