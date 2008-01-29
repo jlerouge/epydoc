@@ -1015,7 +1015,9 @@ def merge_submodules(v1, v2, precedence, cyclecheck, path):
     n2 = sorted([m.canonical_name for m in v2])
     if (n1 != n2) and (n2 != []):
         log.warning('Introspector & parser disagree about submodules '
-                    'for %s: %s vs %s' % (path, n1, n2))
+                    'for %s: (%s) vs (%s)' % (path,
+                                              ', '.join(str(n) for n in n1),
+                                              ', '.join(str(n) for n in n2)))
         return v1 + [m for m in v2 if m.canonical_name not in n1]
                 
     return v1
@@ -1184,7 +1186,7 @@ def _fix_self_shadowing_var(var_doc, varname, docindex):
             return
 
     # If we couldn't find the actual value, use an unreachable name.
-    name = _unreachable_name_for(var_doc.value, docindex)
+    name, score = _unreachable_name_for(var_doc.value, docindex)
     log.warning('%s shadows itself -- using %s instead' % (varname, name))
     var_doc.value.canonical_name = name
 
@@ -1282,7 +1284,7 @@ def _inherit_info(var_doc):
     # If the new variable has a docstring, then don't inherit
     # anything, even if the docstring is blank.
     if var_doc.docstring not in (None, UNKNOWN):
-        inerited_attribs = set()
+        inherited_attribs = set()
     else:
         inherited_attribs = set(_INHERITED_ATTRIBS)
     
