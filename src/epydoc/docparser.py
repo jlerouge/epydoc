@@ -1700,6 +1700,9 @@ def parse_dotted_name(elt_list, strip_parens=True, parent_name=None):
             
         # >>> from . import foo
         if not elt_list:
+            if prefix_name == []:
+                raise ParseError("Attempted relative import in non-package, "
+                                 "or beyond toplevel package")
             return prefix_name
 
     if len(elt_list) % 2 != 1: raise ParseError("Bad dotted name")
