@@ -83,13 +83,13 @@ href="http://epydoc.svn.sourceforge.net/viewcvs.cgi/epydoc/trunk/epydoc/">here</
 <div class="screen"><pre>
 <code class="prompt">[/tmp]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-3.0beta1.noarch.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rpm -i epydoc-3.0.noarch.rpm</code>
 </pre></div></li>
 
 <li> Once epydoc is installed, you can delete the RPM file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0beta1.rpm</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0.rpm</code>
 </pre></div> </li>
 </ol>
 
@@ -97,7 +97,7 @@ Password:
 <h2> Installing from the Windows Installer </h2>
 
 <ol>
-  <li> Download and run <code>epydoc-3.0beta1.win32.exe</code>. </li>
+  <li> Download and run <code>epydoc-3.0.win32.exe</code>. </li>
   <li> Follow the on-screen instructions.  Epydoc will be installed in
   the <code>epydoc</code> subdirectory of your Python installation
   directory (typically <code>C:\Python23\</code>). </li>
@@ -109,7 +109,7 @@ Password:
   scripts to more convenient locations (such as your desktop or start
   menu). </li>
   <li> Once epydoc is installed, you can delete
-  <code>epydoc-3.0beta1.win32.exe</code>. </li>
+  <code>epydoc-3.0.win32.exe</code>. </li>
 </ol>
 
 <a name="src"></a>
@@ -120,19 +120,19 @@ Password:
   to a directory of your choice, and uncompress it.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-3.0beta1.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-3.0beta1.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-3.0beta1.tar</code>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-3.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-3.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-3.0.tar</code>
 </pre></div></li>
 
-  <li> Use "<code>make install</code>" in the <code>eydoc-3.0beta1/</code>
+  <li> Use "<code>make install</code>" in the <code>eydoc-3.0/</code>
   directory to install epydoc.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-3.0beta1/</code>
-<code class="prompt">[/tmp/epydoc-3.0beta1]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-3.0/</code>
+<code class="prompt">[/tmp/epydoc-3.0]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-3.0beta1]#</code> <code class="user">make install</code>
+<code class="prompt">[/tmp/epydoc-3.0]#</code> <code class="user">make install</code>
 running install
 running build
 <i>[...]</i>
@@ -150,16 +150,16 @@ documentation to different directories (such as
 running "<code>make installdocs</code>".
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp/epydoc-3.0beta1]#</code> <code class="user">make installdocs</code>
+<code class="prompt">[/tmp/epydoc-3.0]#</code> <code class="user">make installdocs</code>
 </pre></div></li>
 
 <li> Once epydoc is installed, you can delete the installation
 directory and the source distribution file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp/epydoc-3.0beta1]#</code> <code class="user">cd ..</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-3.0beta1</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0beta1.tar</code>
+<code class="prompt">[/tmp/epydoc-3.0]#</code> <code class="user">cd ..</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-3.0</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0.tar</code>
 </pre></div> </li>
 </ol>
 
@@ -171,25 +171,25 @@ directory and the source distribution file.
   to a directory of your choice, and uncompress it.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-3.0beta1.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-3.0beta1.tar.gz</code>
-<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-3.0beta1.tar</code>
+<code class="prompt">[/tmp]$</code> <code class="user">wget -q http://prdownloads.sourceforge.net/epydoc/epydoc-3.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">gunzip epydoc-3.0.tar.gz</code>
+<code class="prompt">[/tmp]$</code> <code class="user">tar -xvf epydoc-3.0.tar</code>
 </pre></div></li>
 
   <li> Use the <code>setup.py</code> script in the
-  <code>eydoc-3.0beta1/</code> directory to install epydoc. 
+  <code>eydoc-3.0/</code> directory to install epydoc. 
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-3.0beta1/</code>
-<code class="prompt">[/tmp/epydoc-3.0beta1]$</code> <code class="user">su</code>
+<code class="prompt">[/tmp]$</code> <code class="user">cd epydoc-3.0/</code>
+<code class="prompt">[/tmp/epydoc-3.0]$</code> <code class="user">su</code>
 Password:
-<code class="prompt">[/tmp/epydoc-3.0beta1]#</code> <code class="user">python setup.py install</code>
+<code class="prompt">[/tmp/epydoc-3.0]#</code> <code class="user">python setup.py install</code>
 running install
 running build
 <i>[...]</i>
 copying build/scripts/epydoc -> /usr/bin
 changing mode of /usr/bin/epydoc to 100775
-<code class="prompt">[/tmp/epydoc-3.0beta1]#</code> <code class="user">cd ..</code>
+<code class="prompt">[/tmp/epydoc-3.0]#</code> <code class="user">cd ..</code>
 <code class="prompt">[/tmp]#</code>
 </pre></div></li>
 
@@ -199,16 +199,16 @@ You may also want to copy the man pages to a permanant location, such
 as <code>/usr/share/man/</code>.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-3.0beta1/doc/ /usr/share/doc/epydoc/</code>
-<code class="prompt">[/tmp]#</code> <code class="user">cp epydoc-3.0beta1/man/* /usr/share/man/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp -r epydoc-3.0/doc/ /usr/share/doc/epydoc/</code>
+<code class="prompt">[/tmp]#</code> <code class="user">cp epydoc-3.0/man/* /usr/share/man/</code>
 </pre></div> </li>
 
 <li> Once epydoc is installed, you can delete the installation
 directory and the source distribution file.
 
 <div class="screen"><pre>
-<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-3.0beta1</code>
-<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0beta1.tar</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm -r epydoc-3.0</code>
+<code class="prompt">[/tmp]#</code> <code class="user">rm epydoc-3.0.tar</code>
 </pre></div> </li>
 </ol>
 
