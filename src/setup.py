@@ -37,6 +37,12 @@ CLASSIFIERS=[
     'Topic :: Software Development :: Documentation',
     ]
 
+# Classifiers metadata only supported for Python 2.4+
+if sys.version_info[:2] >= (2,4):
+    other_metadata = dict(classifiers=CLASSIFIERS)
+else:
+    other_metadata = {}
+
 if '--format=wininst' in sys.argv:
     SCRIPTS = ['scripts/epydoc.pyw', 'scripts/epydoc.py']
 else:
@@ -53,7 +59,7 @@ setup(name="epydoc",
       url=URL,
       scripts=SCRIPTS,
       keywords=KEYWORDS.split(),
-      classifiers=CLASSIFIERS,
       long_description=LONG_DESCRIPTION,
-      packages=['epydoc', 'epydoc.markup', 'epydoc.test', 'epydoc.docwriter'])
+      packages=['epydoc', 'epydoc.markup', 'epydoc.test', 'epydoc.docwriter'],
+      **other_metadata)
 
