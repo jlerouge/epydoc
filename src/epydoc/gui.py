@@ -144,7 +144,7 @@ ADs=
 from epydoc import log
 from epydoc.util import wordwrap
 class GUILogger(log.Logger):
-    _STAGES = [40, 7, 1, 3, 30, 1, 2, 100]
+    _STAGES = [40, 7, 1, 3, 1, 30, 1, 2, 100]
     
     def __init__(self, progress, cancel):
         self._progress = progress
