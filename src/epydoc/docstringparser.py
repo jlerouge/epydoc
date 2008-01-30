@@ -671,6 +671,9 @@ def process_undocumented_field(api_doc, docindex, tag, arg, descr):
             if var_name_re.match(var_name):
                 # Remove the variable from `variables`.
                 api_doc.variables.pop(var_name, None)
+                if api_doc.sort_spec is not UNKNOWN:
+                    try: api_doc.sort_spec.remove(var_name)
+                    except ValueError: pass
         # For modules, remove any submodules that match var_name_re.
         if isinstance(api_doc, ModuleDoc):
             removed = set([m for m in api_doc.submodules
