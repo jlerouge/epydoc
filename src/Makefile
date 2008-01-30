@@ -89,3 +89,14 @@ windist:
 	test -e doc || ln -s ../webpage doc
 	test -e man || ln -s ../man man
 	$(PYTHON) setup.py -q bdist --format=wininst
+
+upload:
+	test -e doc || ln -s ../webpage doc
+	test -e man || ln -s ../man man
+	$(PYTHON) setup.py register
+	$(PYTHON) setup.py -q sdist --format=gztar upload
+	$(PYTHON) setup.py -q sdist --format=zip upload
+	$(PYTHON) setup.py -q bdist --format=wininst upload
+	$(PYTHON) setup.py -q bdist --format=rpm upload
+
+
