@@ -19,6 +19,7 @@ class PlaintextWriter:
         result = []
         out = result.append
 
+        self._show_private = options.get('show_private', True)
         self._cols = options.get('cols', 75)
 
         try:
@@ -38,9 +39,6 @@ class PlaintextWriter:
         return ''.join(result)
 
     def write_module(self, out, mod_doc):
-        #for n,v in mod_doc.variables.items():
-        #    print n, `v.value`, `v.value.value`
-        
         # The cannonical name of the module.
         out(self.section('Module Name'))
         out('    %s\n\n' % mod_doc.canonical_name)
@@ -225,6 +223,9 @@ class PlaintextWriter:
 
         for i, var_doc in enumerate(var_docs):
             val_doc, name = var_doc.value, var_doc.name
+
+            if not var_doc.is_public and not self._show_private:
+                continue
 
             if verbose:
                 out(prefix+'\n')
