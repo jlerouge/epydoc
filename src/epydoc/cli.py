@@ -346,8 +346,7 @@ def parse_arguments():
 
     output_group.add_option('--suppress-timestamp',
         action='store_false', dest='include_timestamp',
-        help=("When generating HTML output, suppress the timestamp at "
-              "the bottom of each page."))
+        help=("Do not include a timestamp in the generated output."))
     
     # The group of external API options.
     # Skip if the module couldn't be imported (usually missing docutils)
