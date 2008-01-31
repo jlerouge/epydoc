@@ -137,7 +137,8 @@ OPTION_DEFAULTS = dict(
     include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
     exclude=[], exclude_parse=[], exclude_introspect=[],
     external_api=[], external_api_file=[], external_api_root=[],
-    redundant_details=False, src_code_tab_width=8)
+    redundant_details=False, src_code_tab_width=8,
+    include_timestamp=True)
 
 def parse_arguments():
     # Construct the option parser.
@@ -342,6 +343,11 @@ def parse_arguments():
         action='store', type='int', dest='src_code_tab_width',
         help=("When generating HTML output, sets the number of spaces "
               "each tab in source code listings is replaced with."))
+
+    output_group.add_option('--suppress-timestamp',
+        action='store_false', dest='include_timestamp',
+        help=("When generating HTML output, suppress the timestamp at "
+              "the bottom of each page."))
     
     # The group of external API options.
     # Skip if the module couldn't be imported (usually missing docutils)
@@ -580,6 +586,8 @@ def parse_configfiles(configfiles, options, names):
             options.list_classes_separately = _str_to_bool(val, optname)
         elif optname in ('src-code-tab-width', 'src_code_tab_width'):
             options.src_code_tab_width = _str_to_int(val, optname)
+        elif optname == 'timestamp':
+            options.include_timestamp = _str_to_bool(val, optname)
 
         # External API
         elif optname in ('external-api', 'external_api'):
