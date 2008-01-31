@@ -950,7 +950,7 @@ def write_text(docindex, options):
     plaintext_writer = PlaintextWriter()
     s = ''
     for apidoc in docindex.root:
-        s += plaintext_writer.write(apidoc)
+        s += plaintext_writer.write(apidoc, **options.__dict__)
     log.end_progress()
     if isinstance(s, unicode):
         s = s.encode('ascii', 'backslashreplace')
