@@ -547,9 +547,7 @@ def _get_docs_from_module_file(filename, options, progress_estimator,
         try:
             parse_doc = parse_docs(
                 filename=filename, context=parent_docs[1])
-        except ParseError, e:
-            parse_error = str(e)
-        except ImportError, e:
+        except (ParseError, ImportError, IOError, OSError), e:
             parse_error = str(e)
 
     # Report any errors we encountered.
