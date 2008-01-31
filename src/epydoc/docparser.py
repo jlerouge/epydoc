@@ -767,6 +767,8 @@ def process_line(line, parent_docs, prev_line_doc, lineno,
     elif (line[0][0] == token.NAME and
           line[0][1] in CONTROL_FLOW_KEYWORDS):
         return process_control_flow_line(*args)
+    elif line[0] == (token.NAME, '__all__') and is_append_to_all(line):
+        return process_append_to_all(*args)
     else:
         return None
         # [xx] do something with control structures like for/if?
@@ -1340,9 +1342,10 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
             # decode_with_backslashreplace, which will map e.g.
             # "\xe9" -> u"\\xe9".
             docstring = decode_with_backslashreplace(docstring)
-            log.warning("While parsing %s: docstring is not a unicode "
-                        "string, but it contains non-ascii data." %
-                        prev_line_doc.canonical_name)
+            log.warning("Parsing %s (line %s): %s docstring is not a "
+                        "unicode string, but it contains non-ascii data." %
+                        (parent_docs[0].filename, lineno, 
+                         prev_line_doc.canonical_name))
 
     # If the modified APIDoc is an instance variable, and it has
     # not yet been added to its class's C{variables} list,
@@ -1362,9 +1365,12 @@ def process_docstring(line, parent_docs, prev_line_doc, lineno,
                 break
 
     if prev_line_doc.docstring not in (None, UNKNOWN):
-        log.warning("%s has both a comment-docstring and a normal "
-                    "(string) docstring; ignoring the comment-"
-                    "docstring." % prev_line_doc.canonical_name)
+        name = prev_line_doc.canonical_name
+        if name is UNKNOWN and isinstance(prev_line_doc, VariableDoc):
+            name = prev_line_doc.name
+        log.warning("Parsing %s (line %s): %s has both a comment-docstring "
+                    "and a normal (string) docstring; ignoring the comment-"
+                    "docstring." % (parent_docs[0].filename, lineno, name))
         
     prev_line_doc.docstring = docstring
     prev_line_doc.docstring_lineno = lineno
@@ -1548,8 +1554,9 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
             for base_name in parse_classdef_bases(line[2]):
                 class_doc.bases.append(find_base(base_name, parent_docs))
         except ParseError, e:
-            log.warning("Unable to extract the base list for %s: %s" %
-                        (canonical_name, e))
+            log.warning("Parsing %s (line %s): Unable to extract "
+                        "the base list for class '%s'." %
+                        (parent_docs[0].filename, lineno, canonical_name))
             class_doc.bases = UNKNOWN
     else:
         class_doc.bases = []
@@ -1634,6 +1641,67 @@ def find_base(name, parent_docs):
         return _proxy_base(proxy_for=base_var.imported_from)
     else:
         return _proxy_base(parse_repr=str(name))
+
+#/////////////////////////////////////////////////////////////////
+# Line handler: append to all
+#/////////////////////////////////////////////////////////////////
+
+def process_append_to_all(line, parent_docs, prev_line_doc, lineno,
+                          comments, decorators, encoding):
+    """
+    The line handler for __all__.append() lines; either of:
+
+        >>> __all__.append('name')
+        >>> __all__ += ['name']
+
+    This handler looks up the value of the variable C{__all__} in
+    parent_docs; and if it is found, and has a list-of-strings value,
+    the handler appends the new name.
+    """
+    # Extract the string to be appended
+    assert line[-1][1][0] == token.STRING
+    name = line[-1][1][1]
+
+    all_var = lookup_name('__all__', parent_docs)
+    error = None
+    if all_var is None or all_var.value in (None, UNKNOWN):
+        error = "variable __all__ not found."
+    else:
+        try:
+            # Make sure we can parse the __all__ value.
+            parse_string_list(all_var.value.toktree, True)
+
+            # Add the new name to __all__.
+            if len(all_var.value.toktree[0]) > 2:
+                all_var.value.toktree[0].insert(-1, (token.OP, ','))
+            all_var.value.toktree[0].insert(-1, (token.STRING, name))
+            all_var.value.parse_repr = pp_toktree(all_var.value.toktree)
+        except ParseError:
+            error = "unable to parse the contents of __all__"
+
+    if error:
+        log.warning("Parsing %s (line %s): while processing "
+                    "an __all__.append() statement: %s" %
+                    (parent_docs[0].filename, lineno, error))
+    
+def is_append_to_all(line):
+    """
+    Check if a line is an __all__.append line()
+    @see: L{process_append_to_all}
+    """
+    # __all__.append(string)
+    if (len(line) == 4 and line[0] == (token.NAME, '__all__') and
+        line[1] == (token.OP, '.') and line[2] == (token.NAME, 'append') and
+        isinstance(line[3], list) and len(line[3]) == 3 and
+        line[3][0] == (token.OP, '(') and line[3][1][0] == token.STRING):
+        return True
+
+    # __all__ += [string]
+    if (len(line) == 3 and line[0] == (token.NAME, '__all__') and
+        line[1] == (token.OP, '+=') and isinstance(line[2], list) and
+        len(line[2]) == 3 and line[2][0][1] in '[(' and
+        line[2][1][0] == token.STRING):
+        return True
 
 #/////////////////////////////////////////////////////////////////
 #{ Parsing
@@ -1820,10 +1888,12 @@ def parse_string(elt_list):
         raise ParseError("Expected a string")
 
 # ['1', 'b', 'c']
-def parse_string_list(elt_list):
-    if (len(elt_list) == 1 and isinstance(elt_list, list) and
+def parse_string_list(elt_list, require_sequence=False):
+    if (len(elt_list) == 1 and isinstance(elt_list[0], list) and
         elt_list[0][0][1] in ('(', '[')):
         elt_list = elt_list[0][1:-1]
+    elif require_sequence:
+        raise ParseError("Expected a sequence")
 
     string_list = []
     for string_elt in split_on(elt_list, (token.OP, ',')):
