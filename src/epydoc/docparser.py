@@ -145,6 +145,10 @@ it do to the documentation of the decorated function?
     knowledge about what value the decorator returns.
 """
 
+PUBLIC_DECORATOR_APPENDS_TO_ALL = True
+"""If true, then the @public decorator will append the function's
+name to the module's __all__ variable."""
+
 BASE_HANDLING = 'parse'#'link'
 """What should C{docparser} do when it encounters a base class that
 was imported from another module?
@@ -1105,7 +1109,7 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
     
     # Evaluate the right hand side.
     if not is_instvar:
-        rhs_val, is_alias = rhs_to_valuedoc(rhs, parent_docs)
+        rhs_val, is_alias = rhs_to_valuedoc(rhs, parent_docs, lineno)
     else:
         rhs_val, is_alias = UNKNOWN, False
 
@@ -1196,7 +1200,7 @@ def lhs_is_instvar(lhs_pieces, parent_docs):
             return False
     return False
         
-def rhs_to_valuedoc(rhs, parent_docs):
+def rhs_to_valuedoc(rhs, parent_docs, lineno):
     # Dotted variable:
     try:
         rhs_name = parse_dotted_name(rhs)
@@ -1209,9 +1213,10 @@ def rhs_to_valuedoc(rhs, parent_docs):
     # Decorators:
     if (len(rhs)==2 and rhs[0][0] == token.NAME and
         isinstance(rhs[1], list)):
-        arg_val, _ = rhs_to_valuedoc(rhs[1][1:-1], parent_docs)
+        arg_val, _ = rhs_to_valuedoc(rhs[1][1:-1], parent_docs, lineno)
         if isinstance(arg_val, RoutineDoc):
-            doc = apply_decorator(DottedName(rhs[0][1]), arg_val)
+            doc = apply_decorator(DottedName(rhs[0][1]), arg_val,
+                                  parent_docs, lineno)
             doc.canonical_name = UNKNOWN
             doc.parse_repr = pp_toktree(rhs)
             return doc, False
@@ -1438,7 +1443,7 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
                                     func_doc.parse_repr)
         else:
             deco_repr = UNKNOWN
-        func_doc = apply_decorator(deco_name, func_doc)
+        func_doc = apply_decorator(deco_name, func_doc, parent_docs, lineno)
         func_doc.parse_repr = deco_repr
         # [XX] Is there a reson the following should be done?  It
         # causes the grouping code to break.  Presumably the canonical
@@ -1455,12 +1460,18 @@ def process_funcdef(line, parent_docs, prev_line_doc, lineno,
     # Return the new ValueDoc.
     return func_doc
 
-def apply_decorator(decorator_name, func_doc):
+def apply_decorator(decorator_name, func_doc, parent_docs, lineno):
     # [xx] what if func_doc is not a RoutineDoc?
     if decorator_name == DottedName('staticmethod'):
         return StaticMethodDoc(**func_doc.__dict__)
     elif decorator_name == DottedName('classmethod'):
         return ClassMethodDoc(**func_doc.__dict__)
+    elif (decorator_name == DottedName('public') and
+          PUBLIC_DECORATOR_APPENDS_TO_ALL):
+        if '"' not in func_doc.canonical_name[-1]: # for security
+            quoted_func_name = '"%s"' % func_doc.canonical_name[-1]
+            append_to_all(quoted_func_name, parent_docs, lineno)
+        return func_doc.__class__(**func_doc.__dict__) # make a copy.
     elif DEFAULT_DECORATOR_BEHAVIOR == 'transparent':
         return func_doc.__class__(**func_doc.__dict__) # make a copy.
     elif DEFAULT_DECORATOR_BEHAVIOR == 'opaque':
@@ -1660,9 +1671,11 @@ def process_append_to_all(line, parent_docs, prev_line_doc, lineno,
     """
     # Extract the string to be appended
     assert line[-1][1][0] == token.STRING
-    name = line[-1][1][1]
+    append_to_all(line[-1][1][1], parent_docs, lineno)
 
+def append_to_all(name, parent_docs, lineno):
     all_var = lookup_name('__all__', parent_docs)
+    
     error = None
     if all_var is None or all_var.value in (None, UNKNOWN):
         error = "variable __all__ not found."
@@ -1678,10 +1691,11 @@ def process_append_to_all(line, parent_docs, prev_line_doc, lineno,
             all_var.value.parse_repr = pp_toktree(all_var.value.toktree)
         except ParseError:
             error = "unable to parse the contents of __all__"
+        log.warning('now', all_var.value.parse_repr)
 
     if error:
-        log.warning("Parsing %s (line %s): while processing "
-                    "an __all__.append() statement: %s" %
+        log.warning("Parsing %s (line %s): while processing an __all__"
+                    ".append() statement or @public decorator: %s" %
                     (parent_docs[0].filename, lineno, error))
     
 def is_append_to_all(line):
