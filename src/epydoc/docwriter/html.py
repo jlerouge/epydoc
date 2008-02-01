@@ -3423,7 +3423,7 @@ class HTMLWriter:
 
     def _private_subclasses(self, class_doc):
         """Return a list of all subclasses of the given class that are
-        private, as determined by L{_val_is_private}.  Recursive
+        private, as determined by L{_val_is_public}.  Recursive
         subclasses are included in this list."""
         queue = [class_doc]
         private = set()
