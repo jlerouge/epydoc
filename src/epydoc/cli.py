@@ -822,9 +822,10 @@ def main(options, names):
 
     # Basic timing breakdown:
     if options.verbosity >= 2:
-        for logger in logger:
+        for logger in loggers:
             if isinstance(logger, ConsoleLogger):
                 logger.print_times()
+                break
 
     # If we encountered any message types that we were requested to
     # fail on, then exit with status 2.
