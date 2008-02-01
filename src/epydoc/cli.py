@@ -1352,10 +1352,10 @@ class ConsoleLogger(log.Logger):
         total = sum([time for (time, task) in self._task_times])
         max_t = max([time for (time, task) in self._task_times])
         for (time, task) in self._task_times:
-            task = task[:31]
-            print '  %s%s %7.1fs' % (task, '.'*(35-len(task)), time),
-            if self.term.COLS > 55:
-                print '|'+'=' * int((self.term.COLS-53) * time / max_t)
+            task = task[:34]
+            print '  %s%s%7.1fs' % (task, '.'*(37-len(task)), time),
+            if self.term.COLS > 58:
+                print '|'+'=' * int((self.term.COLS-56) * time / max_t)
             else:
                 print
         print
