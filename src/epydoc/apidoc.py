@@ -1082,7 +1082,7 @@ class NamespaceDoc(ValueDoc):
                         unused_groups.discard(ident)
                         if elt_name in ungrouped:
                             group.append(ungrouped.pop(elt_name))
-                        else:
+                        elif elt_name not in set(idents):
                             log.warning("%s.%s in multiple groups" %
                                         (self.canonical_name, elt_name))
 
