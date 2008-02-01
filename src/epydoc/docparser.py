@@ -1691,7 +1691,6 @@ def append_to_all(name, parent_docs, lineno):
             all_var.value.parse_repr = pp_toktree(all_var.value.toktree)
         except ParseError:
             error = "unable to parse the contents of __all__"
-        log.warning('now', all_var.value.parse_repr)
 
     if error:
         log.warning("Parsing %s (line %s): while processing an __all__"
