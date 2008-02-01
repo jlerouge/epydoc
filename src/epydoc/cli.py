@@ -1334,8 +1334,6 @@ class ConsoleLogger(log.Logger):
             print self.term.BOLD + header + self.term.NORMAL
 
     def end_progress(self):
-        if self._progress is None:
-            return # already ended.
         self.progress(1.)
         if self._progress_mode == 'bar':
             sys.stdout.write(self.term.CLEAR_LINE)
