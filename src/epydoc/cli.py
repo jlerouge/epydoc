@@ -660,13 +660,15 @@ def main(options, names):
     #        options.parse = False
 
     # Set up the logger
+    loggers = []
     if options.simple_term:
         TerminalController.FORCE_SIMPLE_TERM = True
     if options.action == 'text':
-        logger = None # no logger for text output.
+        pass # no logger for text output.
     elif options.verbosity > 1:
         logger = ConsoleLogger(options.verbosity)
         log.register_logger(logger)
+        loggers.append(logger)
     else:
         # Each number is a rough approximation of how long we spend on
         # that task, used to divide up the unified progress bar.
@@ -695,6 +697,7 @@ def main(options, names):
             del stages[1:3] # no merging or linking
         logger = UnifiedProgressConsoleLogger(options.verbosity, stages)
         log.register_logger(logger)
+        loggers.append(logger)
 
     # check the output directory.
     if options.action not in ('text', 'check', 'pickle'):
@@ -707,7 +710,9 @@ def main(options, names):
         if options.action == 'html':
             if not os.path.exists(options.target):
                 os.mkdir(options.target)
-            log.register_logger(HTMLLogger(options.target, options))
+            logger = HTMLLogger(options.target, options)
+            log.register_logger(logger)
+            loggers.append(logger)
         else:
             log.warning("--include-log requires --html")
 
@@ -764,9 +769,11 @@ def main(options, names):
                                    exclude_parse=exclude_parse)
 
     if docindex is None:
-        if log.ERROR in logger.reported_message_levels:
-            sys.exit(1)
+        for logger in loggers:
+            if log.ERROR in logger.reported_message_levels:
+                sys.exit(1)
         else:
+            for logger in loggers: log.remove_logger(logger)
             return # docbuilder already logged an error.
 
     # Load profile information, if it was given.
@@ -778,7 +785,9 @@ def main(options, names):
             profile_stats = pstats.Stats(options.pstat_files[0])
             for filename in options.pstat_files[1:]:
                 profile_stats.add(filename)
-        except KeyboardInterrupt: raise
+        except KeyboardInterrupt:
+            for logger in loggers: log.remove_logger(logger)
+            raise
         except Exception, e:
             log.error("Error reading pstat file: %s" % e)
             profile_stats = None
@@ -800,18 +809,22 @@ def main(options, names):
         print >>sys.stderr, '\nUnsupported action %s!' % options.action
 
     # If we suppressed docstring warnings, then let the user know.
-    if logger is not None and logger.suppressed_docstring_warning:
-        if logger.suppressed_docstring_warning == 1:
-            prefix = '1 markup error was found'
-        else:
-            prefix = ('%d markup errors were found' %
-                      logger.suppressed_docstring_warning)
-        log.warning("%s while processing docstrings.  Use the verbose "
-                    "switch (-v) to display markup errors." % prefix)
+    for logger in loggers:
+        if (isinstance(logger, ConsoleLogger) and
+            logger.suppressed_docstring_warning):
+            if logger.suppressed_docstring_warning == 1:
+                prefix = '1 markup error was found'
+            else:
+                prefix = ('%d markup errors were found' %
+                          logger.suppressed_docstring_warning)
+            logger.warning("%s while processing docstrings.  Use the verbose "
+                           "switch (-v) to display markup errors." % prefix)
 
     # Basic timing breakdown:
-    if options.verbosity >= 2 and logger is not None:
-        logger.print_times()
+    if options.verbosity >= 2:
+        for logger in logger:
+            if isinstance(logger, ConsoleLogger):
+                logger.print_times()
 
     # If we encountered any message types that we were requested to
     # fail on, then exit with status 2.
@@ -820,6 +833,9 @@ def main(options, names):
         if max_reported_message_level >= options.fail_on:
             sys.exit(2)
 
+    # Deregister our logger(s).
+    for logger in loggers: log.remove_logger(logger)
+            
 def write_html(docindex, options):
     from epydoc.docwriter.html import HTMLWriter
     html_writer = HTMLWriter(docindex, **options.__dict__)
@@ -1309,7 +1325,7 @@ class ConsoleLogger(log.Logger):
 
     def start_progress(self, header=None):
         if self._progress is not None:
-            raise ValueError
+            raise ValueError('previous progress bar not ended')
         self._progress = None
         self._progress_start_time = time.time()
         self._progress_header = header
@@ -1317,6 +1333,8 @@ class ConsoleLogger(log.Logger):
             print self.term.BOLD + header + self.term.NORMAL
 
     def end_progress(self):
+        if self._progress is None:
+            return # already ended.
         self.progress(1.)
         if self._progress_mode == 'bar':
             sys.stdout.write(self.term.CLEAR_LINE)
@@ -1365,6 +1383,8 @@ class UnifiedProgressConsoleLogger(ConsoleLogger):
         if self.stage == 0:
             ConsoleLogger.start_progress(self)
         self.stage += 1
+        if self.stage > len(self.stages):
+            self.stage = len(self.stages) # should never happen!
 
     def end_progress(self):
         if self.stage == len(self.stages):
@@ -1448,6 +1468,7 @@ class HTMLLogger(log.Logger):
         return self.MESSAGE % (level.split()[-1], hdr, message)
 
     def close(self):
+        if self.out is None: return
         if self.is_empty:
             self.out.write('<div class="log-info">'
                            'No warnings or errors!</div>')
@@ -1457,6 +1478,7 @@ class HTMLLogger(log.Logger):
                        (time.ctime(), self._elapsed_time()))
         self.out.write(self.FOOTER)
         self.out.close()
+        self.out = None
 
     def _elapsed_time(self):
         secs = int(time.time()-self.start_time)

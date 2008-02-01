@@ -66,7 +66,8 @@ class Logger:
 
     def close(self):
         """
-        Perform any tasks needed to close this logger.
+        Perform any tasks needed to close this logger.  This should
+        be safe to call multiple times.
         """
 
     #////////////////////////////////////////////////////////////
@@ -141,7 +142,8 @@ def register_logger(logger):
     """
     _loggers.append(logger)
 
-def remove_logger(logger):
+def remove_logger(logger, close_logger=True):
+    if close_logger: logger.close()
     _loggers.remove(logger)
 
 ######################################################################
