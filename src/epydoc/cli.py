@@ -495,8 +495,6 @@ def parse_arguments():
     if not options.parse and not options.introspect:
         optparser.error("Invalid option combination: --parse-only "
                         "and --introspect-only.")
-    if 'text' in options.actions and len(names) > 1:
-        optparser.error("--text option takes only one name.")
 
     # Check the list of requested graph types to make sure they're
     # acceptable.
@@ -730,6 +728,7 @@ def main(options):
 
     # check the output targets.
     for action in options.actions:
+        if action not in TARGET_ACTIONS: continue
         target = options.target[action]
         if os.path.exists(target):
             if action not in ['html', 'latex'] and os.path.isdir(target):
@@ -1026,13 +1025,13 @@ def write_text(docindex, options):
     log.start_progress('Writing output')
     from epydoc.docwriter.plaintext import PlaintextWriter
     plaintext_writer = PlaintextWriter()
-    s = ''
+    s = '\n'
     for apidoc in docindex.root:
-        s += plaintext_writer.write(apidoc, **options.__dict__)
+        s += plaintext_writer.write(apidoc, **options.__dict__)+'\n'
     log.end_progress()
     if isinstance(s, unicode):
         s = s.encode('ascii', 'backslashreplace')
-    print s
+    sys.stdout.write(s)
 
 def check_docs(docindex, options):
     from epydoc.checker import DocChecker
@@ -1117,6 +1116,7 @@ def _profile():
 ######################################################################
 #{ Logging
 ######################################################################
+# [xx] this should maybe move to util.py or log.py
     
 class TerminalController:
     """
