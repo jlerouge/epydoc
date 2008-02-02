@@ -63,7 +63,7 @@ levels are currently defined as follows::
 """
 __docformat__ = 'epytext en'
 
-import sys, os, time, re, pickle, textwrap
+import sys, os, time, re, pickle, textwrap, tempfile, shutil
 from glob import glob
 from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
 import optparse
@@ -87,6 +87,8 @@ GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'
 PROFILER = 'profile' #: Which profiler to use: 'hotshot' or 'profile'
+TARGET_ACTIONS = ('html', 'latex', 'dvi', 'ps', 'pdf')
+DEFAULT_ACTIONS = ('html',)
 
 ######################################################################
 #{ Help Topics
@@ -128,17 +130,36 @@ HELP_TOPICS['topics'] = wordwrap(
 #{ Argument & Config File Parsing
 ######################################################################
 
-OPTION_DEFAULTS = dict(
-    action="html", show_frames=True, docformat=DEFAULT_DOCFORMAT, 
-    show_private=True, show_imports=False, inheritance="listed",
-    verbose=0, quiet=0, load_pickle=False, parse=True, introspect=True,
-    debug=epydoc.DEBUG, profile=False, graphs=[],
-    list_classes_separately=False, graph_font=None, graph_font_size=None,
-    include_source_code=True, pstat_files=[], simple_term=False, fail_on=None,
-    exclude=[], exclude_parse=[], exclude_introspect=[],
-    external_api=[], external_api_file=[], external_api_root=[],
-    redundant_details=False, src_code_tab_width=8,
-    include_timestamp=True)
+DEFAULT_TARGET = dict(
+    html='html', latex='latex', dvi='api.dvi', ps='api.ps',
+    pdf='api.pdf', pickle='api.pickle')
+
+def option_defaults():
+    return dict(
+        actions=[], show_frames=True, docformat=DEFAULT_DOCFORMAT, 
+        show_private=True, show_imports=False, inheritance="listed",
+        verbose=0, quiet=0, load_pickle=False, parse=True, introspect=True,
+        debug=epydoc.DEBUG, profile=False, graphs=[],
+        list_classes_separately=False, graph_font=None, graph_font_size=None,
+        include_source_code=True, pstat_files=[], simple_term=False,
+        fail_on=None, exclude=[], exclude_parse=[], exclude_introspect=[],
+        external_api=[], external_api_file=[], external_api_root=[],
+        redundant_details=False, src_code_tab_width=8, verbosity=0,
+        include_timestamp=True, target={}, default_target=None)
+
+# append_const is not defined in py2.3 or py2.4, so use a callback
+# instead, with the following function:
+def add_action(option, opt, value, optparser):
+    action = opt.replace('-', '')
+    optparser.values.actions.append(action)
+
+def add_target(option, opt, value, optparser):
+    if optparser.values.actions:
+        optparser.values.target[optparser.values.actions[-1]] = value
+    elif optparser.values.default_target is None:
+        optparser.values.default_target = value
+    else:
+        optparser.error("Default output target specified multiple times!")
 
 def parse_arguments():
     # Construct the option parser.
@@ -152,7 +173,7 @@ def parse_arguments():
               "and/or NAMES.  This option may be repeated."))
 
     optparser.add_option("--output", "-o",
-        dest="target", metavar="PATH",
+        action='callback', callback=add_target, type='string', metavar="PATH",
         help="The output directory.  If PATH does not exist, then "
         "it will be created.")
 
@@ -173,49 +194,48 @@ def parse_arguments():
         help="Do not try to use color or cursor control when displaying "
         "the progress bar, warnings, or errors.")
 
-
     action_group = OptionGroup(optparser, 'Actions')
     optparser.add_option_group(action_group)
 
     action_group.add_option("--html",
-        action="store_const", dest="action", const="html",
+        action='callback', callback=add_action, 
         help="Write HTML output.")
 
     action_group.add_option("--text",
-        action="store_const", dest="action", const="text",
+        action='callback', callback=add_action, 
         help="Write plaintext output. (not implemented yet)")
 
     action_group.add_option("--latex",
-        action="store_const", dest="action", const="latex",
+        action='callback', callback=add_action, 
         help="Write LaTeX output.")
 
     action_group.add_option("--dvi",
-        action="store_const", dest="action", const="dvi",
+        action='callback', callback=add_action, 
         help="Write DVI output.")
 
     action_group.add_option("--ps",
-        action="store_const", dest="action", const="ps",
+        action='callback', callback=add_action, 
         help="Write Postscript output.")
 
     action_group.add_option("--pdf",
-        action="store_const", dest="action", const="pdf",
+        action='callback', callback=add_action, 
         help="Write PDF output.")
 
     action_group.add_option("--check",
-        action="store_const", dest="action", const="check",
+        action='callback', callback=add_action, 
         help="Check completeness of docs.")
 
     action_group.add_option("--pickle",
-        action="store_const", dest="action", const="pickle",
+        action='callback', callback=add_action, 
         help="Write the documentation to a pickle file.")
 
     # Provide our own --help and --version options.
     action_group.add_option("--version",
-        action="store_const", dest="action", const="version",
+        action='callback', callback=add_action, 
         help="Show epydoc's version number and exit.")
 
     action_group.add_option("-h", "--help",
-        action="store_const", dest="action", const="help",
+        action='callback', callback=add_action, 
         help="Show this message and exit.  For help on specific "
         "topics, use \"--help TOPIC\".  Use \"--help topics\" for a "
         "list of available help topics")
@@ -419,14 +439,14 @@ def parse_arguments():
         "warnings).")
 
     # Set the option parser's defaults.
-    optparser.set_defaults(**OPTION_DEFAULTS)
+    optparser.set_defaults(**option_defaults())
 
     # Parse the arguments.
     options, names = optparser.parse_args()
 
     # Print help message, if requested.  We also provide support for
     # --help [topic]
-    if options.action == 'help':
+    if 'help' in options.actions:
         names = set([n.lower() for n in names])
         for (topic, msg) in HELP_TOPICS.items():
             if topic.lower() in names:
@@ -436,7 +456,7 @@ def parse_arguments():
         sys.exit(0)
 
     # Print version message, if requested.
-    if options.action == 'version':
+    if 'version' in options.actions:
         print version
         sys.exit(0)
     
@@ -475,7 +495,7 @@ def parse_arguments():
     if not options.parse and not options.introspect:
         optparser.error("Invalid option combination: --parse-only "
                         "and --introspect-only.")
-    if options.action == 'text' and len(names) > 1:
+    if 'text' in options.actions and len(names) > 1:
         optparser.error("--text option takes only one name.")
 
     # Check the list of requested graph types to make sure they're
@@ -500,13 +520,9 @@ def parse_arguments():
     verbosity = getattr(options, 'verbosity', 0)
     options.verbosity = verbosity + options.verbose - options.quiet
 
-    # The target default depends on the action.
-    if options.target is None:
-        options.target = options.action
-    
     # Return parsed args.
     options.names = names
-    return options, names
+    return options
 
 def parse_configfiles(configfiles, options, names):
     configparser = ConfigParser.ConfigParser()
@@ -524,12 +540,14 @@ def parse_configfiles(configfiles, options, names):
                        'module', 'object', 'value'):
             names.extend(_str_to_list(val))
         elif optname == 'target':
-            options.target = val
+            options.default_target = val
         elif optname == 'output':
-            if val.lower() not in ACTIONS:
-                raise ValueError('"%s" expected one of: %s' %
-                                 (optname, ', '.join(ACTIONS)))
-            options.action = val.lower()
+            for action, target in re.findall('(\w+)\s*(?:->\s*(\S+))?', val):
+                if action not in ACTIONS:
+                    raise ValueError('"%s" expected one of %s, got %r' %
+                                     (optname, ', '.join(ACTIONS), action))
+                options.actions.append(action)
+                if target: options.target[action] = target
         elif optname == 'verbosity':
             options.verbosity = _str_to_int(val, optname)
         elif optname == 'debug':
@@ -649,21 +667,19 @@ def _str_to_list(val):
 #{ Interface
 ######################################################################
 
-def main(options, names):
+def main(options):
     # Set the debug flag, if '--debug' was specified.
     if options.debug:
         epydoc.DEBUG = True
 
-    ## [XX] Did this serve a purpose?  Commenting out for now:
-    #if options.action == 'text':
-    #    if options.parse and options.introspect:
-    #        options.parse = False
+    if not options.actions:
+        options.actions = DEFAULT_ACTIONS
 
     # Set up the logger
     loggers = []
     if options.simple_term:
         TerminalController.FORCE_SIMPLE_TERM = True
-    if options.action == 'text':
+    if options.actions == ['text']:
         pass # no logger for text output.
     elif options.verbosity > 1:
         logger = ConsoleLogger(options.verbosity)
@@ -682,15 +698,15 @@ def main(options, names):
                   2]   # Sorting & Grouping
         if options.load_pickle:
             stages = [30] # Loading pickled documentation
-        if options.action == 'html': stages += [100]
-        elif options.action == 'text': stages += [30]
-        elif options.action == 'latex': stages += [60]
-        elif options.action == 'dvi': stages += [60,30]
-        elif options.action == 'ps': stages += [60,40]
-        elif options.action == 'pdf': stages += [60,50]
-        elif options.action == 'check': stages += [10]
-        elif options.action == 'pickle': stages += [10]
-        else: raise ValueError, '%r not supported' % options.action
+        if 'html' in options.actions: stages += [100]
+        if 'text' in options.actions: stages += [30]
+        if 'check' in options.actions: stages += [10]
+        if 'pickle' in options.actions: stages += [10]
+        if 'latex' in options.actions: stages += [60]
+        if 'pdf' in options.actions: stages += [50]
+        elif 'ps' in options.actions: stages += [40]
+        elif 'dvi' in options.actions: stages += [30]
+        
         if options.parse and not options.introspect:
             del stages[1] # no merging
         if options.introspect and not options.parse:
@@ -699,18 +715,35 @@ def main(options, names):
         log.register_logger(logger)
         loggers.append(logger)
 
-    # check the output directory.
-    if options.action not in ('text', 'check', 'pickle'):
-        if os.path.exists(options.target):
-            if not os.path.isdir(options.target):
-                log.error("%s is not a directory" % options.target)
+    # Calculate the target directories/files.
+    for (key, val) in DEFAULT_TARGET.items():
+        if options.default_target is not None:
+            options.target.setdefault(key, options.default_target)
+        else:
+            options.target.setdefault(key, val)
+
+    # Add extensions to target filenames, where appropriate.
+    for action in ['pdf', 'ps', 'dvi', 'pickle']:
+        if action in options.target:
+            if not options.target[action].endswith('.%s' % action):
+                options.target[action] += '.%s' % action
+
+    # check the output targets.
+    for action in options.actions:
+        target = options.target[action]
+        if os.path.exists(target):
+            if action not in ['html', 'latex'] and os.path.isdir(target):
+                log.error("%s is a directory" % target)
+                sys.exit(1)
+            elif action in ['html', 'latex'] and not os.path.isdir(target):
+                log.error("%s is not a directory" % target)
                 sys.exit(1)
 
     if options.include_log:
-        if options.action == 'html':
-            if not os.path.exists(options.target):
-                os.mkdir(options.target)
-            logger = HTMLLogger(options.target, options)
+        if 'html' in options.actions:
+            if not os.path.exists(options.target['html']):
+                os.mkdir(options.target['html'])
+            logger = HTMLLogger(options.target['html'], options)
             log.register_logger(logger)
             loggers.append(logger)
         else:
@@ -748,11 +781,11 @@ def main(options, names):
     # If the input name is a pickle file, then read the docindex that
     # it contains.  Otherwise, build the docs for the input names.
     if options.load_pickle:
-        assert len(names) == 1
+        assert len(options.names) == 1
         log.start_progress('Deserializing')
-        log.progress(0.1, 'Loading %r' % names[0])
+        log.progress(0.1, 'Loading %r' % options.names[0])
         t0 = time.time()
-        unpickler = pickle.Unpickler(open(names[0], 'rb'))
+        unpickler = pickle.Unpickler(open(options.names[0], 'rb'))
         unpickler.persistent_load = pickle_persistent_load
         docindex = unpickler.load()
         log.debug('deserialization time: %.1f sec' % (time.time()-t0))
@@ -763,8 +796,9 @@ def main(options, names):
         exclude_parse = '|'.join(options.exclude_parse+options.exclude)
         exclude_introspect = '|'.join(options.exclude_introspect+
                                       options.exclude)
-        docindex = build_doc_index(names, options.introspect, options.parse,
-                                   add_submodules=(options.action!='text'),
+        docindex = build_doc_index(options.names,
+                                   options.introspect, options.parse,
+                                   add_submodules=(options.actions!=['text']),
                                    exclude_introspect=exclude_introspect,
                                    exclude_parse=exclude_parse)
 
@@ -795,18 +829,17 @@ def main(options, names):
             docindex.read_profiling_info(profile_stats)
 
     # Perform the specified action.
-    if options.action == 'html':
-        write_html(docindex, options)
-    elif options.action in ('latex', 'dvi', 'ps', 'pdf'):
-        write_latex(docindex, options, options.action)
-    elif options.action == 'text':
-        write_text(docindex, options)
-    elif options.action == 'check':
+    if 'check' in options.actions:
         check_docs(docindex, options)
-    elif options.action == 'pickle':
+    if 'pickle' in options.actions:
         write_pickle(docindex, options)
-    else:
-        print >>sys.stderr, '\nUnsupported action %s!' % options.action
+    if 'html' in options.actions:
+        write_html(docindex, options)
+    if ('latex' in options.actions or 'dvi' in options.actions or
+        'ps' in options.actions or 'pdf' in options.actions):
+        write_latex(docindex, options)
+    if 'text' in options.actions:
+        write_text(docindex, options)
 
     # If we suppressed docstring warnings, then let the user know.
     for logger in loggers:
@@ -817,8 +850,8 @@ def main(options, names):
             else:
                 prefix = ('%d markup errors were found' %
                           logger.suppressed_docstring_warning)
-            logger.warning("%s while processing docstrings.  Use the verbose "
-                           "switch (-v) to display markup errors." % prefix)
+            log.warning("%s while processing docstrings.  Use the verbose "
+                        "switch (-v) to display markup errors." % prefix)
 
     # Basic timing breakdown:
     if options.verbosity >= 2:
@@ -841,10 +874,10 @@ def write_html(docindex, options):
     from epydoc.docwriter.html import HTMLWriter
     html_writer = HTMLWriter(docindex, **options.__dict__)
     if options.verbose > 0:
-        log.start_progress('Writing HTML docs to %r' % options.target)
+        log.start_progress('Writing HTML docs to %r' % options.target['html'])
     else:
         log.start_progress('Writing HTML docs')
-    html_writer.write(options.target)
+    html_writer.write(options.target['html'])
     log.end_progress()
 
 def write_pickle(docindex, options):
@@ -852,14 +885,9 @@ def write_pickle(docindex, options):
     read in at a later time.  But loading the pickle is only marginally
     faster than building the docs from scratch, so this has pretty
     limited application."""
-    if options.target == 'pickle':
-        options.target = 'api.pickle'
-    elif not options.target.endswith('.pickle'):
-        options.target += '.pickle'
-
     log.start_progress('Serializing output')
-    log.progress(0.2, 'Writing %r' % options.target)
-    outfile = open(options.target, 'wb')
+    log.progress(0.2, 'Writing %r' % options.target['pickle'])
+    outfile = open(options.target['pickle'], 'wb')
     pickler = pickle.Pickler(outfile, protocol=0)
     pickler.persistent_id = pickle_persistent_id
     pickler.dump(docindex)
@@ -881,31 +909,40 @@ def pickle_persistent_load(identifier):
 _RERUN_LATEX_RE = re.compile(r'(?im)^LaTeX\s+Warning:\s+Label\(s\)\s+may'
                              r'\s+have\s+changed.\s+Rerun')
 
-def write_latex(docindex, options, format):
+def write_latex(docindex, options):
+    # If latex is an intermediate target, then use a temporary
+    # directory for its files.
+    if 'latex' in options.actions:
+        latex_target = options.target['latex']
+    else:
+        latex_target = tempfile.mkdtemp()
+        
     from epydoc.docwriter.latex import LatexWriter
     latex_writer = LatexWriter(docindex, **options.__dict__)
     log.start_progress('Writing LaTeX docs')
-    latex_writer.write(options.target)
+    latex_writer.write(latex_target)
     log.end_progress()
-    # If we're just generating the latex, and not any output format,
-    # then we're done.
-    if format == 'latex': return
     
-    if format == 'dvi': steps = 4
-    elif format == 'ps': steps = 5
-    elif format == 'pdf': steps = 6
+    if 'pdf' in options.actions: steps = 6
+    elif 'ps' in options.actions: steps = 5
+    elif 'dvi' in options.actions: steps = 4
+    else:
+        # If we're just generating the latex, and not any derived
+        # output format, then we're done.
+        assert 'latex' in options.actions
+        return
     
     log.start_progress('Processing LaTeX docs')
     oldpath = os.path.abspath(os.curdir)
     running = None # keep track of what we're doing.
     try:
         try:
-            os.chdir(options.target)
+            os.chdir(latex_target)
 
             # Clear any old files out of the way.
-            for ext in 'tex aux log out idx ilg toc ind'.split():
-                if os.path.exists('apidoc.%s' % ext):
-                    os.remove('apidoc.%s' % ext)
+            for ext in 'aux log out idx ilg toc ind'.split():
+                if os.path.exists('api.%s' % ext):
+                    os.remove('api.%s' % ext)
 
             # The first pass generates index files.
             running = 'latex'
@@ -936,19 +973,31 @@ def write_latex(docindex, options, format):
                 run_subprocess('latex api.tex')
 
             # If requested, convert to postscript.
-            if format in ('ps', 'pdf'):
+            if 'ps' in options.actions or 'pdf' in options.actions:
                 running = 'dvips'
                 log.progress(4./steps, 'dvips')
                 run_subprocess('dvips api.dvi -o api.ps -G0 -Ppdf')
 
             # If requested, convert to pdf.
-            if format in ('pdf'):
+            if 'pdf' in options.actions:
                 running = 'ps2pdf'
                 log.progress(5./steps, 'ps2pdf')
                 run_subprocess(
                     'ps2pdf -sPAPERSIZE#letter -dMaxSubsetPct#100 '
                     '-dSubsetFonts#true -dCompatibilityLevel#1.2 '
                     '-dEmbedAllFonts#true api.ps api.pdf')
+
+            # Copy files to their respective targets.
+            if 'dvi' in options.actions:
+                dst = os.path.join(oldpath, options.target['dvi'])
+                shutil.copy2('api.dvi', dst)
+            if 'ps' in options.actions:
+                dst = os.path.join(oldpath, options.target['ps'])
+                shutil.copy2('api.ps', dst)
+            if 'pdf' in options.actions:
+                dst = os.path.join(oldpath, options.target['pdf'])
+                shutil.copy2('api.pdf', dst)
+
         except RunSubprocessError, e:
             if running == 'latex':
                 e.out = re.sub(r'(?sm)\A.*?!( LaTeX Error:)?', r'', e.out)
@@ -959,6 +1008,18 @@ def write_latex(docindex, options, format):
             log.error("%s failed: %s" % (running, e))
     finally:
         os.chdir(oldpath)
+        
+        if 'latex' not in options.actions:
+            # The latex output went to a tempdir; clean it up.
+            log.info('Cleaning up %s' % latex_target)
+            try:
+                for filename in os.listdir(latex_target):
+                    os.remove(os.path.join(latex_target, filename))
+                os.rmdir(latex_target)
+            except Exception, e:
+                log.error("Error cleaning up tempdir %s: %s" %
+                          (latex_target, e))
+                
         log.end_progress()
 
 def write_text(docindex, options):
@@ -979,14 +1040,14 @@ def check_docs(docindex, options):
                 
 def cli():
     # Parse command-line arguments.
-    options, names = parse_arguments()
+    options = parse_arguments()
 
     try:
         try:
             if options.profile:
                 _profile()
             else:
-                main(options, names)
+                main(options)
         finally:
             log.close()
     except SystemExit:
@@ -1431,7 +1492,8 @@ class HTMLLogger(log.Logger):
         msg = '<table border="0" cellpadding="0" cellspacing="0">\n'
         opts = [(key, getattr(options, key)) for key in dir(options)
                 if key not in dir(optparse.Values)]
-        opts = [(val==OPTION_DEFAULTS.get(key), key, val)
+        defaults = option_defaults()
+        opts = [(val==defaults.get(key), key, val)
                 for (key, val) in opts]
         for is_default, key, val in sorted(opts):
             css = is_default and 'opt-default' or 'opt-changed'
