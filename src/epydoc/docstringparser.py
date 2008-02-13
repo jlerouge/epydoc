@@ -322,7 +322,7 @@ def add_metadata_from_var(api_doc, field):
             if field.multivalue and not value:
                 try: value = epydoc.docparser.parse_string_list(val_doc.toktree)
                 except KeyboardInterrupt: raise
-                except: raise
+                except: pass
                 
         # Add any values that we found.
         for elt in value:
