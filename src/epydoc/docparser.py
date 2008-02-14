@@ -285,7 +285,7 @@ def parse_docs(filename=None, name=None, context=None, is_script=False):
             raise ParseError('Error during parsing: %s '
                              '(%s, line %d, char %d)' %
                              (msg, module_doc.filename, srow, scol))
-        except IndentationError, e:
+        except (IndentationError, UnicodeDecodeError), e:
             raise ParseError('Error during parsing: %s (%s)' %
                              (e, module_doc.filename))
 
