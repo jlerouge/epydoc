@@ -1257,6 +1257,9 @@ class ClassDoc(NamespaceDoc):
     """@ivar: API documentation for the class's known subclasses.
     @type: C{list} of L{ClassDoc}"""
     #}
+    #{ Information about Metaclasses
+    metaclass = UNKNOWN
+    #}
 
     def apidoc_links(self, **filters):
         val_docs = NamespaceDoc.apidoc_links(self, **filters)

@@ -1128,6 +1128,12 @@ def process_assignment(line, parent_docs, prev_line_doc, lineno,
             if lhs_name[-1] == '__slots__':
                 continue
 
+            # Handle metaclass assignment
+            if (lhs_name[-1] == '__metaclass__' and
+                isinstance(parent_docs[-1], ClassDoc)):
+                parent_docs[-1].metaclass = rhs_val
+                continue
+
             # Create the VariableDoc.
             var_doc = VariableDoc(name=lhs_name[-1], value=rhs_val,
                                   is_imported=False, is_alias=is_alias,

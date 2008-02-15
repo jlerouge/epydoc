@@ -321,7 +321,7 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
 #: class's API documentation.
 UNDOCUMENTED_CLASS_VARS = (
     '__doc__', '__module__', '__dict__', '__weakref__', '__slots__',
-    '__pyx_vtable__')
+    '__pyx_vtable__', '__metaclass__')
 
 def introspect_class(cls, class_doc, module_name=None):
     """
@@ -340,6 +340,9 @@ def introspect_class(cls, class_doc, module_name=None):
             public_names = set([str(name) for name in cls.__all__])
         except KeyboardInterrupt: raise
         except: pass
+
+    # Record the class's metaclass
+    class_doc.metaclass = introspect_docs(type(cls))
 
     # Start a list of subclasses.
     class_doc.subclasses = []
