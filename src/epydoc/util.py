@@ -309,10 +309,12 @@ class TerminalController:
     BOLD = ''            #: Turn on bold mode
     NORMAL = ''          #: Turn off all modes
     COLS = 75            #: Width of the terminal (default to 75)
+    UNDERLINE = ''       #: Underline the text
+    REVERSE = ''         #: Reverse the foreground & background
     BLACK = BLUE = GREEN = CYAN = RED = MAGENTA = YELLOW = WHITE = ''
     
     _STRING_CAPABILITIES = """
-    BOL=cr UP=cuu1 DOWN=cud1 LEFT=cub1 RIGHT=cuf1
+    BOL=cr UP=cuu1 DOWN=cud1 LEFT=cub1 RIGHT=cuf1 REVERSE=rev 
     CLEAR_EOL=el BOLD=bold UNDERLINE=smul NORMAL=sgr0""".split()
     _COLORS = """BLACK BLUE GREEN CYAN RED MAGENTA YELLOW WHITE""".split()
     _ANSICOLORS = "BLACK RED GREEN YELLOW BLUE MAGENTA CYAN WHITE".split()
