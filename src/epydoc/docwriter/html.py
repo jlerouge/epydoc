@@ -842,7 +842,11 @@ class HTMLWriter:
         self.write_breadcrumbs(out, doc, self.url(doc))
 
         # Write the name of the class we're describing.
-        if doc.is_type(): typ = 'Type'
+        if (doc.metaclass is not UNKNOWN and
+                doc.metaclass.canonical_name is not UNKNOWN and 
+                doc.metaclass.canonical_name != 'type'):
+            typ = self.href(doc.metaclass, doc.metaclass.canonical_name[-1])
+        elif doc.is_type(): typ = 'Type'
         elif doc.is_exception(): typ = 'Exception'
         else: typ = 'Class'
         out('<!-- ==================== %s ' % typ.upper() +
@@ -2139,6 +2143,10 @@ class HTMLWriter:
                     var_doc.value.callgraph_uid = callgraph.uid
                 else:
                     callgraph = None
+        elif isinstance(var_doc.value, ClassDoc):
+            typ = -1 # use the whole row for description.
+            description = self.summary_name(var_doc,
+                link_name=link_name, anchor=anchor)
         else:
             typ = self.type_descr(var_doc, indent=6)
             description = self.summary_name(var_doc,
@@ -2171,6 +2179,9 @@ class HTMLWriter:
         # /------------------------- Template -------------------------\
         '''
           <tr$tr_class$>
+        >>> if typ == -1:
+            <td class="summary" colspan="2">
+        >>> else:
             <td width="15%" align="right" valign="top" class="summary">
               <span class="summary-type">$typ or "&nbsp;"$</span>
             </td><td class="summary">
@@ -2266,7 +2277,8 @@ class HTMLWriter:
                             [('Get', prop_doc.fget), ('Set', prop_doc.fset),
                              ('Delete', prop_doc.fdel)]
                             if val_doc not in (None, UNKNOWN)
-                            and val_doc.pyval is not None ]
+                            and val_doc.pyval is not None
+                            and not val_doc.canonical_name[0].startswith('??')]
 
             self.write_property_details_entry(out, var_doc, descr,
                                               accessors, div_class)
