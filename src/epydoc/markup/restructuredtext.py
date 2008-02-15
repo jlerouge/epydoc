@@ -539,6 +539,8 @@ def latex_head_prefix():
     translator = _EpydocLaTeXTranslator(document, None)
     return translator.head_prefix
     
+_TARGET_RE = re.compile(r'^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
+
 class _EpydocLaTeXTranslator(LaTeXTranslator):
     settings = None
     def __init__(self, document, docstring_linker):
@@ -560,8 +562,10 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
 
     # Handle interpreted text (crossreferences)
     def visit_title_reference(self, node):
-        target = self.encode(node.astext())
-        xref = self._linker.translate_identifier_xref(target, target)
+        m = _TARGET_RE.match(node.astext())
+        if m: text, target = m.groups()
+        else: target = text = node.astext()
+        xref = self._linker.translate_identifier_xref(target, text)
         self.body.append(xref)
         raise SkipNode()
 
@@ -598,8 +602,10 @@ class _EpydocHTMLTranslator(HTMLTranslator):
 
     # Handle interpreted text (crossreferences)
     def visit_title_reference(self, node):
-        target = self.encode(node.astext())
-        xref = self._linker.translate_identifier_xref(target, target)
+        m = _TARGET_RE.match(node.astext())
+        if m: text, target = m.groups()
+        else: target = text = node.astext()
+        xref = self._linker.translate_identifier_xref(target, text)
         self.body.append(xref)
         raise SkipNode()
 
