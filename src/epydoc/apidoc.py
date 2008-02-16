@@ -1297,7 +1297,13 @@ class ClassDoc(NamespaceDoc):
 
     def mro(self, warn_about_bad_bases=False):
         if self.is_newstyle_class():
-            return self._c3_mro(warn_about_bad_bases)
+            try:
+                return self._c3_mro(warn_about_bad_bases)
+            except ValueError, e: # (inconsistent hierarchy)
+                log.error('Error finding mro for %s: %s' %
+                          (self.canonical_name, e))
+                # Better than nothing:
+                return self._dfs_bases([], set(), warn_about_bad_bases)
         else:
             return self._dfs_bases([], set(), warn_about_bad_bases)
                 
@@ -1355,7 +1361,7 @@ class ClassDoc(NamespaceDoc):
               nothead=[s for s in nonemptyseqs if cand in s[1:]]
               if nothead: cand=None #reject candidate
               else: break
-          if not cand: raise "Inconsistent hierarchy"
+          if not cand: raise ValueError("Inconsistent hierarchy")
           res.append(cand)
           for seq in nonemptyseqs: # remove cand
               if seq[0] == cand: del seq[0]
