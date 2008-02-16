@@ -512,7 +512,8 @@ def parse_arguments():
                 options.graphs = [g for g in GRAPH_TYPES if g != 'callgraph']
             break
         elif graph_type not in GRAPH_TYPES:
-            optparser.error("Invalid graph type %s." % graph_type)
+            optparser.error("Invalid graph type %s.  Expected one of: %s." %
+                            (graph_type, ', '.join(GRAPH_TYPES + ('all',))))
 
     # Calculate verbosity.
     verbosity = getattr(options, 'verbosity', 0)
