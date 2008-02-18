@@ -491,16 +491,17 @@ class DotGraphUmlClassNode(DotGraphNode):
         show_private = options.get('show_private_vars', False)
         show_magic = options.get('show_magic_vars', True)
         show_inherited = options.get('show_inherited_vars', False)
-        for var in class_doc.sorted_variables:
-            name = var.canonical_name[-1]
-            if ((not show_private and var.is_public == False) or
-                (not show_magic and re.match('__\w+__$', name)) or
-                (not show_inherited and var.container != class_doc)):
-                pass
-            elif isinstance(var.value, RoutineDoc):
-                self.operations.append(var)
-            else:
-                self.attributes.append(var)
+        if class_doc.sorted_variables not in (None, UNKNOWN):
+            for var in class_doc.sorted_variables:
+                name = var.canonical_name[-1]
+                if ((not show_private and var.is_public == False) or
+                    (not show_magic and re.match('__\w+__$', name)) or
+                    (not show_inherited and var.container != class_doc)):
+                    pass
+                elif isinstance(var.value, RoutineDoc):
+                    self.operations.append(var)
+                else:
+                    self.attributes.append(var)
 
         # Initialize our dot node settings.
         tooltip = self._summary(class_doc)
