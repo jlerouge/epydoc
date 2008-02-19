@@ -506,7 +506,7 @@ class APIDoc(object):
             
         if other.__has_been_hashed and not ignore_hash_conflict:
             raise ValueError("%r has already been hashed!  Merging it "
-                             "would cause its has value to change." % other)
+                             "would cause its hash value to change." % other)
 
         # If other was itself already merged with anything,
         # then we need to merge those too.
