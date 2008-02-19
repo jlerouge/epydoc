@@ -70,6 +70,7 @@ __docformat__ = 'epytext en'
 import sys, os, os.path, __builtin__, imp, re, inspect
 from epydoc.apidoc import *
 from epydoc.docintrospecter import introspect_docs
+from epydoc.docintrospecter import get_value_from_filename, get_value_from_name
 from epydoc.docparser import parse_docs, ParseError
 from epydoc.docstringparser import parse_docstring
 from epydoc import log
@@ -203,7 +204,12 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
         return None
 
     # Get the basic docs for each item.
+    log.start_progress('Building documentation')
+    if introspect:
+        # Import everything before we introspect anything.
+        _import_docs_from_items(items, options)
     doc_pairs = _get_docs_from_items(items, options)
+    log.end_progress()
 
     # Merge the introspection & parse docs.
     if options.parse and options.introspect:
@@ -317,13 +323,67 @@ def _report_valdoc_progress(i, val_doc, val_docs):
         log.progress(float(i)/len(val_docs), val_doc.canonical_name)
 
 #/////////////////////////////////////////////////////////////////
+# Pre-Import
+#/////////////////////////////////////////////////////////////////
+
+def _import_docs_from_items(items, options):
+    for item in items:
+        # Make sure the item's module is imported.
+        if isinstance(item, basestring):
+            if os.path.isfile(item):
+                _do_import(item, options)
+            elif is_package_dir(item):
+                pkg = os.path.abspath(os.path.join(item, '__init__.py'))
+                val = _do_import(pkg, options)
+                if options.add_submodules and inspect.ismodule(val):
+                    _import_docs_from_package(val, options)
+            elif is_pyname(item):
+                if options.must_introspect(item):
+                    val = get_value_from_name(item)
+                    if options.add_submodules and inspect.ismodule(val):
+                        _import_docs_from_package(val, options)
+
+def _import_docs_from_package(pkg, options):
+    subpackage_filenames = set()
+    module_filenames = {}
+    pkg_path = getattr(pkg, '__path__', ())
+    for subdir in pkg_path:
+        if os.path.isdir(subdir):
+            for name in os.listdir(subdir):
+                filename = os.path.join(subdir, name)
+                if is_module_file(filename):
+                    basename = os.path.splitext(filename)[0]
+                    if os.path.split(basename)[1] != '__init__':
+                        module_filenames[basename] = filename
+                elif is_package_dir(filename):
+                    subpackage_filenames.add(os.path.join(filename,
+                                                          '__init__.py'))
+
+    for filename in module_filenames.values():
+        _do_import(filename, options, pkg.__name__)
+    for subpackage_filename in subpackage_filenames:
+        subpackage = _do_import(subpackage_filename, options, pkg.__name__)
+        if inspect.ismodule(subpackage):
+            _import_docs_from_package(subpackage, options)
+
+def _do_import(filename, options, parent=None):
+    filename = os.path.abspath(filename)
+    modulename = os.path.splitext(os.path.split(filename)[1])[0]
+    if modulename == '__init__':
+        modulename = os.path.split(os.path.split(filename)[0])[1]
+    if parent:
+        modulename = DottedName(parent, modulename)
+    if options.must_introspect(modulename):
+        log.progress(0, 'Importing %s' % modulename)
+        #log.debug('importing %r (%s)' % (filename, modulename))
+        return get_value_from_filename(filename)
+
+#/////////////////////////////////////////////////////////////////
 # Documentation Generation
 #/////////////////////////////////////////////////////////////////
 
 def _get_docs_from_items(items, options):
-
-    # Start the progress bar.
-    log.start_progress('Building documentation')
+    # Used to estimate progress when there are packages:
     progress_estimator = _ProgressEstimator(items)
 
     # Check for duplicate item names.
@@ -397,7 +457,6 @@ def _get_docs_from_items(items, options):
             doc_pairs += _get_docs_from_submodules(
                 item, doc_pairs[-1], options, progress_estimator)
 
-    log.end_progress()
     return doc_pairs
 
 def _get_docs_from_pyobject(obj, options, progress_estimator):
