@@ -383,7 +383,8 @@ class HTMLWriter:
             self._public_filter = True
         
         # Make sure inheritance has a sane value.
-        if self._inheritance not in ('listed', 'included', 'grouped'):
+        if self._inheritance not in ('listed', 'included',
+                                     'grouped', 'hidden'):
             raise ValueError, 'Bad value for inheritance'
 
         # Create the project homepage link, if it was not specified.
@@ -2056,6 +2057,8 @@ class HTMLWriter:
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
                     grouped_inh_vars.setdefault(base,[]).append(var_doc)
+                elif self._inheritance == 'hidden':
+                    pass
                 else:
                     normal_vars.append(var_doc)
             else:

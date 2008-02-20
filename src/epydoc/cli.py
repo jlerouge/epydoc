@@ -82,7 +82,7 @@ try:
 except:
     xlink = None
 
-INHERITANCE_STYLES = ('grouped', 'listed', 'included')
+INHERITANCE_STYLES = ('grouped', 'listed', 'included', 'hidden')
 GRAPH_TYPES = ('classtree', 'callgraph', 'umlclasstree')
 ACTIONS = ('html', 'text', 'latex', 'dvi', 'ps', 'pdf', 'check')
 DEFAULT_DOCFORMAT = 'epytext'

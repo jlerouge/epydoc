@@ -669,6 +669,8 @@ class LatexWriter:
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
                     grouped_inh_vars.setdefault(base,[]).append(var_doc)
+                elif self._inheritance == 'hidden':
+                    pass
                 else:
                     normal_vars.append(var_doc)
             else:
@@ -938,6 +940,8 @@ class LatexWriter:
                     listed_inh_vars.setdefault(base,[]).append(var_doc)
                 elif self._inheritance == 'grouped':
                     grouped_inh_vars.setdefault(base,[]).append(var_doc)
+                elif self._inheritance == 'hidden':
+                    pass
                 else:
                     normal_vars.append(var_doc)
             else:
