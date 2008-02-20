@@ -128,7 +128,7 @@ class LatexWriter:
     def __init__(self, docindex, **kwargs):
         self.docindex = docindex
         # Process keyword arguments
-        self._show_private = kwargs.get('private', 0)
+        self._show_private = kwargs.get('show_private', 0)
         self._prj_name = kwargs.get('prj_name', None) or 'API Documentation'
         self._crossref = kwargs.get('crossref', 1)
         self._index = kwargs.get('index', 1)
