@@ -195,6 +195,7 @@ information about the submodules and subpackages.
 :contributor: `Simon Pamies  <mailto:spamies@bipbap.de>`__
 :contributor: `Christian Reis  <mailto:kiko@async.com.br>`__
 :contributor: `Daniele Varrazzo  <mailto:daniele.varrazzo@gmail.com>`__
+:contributor: `Jonathan Guyer <mailto:guyer@nist.gov>`__
 
 .. |copy| unicode:: 0xA9 .. copyright sign
 """
