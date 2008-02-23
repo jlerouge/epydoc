@@ -534,17 +534,16 @@ def parse_arguments():
             optparser.error("Invalid graph type %s.  Expected one of: %s." %
                             (graph_type, ', '.join(GRAPH_TYPES + ('all',))))
 
-    # If pdfdriver is 'auto', then pick a pdf driver.
+    # Check the value of the pdfdriver option; and check for conflicts
+    # between pdfdriver & actions
     options.pdfdriver = options.pdfdriver.lower()
     if options.pdfdriver not in PDFDRIVERS:
         optparser.error("Invalid pdf driver %r.  Expected one of: %s" %
                         (options.pdfdriver, ', '.join(PDF_DRIVERS)))
-    if 'pdf' in options.actions and options.pdfdriver=='auto':
-        try:
-            run_subprocess('pdflatex --version')
-            options.pdfdriver = 'pdflatex'
-        except RunSubprocessError, e:
-            options.pdfdriver = 'latex'
+    if (options.pdfdriver == 'pdflatex' and
+        ('dvi' in options.actions or 'ps' in options.actions)):
+        optparser.error("Use of the pdflatex driver is incompatible "
+                        "with generating dvi or ps output.")
 
     # Calculate verbosity.
     verbosity = getattr(options, 'verbosity', 0)
@@ -953,10 +952,23 @@ def write_latex(docindex, options):
         latex_target = options.target['latex']
     else:
         latex_target = tempfile.mkdtemp()
-        
+
+    log.start_progress('Writing LaTeX docs')
+    
+    # Choose a pdfdriver if we're generating pdf output.
+    if 'pdf' in options.actions and options.pdfdriver=='auto':
+        if 'dvi' in options.actions or 'ps' in options.actions:
+            options.pdfdriver = 'latex'
+        else:
+            try:
+                run_subprocess('pdflatex --version')
+                options.pdfdriver = 'pdflatex'
+            except RunSubprocessError, e:
+                options.pdfdriver = 'latex'
+    log.info('%r pdfdriver selected' % options.pdfdriver)
+    
     from epydoc.docwriter.latex import LatexWriter
     latex_writer = LatexWriter(docindex, **options.__dict__)
-    log.start_progress('Writing LaTeX docs')
     latex_writer.write(latex_target)
     log.end_progress()
 
