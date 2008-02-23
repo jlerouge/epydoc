@@ -996,21 +996,22 @@ def write_latex(docindex, options):
                     os.remove('api.%s' % ext)
 
             for latex_command in latex_commands:
+                LaTeX = latex_command.replace('latex', 'LaTeX')
                 # The first pass generates index files.
                 running = latex_command
-                log.progress(step/steps, 'LaTeX: First pass')
+                log.progress(step/steps, '%s (First pass)' % LaTeX)
                 step += 1
                 run_subprocess('%s api.tex' % latex_command)
                 
                 # Build the index.
                 running = 'makeindex'
-                log.progress(step/steps, 'LaTeX: Build index')
+                log.progress(step/steps, '%s (Build index)' % LaTeX)
                 step += 1
                 run_subprocess('makeindex api.idx')
                 
                 # The second pass generates our output.
                 running = latex_command
-                log.progress(step/steps, 'LaTeX: Second pass')
+                log.progress(step/steps, '%s (Second pass)' % LaTeX)
                 step += 1
                 out, err = run_subprocess('%s api.tex' % latex_command)
                 
@@ -1018,13 +1019,13 @@ def write_latex(docindex, options):
                 # changed what page some things are on.
                 running = latex_command
                 if _RERUN_LATEX_RE.match(out):
-                    log.progress(step/steps, 'LaTeX: Third pass')
+                    log.progress(step/steps, '%s (Third pass)' % LaTeX)
                     out, err = run_subprocess('%s api.tex' % latex_command)
                     
                 # A fourth path should (almost?) never be necessary.
                 running = latex_command
                 if _RERUN_LATEX_RE.match(out):
-                    log.progress(step/steps, 'LaTeX: Fourth pass')
+                    log.progress(step/steps, '%s (Fourth pass)' % LaTeX)
                     run_subprocess('%s api.tex' % latex_command)
                 step += 1
 
