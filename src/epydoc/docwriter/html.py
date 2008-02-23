@@ -3487,8 +3487,6 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         else:
             return self.htmlwriter.href(doc, label, 'link')
 
-    # [xx] Should this be added to the DocstringLinker interface???
-    # Currently, this is *only* used by dotgraph.
     def url_for(self, identifier):
         if isinstance(identifier, (basestring, DottedName)):
             doc = self.docindex.find(identifier, self.container)
