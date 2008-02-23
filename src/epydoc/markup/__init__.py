@@ -466,7 +466,9 @@ class DocstringLinker:
             should be linked to.
         @type label: C{string} or C{None}
         @param label: The label that should be used for the identifier,
-            if it's different from the name of the identifier.
+            if it's different from the name of the identifier.  This
+            should be expressed in the target markup language -- e.g.
+            for latex, "_"s should be escaped.
         @rtype: C{string}
         @return: The translated crossreference link.
         """
