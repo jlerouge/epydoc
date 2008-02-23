@@ -328,7 +328,7 @@ class LatexWriter:
         # Add the module's description.
         if doc.descr not in (None, UNKNOWN):
             out(' '*4 + '\\begin{EpydocModuleDescription}%\n')
-            out(self.docstring_to_latex(doc.descr, 4))
+            out(self.docstring_to_latex(doc.descr, doc, 4))
             out(' '*4 + '\\end{EpydocModuleDescription}\n')
 
         # Add version, author, warnings, requirements, notes, etc.
@@ -411,7 +411,7 @@ class LatexWriter:
         # The class's description.
         if doc.descr not in (None, UNKNOWN):
             out(' '*4 + '\\begin{EpydocClassDescription}\n')
-            out(self.docstring_to_latex(doc.descr))
+            out(self.docstring_to_latex(doc.descr, doc))
             out(' '*4 + '\\end{EpydocClassDescription}\n')
 
         # Version, author, warnings, requirements, notes, etc.
@@ -478,7 +478,7 @@ class LatexWriter:
         out(' '*depth + '\\item[%s]' % _hyperlink(doc, doc.canonical_name[-1]))
 
         if doc.summary not in (None, UNKNOWN):
-            out(' %s\n' % self.docstring_to_latex(doc.summary))
+            out(' %s\n' % self.docstring_to_latex(doc.summary, doc))
         out(self.crossref(doc) + '\n\n')
         if doc.submodules != UNKNOWN and doc.submodules:
             out(' '*depth + '  \\begin{EpydocModuleList}\n')
@@ -600,7 +600,7 @@ class LatexWriter:
         out('  ' + '\\item[%s]' % _hyperlink(var_doc.target, 
                                              var_doc.name))
         if doc.summary not in (None, UNKNOWN):
-            out(': %s\n' % self.docstring_to_latex(doc.summary))
+            out(': %s\n' % self.docstring_to_latex(doc.summary, doc))
         out(self.crossref(doc) + '\n\n')
         
     #////////////////////////////////////////////////////////////
@@ -733,7 +733,7 @@ class LatexWriter:
 
         # Argument 2: the function description
         if func_doc.descr not in (None, UNKNOWN):
-            out(self.docstring_to_latex(func_doc.descr, 4))
+            out(self.docstring_to_latex(func_doc.descr, func_doc, 4))
         out('}{%\n')
 
         # Argument 3: the function parameter descriptions
@@ -743,12 +743,14 @@ class LatexWriter:
 
         # Argument 4: The return description
         if func_doc.return_descr not in (None, UNKNOWN):
-                out(self.docstring_to_latex(func_doc.return_descr, 6))
+                out(self.docstring_to_latex(func_doc.return_descr,
+                                            func_doc, 6))
         out('}{%\n')
         
         # Argument 5: The return type
         if func_doc.return_type not in (None, UNKNOWN):
-                out(self.docstring_to_latex(func_doc.return_type, 6).strip())
+                out(self.docstring_to_latex(func_doc.return_type,
+                                            func_doc, 6).strip())
         out('}{%\n')
 
         # Argument 6: The raises section
@@ -757,7 +759,7 @@ class LatexWriter:
             for name, descr in func_doc.exception_descrs:
                 out(' '*10+'\\item[%s]\n\n' %
                     plaintext_to_latex('%s' % name))
-                out(self.docstring_to_latex(descr, 10))
+                out(self.docstring_to_latex(descr, func_doc, 10))
             out(' '*6+'\\end{EpydocFunctionRaises}\n\n')
         out('}{%\n')
 
@@ -798,7 +800,7 @@ class LatexWriter:
             arg_name = plaintext_to_latex(', '.join(arg_names))
             out('%s\\item[%s]\n\n' % (' '*10, arg_name))
             if arg_descr:
-                out(self.docstring_to_latex(arg_descr, 10))
+                out(self.docstring_to_latex(arg_descr, func_doc, 10))
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             # !!! JEG - this loop needs abstracting
             # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -809,7 +811,7 @@ class LatexWriter:
                         lhs = 'type'
                     else:
                         lhs = 'type of %s' % arg_name
-                    rhs = self.docstring_to_latex(arg_typ).strip()
+                    rhs = self.docstring_to_latex(arg_typ, func_doc).strip()
                     out('%s{\\it (%s=%s)}\n\n' % (' '*12, lhs, rhs))
         out(' '*6+'\\end{EpydocFunctionParameters}\n\n')
         
@@ -978,10 +980,11 @@ class LatexWriter:
                      
         out('\\EpydocVariable{%s}{' % _hypertarget(var_doc, var_doc.name))
         if has_descr:
-            out(self.docstring_to_latex(var_doc.descr, 10).strip())
+            out(self.docstring_to_latex(var_doc.descr, var_doc, 10).strip())
         out('}{')
         if has_type:
-            out(self.docstring_to_latex(var_doc.type_descr, 12).strip())
+            out(self.docstring_to_latex(var_doc.type_descr,
+                                        var_doc, 12).strip())
         out('}{')
         if has_repr:
             out(var_doc.value.summary_pyval_repr().to_latex(None))
@@ -997,10 +1000,12 @@ class LatexWriter:
         has_type = prop_doc.type_descr not in (None, UNKNOWN)
         out('\\EpydocProperty{%s}{' % _hypertarget(var_doc, var_doc.name))
         if has_descr:
-            out(self.docstring_to_latex(prop_doc.descr, 10).strip())
+            out(self.docstring_to_latex(prop_doc.descr,
+                                        prop_doc, 10).strip())
         out('}{')
         if has_type:
-            out(self.docstring_to_latex(prop_doc.type_descr, 12).strip())
+            out(self.docstring_to_latex(prop_doc.type_descr,
+                                        prop_doc, 12).strip())
         out('}{')
         # [xx] What if the accessor is private and show_private=False?
         if (prop_doc.fget not in (None, UNKNOWN) and
@@ -1050,7 +1055,7 @@ class LatexWriter:
         if arg:
             singular += ' (%s)' % arg
             plural += ' (%s)' % arg
-        out(self._descrlist([self.docstring_to_latex(d) for d in descrs],
+        out(self._descrlist([self.docstring_to_latex(d, doc) for d in descrs],
                             field.singular, field.plural, field.short))
             
     def _descrlist(self, items, singular, plural=None, short=0):
@@ -1087,7 +1092,7 @@ class LatexWriter:
             return None
     _docstring_linker = _LatexDocstringLinker()
     
-    def docstring_to_latex(self, docstring, indent=0, breakany=0):
+    def docstring_to_latex(self, docstring, where, indent=0, breakany=0):
         if docstring is None: return ''
         s = docstring.to_latex(self._docstring_linker, indent=indent,
                                directory=self._directory,
