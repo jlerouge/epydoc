@@ -55,13 +55,10 @@ class LatexWriter:
         self._exclude = kwargs.get('exclude', 1)
         self._list_submodules = kwargs.get('list_submodules', 1)
         self._sty = kwargs.get('sty')
+        self._pdfdriver = kwargs.get('pdfdriver', 'latex')
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
-        
-        # [xx] check into this:
-        self._pdflatex = (kwargs['pdfdriver'] == 'pdflatex')
-        
         self._graph_types = kwargs.get('graphs', ()) or ()
         """Graphs that we should include in our output."""
 
@@ -278,10 +275,12 @@ class LatexWriter:
         if self._hyperref:
             out('\\definecolor{UrlColor}{rgb}{0,0.08,0.45}\n')
             
-            if self._pdflatex:
+            if self._pdfdriver == 'pdflatex':
                 driver = 'pdftex'
-            else:
+            elif self._pdfdriver == 'latex':
                 driver = 'dvips'
+            else:
+                raise ValueError('bad pdfdriver: %s' % self._pdfdriver)
                 
             out('\\usepackage[%s, pagebackref, pdftitle={%s}, '
                 'pdfcreator={epydoc %s}, bookmarks=true, '
