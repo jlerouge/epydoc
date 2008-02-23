@@ -812,7 +812,7 @@ class DotGraphUmlClassNode(DotGraphNode):
     def _get_html_label(self):
         # Get the class name & contextualize it.
         classname = self.class_doc.canonical_name
-        if context is not None:
+        if self.context is not None:
             classname = classname.contextualize(self.context.canonical_name)
         
         # If we're collapsed, display the node as a single box.
