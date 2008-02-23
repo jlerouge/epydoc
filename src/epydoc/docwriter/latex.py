@@ -134,7 +134,7 @@ class LatexWriter:
         (ValueDoc.SUMMARY_REPR_LINELEN, ValueDoc.REPR_LINELEN,
          ValueDoc.REPR_MAXLINES) = orig_valdoc_defaults
 
-    def _write_sty(self, directory, stylesheet, filename='epydoc.sty'):
+    def _write_sty(self, directory, stylesheet):
         """
         Copy the requested LaTeX stylesheet to the target directory.
         The stylesheet can be specified as a name (i.e., a key from
@@ -170,30 +170,6 @@ class LatexWriter:
 
         else:
             raise IOError("Can't find LaTeX style file: %r" % stylesheet)
-            
-            self._write_sty(directory, None, 'epydoc-default.sty')
-
-
-
-        
-        if stylesheet is None:
-            sty = STYLESHEETS['base']
-        elif os.path.exists(stylesheet):
-            try: sty = open(stylesheet, 'rb').read()
-            except: raise IOError("Can't open LaTeX style file: %r" %
-                                  stylesheet)
-            self._write_sty(directory, None, 'epydoc-default.sty')
-        elif stylesheet in STYLESHEETS:
-            sty = STYLESHEETS[stylesheet]
-            if sty != STYLESHEETS['base']:
-                self._write_sty(directory, None, 'epydoc-default.sty')
-        else:
-            raise IOError("Can't find LaTeX style file: %r" % stylesheet)
-
-        # Write the stylesheet.
-        out = open(os.path.join(directory, filename), 'wb')
-        out.write(sty)
-        out.close()
         
     def _write(self, write_func, directory, filename, *args):
         # Display our progress.
@@ -302,9 +278,7 @@ class LatexWriter:
         out('\\usepackage[%s]{inputenc}\n' % self.get_latex_encoding())
 
         # If we're generating hyperrefs, add the appropriate packages.
-        # !!!!!!!!!!!!!!!!!!!!!!
-        # !!! JEG - this needs to be the last thing in the preamble
-        # !!!!!!!!!!!!!!!!!!!!!!
+        # Note: this needs to be the last thing in the preamble -JEG
         if self._hyperref:
             out('\\definecolor{UrlColor}{rgb}{0,0.08,0.45}\n')
             
