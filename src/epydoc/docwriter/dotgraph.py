@@ -274,7 +274,8 @@ class DotGraph(object):
 
         # Link xrefs in body
         def subfunc(m):
-            url = docstring_linker.url_for(m.group(1))
+            try: url = docstring_linker.url_for(m.group(1))
+            except NotImplementedError: url = ''
             if url: return 'href="%s"%s' % (url, m.group(2))
             else: return ''
         self.body = re.sub("href\s*=\s*['\"]?<([\w\.]+)>['\"]?\s*(,?)",
@@ -285,7 +286,8 @@ class DotGraph(object):
         if 'href' in attribs:
             m = re.match(r'^<([\w\.]+)>$', attribs['href'])
             if m:
-                url = docstring_linker.url_for(m.group(1))
+                try: url = docstring_linker.url_for(m.group(1))
+                except NotImplementedError: url = ''
                 if url: attribs['href'] = url
                 else: del attribs['href']
                 
@@ -579,9 +581,10 @@ class DotGraphUmlClassNode(DotGraphNode):
             tooltip = " ".join(tooltip.split())
         else:
             tooltip = class_doc.canonical_name
-        DotGraphNode.__init__(self, tooltip=tooltip,
-                              width=0, height=0, shape='plaintext',
-                              href=linker.url_for(class_doc) or NOOP_URL)
+        try: url = linker.url_for(class_doc) or NOOP_URL
+        except NotImplementedError: url = NOOP_URL
+        DotGraphNode.__init__(self, tooltip=tooltip, width=0, height=0, 
+                              shape='plaintext', href=url)
 
     #/////////////////////////////////////////////////////////////////
     #{ Attribute Linking
@@ -726,7 +729,8 @@ class DotGraphUmlClassNode(DotGraphNode):
         # [xx] should I set constraint=false here?
         attribs.setdefault('headport', 'body')
         attribs.setdefault('tailport', 'body')
-        url = self.linker.url_for(var) or NOOP_URL
+        try: url = self.linker.url_for(var) or NOOP_URL
+        except NotImplementedError: url = NOOP_URL
         self.edges.append(DotGraphEdge(self, type_node, label=var.name,
                         arrowtail='odiamond', arrowhead='none', href=url,
                         tooltip=var.canonical_name, labeldistance=1.5,
@@ -769,7 +773,8 @@ class DotGraphUmlClassNode(DotGraphNode):
                       self._type_descr(var_doc.value))
         if type_descr: label += ': %s' % type_descr
         # Get the URL
-        url = self.linker.url_for(var_doc) or NOOP_URL
+        try: url = self.linker.url_for(var_doc) or NOOP_URL
+        except NotImplementedError: url = NOOP_URL
         # Construct & return the pseudo-html code
         return self._ATTRIBUTE_CELL % (url, self._tooltip(var_doc), label)
 
@@ -792,7 +797,8 @@ class DotGraphUmlClassNode(DotGraphNode):
         if len(label) > self._max_signature_width:
             label = label[:self._max_signature_width-4]+'...)'
         # Get the URL
-        url = self.linker.url_for(var_doc) or NOOP_URL
+        try: url = self.linker.url_for(var_doc) or NOOP_URL
+        except NotImplementedError: url = NOOP_URL
         # Construct & return the pseudo-html code
         return self._OPERATION_CELL % (url, self._tooltip(var_doc), label)
 
@@ -939,8 +945,9 @@ class DotGraphUmlModuleNode(DotGraphNode):
         self.collapsed = collapsed
         self.options = options
         self.excluded_submodules = excluded_submodules
-        DotGraphNode.__init__(self, shape='plaintext',
-                              href=linker.url_for(module_doc) or NOOP_URL,
+        try: url = linker.url_for(module_doc) or NOOP_URL
+        except NotImplementedError: url = NOOP_URL
+        DotGraphNode.__init__(self, shape='plaintext', href=url,
                               tooltip=module_doc.canonical_name)
 
     #: Expects: (color, color, url, tooltip, body)
@@ -976,7 +983,8 @@ class DotGraphUmlModuleNode(DotGraphNode):
         """
         MAX_ROW_WIDTH = 80 # unit is roughly characters.
         pkg_name = package.canonical_name
-        pkg_url = self.linker.url_for(package) or NOOP_URL
+        try: pkg_url = self.linker.url_for(package) or NOOP_URL
+        except NotImplementedError: pkg_url = NOOP_URL
         
         if (not package.is_package or len(package.submodules) == 0 or
             self.collapsed):
@@ -1181,11 +1189,12 @@ def _add_class_tree_superclasses(graph, classes, mknode, mkedge, linker,
             if base in exclude: break
             # Don't do the same class twice.
             if base in cls2node: continue
+            # Decide if the base is documented.
+            try: documented = (linker.url_for(base) is not None)
+            except: documented = True
             # Make the node.
             if base in classes: typ = 'selected'
-            elif (hasattr(linker, 'docindex') and
-                  linker.docindex.find(identifier, self.container) is None):
-                typ = 'undocumented'
+            elif not documented: typ = 'undocumented'
             else: typ = 'superclass'
             cls2node[base] = mknode(base, typ, linker, context, options)
             graph.nodes.append(cls2node[base])
@@ -1499,8 +1508,9 @@ def specialize_valdoc_node(node, val_doc, context, linker):
 
     # Set the URL.  (Do this even if it points to the page we're
     # currently on; otherwise, the tooltip is ignored.)
-    url = linker.url_for(val_doc)
-    node['href'] = url or NOOP_URL
+    try: url = linker.url_for(val_doc) or NOOP_URL
+    except NotImplementedError: url = NOOP_URL
+    node['href'] = url
 
     if (url is None and
         hasattr(linker, 'docindex') and
