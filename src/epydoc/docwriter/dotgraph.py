@@ -1139,8 +1139,10 @@ def _add_class_tree_superclasses(graph, classes, mknode, mkedge, linker,
             # Don't do the same class twice.
             if base in cls2node: continue
             # Make the node.
-            if linker.url_for(base) is None: typ = 'undocumented'
-            elif base in classes: typ = 'selected'
+            if base in classes: typ = 'selected'
+            elif (hasattr(linker, 'docindex') and
+                  linker.docindex.find(identifier, self.container) is None):
+                typ = 'undocumented'
             else: typ = 'superclass'
             cls2node[base] = mknode(base, typ, linker, context, options)
             graph.nodes.append(cls2node[base])
@@ -1425,7 +1427,7 @@ def mk_valdoc_node(val_doc, linker, context):
     if context is not None:
         label = label.contextualize(context.canonical_name)
     node = DotGraphNode(label)
-    specialize_valdoc_node(node, val_doc, context, linker.url_for(val_doc))
+    specialize_valdoc_node(node, val_doc, context, linker)
     return node
 
 NOOP_URL = 'javascript:void(0);'
@@ -1438,7 +1440,7 @@ MODULE_NODE_HTML = '''
           PORT="body" HREF="%s" TOOLTIP="%s">%s</TD></TR>
   </TABLE>'''.strip()
 
-def specialize_valdoc_node(node, val_doc, context, url):
+def specialize_valdoc_node(node, val_doc, context, linker):
     """
     Update the style attributes of `node` to reflext its type
     and context.
@@ -1454,9 +1456,12 @@ def specialize_valdoc_node(node, val_doc, context, url):
 
     # Set the URL.  (Do this even if it points to the page we're
     # currently on; otherwise, the tooltip is ignored.)
+    url = linker.url_for(val_doc)
     node['href'] = url or NOOP_URL
-    
-    if url is None:
+
+    if (url is None and
+        hasattr(linker, 'docindex') and
+        linker.docindex.find(identifier, self.container) is None):
         node['fillcolor'] = UNDOCUMENTED_BG
         node['style'] = 'filled'
 
