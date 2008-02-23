@@ -987,8 +987,6 @@ class LatexWriter:
         def translate_identifier_xref(self, identifier, label=None):
             if label is None: label = markup.plaintext_to_latex(identifier)
             return '\\texttt{%s}' % label
-        def url_for(self, identifier):
-            return None
                 
     _docstring_linker = _LatexDocstringLinker()
     
