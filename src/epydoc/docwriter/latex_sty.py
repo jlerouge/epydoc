@@ -1023,15 +1023,13 @@ SHADED = r"""
     \begin{@EpydocGeneralList}}
     {\end{@EpydocGeneralList}}
 
-\renewenvironment{EpydocGroup}[1][]{%
-    \ifthenelse{\equal{#1}{}}{}{
+\renewcommand{\EpydocGroup}[1]{
 
-    \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
-      {\Large\bf\center #1\\}
-    \end{cminipage}
-    
-    }}
-    {}
+  \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
+    {\Large\bf\center #1\\}
+  \end{cminipage}
+
+  }
 
 % This is just like the default definitions, except that we use
 % \raggedright, and dedent by \EpydocSectionHeaderDedent
