@@ -27,10 +27,10 @@ from epydoc.docwriter.dotgraph import *
 from epydoc.docwriter.latex_sty import STYLESHEETS
 
 class LatexWriter:
-    #: Expects (options,)
+    #: Expects (options, epydoc_sty_package)
     PREAMBLE = [
         "\\documentclass{article}",
-        "\\usepackage[%s]{epydoc}",
+        "\\usepackage[%s]{%s}",
         "\\usepackage{graphicx}",
         ]
 
@@ -144,6 +144,38 @@ class LatexWriter:
         copied to 'epydoc-default.sty', which makes it possible to
         reference it via \RequirePackage.
         """
+        # Write all the standard style files
+        for (name, sty) in STYLESHEETS.items():
+            out = open(os.path.join(directory, 'epydoc-%s.sty' % name), 'wb')
+            out.write(sty)
+            out.close()
+
+        # Default: use the 'epydoc-default' style.
+        if stylesheet is None:
+            self._epydoc_sty_package = 'epydoc-default'
+
+        # Stylesheet name: use the indicated style.
+        elif stylesheet in STYLESHEETS:
+            self._epydoc_sty_package = 'epydoc-%s' % stylesheet
+
+        # Custom user stylesheet: copy the style to epydoc-custom.
+        elif os.path.exists(stylesheet):
+            try: sty = open(stylesheet, 'rb').read()
+            except: raise IOError("Can't open LaTeX style file: %r" %
+                                  stylesheet)
+            out = open(os.path.join(directory, 'epydoc-custom.sty'), 'wb')
+            out.write(sty)
+            out.close()
+            self._epydoc_sty_package = 'epydoc-custom'
+
+        else:
+            raise IOError("Can't find LaTeX style file: %r" % stylesheet)
+            
+            self._write_sty(directory, None, 'epydoc-default.sty')
+
+
+
+        
         if stylesheet is None:
             sty = STYLESHEETS['base']
         elif os.path.exists(stylesheet):
@@ -263,7 +295,8 @@ class LatexWriter:
         options = []
         if self._index: options.append('index')
         if self._hyperlink: options.append('hyperlink')
-        out('\n'.join(self.PREAMBLE) % (','.join(options),) + '\n')
+        out('\n'.join(self.PREAMBLE) % (','.join(options),
+                                        self._epydoc_sty_package) + '\n')
         
         # Set the encoding.
         out('\\usepackage[%s]{inputenc}\n' % self.get_latex_encoding())

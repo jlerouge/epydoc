@@ -606,11 +606,11 @@ BOXES = r"""
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
-\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-default}}
-\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-default}}
+\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
 \ProcessOptions\relax
 
-\RequirePackage{epydoc-default}
+\RequirePackage{epydoc-base}
 
 % Double the standard size boxedminipage outlines.
 \setlength{\fboxrule}{2\fboxrule}
@@ -821,11 +821,11 @@ SHADED = r"""
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
-\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-default}}
-\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-default}}
+\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
 \ProcessOptions\relax
 
-\RequirePackage{epydoc-default}
+\RequirePackage{epydoc-base}
 
 \definecolor{gray95}{gray}{0.95}
 \definecolor{gray90}{gray}{0.90}
