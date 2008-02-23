@@ -252,7 +252,7 @@ BASE = r"""
 % This list environment is used to list the classes that are defined 
 % by a module.
 \newenvironment{EpydocClassList}{%
-    \newcommand{\EpydocGroup}[1]{\item[##1] \
+    \renewcommand{\EpydocGroup}[1]{\item[##1] \
     }
     \begin{itemize}
         \renewcommand{\makelabel}[1]{\textbf{##1:}}
@@ -268,7 +268,7 @@ BASE = r"""
 %
 %   - The function's signature: an EpydocFunctionSignature environment
 %     specifying the signature for the function.
-
+%
 %   - The function's description (from the docstring)
 % 
 %   - The function's parameters: An EpydocFunctionParameters list 
