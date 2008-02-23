@@ -325,6 +325,11 @@ def parse_arguments():
         help="The CSS stylesheet.  STYLESHEET can be either a "
         "builtin stylesheet or the name of a CSS file.")
 
+    output_group.add_option("--sty",
+        dest="sty", metavar="LATEXSTYLE",
+        help="The LaTeX style file.  LATEXSTYLE can be either a "
+        "builtin style file or the name of a .sty file.")
+
     output_group.add_option("--url", "-u",
         dest="prj_url", metavar="URL",
         help="The documented project's URL (for the navigation bar).")
@@ -698,13 +703,13 @@ def main(options):
         if options.load_pickle:
             stages = [30] # Loading pickled documentation
         if 'html' in options.actions: stages += [100]
-        if 'text' in options.actions: stages += [30]
         if 'check' in options.actions: stages += [10]
         if 'pickle' in options.actions: stages += [10]
         if 'latex' in options.actions: stages += [60]
         if 'pdf' in options.actions: stages += [50]
-        elif 'ps' in options.actions: stages += [40]
-        elif 'dvi' in options.actions: stages += [30]
+        elif 'ps' in options.actions: stages += [40] # implied by pdf
+        elif 'dvi' in options.actions: stages += [30] # implied by ps
+        if 'text' in options.actions: stages += [30]
         
         if options.parse and not options.introspect:
             del stages[1] # no merging
@@ -828,13 +833,15 @@ def main(options):
         if profile_stats is not None:
             docindex.read_profiling_info(profile_stats)
 
-    # Perform the specified action.
+    # Perform the specified action.  NOTE: It is important that these
+    # are performed in the same order that the 'stages' list was
+    # constructed, at the top of this function.
+    if 'html' in options.actions:
+        write_html(docindex, options)
     if 'check' in options.actions:
         check_docs(docindex, options)
     if 'pickle' in options.actions:
         write_pickle(docindex, options)
-    if 'html' in options.actions:
-        write_html(docindex, options)
     if ('latex' in options.actions or 'dvi' in options.actions or
         'ps' in options.actions or 'pdf' in options.actions):
         write_latex(docindex, options)
