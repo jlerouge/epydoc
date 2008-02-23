@@ -76,6 +76,7 @@ from epydoc.compat import *
 import ConfigParser
 from epydoc.docwriter.html_css import STYLESHEETS as CSS_STYLESHEETS
 from epydoc.docwriter.latex_sty import STYLESHEETS as STY_STYLESHEETS
+from epydoc.docwriter.dotgraph import DotGraph
 
 # This module is only available if Docutils are in the system
 try:
@@ -429,13 +430,24 @@ def parse_arguments():
         action='append', dest='pstat_files', metavar='FILE',
         help="A pstat output file, to be used in generating call graphs.")
 
+    graph_group.add_option('--max-html-graph-size',
+        action='store', dest='max_html_graph_size', metavar='SIZE',
+        help="Set the maximum graph size for HTML graphs.  This should "
+        "be a string of the form \"w,h\", specifying the maximum width "
+        "and height in inches.  Default=%r" % DotGraph.DEFAULT_HTML_SIZE)
+
+    graph_group.add_option('--max-latex-graph-size',
+        action='store', dest='max_latex_graph_size', metavar='SIZE',
+        help="Set the maximum graph size for LATEX graphs.  This should "
+        "be a string of the form \"w,h\", specifying the maximum width "
+        "and height in inches.  Default=%r" % DotGraph.DEFAULT_LATEX_SIZE)
+
     # this option is for developers, not users.
     graph_group.add_option("--profile-epydoc",
         action="store_true", dest="profile",
         help=SUPPRESS_HELP or
              ("Run the hotshot profiler on epydoc itself.  Output "
               "will be written to profile.out."))
-
 
     return_group = OptionGroup(optparser, 'Return Value Options')
     optparser.add_option_group(return_group)
@@ -544,6 +556,18 @@ def parse_arguments():
         ('dvi' in options.actions or 'ps' in options.actions)):
         optparser.error("Use of the pdflatex driver is incompatible "
                         "with generating dvi or ps output.")
+
+    # Set max graph sizes
+    if options.max_html_graph_size:
+        if not re.match(r'^\d+\s*,\s*\d+$', options.max_html_graph_size):
+            optparser.error("Bad max-html-graph-size value: %r" %
+                            options.max_html_graph_size)
+        DotGraph.DEFAULT_HTML_SIZE = options.max_html_graph_size
+    if options.max_latex_graph_size:
+        if not re.match(r'^\d+\s*,\s*\d+$', options.max_latex_graph_size):
+            optparser.error("Bad max-latex-graph-size value: %r" %
+                            options.max_latex_graph_size)
+        DotGraph.DEFAULT_LATEX_SIZE = options.max_latex_graph_size
 
     # Calculate verbosity.
     verbosity = getattr(options, 'verbosity', 0)
@@ -663,6 +687,10 @@ def parse_configfiles(configfiles, options, names):
             options.graph_font_size = _str_to_int(val, optname)
         elif optname == 'pstat':
             options.pstat_files.extend(_str_to_list(val))
+        elif optname in ('max-html-graph-size', 'max_html_graph_size'):
+            options.max_html_graph_size = val
+        elif optname in ('max-latex-graph-size', 'max_latex_graph_size'):
+            options.max_latex_graph_size = val
 
         # Return value options
         elif optname in ('failon', 'fail-on', 'fail_on'):
