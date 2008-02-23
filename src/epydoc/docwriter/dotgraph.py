@@ -22,6 +22,7 @@ __docformat__ = 'restructuredtext'
 
 import re
 import sys
+import tempfile
 from epydoc import log
 from epydoc.apidoc import *
 from epydoc.util import *
@@ -128,6 +129,32 @@ class DotGraph(object):
             while ('%s_%s' % (self.uid, n)) in self._uids: n += 1
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
+
+    def to_latex(self, image_file, language='ps', center=True):
+        # Write the image file.
+        if language == 'ps':
+            self.write(image_file, language='ps')
+        elif language == 'pdf':
+            ps = self._run_dot('-Tps')
+            psfilename = tempfile.mktemp('.ps')
+            psfile = open(psfilename, 'wb')
+            psfile.write('%!PS-Adobe-2.0 EPSF-1.2\n')
+            psfile.write(ps)
+            psfile.close()
+            try: run_subprocess(('ps2pdf', '-dEPSCrop', psfilename,
+                                 image_file))
+            except RunSubprocessError, e:
+                log.warning("Unable to render Graphviz dot graph (%s):\n"
+                            "ps2pdf failed." % self.title)
+                return None
+        else:
+            raise ValueError('Expected language to be "ps" or "pdf"')
+        
+        # Generate the latex code to display the graph.
+        name = os.path.splitext(os.path.split(image_file)[-1])[0]
+        s = '  \\includegraphics{%s}\n' % name
+        if center: s = '\\begin{center}\n%s\\end{center}\n' % s
+        return s
 
     def to_html(self, image_file, image_url, center=True):
         """
@@ -633,6 +660,7 @@ class DotGraphUmlClassNode(DotGraphNode):
         successful.
         """
         # Use the type string to look up a corresponding ValueDoc.
+        if not hasattr(self.linker, 'docindex'): return False
         type_doc = self.linker.docindex.find(type_str, var)
         if not type_doc: return False
 
