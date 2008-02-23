@@ -12,7 +12,7 @@ LaTeX stylesheets (*.sty) for epydoc's LaTeX writer.
 #: A disclaimer that is appended to the bottom of the BASE and
 #: BOXES stylesheets.
 NIST_DISCLAIMER = r"""
-% This style file is a derivite work, based on a public domain style
+% This style file is a derivative work, based on a public domain style
 % file that was originally developed at the National Institute of
 % Standards and Technology by employees of the Federal Government in the
 % course of their official duties.  NIST assumes no responsibility
