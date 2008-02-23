@@ -28,6 +28,11 @@ from epydoc.apidoc import *
 from epydoc.util import *
 from epydoc.compat import * # Backwards compatibility
 
+#: Should the dot2tex module be used to render dot graphs to latex
+#: (if it's available)?  This is experimental, and not yet working,
+#: so it should be left False for now.
+USE_DOT2TEX = False
+
 # colors for graphs of APIDocs
 MODULE_BG = '#d8e8ff'
 CLASS_BG = '#d8ffe8'
@@ -136,6 +141,15 @@ class DotGraph(object):
         graph.  Two image files will be written: image_file+'.eps'
         and image_file+'.pdf'.
         """
+        # Use dot2tex if requested (and if it's available).
+        # Otherwise, render it to an image file & use \includgraphics.
+        if USE_DOT2TEX and dot2tex is not None:
+            try: return self._to_dot2tex(center)
+            except KeyboardInterrupt: raise
+            except:
+                raise
+                log.warning('dot2tex failed; using dot instead')
+
         # Render the graph in postscript.
         ps = self._run_dot('-Tps')
         # Write the postscript output.
@@ -157,6 +171,25 @@ class DotGraph(object):
         if center: s = '\\begin{center}\n%s\\end{center}\n' % s
         return s
 
+    def _to_dot2tex(self, center=True):
+        # requires: pgf, latex-xcolor.
+        from dot2tex import dot2tex
+        if 0: # DEBUG
+            import logging
+            log = logging.getLogger("dot2tex")
+            log.setLevel(logging.DEBUG)
+            console = logging.StreamHandler()
+            formatter = logging.Formatter('%(levelname)-8s %(message)s')
+            console.setFormatter(formatter)
+            log.addHandler(console)
+        options = dict(crop=True, autosize=True, figonly=True, debug=True)
+        conv = dot2tex.Dot2PGFConv(options)
+        s = conv.convert(self.to_dotfile())
+        conv.dopreproc = False
+        s = conv.convert(s)
+        if center: s = '\\begin{center}\n%s\\end{center}\n' % s
+        return s
+    
     def to_html(self, image_file, image_url, center=True):
         """
         Return the HTML code that should be uesd to display this graph
