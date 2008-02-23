@@ -41,7 +41,7 @@ import re
 
 # Black on white, with blue highlights.  This is similar to how
 # javadoc looks.
-TEMPLATE = """
+TEMPLATE = r"""
 
 /* Epydoc CSS Stylesheet
  *
