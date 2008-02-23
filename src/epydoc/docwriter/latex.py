@@ -31,6 +31,7 @@ class LatexWriter:
     PREAMBLE = [
         "\\documentclass{article}",
         "\\usepackage[%s]{epydoc}",
+        "\\usepackage{graphicx}",
         ]
 
     SECTIONS = ['\\part{%s}', '\\chapter{%s}', '\\section{%s}',
@@ -59,7 +60,7 @@ class LatexWriter:
         self._hyperref = 1
         
         # [xx] check into this:
-        self._pdflatex = kwargs.get('action', '') == "pdflatex"
+        self._pdflatex = (kwargs['pdfdriver'] == 'pdflatex')
         
         self._graph_types = kwargs.get('graphs', ()) or ()
         """Graphs that we should include in our output."""
@@ -334,7 +335,8 @@ class LatexWriter:
         self.write_standard_fields(out, doc)
 
         # If it's a package, list the sub-modules.
-        if self._list_submodules and doc.submodules != UNKNOWN and doc.submodules:
+        if (self._list_submodules and doc.submodules !=
+            UNKNOWN and doc.submodules):
             self.write_module_list(out, doc)
 
         # Contents.
@@ -358,14 +360,13 @@ class LatexWriter:
         if graph is None: return ''
         graph.caption = graph.title = None
         if self._pdflatex:
-            return graph.to_dot2tex()
-##             image_url = '%s.ps' % graph.uid
-##             image_file = os.path.join(self._directory, image_url)
-##             return graph.to_pdf(image_file, image_url)
+            image_url = '%s.pdf' % graph.uid
+            image_file = os.path.join(self._directory, image_url)
+            return graph.to_latex(image_file, 'pdf') or ''
         else:
             image_url = '%s.eps' % graph.uid
             image_file = os.path.join(self._directory, image_url)
-            return graph.to_latex(image_file, image_url)
+            return graph.to_latex(image_file, 'ps') or ''
 
     def write_class(self, out, doc):
         if self._list_classes_separately:
@@ -391,12 +392,10 @@ class LatexWriter:
             (doc.subclasses not in (UNKNOWN,None) and len(doc.subclasses)>0)):
             # Display bases graphically, if requested.
             if 'umlclasstree' in self._graph_types:
-##                 linker = self._LatexDocstringLinker()
                 graph = uml_class_tree_graph(doc, self._docstring_linker, doc)
                 out(self.render_graph(graph))
                 
             elif 'classtree' in self._graph_types:
-##                 linker = self._LatexDocstringLinker()
                 graph = class_tree_graph([doc], self._docstring_linker, doc)
                 out(self.render_graph(graph))
 
@@ -407,11 +406,12 @@ class LatexWriter:
                 if doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0:
                     out(self.base_tree(doc))
 
-                # The class's known subclasses
-                if doc.subclasses not in (UNKNOWN, None) and len(doc.subclasses) > 0:
-                    sc_items = [_hyperlink(sc, '%s' % sc.canonical_name)
-                                for sc in doc.subclasses]
-                    out(self._descrlist(sc_items, 'Known Subclasses', short=1))
+            # The class's known subclasses
+            if (doc.subclasses not in (UNKNOWN, None) and
+                len(doc.subclasses) > 0):
+                sc_items = [_hyperlink(sc, '%s' % sc.canonical_name)
+                            for sc in doc.subclasses]
+                out(self._descrlist(sc_items, 'Known Subclasses', short=1))
 
         # The class's description.
         if doc.descr not in (None, UNKNOWN):
@@ -1088,23 +1088,8 @@ class LatexWriter:
         def translate_identifier_xref(self, identifier, label=None):
             if label is None: label = markup.plaintext_to_latex(identifier)
             return '\\texttt{%s}' % label
-        # [xx] Should this be added to the DocstringLinker interface???
-        # Currently, this is *only* used by dotgraph.
         def url_for(self, identifier):
             return None
-##             if isinstance(identifier, (basestring, DottedName)):
-##                 doc = self.docindex.find(identifier, self.container)
-##                 if doc:
-##                     return identifier
-##                 else:
-##                     return None
-##                 
-##             elif isinstance(identifier, APIDoc):
-##                 return ':'.join(identifier.canonical_name)
-##                 doc = identifier
-##                 
-##             else:
-##                 raise TypeError('Expected string or APIDoc')
     _docstring_linker = _LatexDocstringLinker()
     
     def docstring_to_latex(self, docstring, indent=0, breakany=0):
