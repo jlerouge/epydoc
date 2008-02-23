@@ -83,9 +83,16 @@ class DotGraph(object):
     DEFAULT_NODE_DEFAULTS={'fontsize':10, 'fontname': 'Helvetica'}
     DEFAULT_EDGE_DEFAULTS={'fontsize':10, 'fontname': 'Helvetica'}
     
+    DEFAULT_LATEX_SIZE="6.25,8"
+    """The default minimum size in inches (width,height) for graphs
+    when rendering with `to_latex()`"""
+    
+    DEFAULT_HTML_SIZE="10,20"
+    """The default minimum size in inches (width,height) for graphs
+    when rendering with `to_html()`"""
+    
     def __init__(self, title, body='', node_defaults=None,
-                 edge_defaults=None, caption=None,
-                 max_width=6, max_height=8):
+                 edge_defaults=None, caption=None):
         """
         Create a new `DotGraph`.
         """
@@ -111,12 +118,6 @@ class DotGraph(object):
         
         :type: ``str``"""
 
-        self.max_width = max_width
-        """The maximum width of the graph (in inches)"""
-        
-        self.max_height = max_height
-        """The maximum height of the graph (in inches)"""
-        
         self.node_defaults = node_defaults or self.DEFAULT_NODE_DEFAULTS
         """Default attribute values for nodes."""
         
@@ -142,23 +143,30 @@ class DotGraph(object):
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
 
-    def to_latex(self, image_file, center=True):
+    def to_latex(self, image_file, center=True, size=None):
         """
         Return the LaTeX code that should be used to display this
         graph.  Two image files will be written: image_file+'.eps'
         and image_file+'.pdf'.
+
+        :param size: The maximum size for the generated image, in
+            inches.  In particular, if ``size`` is ``\"w,h\"``, then
+            this will add a line ``size=\"w,h\"`` to the dot graph.
+            Defaults to `DEFAULT_LATEX_SIZE`.
+        :type size: ``str``
         """
+        size = size or self.DEFAULT_LATEX_SIZE
         # Use dot2tex if requested (and if it's available).
         # Otherwise, render it to an image file & use \includgraphics.
         if USE_DOT2TEX and dot2tex is not None:
-            try: return self._to_dot2tex(center)
+            try: return self._to_dot2tex(center, size)
             except KeyboardInterrupt: raise
             except:
                 raise
                 log.warning('dot2tex failed; using dot instead')
 
         # Render the graph in postscript.
-        ps = self._run_dot('-Tps')
+        ps = self._run_dot('-Tps', size=size)
         # Write the postscript output.
         psfile = open(image_file+'.eps', 'wb')
         psfile.write('%!PS-Adobe-2.0 EPSF-1.2\n')
@@ -178,7 +186,7 @@ class DotGraph(object):
         if center: s = '\\begin{center}\n%s\\end{center}\n' % s
         return s
 
-    def _to_dot2tex(self, center=True):
+    def _to_dot2tex(self, center=True, size=None):
         # requires: pgf, latex-xcolor.
         from dot2tex import dot2tex
         if 0: # DEBUG
@@ -191,25 +199,32 @@ class DotGraph(object):
             log.addHandler(console)
         options = dict(crop=True, autosize=True, figonly=True, debug=True)
         conv = dot2tex.Dot2PGFConv(options)
-        s = conv.convert(self.to_dotfile())
+        s = conv.convert(self.to_dotfile(size=size))
         conv.dopreproc = False
         s = conv.convert(s)
         if center: s = '\\begin{center}\n%s\\end{center}\n' % s
         return s
     
-    def to_html(self, image_file, image_url, center=True):
+    def to_html(self, image_file, image_url, center=True, size=None):
         """
         Return the HTML code that should be uesd to display this graph
         (including a client-side image map).
         
         :param image_url: The URL of the image file for this graph;
             this should be generated separately with the `write()` method.
+        :param size: The maximum size for the generated image, in
+            inches.  In particular, if ``size`` is ``\"w,h\"``, then
+            this will add a line ``size=\"w,h\"`` to the dot graph.
+            Defaults to `DEFAULT_HTML_SIZE`.
+        :type size: ``str``
         """
+        size = size or self.DEFAULT_HTML_SIZE
         # If dotversion >1.8.10, then we can generate the image and
         # the cmapx with a single call to dot.  Otherwise, we need to
         # run dot twice.
         if get_dot_version() > [1,8,10]:
-            cmapx = self._run_dot('-Tgif', '-o%s' % image_file, '-Tcmapx')
+            cmapx = self._run_dot('-Tgif', '-o%s' % image_file,
+                                  '-Tcmapx', size=size)
             if cmapx is None: return '' # failed to render
         else:
             if not self.write(image_file):
@@ -291,32 +306,44 @@ class DotGraph(object):
                 if url: attribs['href'] = url
                 else: del attribs['href']
                 
-    def write(self, filename, language='gif'):
+    def write(self, filename, language='gif', size=None):
         """
         Render the graph using the output format `language`, and write
         the result to `filename`.
         
         :return: True if rendering was successful.
+        :param size: The maximum size for the generated image, in
+            inches.  In particular, if ``size`` is ``\"w,h\"``, then
+            this will add a line ``size=\"w,h\"`` to the dot graph.
+            If not specified, no size line will be added.
+        :type size: ``str``
         """
         result = self._run_dot('-T%s' % language,
-                               '-o%s' % filename)
+                               '-o%s' % filename,
+                               size=size)
         # Decode into unicode, if necessary.
         if language == 'cmapx' and result is not None:
             result = result.decode('utf-8')
         return (result is not None)
 
-    def render(self, language='gif'):
+    def render(self, language='gif', size=None):
         """
         Use the ``dot`` command to render this graph, using the output
         format `language`.  Return the result as a string, or ``None``
         if the rendering failed.
+        
+        :param size: The maximum size for the generated image, in
+            inches.  In particular, if ``size`` is ``\"w,h\"``, then
+            this will add a line ``size=\"w,h\"`` to the dot graph.
+            If not specified, no size line will be added.
+        :type size: ``str``
         """
-        return self._run_dot('-T%s' % language)
+        return self._run_dot('-T%s' % language, size=size)
 
-    def _run_dot(self, *options):
+    def _run_dot(self, *options, **kwparam):
         try:
             result, err = run_subprocess((DOT_COMMAND,)+options,
-                                         self.to_dotfile())
+                                         self.to_dotfile(**kwparam))
             if err: log.warning("Graphviz dot warning(s):\n%s" % err)
         except OSError, e:
             log.warning("Unable to render Graphviz dot graph (%s):\n%s" %
@@ -325,24 +352,31 @@ class DotGraph(object):
             if epydoc.DEBUG:
                 filename = tempfile.mktemp('.dot')
                 out = open(filename, 'wb')
-                out.write(self.to_dotfile())
+                out.write(self.to_dotfile(**kwparam))
                 out.close()
                 log.debug('Failed dot graph written to %s' % filename)
             return None
 
         return result
 
-    def to_dotfile(self):
+    def to_dotfile(self, size=None):
         """
         Return the string contents of the dot file that should be used
         to render this graph.
+        
+        :param size: The maximum size for the generated image, in
+            inches.  In particular, if ``size`` is ``\"w,h\"``, then
+            this will add a line ``size=\"w,h\"`` to the dot graph.
+            If not specified, no size line will be added.
+        :type size: ``str``
         """
         lines = ['digraph %s {' % self.uid,
-                 'size="%d,%d"\n' % (self.max_width, self.max_height),
                  'node [%s]' % ','.join(['%s="%s"' % (k,v) for (k,v)
                                          in self.node_defaults.items()]),
                  'edge [%s]' % ','.join(['%s="%s"' % (k,v) for (k,v)
                                          in self.edge_defaults.items()])]
+        if size:
+            lines.append('size="%s"' % size)
         if self.body:
             lines.append(self.body)
         lines.append('/* Nodes */')
