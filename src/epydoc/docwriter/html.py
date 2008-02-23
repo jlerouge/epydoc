@@ -2280,7 +2280,9 @@ class HTMLWriter:
                             [('Get', prop_doc.fget), ('Set', prop_doc.fset),
                              ('Delete', prop_doc.fdel)]
                             if val_doc not in (None, UNKNOWN)
+                          # [xx] this requires introspection -- why do this?
                             and val_doc.pyval is not None
+                          # [xx] (end)
                             and not val_doc.canonical_name[0].startswith('??')]
 
             self.write_property_details_entry(out, var_doc, descr,
