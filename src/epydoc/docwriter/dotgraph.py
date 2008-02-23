@@ -84,7 +84,8 @@ class DotGraph(object):
     DEFAULT_EDGE_DEFAULTS={'fontsize':10, 'fontname': 'Helvetica'}
     
     def __init__(self, title, body='', node_defaults=None,
-                 edge_defaults=None, caption=None):
+                 edge_defaults=None, caption=None,
+                 max_width=6, max_height=8):
         """
         Create a new `DotGraph`.
         """
@@ -109,6 +110,12 @@ class DotGraph(object):
         graph.
         
         :type: ``str``"""
+
+        self.max_width = max_width
+        """The maximum width of the graph (in inches)"""
+        
+        self.max_height = max_height
+        """The maximum height of the graph (in inches)"""
         
         self.node_defaults = node_defaults or self.DEFAULT_NODE_DEFAULTS
         """Default attribute values for nodes."""
@@ -329,6 +336,7 @@ class DotGraph(object):
         to render this graph.
         """
         lines = ['digraph %s {' % self.uid,
+                 'size="%d,%d"\n' % (self.max_width, self.max_height),
                  'node [%s]' % ','.join(['%s="%s"' % (k,v) for (k,v)
                                          in self.node_defaults.items()]),
                  'edge [%s]' % ','.join(['%s="%s"' % (k,v) for (k,v)
@@ -1126,6 +1134,8 @@ def class_tree_graph(classes, linker, context=None, **options):
         return DotGraphEdge(start, end)
     
     if isinstance(classes, ClassDoc): classes = [classes]
+    # [xx] this should be done earlier, and should generate a warning:
+    classes = [c for c in classes if c is not None] 
     graph = DotGraph('Class Hierarchy for %s' % name_list(classes, context),
                      body='ranksep=0.3\n',
                      edge_defaults={'sametail':True, 'dir':'none'})
