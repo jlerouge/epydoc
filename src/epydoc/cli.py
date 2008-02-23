@@ -89,6 +89,7 @@ DEFAULT_DOCFORMAT = 'epytext'
 PROFILER = 'profile' #: Which profiler to use: 'hotshot' or 'profile'
 TARGET_ACTIONS = ('html', 'latex', 'dvi', 'ps', 'pdf')
 DEFAULT_ACTIONS = ('html',)
+PDFDRIVERS = ('pdflatex', 'latex', 'auto')
 
 ######################################################################
 #{ Help Topics
@@ -145,7 +146,8 @@ def option_defaults():
         fail_on=None, exclude=[], exclude_parse=[], exclude_introspect=[],
         external_api=[], external_api_file=[], external_api_root=[],
         redundant_details=False, src_code_tab_width=8, verbosity=0,
-        include_timestamp=True, target={}, default_target=None)
+        include_timestamp=True, target={}, default_target=None,
+        pdfdriver='auto')
 
 # append_const is not defined in py2.3 or py2.4, so use a callback
 # instead, with the following function:
@@ -329,6 +331,14 @@ def parse_arguments():
         dest="sty", metavar="LATEXSTYLE",
         help="The LaTeX style file.  LATEXSTYLE can be either a "
         "builtin style file or the name of a .sty file.")
+
+    output_group.add_option("--pdfdriver",
+        dest="pdfdriver", metavar="DRIVER",
+        help="The command sequence that should be used to render "
+        "pdf output.  \"pdflatex\" will generate the pdf directly "
+        "using pdflatex.  \"latex\" will generate the pdf using "
+        "latex, dvips, and ps2pdf in succession.  \"auto\" will use "
+        "pdflatex if available, and latex otherwise.")
 
     output_group.add_option("--url", "-u",
         dest="prj_url", metavar="URL",
@@ -520,6 +530,18 @@ def parse_arguments():
             optparser.error("Invalid graph type %s.  Expected one of: %s." %
                             (graph_type, ', '.join(GRAPH_TYPES + ('all',))))
 
+    # If pdfdriver is 'auto', then pick a pdf driver.
+    options.pdfdriver = options.pdfdriver.lower()
+    if options.pdfdriver not in PDFDRIVERS:
+        optparser.error("Invalid pdf driver %r.  Expected one of: %s" %
+                        (options.pdfdriver, ', '.join(PDF_DRIVERS)))
+    if 'pdf' in options.actions and options.pdfdriver=='auto':
+        try:
+            run_subprocess('pdflatex --version')
+            options.pdfdriver = 'pdflatex'
+        except RunSubprocessError, e:
+            options.pdfdriver = 'latex'
+
     # Calculate verbosity.
     verbosity = getattr(options, 'verbosity', 0)
     options.verbosity = verbosity + options.verbose - options.quiet
@@ -593,6 +615,10 @@ def parse_configfiles(configfiles, options, names):
             options.prj_name = val
         elif optname == 'css':
             options.css = val
+        elif optname == 'sty':
+            options.sty = val
+        elif optname == 'pdfdriver':
+            options.pdfdriver = val
         elif optname == 'url':
             options.prj_url = val
         elif optname == 'link':
@@ -929,8 +955,13 @@ def write_latex(docindex, options):
     log.start_progress('Writing LaTeX docs')
     latex_writer.write(latex_target)
     log.end_progress()
-    
-    if 'pdf' in options.actions: steps = 6
+
+    # Decide how many steps we need to go through.
+    if 'pdf' in options.actions:
+        if options.pdfdriver == 'latex': steps = 6
+        elif 'ps' in options.actions: steps = 8
+        elif 'dvi' in options.actions: steps = 7
+        else: steps = 4
     elif 'ps' in options.actions: steps = 5
     elif 'dvi' in options.actions: steps = 4
     else:
@@ -938,10 +969,19 @@ def write_latex(docindex, options):
         # output format, then we're done.
         assert 'latex' in options.actions
         return
-    
+
+    # Decide whether we need to run latex, pdflatex, or both.
+    if options.pdfdriver == 'latex':
+        latex_commands = ['latex']
+    elif 'dvi' in options.actions or 'ps' in options.actions:
+        latex_commands = ['latex', 'pdflatex']
+    else:
+        latex_commands = ['pdflatex']
+        
     log.start_progress('Processing LaTeX docs')
     oldpath = os.path.abspath(os.curdir)
     running = None # keep track of what we're doing.
+    step = 0.
     try:
         try:
             os.chdir(latex_target)
@@ -951,44 +991,52 @@ def write_latex(docindex, options):
                 if os.path.exists('api.%s' % ext):
                     os.remove('api.%s' % ext)
 
-            # The first pass generates index files.
-            running = 'latex'
-            log.progress(0./steps, 'LaTeX: First pass')
-            run_subprocess('latex api.tex')
-
-            # Build the index.
-            running = 'makeindex'
-            log.progress(1./steps, 'LaTeX: Build index')
-            run_subprocess('makeindex api.idx')
-
-            # The second pass generates our output.
-            running = 'latex'
-            log.progress(2./steps, 'LaTeX: Second pass')
-            out, err = run_subprocess('latex api.tex')
-            
-            # The third pass is only necessary if the second pass
-            # changed what page some things are on.
-            running = 'latex'
-            if _RERUN_LATEX_RE.match(out):
-                log.progress(3./steps, 'LaTeX: Third pass')
-                out, err = run_subprocess('latex api.tex')
- 
-            # A fourth path should (almost?) never be necessary.
-            running = 'latex'
-            if _RERUN_LATEX_RE.match(out):
-                log.progress(3./steps, 'LaTeX: Fourth pass')
-                run_subprocess('latex api.tex')
+            for latex_command in latex_commands:
+                # The first pass generates index files.
+                running = latex_command
+                log.progress(step/steps, 'LaTeX: First pass')
+                step += 1
+                run_subprocess('%s api.tex' % latex_command)
+                
+                # Build the index.
+                running = 'makeindex'
+                log.progress(step/steps, 'LaTeX: Build index')
+                step += 1
+                run_subprocess('makeindex api.idx')
+                
+                # The second pass generates our output.
+                running = latex_command
+                log.progress(step/steps, 'LaTeX: Second pass')
+                step += 1
+                out, err = run_subprocess('%s api.tex' % latex_command)
+                
+                # The third pass is only necessary if the second pass
+                # changed what page some things are on.
+                running = latex_command
+                if _RERUN_LATEX_RE.match(out):
+                    log.progress(step/steps, 'LaTeX: Third pass')
+                    out, err = run_subprocess('%s api.tex' % latex_command)
+                    
+                # A fourth path should (almost?) never be necessary.
+                running = latex_command
+                if _RERUN_LATEX_RE.match(out):
+                    log.progress(step/steps, 'LaTeX: Fourth pass')
+                    run_subprocess('%s api.tex' % latex_command)
+                step += 1
 
             # If requested, convert to postscript.
-            if 'ps' in options.actions or 'pdf' in options.actions:
+            if ('ps' in options.actions or
+                ('pdf' in options.actions and options.pdfdriver=='latex')):
                 running = 'dvips'
-                log.progress(4./steps, 'dvips')
+                log.progress(step/steps, 'dvips')
+                step += 1
                 run_subprocess('dvips api.dvi -o api.ps -G0 -Ppdf')
 
             # If requested, convert to pdf.
-            if 'pdf' in options.actions:
+            if 'pdf' in options.actions and options.pdfdriver=='latex':
                 running = 'ps2pdf'
-                log.progress(5./steps, 'ps2pdf')
+                log.progress(step/steps, 'ps2pdf')
+                step += 1
                 run_subprocess(
                     'ps2pdf -sPAPERSIZE#letter -dMaxSubsetPct#100 '
                     '-dSubsetFonts#true -dCompatibilityLevel#1.2 '
@@ -1006,7 +1054,7 @@ def write_latex(docindex, options):
                 shutil.copy2('api.pdf', dst)
 
         except RunSubprocessError, e:
-            if running == 'latex':
+            if running in ('latex', 'pdflatex'):
                 e.out = re.sub(r'(?sm)\A.*?!( LaTeX Error:)?', r'', e.out)
                 e.out = re.sub(r'(?sm)\s*Type X to quit.*', '', e.out)
                 e.out = re.sub(r'(?sm)^! Emergency stop.*', '', e.out)
