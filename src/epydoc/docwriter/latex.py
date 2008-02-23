@@ -540,7 +540,8 @@ class LatexWriter:
         # The base class name.
         s += ('\\multicolumn{%s}{r}{' % labelwidth)
         s += '\\settowidth{\\EpydocBCL}{%s}' % base_name
-        s += '\\multirow{2}{\\EpydocBCL}{%s}}\n' % _hyperlink(doc, self._base_name(doc))
+        s += ('\\multirow{2}{\\EpydocBCL}{%s}}\n' %
+              _hyperlink(doc, self._base_name(doc)))
 
         # The vertical bars for other base classes (top half)
         for vbar in linespec:
@@ -859,114 +860,6 @@ class LatexWriter:
             return '\\TupleArg{%s}' % '\\and '.join([self._arg_name(a)
                                                      for a in arg])
 
-                
-#     def write_func_list_box(self, out, var_doc):
-#         func_doc = var_doc.value
-#         is_inherited = (var_doc.overrides not in (None, UNKNOWN))
-
-#         out('\\begin{EpydocFunction}%\n')
-#         # Function signature.
-#         out(self.function_signature(var_doc))
-
-#         # nb: this gives the containing section, not a reference
-#         # directly to the function.
-#         if not is_inherited:
-#             out('    %s%%\n' % self.indexterm(func_doc))
-
-#         # If we have nothing else to say, then don't create an
-#         # \EpydocFunctionInfo environment.
-#         if not (func_doc.descr not in (None, UNKNOWN) or
-#                 func_doc.arg_descrs or func_doc.arg_types or
-#                 func_doc.return_descr not in (None, UNKNOWN) or
-#                 func_doc.return_type not in (None, UNKNOWN) or
-#                 func_doc.exception_descrs not in (None, UNKNOWN, [], ()) or
-#                 var_doc.overrides not in (None, UNKNOWN) or
-#                 func_doc.metadata not in (None, UNKNOWN, [], ())):
-#             out('    \\end{EpydocFunction}\n\n')
-#             return
-        
-#         out('\\begin{EpydocFunctionInfo}%\n')
-        
-#         # Description
-#         if func_doc.descr not in (None, UNKNOWN):
-#             out(' '*4 + '\\begin{EpydocFunctionDescription}\n')
-#             out(self.docstring_to_latex(func_doc.descr, 4))
-#             out(' '*4 + '\\end{EpydocFunctionDescription}\n')
-
-#         # Parameters
-#         if func_doc.arg_descrs or func_doc.arg_types:
-#             # Find the longest name.
-#             longest = max([0]+[len(n) for n in func_doc.arg_types])
-#             for names, descrs in func_doc.arg_descrs:
-#                 longest = max([longest]+[len(n) for n in names])
-#             # Table header.
-#             out(' '*6+'\\begin{EpydocFunctionParameters}{%s}\n' % (longest*'x'))
-#             # Add params that have @type but not @param info:
-#             arg_descrs = list(func_doc.arg_descrs)
-#             args = set()
-#             for arg_names, arg_descr in arg_descrs:
-#                 args.update(arg_names)
-#             for arg in var_doc.value.arg_types:
-#                 if arg not in args:
-#                     arg_descrs.append( ([arg],None) )
-#             # Display params
-#             for (arg_names, arg_descr) in arg_descrs:
-#                 arg_name = plaintext_to_latex(', '.join(arg_names))
-#                 out('%s\\item[%s]\n\n' % (' '*10, arg_name))
-#                 if arg_descr:
-#                     out(self.docstring_to_latex(arg_descr, 10))
-#                 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#                 # !!! JEG - this loop needs abstracting
-#                 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#                 for arg_name in arg_names:
-#                     arg_typ = func_doc.arg_types.get(arg_name)
-#                     if arg_typ is not None:
-#                         if len(arg_names) == 1:
-#                             lhs = 'type'
-#                         else:
-#                             lhs = 'type of %s' % arg_name
-#                         rhs = self.docstring_to_latex(arg_typ).strip()
-#                         out('%s{\\it (%s=%s)}\n\n' % (' '*12, lhs, rhs))
-#             out(' '*6+'\\end{EpydocFunctionParameters}\n\n')
-                
-#         # Returns
-#         rdescr = func_doc.return_descr
-#         rtype = func_doc.return_type
-#         if rdescr not in (None, UNKNOWN) or rtype not in (None, UNKNOWN):
-#             out(' '*6+'\\EpydocFunctionReturns')
-#             if rtype not in (None, UNKNOWN):
-#                 out('[%s]' % self.docstring_to_latex(rtype, 6).strip())
-#             if rdescr not in (None, UNKNOWN):
-#                 out('{%s}' % self.docstring_to_latex(rdescr, 6))
-#             else:
-#                 out('{}')
-#             out('\n\n')
-
-#         # Raises
-#         if func_doc.exception_descrs not in (None, UNKNOWN, [], ()):
-#             out(' '*6+'\\begin{EpydocFunctionRaises}\n')
-#             for name, descr in func_doc.exception_descrs:
-#                 out(' '*10+'\\item[%s]\n\n' %
-#                     plaintext_to_latex('%s' % name))
-#                 out(self.docstring_to_latex(descr, 10))
-#             out(' '*6+'\\end{EpydocFunctionRaises}\n\n')
-
-#         ## Overrides
-#         if var_doc.overrides not in (None, UNKNOWN):
-#             out('\\EpydocFunctionOverrides')
-#             if (func_doc.docstring in (None, UNKNOWN) and
-#                 var_doc.overrides.value.docstring not in (None, UNKNOWN)):
-#                 out('[1]')
-#             out('{%s}\n\n' 
-#                 % _hyperlink(var_doc.overrides, 
-#                              '%s' % var_doc.overrides.canonical_name))
-
-#         # Add version, author, warnings, requirements, notes, etc.
-#         self.write_standard_fields(out, func_doc)
-
-#         out('    \\end{EpydocFunctionInfo}\n')
-#         out('    \\end{EpydocFunction}\n\n')
-
     #////////////////////////////////////////////////////////////
     #{ Variable Details
     #////////////////////////////////////////////////////////////
@@ -1090,6 +983,7 @@ class LatexWriter:
             return '\\texttt{%s}' % label
         def url_for(self, identifier):
             return None
+                
     _docstring_linker = _LatexDocstringLinker()
     
     def docstring_to_latex(self, docstring, where, indent=0, breakany=0):
@@ -1194,8 +1088,9 @@ class LatexWriter:
             raise AssertionError('Bad index position %s' % pos)
         
         if pos in ['only', 'start'] and classCrossRef is not None:
-            term += classCrossRef % ('\\EpydocIndex[%s]{%s}' % (self.doc_kind(doc).lower(), 
-                                                                _dotted('%s'%doc.canonical_name)))
+            term += classCrossRef % ('\\EpydocIndex[%s]{%s}' %
+                                     (self.doc_kind(doc).lower(), 
+                                      _dotted('%s'%doc.canonical_name)))
             
         return term
 
