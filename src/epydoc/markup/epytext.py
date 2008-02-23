@@ -345,10 +345,10 @@ def _raise_graphs(tree, parent):
     block = ('section', 'fieldlist', 'field', 'ulist', 'olist', 'li')
     if have_graph_child and tree.tag not in block:
         child_index = 0
+        parent_index = parent.children.index(tree)
         for elt in tree.children:
             if isinstance(elt, Element) and elt.tag == 'graph':
                 # We found a graph: splice it into the parent.
-                parent_index = parent.children.index(tree)
                 left = tree.children[:child_index]
                 right = tree.children[child_index+1:]
                 parent.children[parent_index:parent_index+1] = [
@@ -357,6 +357,7 @@ def _raise_graphs(tree, parent):
                     Element(tree.tag, *right, **tree.attribs)]
                 child_index = 0
                 parent_index += 2
+                tree = parent.children[parent_index]
             else:
                 child_index += 1
 
@@ -1782,12 +1783,14 @@ class ParsedEpytextDocstring(ParsedDocstring):
                                    docindex, context, indent)
         return self._html
 
-    def to_latex(self, docstring_linker, **options):
+    def to_latex(self, docstring_linker, directory=None, docindex=None,
+                 context=None, **options):
         if self._latex is not None: return self._latex
         if self._tree is None: return ''
         indent = options.get('indent', 0)
         self._hyperref = options.get('hyperref', 1)
-        self._latex = self._to_latex(self._tree, docstring_linker, indent)
+        self._latex = self._to_latex(self._tree, docstring_linker, directory,
+                                     docindex, context, indent)
         return self._latex
 
     def to_plaintext(self, docstring_linker, **options):
@@ -1873,6 +1876,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
             symbol = tree.children[0]
             return self.SYMBOL_TO_HTML.get(symbol, '[%s]' % symbol)
         elif tree.tag == 'graph':
+            if directory is None: return ''
             # Generate the graph.
             graph = self._build_graph(variables[0], variables[1:], linker,
                                       docindex, context)
@@ -1931,8 +1935,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
         else:
             log.warning("Unknown graph type %s" % graph_type)
             
-    
-    def _to_latex(self, tree, linker, indent=0, seclevel=0, breakany=0):
+    def _to_latex(self, tree, linker, directory, docindex, context,
+                  indent=0, seclevel=0, breakany=0):
         if isinstance(tree, basestring):
             return plaintext_to_latex(tree, breakany=breakany)
 
@@ -1941,7 +1945,8 @@ class ParsedEpytextDocstring(ParsedDocstring):
         # Figure out the child indent level.
         if tree.tag == 'epytext': cindent = indent
         else: cindent = indent + 2
-        variables = [self._to_latex(c, linker, cindent, seclevel, breakany)
+        variables = [self._to_latex(c, linker, directory, docindex,
+                                    context, cindent, seclevel, breakany)
                     for c in tree.children]
         childstr = ''.join(variables)
     
@@ -2002,8 +2007,14 @@ class ParsedEpytextDocstring(ParsedDocstring):
             symbol = tree.children[0]
             return self.SYMBOL_TO_LATEX.get(symbol, '[%s]' % symbol)
         elif tree.tag == 'graph':
-            return '(GRAPH)'
-            #raise ValueError, 'graph not implemented yet for latex'
+            if directory is None: return ''
+            # Generate the graph.
+            graph = self._build_graph(variables[0], variables[1:], linker,
+                                      docindex, context)
+            if not graph: return ''
+            # Write the graph.
+            image_file = os.path.join(directory, graph.uid)
+            return graph.to_latex(image_file)
         else:
             # Assume that anything else can be passed through.
             return childstr

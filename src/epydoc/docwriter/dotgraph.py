@@ -130,25 +130,26 @@ class DotGraph(object):
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
 
-    def to_latex(self, image_file, language='ps', center=True):
-        # Write the image file.
-        if language == 'ps':
-            self.write(image_file, language='ps')
-        elif language == 'pdf':
-            ps = self._run_dot('-Tps')
-            psfilename = tempfile.mktemp('.ps')
-            psfile = open(psfilename, 'wb')
-            psfile.write('%!PS-Adobe-2.0 EPSF-1.2\n')
-            psfile.write(ps)
-            psfile.close()
-            try: run_subprocess(('ps2pdf', '-dEPSCrop', psfilename,
-                                 image_file))
-            except RunSubprocessError, e:
-                log.warning("Unable to render Graphviz dot graph (%s):\n"
+    def to_latex(self, image_file, center=True):
+        """
+        Return the LaTeX code that should be used to display this
+        graph.  Two image files will be written: image_file+'.eps'
+        and image_file+'.pdf'.
+        """
+        # Render the graph in postscript.
+        ps = self._run_dot('-Tps')
+        # Write the postscript output.
+        psfile = open(image_file+'.eps', 'wb')
+        psfile.write('%!PS-Adobe-2.0 EPSF-1.2\n')
+        psfile.write(ps)
+        psfile.close()
+        # Use ps2pdf to generate the pdf output.
+        try: run_subprocess(('ps2pdf', '-dEPSCrop', image_file+'.eps',
+                             image_file+'.pdf'))
+        except RunSubprocessError, e:
+            log.warning("Unable to render Graphviz dot graph (%s):\n"
                             "ps2pdf failed." % self.title)
-                return None
-        else:
-            raise ValueError('Expected language to be "ps" or "pdf"')
+            return None
         
         # Generate the latex code to display the graph.
         name = os.path.splitext(os.path.split(image_file)[-1])[0]
@@ -811,7 +812,8 @@ class DotGraphUmlClassNode(DotGraphNode):
     def _get_html_label(self):
         # Get the class name & contextualize it.
         classname = self.class_doc.canonical_name
-        classname = classname.contextualize(self.context.canonical_name)
+        if context is not None:
+            classname = classname.contextualize(self.context.canonical_name)
         
         # If we're collapsed, display the node as a single box.
         if self.collapsed:
@@ -1414,12 +1416,14 @@ def add_valdoc_nodes(graph, val_docs, linker, context):
     """
     nodes = {}
     for val_doc in sorted(val_docs, key=lambda d:d.canonical_name):
-        nodes[val_doc] = mk_valdoc_node(graph, val_doc, linker, context)
+        nodes[val_doc] = mk_valdoc_node(val_doc, linker, context)
         graph.nodes.append(nodes[val_doc])
     return nodes
 
 def mk_valdoc_node(val_doc, linker, context):
-    label = val_doc.canonical_name.contextualize(context.canonical_name)
+    label = val_doc.canonical_name
+    if context is not None:
+        label = label.contextualize(context.canonical_name)
     node = DotGraphNode(label)
     specialize_valdoc_node(node, val_doc, context, linker.url_for(val_doc))
     return node
@@ -1488,12 +1492,13 @@ def specialize_valdoc_node(node, val_doc, context, url):
             node['style'] = 'filled,bold'
 
 def name_list(api_docs, context=None):
+    names = [d.canonical_name for d in api_docs]
     if context is not None:
-        context = context.canonical_name
-    names = [str(d.canonical_name.contextualize(context)) for d in api_docs]
+        names = [name.contextualize(context.canonical_name) for name in names]
     if len(names) == 0: return ''
     if len(names) == 1: return '%s' % names[0]
     elif len(names) == 2: return '%s and %s' % (names[0], names[1])
     else:
+        names = ['%s' % name for name in names]
         return '%s, and %s' % (', '.join(names[:-1]), names[-1])
 

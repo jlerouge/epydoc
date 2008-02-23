@@ -198,9 +198,11 @@ class ParsedRstDocstring(ParsedDocstring):
         self._document.walkabout(visitor)
         return ''.join(visitor.body)
 
-    def to_latex(self, docstring_linker, **options):
+    def to_latex(self, docstring_linker, directory=None,
+                 docindex=None, context=None, **options):
         # Inherit docs
-        visitor = _EpydocLaTeXTranslator(self._document, docstring_linker)
+        visitor = _EpydocLaTeXTranslator(self._document, docstring_linker,
+                                         directory, docindex, context)
         self._document.walkabout(visitor)
         return ''.join(visitor.body).strip()+'\n'
 
@@ -537,14 +539,15 @@ class _SplitFieldsTranslator(NodeVisitor):
 
 def latex_head_prefix():
     document = new_document('<fake>')
-    translator = _EpydocLaTeXTranslator(document, None)
+    translator = _EpydocLaTeXTranslator(document)
     return translator.head_prefix
     
 _TARGET_RE = re.compile(r'^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
 
 class _EpydocLaTeXTranslator(LaTeXTranslator):
     settings = None
-    def __init__(self, document, docstring_linker):
+    def __init__(self, document, docstring_linker=None, directory=None,
+                 docindex=None, context=None):
         # Set the document's settings.
         if self.settings is None:
             settings = OptionParser([LaTeXWriter()]).get_default_values()
@@ -554,6 +557,9 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
 
         LaTeXTranslator.__init__(self, document)
         self._linker = docstring_linker
+        self._directory = directory
+        self._docindex = docindex
+        self._context = context
 
         # Start at section level 3.  (Unfortunately, we now have to
         # set a private variable to make this work; perhaps the standard
@@ -574,12 +580,18 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
     def visit_document(self, node): pass
     def depart_document(self, node): pass
 
-    # For now, just ignore dotgraphs. [XXX]
     def visit_dotgraph(self, node):
-        log.warning("Ignoring dotgraph in latex output (dotgraph "
-                    "rendering for latex not implemented yet).")
+        if self._directory is None: raise SkipNode() # [xx] warning?
+        
+        # Generate the graph.
+        graph = node.graph(self._docindex, self._context, self._linker)
+        if graph is None: raise SkipNode()
+        
+        # Write the graph.
+        image_file = os.path.join(self._directory, graph.uid)
+        self.body.append(graph.to_latex(image_file))
         raise SkipNode()
-    
+
     def visit_doctest_block(self, node):
         self.body.append(doctest_to_latex(node[0].astext()))
         raise SkipNode()
@@ -672,11 +684,11 @@ class _EpydocHTMLTranslator(HTMLTranslator):
                                        **attributes)
 
     def visit_dotgraph(self, node):
-        if self._directory is None: return # [xx] warning?
+        if self._directory is None: raise SkipNode() # [xx] warning?
         
         # Generate the graph.
         graph = node.graph(self._docindex, self._context, self._linker)
-        if graph is None: return
+        if graph is None: raise SkipNode()
         
         # Write the graph.
         image_url = '%s.gif' % graph.uid

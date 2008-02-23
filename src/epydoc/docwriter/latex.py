@@ -359,14 +359,9 @@ class LatexWriter:
     def render_graph(self, graph):
         if graph is None: return ''
         graph.caption = graph.title = None
-        if self._pdflatex:
-            image_url = '%s.pdf' % graph.uid
-            image_file = os.path.join(self._directory, image_url)
-            return graph.to_latex(image_file, 'pdf') or ''
-        else:
-            image_url = '%s.eps' % graph.uid
-            image_file = os.path.join(self._directory, image_url)
-            return graph.to_latex(image_file, 'ps') or ''
+        image_url = '%s' % graph.uid
+        image_file = os.path.join(self._directory, image_url)
+        return graph.to_latex(image_file) or ''
 
     def write_class(self, out, doc):
         if self._list_classes_separately:
@@ -1095,6 +1090,8 @@ class LatexWriter:
     def docstring_to_latex(self, docstring, indent=0, breakany=0):
         if docstring is None: return ''
         s = docstring.to_latex(self._docstring_linker, indent=indent,
+                               directory=self._directory,
+                               docindex=self.docindex,
                                hyperref=self._hyperref)
         return (' '*indent + '\\begin{EpydocDescription}%\n' +
                 s.strip() + '%\n' +
