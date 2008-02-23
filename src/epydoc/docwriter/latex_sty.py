@@ -487,25 +487,25 @@ BASE = r"""
         \gdef\@EpydocPropertyGet{##4}%
         \gdef\@EpydocPropertySet{##5}%
         \gdef\@EpydocPropertyDel{##6}%
-    {\Large\raggedright\@EpydocVariableName}
+    {\Large\raggedright\@EpydocPropertyName}
 
     \begin{quote}
         \setlength{\parskip}{\EpydocParskip}%
-        \ifx\@EpydocVariableDescription\empty\else
+        \ifx\@EpydocPropertyDescription\empty\else
 
-            \@EpydocVariableDescription\fi%
-        \ifx\@EpydocVariableType\empty\else
+            \@EpydocPropertyDescription\fi%
+        \ifx\@EpydocPropertyType\empty\else
 
-            \textbf{Type:} \@EpydocVariableType\fi%
-        \ifx\@EpydocVariableGet\empty
+            \textbf{Type:} \@EpydocPropertyType\fi%
+        \ifx\@EpydocPropertyGet\empty
 
-            \textbf{Get:} \texttt{\@EpydocVariableGet}\fi%
-        \ifx\@EpydocVariableSet\empty
+            \textbf{Get:} \texttt{\@EpydocPropertyGet}\fi%
+        \ifx\@EpydocPropertySet\empty
 
-            \textbf{Set:} \texttt{\@EpydocVariableSet}\fi%
-        \ifx\@EpydocVariableDel\empty
+            \textbf{Set:} \texttt{\@EpydocPropertySet}\fi%
+        \ifx\@EpydocPropertyDel\empty
 
-            \textbf{Delete:} \texttt{\@EpydocVariableDel}\fi%
+            \textbf{Delete:} \texttt{\@EpydocPropertyDel}\fi%
     \end{quote}
   }}
   {}
