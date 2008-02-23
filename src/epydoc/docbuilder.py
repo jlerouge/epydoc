@@ -339,9 +339,11 @@ def _import_docs_from_items(items, options):
                     _import_docs_from_package(val, options)
             elif is_pyname(item):
                 if options.must_introspect(item):
-                    val = get_value_from_name(item)
-                    if options.add_submodules and inspect.ismodule(val):
-                        _import_docs_from_package(val, options)
+                    try:
+                        val = get_value_from_name(item)
+                        if options.add_submodules and inspect.ismodule(val):
+                            _import_docs_from_package(val, options)
+                    except ImportError, e: pass
 
 def _import_docs_from_package(pkg, options):
     subpackage_filenames = set()
@@ -376,7 +378,8 @@ def _do_import(filename, options, parent=None):
     if options.must_introspect(modulename):
         log.progress(0, 'Importing %s' % modulename)
         #log.debug('importing %r (%s)' % (filename, modulename))
-        return get_value_from_filename(filename)
+        try: return get_value_from_filename(filename)
+        except ImportError, e: return None
 
 #/////////////////////////////////////////////////////////////////
 # Documentation Generation
