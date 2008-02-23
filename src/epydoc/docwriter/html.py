@@ -3497,7 +3497,6 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
             
         elif isinstance(identifier, APIDoc):
             return self.htmlwriter.url(identifier)
-            doc = identifier
             
         else:
             raise TypeError('Expected string or APIDoc')
