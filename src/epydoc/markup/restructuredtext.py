@@ -89,6 +89,7 @@ from epydoc.markup import *
 from epydoc.apidoc import ModuleDoc, ClassDoc
 from epydoc.docwriter.dotgraph import *
 from epydoc.docwriter.xlink import ApiLinkReader
+from epydoc.util import wordwrap, plaintext_to_html, plaintext_to_latex
 from epydoc.markup.doctest import doctest_to_html, doctest_to_latex, \
                                   HTMLDoctestColorizer
 
@@ -201,7 +202,7 @@ class ParsedRstDocstring(ParsedDocstring):
         # Inherit docs
         visitor = _EpydocLaTeXTranslator(self._document, docstring_linker)
         self._document.walkabout(visitor)
-        return ''.join(visitor.body)
+        return ''.join(visitor.body).strip()+'\n'
 
     def to_plaintext(self, docstring_linker, **options):
         # This is should be replaced by something better:
@@ -565,6 +566,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         m = _TARGET_RE.match(node.astext())
         if m: text, target = m.groups()
         else: target = text = node.astext()
+        text = plaintext_to_latex(text)
         xref = self._linker.translate_identifier_xref(target, text)
         self.body.append(xref)
         raise SkipNode()
@@ -605,6 +607,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         m = _TARGET_RE.match(node.astext())
         if m: text, target = m.groups()
         else: target = text = node.astext()
+        text = plaintext_to_latex(text)
         xref = self._linker.translate_identifier_xref(target, text)
         self.body.append(xref)
         raise SkipNode()
