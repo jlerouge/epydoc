@@ -75,6 +75,7 @@ from epydoc.apidoc import UNKNOWN
 from epydoc.compat import *
 import ConfigParser
 from epydoc.docwriter.html_css import STYLESHEETS as CSS_STYLESHEETS
+from epydoc.docwriter.latex_sty import STYLESHEETS as STY_STYLESHEETS
 
 # This module is only available if Docutils are in the system
 try:
@@ -117,6 +118,9 @@ HELP_TOPICS = {
         '\n'.join(['  %10s: %s' % (key, descr)
                    for (key, (sheet, descr))
                    in CSS_STYLESHEETS.items()])),
+    'sty': textwrap.dedent(
+        'The following built-in LaTeX style files are available:\n' +
+        ', '.join(STY_STYLESHEETS)),
     #'checks': textwrap.dedent('''\
     #
     #    '''),
