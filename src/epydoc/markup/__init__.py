@@ -453,7 +453,7 @@ class DocstringLinker:
         @rtype: C{string}
         @return: The translated index term.
         """
-        raise NotImplementedError, 'DocstringLinker.translate_indexterm()'
+        raise NotImplementedError('DocstringLinker.translate_indexterm()')
 
     def translate_identifier_xref(self, identifier, label=None):
         """
@@ -472,14 +472,15 @@ class DocstringLinker:
         @rtype: C{string}
         @return: The translated crossreference link.
         """
-        raise NotImplementedError, 'DocstringLinker.translate_xref()'
+        raise NotImplementedError('DocstringLinker.translate_xref()')
 
     def url_for(self, identifier):
         """
         Given an identifier, return a URL pointing at that identifier.
-        This is used to create hyperlinks in dotgraphs.
+        This is used to create hyperlinks in dotgraphs.  This method
+        is *optional* -- i.e., it may raise NotImplementedError
         """
-        raise NotImplementedError, 'DocstringLinker.url_for()'
+        raise NotImplementedError('DocstringLinker.url_for()')
         
 
 ##################################################
