@@ -544,6 +544,16 @@ def latex_head_prefix():
     
 _TARGET_RE = re.compile(r'^(.*?)\s*<(?:URI:|URL:)?([^<>]+)>$')
 
+class _EpydocDocumentClass:
+    SECTIONS = ['EpydocUserSection',
+                'EpydocUserSubsection',
+                'EpydocUserSubsubsection']
+    def section(self, level):
+        if level <= len(self.SECTIONS):
+            return self.SECTIONS[level-1]
+        else:
+            return self.SECTIONS[-1]
+
 class _EpydocLaTeXTranslator(LaTeXTranslator):
     settings = None
     def __init__(self, document, docstring_linker=None, directory=None,
@@ -552,6 +562,11 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         if self.settings is None:
             settings = OptionParser([LaTeXWriter()]).get_default_values()
             settings.output_encoding = 'utf-8'
+            
+            # This forces eg \EpydocUserSection rather than
+            # \EpydocUserSEction*:
+            settings.use_latex_toc = True
+            
             self.__class__.settings = settings
         document.settings = self.settings
 
@@ -561,11 +576,8 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         self._docindex = docindex
         self._context = context
 
-        # Start at section level 3.  (Unfortunately, we now have to
-        # set a private variable to make this work; perhaps the standard
-        # latex translator should grow an official way to spell this?)
-        self.section_level = 3
-        self._section_number = [0]*self.section_level
+        # Use custom section names.
+        self.d_class = _EpydocDocumentClass()
 
     # Handle interpreted text (crossreferences)
     def visit_title_reference(self, node):

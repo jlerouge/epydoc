@@ -1986,7 +1986,9 @@ class ParsedEpytextDocstring(ParsedDocstring):
         elif tree.tag == 'li':
             return indent*' ' + '\\item ' + childstr.lstrip()
         elif tree.tag == 'heading':
-            return ' '*(indent-2) + '(section) %s\n\n' % childstr
+            sec = ('\\EpydocUser' +
+                   ('%ssection' % ('sub'*(min(seclevel,3)-1))).capitalize())
+            return (' '*(indent-2) + '%s{%s}\n\n' % (sec, childstr.strip()))
         elif tree.tag == 'doctestblock':
             return doctest_to_latex(tree.children[0].strip())
         elif tree.tag == 'literalblock':

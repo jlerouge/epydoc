@@ -13,7 +13,11 @@
 \usepackage[index]{epydoc}
 \usepackage[utf8]{inputenc}
 \definecolor{UrlColor}{rgb}{0,0.08,0.45}
-\usepackage[pdftex, pagebackref, pdftitle={API Documentation}, pdfcreator={epydoc 3.0.1}, bookmarks=true, bookmarksopen=false, pdfpagemode=UseOutlines, colorlinks=true, linkcolor=black, anchorcolor=black, citecolor=black, filecolor=black, menucolor=black, pagecolor=black, urlcolor=UrlColor]{hyperref}
+\usepackage[pdftex, pagebackref, pdftitle={API Documentation}, %
+  pdfcreator={epydoc 3.0.1}, bookmarks=true, bookmarksopen=false, %
+  pdfpagemode=UseOutlines, colorlinks=true, linkcolor=black, %
+  anchorcolor=black, citecolor=black, filecolor=black, menucolor=black, %
+  pagecolor=black, urlcolor=UrlColor]{hyperref}
 \begin{document}
 
 \title{Epydoc LaTeX Writer Output Demo}
@@ -85,6 +89,15 @@ be able to determine how to write your own customized style file.
 \begin{reSTadmonition}[note]
   This is a note.
 \end{reSTadmonition}
+
+\subsubsection{Sections inside Docstrings}
+
+% The commands \EpydocUserSection, \EpydocUserSubsection, and
+% \EpydocUserSubsubsection are used to add section headings inside
+% of docstrings
+\EpydocUserSection{Intra-docstring heading 1}
+\EpydocUserSubsection{Intra-docstring heading 2}
+\EpydocUserSubsubsection{Intra-docstring heading 3}
 
 % ======================================================================
 

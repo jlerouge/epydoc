@@ -109,6 +109,18 @@ BASE = r"""
 \newlength{\EpydocBCL} % base class length, for base trees.
 
 % ======================================================================
+% Sections inside docstring
+
+% The following commands are used to mark section headers within
+% docstrings.
+\newcommand\EpydocUserSection[1]{%
+  \par\vspace{3ex}{\large\bf #1 }\par\vspace{1.4ex}}
+\newcommand\EpydocUserSubsection[1]{%
+  \par\vspace{2.8ex}{\bf #1 }\par\vspace{1.2ex}}
+\newcommand\EpydocUserSubsubsection[1]{%
+  \par\vspace{2.6ex}{\bf\it #1 }\par\vspace{1.0ex}}
+
+% ======================================================================
 % Hyperlinks & Crossreferences
 
 % The \EpydocHypertarget command is used to mark targets that hyperlinks
@@ -801,8 +813,7 @@ BOXES = r"""
 SHADED = r"""
 % epydoc-shaded.sty
 %
-% Authors: Jonathan Guyer <guyer@nist.gov>
-%          Edward Loper <edloper@seas.upenn.edu>
+% Author: Edward Loper <edloper@seas.upenn.edu>
 % URL: <http://epydoc.sf.net>
 %
 % This LaTeX stylesheet for epydoc's output uses shaded boxes to
@@ -1052,6 +1063,27 @@ SHADED = r"""
               {\raggedright\normalfont\normalsize\bfseries}}
 """
 
+######################################################################
+######################################################################
+
+TEMPLATE = r"""
+% epydoc-template.sty
+%
+% This is a starting point for creating new epydoc style files.
+% Add on \renewcommand and \renewenvironment commands to change
+% how different pieces of the documentation are displayed.
+%
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
+\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
+\ProcessOptions\relax
+
+\RequirePackage{epydoc-base}
+
+% Add \renewcommand and \renewenvironment commands here.
+"""
+
 ############################################################
 ## Stylesheet table
 ############################################################
@@ -1061,4 +1093,5 @@ STYLESHEETS = {
     'boxes': BOXES,
     'shaded': SHADED,
     'default': BOXES,
+    'template': TEMPLATE,
 }
