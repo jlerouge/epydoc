@@ -303,9 +303,9 @@ class HTMLDoctestColorizer(DoctestColorizer):
 
 class LaTeXDoctestColorizer(DoctestColorizer):
     """A subclass of DoctestColorizer that generates LaTeX output."""
-    PREFIX = '\\begin{alltt}\n'
+    PREFIX = ('\\begin{alltt}')
     SUFFIX = '\\end{alltt}\n'
-    NEWLINE = '\\\\\n'
+    NEWLINE = '\\\\'
     def markup(self, s, tag):
         if tag == 'other':
             return plaintext_to_latex(s)
