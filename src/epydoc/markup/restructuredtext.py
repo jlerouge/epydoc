@@ -91,7 +91,8 @@ from epydoc.docwriter.dotgraph import *
 from epydoc.docwriter.xlink import ApiLinkReader
 from epydoc.util import wordwrap, plaintext_to_html, plaintext_to_latex
 from epydoc.markup.doctest import doctest_to_html, doctest_to_latex, \
-                                  HTMLDoctestColorizer
+                                  HTMLDoctestColorizer, \
+                                  LaTeXDoctestColorizer
 
 #: A dictionary whose keys are the "consolidated fields" that are
 #: recognized by epydoc; and whose values are the corresponding epydoc
@@ -605,7 +606,11 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         raise SkipNode()
 
     def visit_doctest_block(self, node):
-        self.body.append(doctest_to_latex(node[0].astext()))
+        pysrc = node[0].astext()
+        if node.get('codeblock'):
+            self.body.append(LaTeXDoctestColorizer().colorize_codeblock(pysrc))
+        else:
+            self.body.append(doctest_to_latex(pysrc))
         raise SkipNode()
 
     def visit_admonition(self, node, name=''):
