@@ -1272,6 +1272,7 @@ def _add_class_tree_inheritance(graph, classes, mknode, mkedge, linker,
                                 context, options, cls2node, truncated):
     # Add inheritance edges.
     for (cls, node) in cls2node.items():
+        if cls.bases is UNKNOWN: continue
         for base in cls.bases:
             if base in cls2node:
                 graph.edges.append(mkedge(cls2node[base], node,
