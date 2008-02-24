@@ -47,7 +47,7 @@ BASE = r"""
 % Basic Package Requirements
 
 \RequirePackage{alltt, boxedminipage}
-\RequirePackage{multirow, longtable, amssymb}
+\RequirePackage{multirow, amssymb}
 \RequirePackage[headings]{fullpage}
 \RequirePackage[usenames]{color}
 \RequirePackage{ifthen}
@@ -429,10 +429,6 @@ BASE = r"""
 %
 % If any of these arguments is not available, then the empty
 % string will be used.
-%
-% See EpydocGeneralList, above, for info about the commands
-% \EpydocInternalHeader and \EpydocInheritanceItemList, which
-% may be used inside the EpydocVariableList environment.
 \newenvironment{EpydocVariableList}{%
     \newcommand{\EpydocVariable}[4]{%
         \gdef\@EpydocVariableName{##1}%
@@ -484,13 +480,6 @@ BASE = r"""
 %
 % If any of these arguments is not available, then the empty
 % string will be used.
-%
-% See EpydocGeneralList, above, for info about the commands
-% \EpydocInternalHeader and \EpydocInheritanceItemList, which
-% may be used inside the EpydocVariableList environment.
-%
-% Implementation node: \@EpydocSeparator evaluates to nothing on
-% the first use, and to a paragraph break on subsequent uses.
 \newenvironment{EpydocPropertyList}{%
     \newcommand{\EpydocProperty}[6]{%
         \gdef\@EpydocPropertyName{##1}%
@@ -623,9 +612,15 @@ BOXES = r"""
 \ProcessOptions\relax
 
 \RequirePackage{epydoc-base}
+\RequirePackage{longtable}
 
 % Double the standard size boxedminipage outlines.
 \setlength{\fboxrule}{2\fboxrule}
+
+% Set the width of the variable name cells in the variable & property
+% tables.
+\newlength{\EpydocVariableWidth}
+\setlength{\EpydocVariableWidth}{.3\textwidth}
 
 % ======================================================================
 % Function Lists
@@ -707,22 +702,34 @@ BOXES = r"""
 % \EpydocInheritanceList commands to add a row to the table.
 \newenvironment{@EpydocGeneralList}{%
     \renewcommand{\EpydocGroup}[1]{%
-        \multicolumn{2}{|l|}{\textbf{##1}} \\
-         \hline}%
+        \multicolumn{2}{@{\vrule width \fboxrule \hspace \tabcolsep}l
+                        @{\hspace \tabcolsep \vrule width \fboxrule}}
+            {\textbf{\textit{##1}}} \\
+        \hline}%
     \renewcommand{\EpydocInheritanceList}[2]{%
-        \multicolumn{2}{|p{\dimexpr \textwidth -4\tabcolsep-3\arrayrulewidth}|}{%
-            \raggedright\textbf{Inherited from {##1}:\\
-            ##2}} \\
-        \hline}
-    \begin{longtable}{|p{.30\textwidth}|p{.62\textwidth}|}
+        \multicolumn{2}{@{\vrule width \fboxrule \hspace \tabcolsep}
+                        p{\dimexpr \textwidth -4\tabcolsep-7pt}
+                        @{\hspace \tabcolsep \vrule width \fboxrule}}
+            {\raggedright\textbf{Inherited from {##1}:\\##2}} \\
+        \hline}%
+    \setlength{\doublerulesep}{0pt}
+    \begin{longtable}[l]{@{\vrule width \fboxrule \hspace \tabcolsep}
+                         p{\EpydocVariableWidth}|
+                         p{\dimexpr \textwidth%
+                                -4\tabcolsep-7pt
+                                -\EpydocVariableWidth \relax}
+                         @{\hspace \tabcolsep \vrule width \fboxrule}}
     % Set up the headers & footer (this makes the table span
     % multiple pages in a happy way).
-    \hline 
-    \centering \textbf{Name} & \centering \textbf{Description} 
+    \hline \hline \rule{0pt}{\baselineskip} 
+    \centering \Large \textbf{Name} &
+    \centering \Large \textbf{Description} 
     \tabularnewline
-    \hline
-    \endhead\hline\multicolumn{2}{r}{%
-        \small\textit{continued on next page}}\\\endfoot\hline
+    \hline \hline 
+    \endhead%
+    \hline\hline\multicolumn{2}{r}{%
+        \small\textit{continued on next page}}\\\endfoot%
+    \hline\hline
     \endlastfoot}
     {\end{longtable}}
 
@@ -755,8 +762,9 @@ BOXES = r"""
             \fi%
         \fi%
         \tabularnewline
-        \hline}
-    \begin{@EpydocGeneralList}}
+        \hline}%
+    \begin{@EpydocGeneralList}%
+    }
     {\end{@EpydocGeneralList}}
 
 % By default, EpydocClassVariableList & EpydocInstanceVariableList are 
@@ -765,6 +773,8 @@ BOXES = r"""
 % ======================================================================
 % Property Lists
 
+% Implementation node: \@EpydocSeparator evaluates to nothing on
+% the first use, and to a paragraph break on subsequent uses.
 \renewenvironment{EpydocPropertyList}{%
     \def\@EpydocSeparator{%
        \aftergroup\def\aftergroup\@EpydocSeparator\aftergroup{%
