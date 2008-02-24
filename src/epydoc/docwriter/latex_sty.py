@@ -219,11 +219,7 @@ BASE = r"""
 % the default definition, but several of the Epydoc*List environments
 % use \renewcommand to provide definitions that are appropriate for the
 % style of that environment.
-\newcommand{\EpydocGroup}[1]{
-
-    {\large #1}
-    
-    }
+\newcommand{\EpydocGroup}[1]{\par{\large #1}\par}
 
 % ======================================================================
 % Inheritance
@@ -235,7 +231,7 @@ BASE = r"""
 % use \renewcommand to provide definitions that are appropriate for the
 % style of that environment.
 \newcommand{\EpydocInheritanceList}[2]{%
-    \textbf{Inherited from {#1}:} #2}
+    \textbf{Inherited from {#1}:} #2\par}
     
 % ======================================================================
 % Submodule List
@@ -313,31 +309,23 @@ BASE = r"""
         \gdef\@EpydocFunctionRaises{##6}%
         \gdef\@EpydocFunctionOverrides{##7}%
         \gdef\@EpydocFunctionMetadata{##8}%
-    {\Large\raggedright\@EpydocFunctionSignature}
-
+    {\Large\raggedright\@EpydocFunctionSignature}\par
     \begin{quote}%
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocFunctionDescription\empty\else
-
-            \@EpydocFunctionDescription\fi%
+            \par\@EpydocFunctionDescription\fi%
         \ifx\@EpydocFunctionParameters\empty\else
-
-            \@EpydocFunctionParameters\fi%
+            \par\@EpydocFunctionParameters\fi%
         \ifx\@EpydocFunctionReturnDescr\empty
-
-            \@EpydocFunctionReturnDescr\fi%
+            \par\@EpydocFunctionReturnDescr\fi%
         \ifx\@EpydocFunctionReturnType\empty
-
-            \@EpydocFunctionReturnType\fi%
+            \par\@EpydocFunctionReturnType\fi%
         \ifx\@EpydocFunctionRaises\empty\else
-
-            \@EpydocFunctionRaises\fi%
+            \par\@EpydocFunctionRaises\fi%
         \ifx\@EpydocFunctionOverrides\empty\else
-
-            \@EpydocFunctionOverrides\fi%
+            \par\@EpydocFunctionOverrides\fi%
         \ifx\@EpydocFunctionMetadata\empty\else
-
-            \@EpydocFunctionMetadata\fi%
+            \par\@EpydocFunctionMetadata\fi%
     \end{quote}
 
   }}
@@ -406,9 +394,7 @@ BASE = r"""
 % method, to display the name of the overridden method.
 \newcommand{\EpydocFunctionOverrides}[2][0]{%
     \textbf{Overrides:} #2 %
-    \ifthenelse{#1=1}{\textit{(inherited documentation)}{}}
-
-    }
+    \ifthenelse{#1=1}{\textit{(inherited documentation)}{}}\par}
 
 % ======================================================================
 % Variable Lists
@@ -435,19 +421,15 @@ BASE = r"""
         \gdef\@EpydocVariableDescription{##2}%
         \gdef\@EpydocVariableType{##3}%
         \gdef\@EpydocVariableValue{##4}%
-    {\Large\raggedright\@EpydocVariableName}
-
+    {\Large\raggedright\@EpydocVariableName}\par
     \begin{quote}
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocVariableDescription\empty\else
-
-            \@EpydocVariableDescription\fi%
+            \par\@EpydocVariableDescription\fi%
         \ifx\@EpydocVariableType\empty\else
-
-            \textbf{Type:} \@EpydocVariableType\fi%
+            \par\textbf{Type:} \@EpydocVariableType\fi%
         \ifx\@EpydocVariableValue\empty
-
-            \textbf{Value:} \texttt{\@EpydocVariableValue}\fi%
+            \par\textbf{Value:} \texttt{\@EpydocVariableValue}\fi%
     \end{quote}
   }}
   {}
@@ -488,25 +470,19 @@ BASE = r"""
         \gdef\@EpydocPropertyGet{##4}%
         \gdef\@EpydocPropertySet{##5}%
         \gdef\@EpydocPropertyDel{##6}%
-    {\Large\raggedright\@EpydocPropertyName}
-
+    {\Large\raggedright\@EpydocPropertyName}\par
     \begin{quote}
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocPropertyDescription\empty\else
-
-            \@EpydocPropertyDescription\fi%
+            \par\@EpydocPropertyDescription\fi%
         \ifx\@EpydocPropertyType\empty\else
-
-            \textbf{Type:} \@EpydocPropertyType\fi%
+            \par\textbf{Type:} \@EpydocPropertyType\fi%
         \ifx\@EpydocPropertyGet\empty
-
-            \textbf{Get:} \texttt{\@EpydocPropertyGet}\fi%
+            \par\textbf{Get:} \texttt{\@EpydocPropertyGet}\fi%
         \ifx\@EpydocPropertySet\empty
-
-            \textbf{Set:} \texttt{\@EpydocPropertySet}\fi%
+            \par\textbf{Set:} \texttt{\@EpydocPropertySet}\fi%
         \ifx\@EpydocPropertyDel\empty
-
-            \textbf{Delete:} \texttt{\@EpydocPropertyDel}\fi%
+            \par\textbf{Delete:} \texttt{\@EpydocPropertyDel}\fi%
     \end{quote}
   }}
   {}
@@ -646,8 +622,7 @@ BOXES = r"""
         \gdef\@EpydocFunctionMetadata{##8}%
     \begin{boxedminipage}{\dimexpr \textwidth-2\fboxsep \relax}
         {\Large \@EpydocFunctionSignature}
-        \setlength{\parskip}{\EpydocParskip}%
-        
+        \setlength{\parskip}{\EpydocParskip}\par        
         \ifx\@EpydocFunctionDescription\empty\else%
             {\@EpydocSeparator}%
             \@EpydocFunctionDescription %
@@ -747,15 +722,11 @@ BOXES = r"""
         \@EpydocVariableDescription %
         \ifx\@EpydocVariableValue\empty\relax%
             \ifx\@EpydocVariableType\empty\else%
-                \ifx\@EpydocVariableDescription\empty\else
-
-                \fi%
+                \ifx\@EpydocVariableDescription\empty\else\par\fi%
                 \textit{(type=\texttt{\@EpydocVariableType})}%
             \fi%
         \else\relax%
-            \ifx\@EpydocVariableDescription\empty\else
-
-            \fi%
+            \ifx\@EpydocVariableDescription\empty\else\par\fi%
             \textbf{Value:} \texttt{\@EpydocVariableValue}%
             \ifx\@EpydocVariableType\empty\else%
                 \textit{(type=\texttt{\@EpydocVariableType})}%
@@ -894,9 +865,7 @@ SHADED = r"""
       \end{cminipage}%
       \if@EpydocFunctionDetails
         \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}%
-        \setlength{\parskip}{\EpydocParskip}%
-          \setlength{\parskip}{\EpydocParskip}%
-          
+          \setlength{\parskip}{\EpydocParskip}
           \ifx\@EpydocFunctionDescription\empty\else%
               \@EpydocFunctionDescription %
           \fi%
@@ -930,25 +899,18 @@ SHADED = r"""
           \fi%
         \end{cminipage}%
       \fi%
-    \end{minipage}
-
-  }}
+    \end{minipage}\par}}
   {}
     
 \newenvironment{@EpydocGeneralList}{%
-  \renewcommand{\EpydocGroup}[1]{
-  
+  \renewcommand{\EpydocGroup}[1]{\par
     \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
       {\Large\bf\center ##1\\}
-    \end{cminipage}
-
-  }%
-  \renewcommand{\EpydocInheritanceList}[2]{%
+    \end{cminipage}\par}
+  \renewcommand{\EpydocInheritanceList}[2]{\par
     \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
     Inherited from {##1}: ##2%
-    \end{cminipage}%
-  
-  }}{}
+    \end{cminipage}\par}}{}
   
 \newlength{\EpydocValueWidth}
 
@@ -970,27 +932,24 @@ SHADED = r"""
     \ifx\@EpydocVariableValue\empty\else \@EpydocVariableDetailstrue\fi%
     \if@EpydocVariableDetails
       \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}
+        \setlength{\parskip}{\EpydocParskip}
         \ifx\@EpydocVariableDescription\empty\else
-        
-            \@EpydocVariableDescription
+            \par\@EpydocVariableDescription
         \fi%
         \ifx\@EpydocVariableType\empty\else
-        
-            \textbf{Type:} \texttt{\@EpydocVariableType}
+            \par\textbf{Type:} \texttt{\@EpydocVariableType}
         \fi%
         \ifx\@EpydocVariableValue\empty\else
-        
-          \settowidth{\EpydocValueWidth}{Value:w}%
+          \par\settowidth{\EpydocValueWidth}{Value:w}%
           Value:
-          \begin{cminipage}[gray85]{\dimexpr \textwidth-2\fboxsep-\EpydocValueWidth \relax}
+          \begin{cminipage}[gray85]{\dimexpr \textwidth-2\fboxsep-
+                                             \EpydocValueWidth \relax}
             \texttt{\@EpydocVariableValue}
           \end{cminipage}%
         \fi%
       \end{cminipage}%
     \fi%
-    \end{minipage}%
-
-    }
+    \end{minipage}\par}
     \begin{@EpydocGeneralList}}
     {\end{@EpydocGeneralList}}
 
@@ -1016,41 +975,32 @@ SHADED = r"""
     \ifx\@EpydocPropertyDel\empty\else \@EpydocPropertyDetailstrue\fi%
     \if@EpydocPropertyDetails
       \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}
+        \setlength{\parskip}{\EpydocParskip}
         \ifx\@EpydocPropertyDescription\empty\else%
-        
-            \@EpydocPropertyDescription
+            \par\@EpydocPropertyDescription
         \fi%
         \ifx\@EpydocPropertyType\empty\else
-        
-            \textbf{Type:} \@EpydocPropertyType
+            \par\textbf{Type:} \@EpydocPropertyType
         \fi%
         \ifx\@EpydocPropertyGet\empty\else
-        
-            \textbf{Get:} \@EpydocPropertyGet%
+            \par\textbf{Get:} \@EpydocPropertyGet%
         \fi%
         \ifx\@EpydocPropertySet\empty\else
-        
-            \textbf{Set:} \@EpydocPropertySet%
+            \par\textbf{Set:} \@EpydocPropertySet%
         \fi%
         \ifx\@EpydocPropertyDel\empty\else
-        
-            \textbf{Delete:} \@EpydocPropertyDel%
+            \par\textbf{Delete:} \@EpydocPropertyDel%
         \fi%
       \end{cminipage}%
       \fi%
-    \end{minipage}%
-
-    }
+    \end{minipage}\par}
     \begin{@EpydocGeneralList}}
     {\end{@EpydocGeneralList}}
 
-\renewcommand{\EpydocGroup}[1]{
-
+\renewcommand{\EpydocGroup}[1]{\par
   \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
     {\Large\bf\center #1\\}
-  \end{cminipage}
-
-  }
+  \end{cminipage}\par}
 
 % This is just like the default definitions, except that we use
 % \raggedright, and dedent by \EpydocSectionHeaderDedent
