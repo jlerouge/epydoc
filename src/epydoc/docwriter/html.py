@@ -1000,21 +1000,22 @@ class HTMLWriter:
         # Build a set containing all classes that we should list.
         # This includes everything in class_list, plus any of those
         # class' bases, but not undocumented subclasses.
-        class_set = self.class_set.copy()
+        class_set = set()
         for doc in self.class_list:
-            if doc.bases != UNKNOWN:
-                for base in doc.bases:
-                    if base not in class_set:
-                        if isinstance(base, ClassDoc):
-                            class_set.update(base.mro())
-                        else:
-                            # [XX] need to deal with this -- how?
-                            pass
-                            #class_set.add(base)
- 
+            class_set.update([base for base in doc.mro()
+                              if isinstance(base, ClassDoc) and
+                              base.canonical_name != DottedName('object')])
+
+        
         out('<ul class="nomargin-top">\n')
         for doc in sorted(class_set, key=lambda c:c.canonical_name[-1]):
-            if doc.bases != UNKNOWN and len(doc.bases)==0:
+            # If doc is a subclass of anything that's documented, then
+            # we don't need to list it separately; it will be listed
+            # under that base.
+            for base in doc.mro()[1:]:
+                if base in class_set: break
+            else:
+                # It's not a subclass of anything documented:
                 self.write_class_tree_item(out, doc, class_set)
         out('</ul>\n')
         
