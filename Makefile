@@ -17,7 +17,7 @@ DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
 MANUAL_SRC = $(wildcard doc/manual-*.txt)
 
 # What version of python to use?
-PYTHON = python
+PYTHON = python2.5
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -43,9 +43,9 @@ LATEX_STDLIB  = $(LATEX)/stdlib
 EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
 
-# Options for rst->html converter
 RST2HTML = $(PYTHON) src/tools/rst2html.py
 MKDISPATCH = $(PYTHON) src/tools/mkdispatch.py
+STY2HTML = $(PYTHON) src/tools/sty2html.py
 
 DOCTEST_HTML_FILES := \
     $(DOCTESTS:src/epydoc/test/%.doctest=$(HTML_DOCTEST)/%.html)
@@ -110,10 +110,11 @@ local: .webpage.up2date
 
 manual-html: $(MANUAL_HTML_FILES)
 
-$(HTML_MANUAL)/epydoc.html: doc/manual.txt $(MANUAL_SRC)
+$(HTML_MANUAL)/epydoc.html: doc/manual.txt $(MANUAL_SRC) \
+                            doc/epydoc-style-list.txt
 	$(RST2HTML) doc/manual.txt $@ --template=doc/rst-template.txt
 
-$(HTML_MANUAL)/manual-%.html: doc/manual-%.txt
+$(HTML_MANUAL)/manual-%.html: doc/manual-%.txt doc/epydoc-style-list.txt
 	echo ".. include:: ../$<"        > doc/tmp.txt
 	$(MKDISPATCH) $(MANUAL_SRC)     >> doc/tmp.txt
 	$(RST2HTML) doc/tmp.txt $@ --template=doc/rst-template.txt
@@ -233,6 +234,11 @@ profile.out: $(PY_SRCFILES)
 	       --include-log \
 	       --docformat plaintext -v --graph all $(PY_SRC)
 	rm -rf profile.tmp hotshot.out
+
+# Convert standard style files to html
+doc/epydoc-style-list.txt: src/epydoc/docwriter/latex_sty.py \
+                           src/tools/sty2html.py
+	$(STY2HTML) $(WEBDIR)
 
 ##//////////////////////////////////////////////////////////////////////
 ## Standard Library docs

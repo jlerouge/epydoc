@@ -294,6 +294,22 @@ treated as comments.
     **#fail-on: error**
 
 
+Customizing LaTeX and PDF Output
+--------------------------------
+
+Epydoc's LaTeX output, and the outputs that are derived from it (dvi,
+ps, and pdf), can be customized by creating a custom LaTeX style file.
+To help you create custom stylesheets, a complete description of the
+specialized LaTeX commands that epydoc uses to generate its output is
+available here:
+
+- `Epydoc LaTeX Style Reference <epydoc-latex-demo.html>`__
+
+Additionaly, you may find it useful to look at the builtin style files
+that epydoc provides:
+
+.. include:: epydoc-style-list.txt
+
 Warnings and Errors
 -------------------
 
