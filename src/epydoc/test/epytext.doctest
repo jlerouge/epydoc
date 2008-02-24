@@ -337,6 +337,7 @@ Graph Raising
 .</para>
 
 Should we strip the 'inline' from the paras in cases like this:?
+
 >>> print testparse("""
 ... - List item with G{classtree foo} graph.
 ... - And with I{nested G{callgraph: zippy} markup} too.
