@@ -12,7 +12,8 @@
 PY_SRC = src/epydoc/
 PY_SRCFILES = $(shell find $(PY_SRC) -name '*.py')
 EXAMPLES_SRC = $(wildcard doc/*.py)
-DOCS = $(wildcard doc/*)
+DOCDIR = doc
+DOCS = $(wildcard $(DOCDIR)/*)
 DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
 MANUAL_SRC = $(wildcard doc/manual-*.txt)
 
@@ -37,8 +38,8 @@ HTML_API      = $(HTML)/api
 HTML_EXAMPLES = $(HTML)/examples
 HTML_STDLIB   = $(HTML)/stdlib
 HTML_DOCTEST  = $(HTML)/doctest
-LATEX_API     = $(LATEX)/api
-LATEX_STDLIB  = $(LATEX)/stdlib
+LATEX_API     = $(LATEX)/api.pdf
+LATEX_STDLIB  = $(LATEX)/stdlib.pdf
 
 EPYDOC = $(PYTHON) src/epydoc/cli.py
 export PYTHONPATH=src/
@@ -134,7 +135,7 @@ checkdocs:
 	cp -r $(HTML_API) $(WEBDIR)/api
 	cp -r $(HTML_EXAMPLES) $(WEBDIR)/examples
 	cp -r $(HTML_DOCTEST)/* $(WEBDIR)/doctest
-	cp $(LATEX_API)/api.pdf $(WEBDIR)/epydoc.pdf
+	cp $(LATEX_API) $(WEBDIR)/epydoc.pdf
 	touch .webpage.up2date
 
 # Use plaintext docformat by default.  But this is overridden by the
@@ -154,10 +155,10 @@ api-html: .api-html.up2date
 
 api-pdf: .api-pdf.up2date
 .api-pdf.up2date: $(PY_SRCFILES)
-	rm -rf $(LATEX_API)
-	mkdir -p $(LATEX_API)
+	mkdir -p $(LATEX)
+	rm -f $(LATEX_API)
 	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
-	       --no-module-list --graph classtree --sty shaded \
+	       --no-submodule-list --graph classtree --sty shaded \
 	       --name "Epydoc $(VERSION)" $(PY_SRC) -v --debug
 	touch .api-pdf.up2date
 
@@ -236,10 +237,10 @@ profile.out: $(PY_SRCFILES)
 	       --docformat plaintext -v --graph all $(PY_SRC)
 	rm -rf profile.tmp hotshot.out
 
-# Convert standard style files to html
+# Convert builtin latex style files to html
 doc/epydoc-style-list.txt: src/epydoc/docwriter/latex_sty.py \
                            src/tools/sty2html.py
-	$(STY2HTML) $(WEBDIR)
+	$(STY2HTML) $(DOCDIR)
 
 ##//////////////////////////////////////////////////////////////////////
 ## Standard Library docs
@@ -270,8 +271,8 @@ stdlib-html: .stdlib-html.up2date
 # (this will typically cause latex to run out of resources)
 stdlib-pdf: .stdlib-pdf.up2date
 .stdlib-pdf.up2date: $(PY_SRCFILES)
-	rm -rf $(LATEX_STDLIB)
-	mkdir -p $(LATEX_STDLIB)
+	mkdir -p $(LATEX)
+	rm -f $(LATEX_STDLIB)
 	$(EPYDOC) --pdf -o $(LATEX_STDLIB) --debug \
 		--no-private --name $(SLNAME) --docformat plaintext \
 		--debug --builtins $(SLFILES)
