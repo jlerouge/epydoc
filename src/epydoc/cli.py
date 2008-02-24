@@ -1200,7 +1200,7 @@ def _profile():
             return
         try:
             prof = hotshot.Profile('hotshot.out')
-            prof = prof.runctx('main(*parse_arguments())', globals(), {})
+            prof = prof.runctx('main(parse_arguments())', globals(), {})
         except SystemExit:
             pass
         prof.close()
@@ -1230,7 +1230,7 @@ def _profile():
             Profile.dispatch['c_exception'] = trace_dispatch_return
         try:
             prof = Profile()
-            prof = prof.runctx('main(*parse_arguments())', globals(), {})
+            prof = prof.runctx('main(parse_arguments())', globals(), {})
         except SystemExit:
             pass
         prof.dump_stats('profile.out')
