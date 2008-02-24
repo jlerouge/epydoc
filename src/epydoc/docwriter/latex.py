@@ -996,6 +996,7 @@ class LatexWriter:
         s = docstring.to_latex(self._docstring_linker, indent=indent,
                                directory=self._directory,
                                docindex=self.docindex,
+                               context=where,
                                hyperref=self._hyperref)
         return (' '*indent + '\\begin{EpydocDescription}%\n' +
                 s.strip() + '%\n' +
