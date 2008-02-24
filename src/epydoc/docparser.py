@@ -1582,17 +1582,7 @@ def process_classdef(line, parent_docs, prev_line_doc, lineno,
     if class_doc.bases is not UNKNOWN:
         for basedoc in class_doc.bases:
             if isinstance(basedoc, ClassDoc):
-                # This test avoids that a subclass gets listed twice when
-                # both introspection and parsing.
-                # [XXX] This check only works because currently parsing is
-                # always performed just after introspection of the same
-                # class. A more complete fix shuld be independent from
-                # calling order; probably the subclasses list should be
-                # replaced by a ClassDoc set or a {name: ClassDoc} mapping.
-                if (basedoc.subclasses
-                    and basedoc.subclasses[-1].canonical_name
-                        != class_doc.canonical_name):
-                    basedoc.subclasses.append(class_doc)
+                basedoc.subclasses.append(class_doc)
     
     # If the preceeding comment includes a docstring, then add it.
     add_docstring_from_comments(class_doc, comments)
