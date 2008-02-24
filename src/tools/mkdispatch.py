@@ -39,7 +39,12 @@ for k in '()':
 
 def get_anchor(s):
     # IndexErrors are expected to test for what else include in the map
-    return "".join(map(charmap.__getitem__, s))
+    try:
+        return "".join(map(charmap.__getitem__, s))
+    except KeyError, e:
+        sys.stderr.write('Unexpected char while getting anchor for %r: %s\n'
+                         % (s, e))
+        sys.exit(-1)
 
 if __name__ == '__main__':
     for fn in sys.argv[1:]:
