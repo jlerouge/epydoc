@@ -86,6 +86,9 @@ class DoctestColorizer:
     #: Typically, this string ends a preformatted area.
     SUFFIX = None
 
+    #: The string used to divide lines
+    NEWLINE = '\n'
+
     #: A list of the names of all Python keywords.  ('as' is included
     #: even though it is technically not a keyword.)
     _KEYWORDS = ("and       del       for       is        raise"
@@ -191,21 +194,21 @@ class DoctestColorizer:
             # Parse the doctest example:
             pysrc, want = m.group('source', 'want')
             # Pre-example text:
-            output.append(s[charno:m.start()])
+            output.append(self.NEWLINE.join(s[charno:m.start()].split('\n')))
             # Example source code:
             output.append(self.DOCTEST_RE.sub(self.subfunc, pysrc))
             # Example output:
             if want:
                 if self.EXCEPT_RE.match(want):
-                    output += '\n'.join([self.markup(line, 'except')
-                                         for line in want.split('\n')])
+                    output += self.NEWLINE.join([self.markup(line, 'except')
+                                                 for line in want.split('\n')])
                 else:
-                    output += '\n'.join([self.markup(line, 'output')
-                                         for line in want.split('\n')])
+                    output += self.NEWLINE.join([self.markup(line, 'output')
+                                                 for line in want.split('\n')])
             # Update charno
             charno = m.end()
         # Add any remaining post-example text.
-        output.append(s[charno:])
+        output.append(self.NEWLINE.join(s[charno:].split('\n')))
         
         return self.PREFIX + ''.join(output) + self.SUFFIX
     
@@ -213,8 +216,8 @@ class DoctestColorizer:
         other, text = match.group(1, 2)
         #print 'M %20r %20r' % (other, text) # <- for debugging
         if other:
-            other = '\n'.join([self.markup(line, 'other')
-                               for line in other.split('\n')])
+            other = self.NEWLINE.join([self.markup(line, 'other')
+                                       for line in other.split('\n')])
             
         if match.group('PROMPT1'):
             return other + self.markup(text, 'prompt')
@@ -243,7 +246,7 @@ class DoctestColorizer:
                     pieces.append(self.markup(line, 'string'))
                 else:
                     pieces.append('')
-            return other + '\n'.join(pieces)
+            return other + self.NEWLINE.join(pieces)
         elif match.group('DEFINE'):
             m = re.match('(?P<def>\w+)(?P<space>\s+)(?P<name>\w+)', text)
             return other + (self.markup(m.group('def'), 'keyword') +
@@ -302,6 +305,7 @@ class LaTeXDoctestColorizer(DoctestColorizer):
     """A subclass of DoctestColorizer that generates LaTeX output."""
     PREFIX = '\\begin{alltt}\n'
     SUFFIX = '\\end{alltt}\n'
+    NEWLINE = '\\\\\n'
     def markup(self, s, tag):
         if tag == 'other':
             return plaintext_to_latex(s)
