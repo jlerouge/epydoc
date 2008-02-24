@@ -152,7 +152,7 @@ def option_defaults():
         external_api=[], external_api_file=[], external_api_root=[],
         redundant_details=False, src_code_tab_width=8, verbosity=0,
         include_timestamp=True, target={}, default_target=None,
-        pdfdriver='auto', show_submodule_list=True)
+        pdfdriver='auto', show_submodule_list=True, inherit_from_object=False)
 
 # append_const is not defined in py2.3 or py2.4, so use a callback
 # instead, with the following function:
@@ -326,8 +326,18 @@ def parse_arguments():
         
     generation_group.add_option('--no-submodule-list',
         action='store_false', dest='show_submodule_list',
-        help="Do not nclude a list of submodules on package "
+        help="Do not include a list of submodules on package "
         "documentation pages.")
+
+    generation_group.add_option('--inherit-from-object',
+        action='store_true', dest='inherit_from_object',
+        help="Include methods & properties that are inherited from "
+        "\"object\".")
+        
+    generation_group.add_option('--no-inherit-from-object',
+        action='store_false', dest='inherit_from_object',
+        help="Do not include methods & properties that are inherited "
+        "from \"object\".  (default)")
 
     output_group = OptionGroup(optparser, 'Output Options')
     optparser.add_option_group(output_group)
@@ -647,6 +657,8 @@ def parse_configfiles(configfiles, options, names):
             options.redundant_details = _str_to_bool(val, optname)
         elif optname in ('submodule-list', 'submodule_list'):
             options.show_submodule_list = _str_to_bool(val, optname)
+        elif optname in ('inherit-from-object', 'inherit_from_object'):
+            options.inherit_from_object = _str_to_bool(val, optname)
 
         # Output options
         elif optname == 'name':
@@ -869,11 +881,13 @@ def main(options):
         exclude_parse = '|'.join(options.exclude_parse+options.exclude)
         exclude_introspect = '|'.join(options.exclude_introspect+
                                       options.exclude)
+        inherit_from_object = options.inherit_from_object
         docindex = build_doc_index(options.names,
                                    options.introspect, options.parse,
                                    add_submodules=(options.actions!=['text']),
                                    exclude_introspect=exclude_introspect,
-                                   exclude_parse=exclude_parse)
+                                   exclude_parse=exclude_parse,
+                                   inherit_from_object=inherit_from_object)
 
     if docindex is None:
         for logger in loggers:

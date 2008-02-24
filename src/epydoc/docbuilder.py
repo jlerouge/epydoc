@@ -147,7 +147,8 @@ class BuildOptions:
 
 
 def build_doc(item, introspect=True, parse=True, add_submodules=True,
-              exclude_introspect=None, exclude_parse=None):
+              exclude_introspect=None, exclude_parse=None,
+              inherit_from_object=False):
     """
     Build API documentation for a given item, and return it as
     an L{APIDoc} object.
@@ -170,11 +171,13 @@ def build_doc(item, introspect=True, parse=True, add_submodules=True,
     """
     docindex = build_doc_index([item], introspect, parse, add_submodules,
                                exclude_introspect=exclude_introspect,
-                               exclude_parse=exclude_parse)
+                               exclude_parse=exclude_parse,
+                               inherit_from_object=inherit_from_object)
     return docindex.root[0]
 
 def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
-                    exclude_introspect=None, exclude_parse=None):
+                    exclude_introspect=None, exclude_parse=None,
+                    inherit_from_object=False):
     """
     Build API documentation for the given list of items, and
     return it in the form of a L{DocIndex}.
@@ -298,7 +301,7 @@ def build_doc_index(items, introspect=True, parse=True, add_submodules=True,
         if isinstance(val_doc, ClassDoc):
             percent = float(i)/len(valdocs)
             log.progress(percent, val_doc.canonical_name)
-            inherit_docs(val_doc)
+            inherit_docs(val_doc, inherit_from_object)
     log.end_progress()
 
     # Initialize the groups & sortedvars attributes.
@@ -1321,9 +1324,10 @@ def find_overrides(class_doc):
                 class_doc.variables[name].overrides = var_doc
     
     
-def inherit_docs(class_doc):
+def inherit_docs(class_doc, inherit_from_object):
     for base_class in list(class_doc.mro(warn_about_bad_bases=True)):
         if base_class == class_doc: continue
+        if base_class.pyval is object and not inherit_from_object: continue
 
         # Inherit any groups.  Place them *after* this class's groups,
         # so that any groups that are important to this class come
