@@ -157,6 +157,7 @@ api-pdf: .api-pdf.up2date
 	rm -rf $(LATEX_API)
 	mkdir -p $(LATEX_API)
 	$(EPYDOC) --pdf -o $(LATEX_API) --docformat plaintext \
+	       --no-module-list --graph classtree --sty shaded \
 	       --name "Epydoc $(VERSION)" $(PY_SRC) -v --debug
 	touch .api-pdf.up2date
 
