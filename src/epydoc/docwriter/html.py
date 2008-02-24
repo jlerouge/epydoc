@@ -376,6 +376,10 @@ class HTMLWriter:
         """If true, then include objects in the details list even if all
         info about them is already provided by the summary table."""
 
+        self._show_submodule_list = kwargs.get('show_submodule_list', True)
+        """If true, the include a list of submodules on the package
+        documentation page."""
+        
         # For use with select_variables():
         if self._show_private:
             self._public_filter = None
@@ -769,7 +773,7 @@ class HTMLWriter:
         self.write_standard_fields(out, doc)
 
         # If it's a package, then list the modules it contains.
-        if doc.is_package is True:
+        if doc.is_package is True and self._show_submodule_list:
             self.write_module_list(out, doc)
 
         # Write summary tables describing the variables that the

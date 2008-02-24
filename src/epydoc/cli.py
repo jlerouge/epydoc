@@ -152,7 +152,7 @@ def option_defaults():
         external_api=[], external_api_file=[], external_api_root=[],
         redundant_details=False, src_code_tab_width=8, verbosity=0,
         include_timestamp=True, target={}, default_target=None,
-        pdfdriver='auto')
+        pdfdriver='auto', show_submodule_list=True)
 
 # append_const is not defined in py2.3 or py2.4, so use a callback
 # instead, with the following function:
@@ -314,11 +314,20 @@ def parse_arguments():
         action='store_true', dest='include_log',
         help=("Include a page with the process log (epydoc-log.html)"))
 
-    generation_group.add_option(
-        '--redundant-details',
+    generation_group.add_option('--redundant-details',
         action='store_true', dest='redundant_details',
         help=("Include values in the details lists even if all info "
               "about them is already provided by the summary table."))
+
+    generation_group.add_option('--show-submodule-list',
+        action='store_true', dest='show_submodule_list',
+        help="Include a list of submodules on package documentation "
+        "pages.  (default)")
+        
+    generation_group.add_option('--no-submodule-list',
+        action='store_false', dest='show_submodule_list',
+        help="Do not nclude a list of submodules on package "
+        "documentation pages.")
 
     output_group = OptionGroup(optparser, 'Output Options')
     optparser.add_option_group(output_group)
@@ -636,6 +645,8 @@ def parse_configfiles(configfiles, options, names):
             options.include_log = _str_to_bool(val, optname)
         elif optname in ('redundant-details', 'redundant_details'):
             options.redundant_details = _str_to_bool(val, optname)
+        elif optname in ('submodule-list', 'submodule_list'):
+            options.show_submodule_list = _str_to_bool(val, optname)
 
         # Output options
         elif optname == 'name':

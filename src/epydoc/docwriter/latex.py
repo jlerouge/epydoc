@@ -59,6 +59,7 @@ class LatexWriter:
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
+        self._show_submodule_list = kwargs.get('show_submodule_list', True)
         self._graph_types = kwargs.get('graphs', ()) or ()
         """Graphs that we should include in our output."""
 
@@ -341,8 +342,8 @@ class LatexWriter:
         self.write_standard_fields(out, doc)
 
         # If it's a package, list the sub-modules.
-        if (self._list_submodules and doc.submodules !=
-            UNKNOWN and doc.submodules):
+        if (self._list_submodules and self._show_submodule_list and
+            doc.submodules != UNKNOWN and doc.submodules):
             self.write_module_list(out, doc)
 
         # Contents.
