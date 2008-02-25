@@ -357,8 +357,8 @@ BASE = r"""
     \newcommand{\Param}[2][]{%
         \textit{##2}%
         \ifthenelse{\equal{##1}{}}{}{=\texttt{##1}}}%
-    \textbf{#1}(%
-    }{)}
+    \@hangfrom{\textbf{#1}(}%
+    }{)\par}
 
 % The EpydocFunctionParameters environment is used to display 
 % descriptions for the parameters that a function can take.
