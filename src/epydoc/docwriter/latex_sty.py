@@ -309,7 +309,7 @@ BASE = r"""
         \gdef\@EpydocFunctionRaises{##6}%
         \gdef\@EpydocFunctionOverrides{##7}%
         \gdef\@EpydocFunctionMetadata{##8}%
-    {\Large\raggedright\@EpydocFunctionSignature}\par
+    {\Large\raggedright\@EpydocFunctionSignature\par}
     \begin{quote}%
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocFunctionDescription\empty\else
@@ -421,7 +421,7 @@ BASE = r"""
         \gdef\@EpydocVariableDescription{##2}%
         \gdef\@EpydocVariableType{##3}%
         \gdef\@EpydocVariableValue{##4}%
-    {\Large\raggedright\@EpydocVariableName}\par
+    {\Large\raggedright\@EpydocVariableName\par}
     \begin{quote}
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocVariableDescription\empty\else
@@ -470,7 +470,7 @@ BASE = r"""
         \gdef\@EpydocPropertyGet{##4}%
         \gdef\@EpydocPropertySet{##5}%
         \gdef\@EpydocPropertyDel{##6}%
-    {\Large\raggedright\@EpydocPropertyName}\par
+    {\Large\raggedright\@EpydocPropertyName\par}
     \begin{quote}
         \setlength{\parskip}{\EpydocParskip}%
         \ifx\@EpydocPropertyDescription\empty\else
@@ -621,8 +621,8 @@ BOXES = r"""
         \gdef\@EpydocFunctionOverrides{##7}%
         \gdef\@EpydocFunctionMetadata{##8}%
     \begin{boxedminipage}{\dimexpr \textwidth-2\fboxsep \relax}
-        {\Large \@EpydocFunctionSignature}
-        \setlength{\parskip}{\EpydocParskip}\par        
+        {\Large\raggedright\@EpydocFunctionSignature\par}
+        \setlength{\parskip}{\EpydocParskip}
         \ifx\@EpydocFunctionDescription\empty\else%
             {\@EpydocSeparator}%
             \@EpydocFunctionDescription %
@@ -661,9 +661,7 @@ BOXES = r"""
             {\@EpydocSeparator}%
             \@EpydocFunctionMetadata %
         \fi%
-    \end{boxedminipage}
-
-  }}
+    \end{boxedminipage}\par}}
   {}
 
 % ======================================================================
@@ -717,7 +715,7 @@ BOXES = r"""
         \gdef\@EpydocVariableDescription{##2}%
         \gdef\@EpydocVariableType{##3}%
         \gdef\@EpydocVariableValue{##4}%
-        \raggedright \@EpydocVariableName & %
+        \raggedright\@EpydocVariableName & %
         \setlength{\parskip}{\EpydocParskip}\raggedright%
         \@EpydocVariableDescription %
         \ifx\@EpydocVariableValue\empty\relax%
@@ -758,7 +756,7 @@ BOXES = r"""
         \gdef\@EpydocPropertyGet{##4}%
         \gdef\@EpydocPropertySet{##5}%
         \gdef\@EpydocPropertyDel{##6}%
-        \raggedright \@EpydocPropertyName & %
+        \raggedright\@EpydocPropertyName & %
         \setlength{\parskip}{\EpydocParskip}\raggedright%
         \ifx\@EpydocPropertyDescription\empty\else%
             {\@EpydocSeparator}%
@@ -861,7 +859,7 @@ SHADED = r"""
     \begin{minipage}{\textwidth}%
       \raggedleft%
       \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
-        {\Large \@EpydocFunctionSignature}
+        \Large\raggedright\@EpydocFunctionSignature
       \end{cminipage}%
       \if@EpydocFunctionDetails
         \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}%
