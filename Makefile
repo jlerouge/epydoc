@@ -19,6 +19,7 @@ MANUAL_SRC = $(wildcard doc/manual-*.txt)
 
 # What version of python to use?
 PYTHON = python2.5
+export PYTHONPATH=src/
 
 # The location of the webpage.
 HOST = shell.sf.net
@@ -42,7 +43,6 @@ LATEX_API     = $(LATEX)/api.pdf
 LATEX_STDLIB  = $(LATEX)/stdlib.pdf
 
 EPYDOC = $(PYTHON) src/epydoc/cli.py
-export PYTHONPATH=src/
 
 RST2HTML = $(PYTHON) src/tools/rst2html.py
 MKDISPATCH = $(PYTHON) src/tools/mkdispatch.py
