@@ -31,7 +31,6 @@ class LatexWriter:
     PREAMBLE = [
         "\\documentclass{article}",
         "\\usepackage[%s]{%s}",
-        "\\usepackage{graphicx}",
         ]
 
     SECTIONS = ['\\part{%s}', '\\chapter{%s}', '\\section{%s}',
@@ -55,7 +54,6 @@ class LatexWriter:
         self._exclude = kwargs.get('exclude', 1)
         self._list_submodules = kwargs.get('list_submodules', 1)
         self._sty = kwargs.get('sty')
-        self._pdfdriver = kwargs.get('pdfdriver', 'latex')
         self._top_section = 2
         self._index_functions = 1
         self._hyperref = 1
@@ -270,6 +268,8 @@ class LatexWriter:
     def write_preamble(self, out):
         # If we're generating an index, add it to the preamble.
         options = []
+        options.append('creator={epydoc %s}' % epydoc.__version__)
+        options.append('title={%s}' % plaintext_to_latex(self._prj_name or ''))
         if self._index: options.append('index')
         if self._hyperlink: options.append('hyperlink')
         out('\n'.join(self.PREAMBLE) % (','.join(options),
@@ -282,21 +282,6 @@ class LatexWriter:
         # Note: this needs to be the last thing in the preamble -JEG
         if self._hyperref:
             out('\\definecolor{UrlColor}{rgb}{0,0.08,0.45}\n')
-            
-            if self._pdfdriver == 'pdflatex':
-                driver = 'pdftex'
-            elif self._pdfdriver == 'latex':
-                driver = 'dvips'
-            else:
-                raise ValueError('bad pdfdriver: %s' % self._pdfdriver)
-                
-            out('\\usepackage[%s, pagebackref, pdftitle={%s}, '
-                'pdfcreator={epydoc %s}, bookmarks=true, '
-                'bookmarksopen=false, pdfpagemode=UseOutlines, '
-                'colorlinks=true, linkcolor=black, anchorcolor=black, '
-                'citecolor=black, filecolor=black, menucolor=black, '
-                'pagecolor=black, urlcolor=UrlColor]{hyperref}\n' %
-                (driver, self._prj_name or '', epydoc.__version__))
             
         # If restructuredtext was used, then we need to extend
         # the prefix to include LatexTranslator.head_prefix.
@@ -370,7 +355,9 @@ class LatexWriter:
         image_file = os.path.join(self._directory, image_url)
         return graph.to_latex(image_file) or ''
 
-    def write_class(self, out, doc):
+    def write_class(self, out, doc, short_name=None):
+        if short_name is None: short_name = doc.canonical_name[-1]
+        
         if self._list_classes_separately:
             self.write_header(out, doc)
         self.write_start_of(out, 'Class Description')
@@ -387,7 +374,7 @@ class LatexWriter:
         else:
             seclevel = 1
             out(self.section('%s %s' % (self.doc_kind(doc),
-                                        _dotted(doc.canonical_name[-1])), 
+                                        _dotted(short_name)), 
                              seclevel, ref=doc))
 
         if ((doc.bases not in (UNKNOWN, None) and len(doc.bases) > 0) or
@@ -438,6 +425,18 @@ class LatexWriter:
 
         # Mark the end of the class (for the index)
         out('    ' + self.indexterm(doc, 'end'))
+
+        # Write any nested classes.  These will have their own
+        # section (at the same level as this section)
+        for nested_class in doc.select_variables(imported=False,
+                                                 value_type='class',
+                                                 public=self._public_filter):
+            if (nested_class.value.canonical_name != UNKNOWN and
+                (nested_class.value.canonical_name[:-1] ==
+                 doc.canonical_name)):
+                self.write_class(out, nested_class.value,
+                                 DottedName(short_name,
+                                            nested_class.canonical_name[-1]))
 
     #////////////////////////////////////////////////////////////
     #{ Module hierarchy trees
@@ -1058,6 +1057,9 @@ class LatexWriter:
         else:
             return 'Variable'
 
+    # [xx] list modules, classes, and functions as top-level index
+    # items.  Methods are listed under their classes.  Nested classes
+    # are listed under their classes.
     def indexterm(self, doc, pos='only'):
         """Mark a term or section for inclusion in the index."""
         if not self._index: return ''
@@ -1065,39 +1067,30 @@ class LatexWriter:
             return ''
 
         pieces = []
-        
-        if isinstance(doc, ClassDoc):
-            classCrossRef = '\\index{\\EpydocIndex[%s]{%s}|see{%%s}}\n' \
-              % (self.doc_kind(doc).lower(), 
-                 _dotted('%s' % doc.canonical_name))
-        else:
-            classCrossRef = None
-
-        while isinstance(doc, ClassDoc) or isinstance(doc, RoutineDoc):
-            if doc.canonical_name == UNKNOWN:
-                return '' # Give up.
-            pieces.append('\\EpydocIndex[%s]{%s}' %
-                          (self.doc_kind(doc).lower(), 
-                           _dotted('%s' % doc.canonical_name)))
+        kinds = []
+        while True:
+            if doc.canonical_name in (None, UNKNOWN): return '' # Give up.
+            pieces.append(doc.canonical_name[-1])
+            kinds.append(self.doc_kind(doc).lower())
             doc = self.docindex.container(doc)
-            if doc == UNKNOWN:
-                return '' # Give up.
+            if isinstance(doc, ModuleDoc): break
+            if doc is None: break
+            if doc == UNKNOWN: return '' # give up.
 
         pieces.reverse()
-        if pos == 'only':
-            term = '\\index{%s}\n' % '!'.join(pieces)
-        elif pos == 'start':
-            term = '\\index{%s|(}\n' % '!'.join(pieces)
-        elif pos == 'end':
-            term = '\\index{%s|)}\n' % '!'.join(pieces)
-        else:
-            raise AssertionError('Bad index position %s' % pos)
+        kinds.reverse()
+        for i in range(1, len(pieces)):
+            pieces[i] = '%s.%s' % (pieces[i-1], pieces[i])
+        pieces = ['\\EpydocIndex{%s}{%s}{%s}' % (piece.lower(), piece, kind)
+                  for (piece, kind) in zip (pieces, kinds)]
+
+        if pos == 'only': modifier = ''
+        elif pos == 'start': modifier = '|('
+        elif pos == 'end': modifier = '|)'
+        else: raise AssertionError('Bad index position %s' % pos)
+
+        term = '\\index{%s%s}\n' % ('!'.join(pieces), modifier)
         
-        if pos in ['only', 'start'] and classCrossRef is not None:
-            term += classCrossRef % ('\\EpydocIndex[%s]{%s}' %
-                                     (self.doc_kind(doc).lower(), 
-                                      _dotted('%s'%doc.canonical_name)))
-            
         return term
 
     #: Map the Python encoding representation into mismatching LaTeX ones.

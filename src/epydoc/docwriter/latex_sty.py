@@ -41,29 +41,40 @@ BASE = r"""
 % $Id:$
 
 \NeedsTeXFormat{LaTeX2e}%
-\ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-base}[2008/02/26 v3.0.1 Epydoc Python Documentation]
 
 % ======================================================================
-% Basic Package Requirements
+% Options
+
+% These two packages are used to process options:
+\RequirePackage{ifthen}
+\RequirePackage{xkeyval}
+
+% Define an option 'index' that sets the boolean value \@doIndex
+\newif\if@doIndex
+\@doIndexfalse
+\DeclareOptionX{index}{\@doIndextrue}
+
+% Define an option 'hyperlink' that sets the boolean value \@docHyperlink
+\newif\if@doHyperlink
+\@doHyperlinkfalse
+\DeclareOptionX{hyperlink}{\@doHyperlinktrue}
+
+% Pass the 'title' & 'creator' options to the hyperref package.
+\DeclareOptionX{title}[]{\PassOptionsToPackage{pdftitle={#1}}{hyperref}}
+\DeclareOptionX{creator}[]{\PassOptionsToPackage{pdfcreator={#1}}{hyperref}}
+
+% Process the options list.
+\ProcessOptionsX\relax
+
+% ======================================================================
+% Package Requirements
 
 \RequirePackage{alltt, boxedminipage}
 \RequirePackage{multirow, amssymb}
 \RequirePackage[headings]{fullpage}
 \RequirePackage[usenames]{color}
-\RequirePackage{ifthen}
-
-% ======================================================================
-% Options
-
-\newif\if@doIndex
-\@doIndexfalse
-\DeclareOption{index}{\@doIndextrue}
-
-\newif\if@doHyperlink
-\@doHyperlinkfalse
-\DeclareOption{hyperlink}{\@doHyperlinktrue}
-
-\ProcessOptions\relax
+\RequirePackage{graphicx}
 
 \@ifclassloaded{memoir}{%
     \RequirePackage[other,notbib]{tocbibind}
@@ -80,6 +91,17 @@ BASE = r"""
 \if@doIndex
     \makeindex
 \fi
+
+\ifx\pdfoutput\undefined\newcommand{\driver}{dvips}
+\else\ifnum\pdfoutput=1\newcommand{\driver}{pdftex}
+\else\newcommand{\driver}{dvips}\fi\fi
+
+\RequirePackage[\driver, pagebackref, 
+    bookmarks=true, bookmarksopen=false, pdfpagemode=UseOutlines, 
+    colorlinks=true, linkcolor=black, anchorcolor=black, citecolor=black, 
+    filecolor=black, menucolor=black, pagecolor=black, urlcolor=UrlColor]
+    {hyperref}
+
 
 % ======================================================================
 % General Formatting
@@ -150,14 +172,16 @@ BASE = r"""
 % Index Terms
 
 % The \EpydocIndex command is used to mark items that should be included
-% in the index.  It takes one optional argument, specifying the 'kind'
-% of the object, and one required argument, the term that should be
-% included in the index.  (This command is used inside the \index
-% command.)  kind can be Package, Script, Module, Class, Class Method,
-% Static Method, Method, Function, or Variable.
-\newcommand{\EpydocIndex}[2][]{%
+% in the index.  It takes three arguments.  The first argument is the
+% item's case-normalized name; this is typically discarded, and is
+% simply used to ensure the proper (i.e., case-insensitive) sort order
+% in the index.  The second argument is the item's name; and the
+% third item is the item's "kind".  "kind" can be Package, Script, Module,
+% Class, Class Method, Static Method, Method, Function, or Variable.
+% This command is used inside of the \index{...} command.
+\newcommand{\EpydocIndex}[3]{%
     #2 %
-    \ifthenelse{\equal{#1}{}}{}{\textit{(\MakeLowercase{#1})}}}
+    \ifthenelse{\equal{#3}{}}{}{\textit{(#3)}}}
     
 % ======================================================================
 % Descriptions (docstring contents)
@@ -582,10 +606,14 @@ BOXES = r"""
 %
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
-\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\ProcessOptions\relax
+\ProvidesClass{epydoc-boxes}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+
+\RequirePackage{xkeyval}
+\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
+\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
+\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\ProcessOptionsX\relax
 
 \RequirePackage{epydoc-base}
 \RequirePackage{longtable}
@@ -810,10 +838,14 @@ SHADED = r"""
 %
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
-\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\ProcessOptions\relax
+\ProvidesClass{epydoc-shaded}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+
+\RequirePackage{xkeyval}
+\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
+\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
+\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\ProcessOptionsX\relax
 
 \RequirePackage{epydoc-base}
 
@@ -1032,10 +1064,17 @@ TEMPLATE = r"""
 % how different pieces of the documentation are displayed.
 %
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc}[2007/04/06 v3.0beta1 Epydoc Python Documentation]
-\DeclareOption{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOption{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\ProcessOptions\relax
+
+% Replace 'XXX' with a new name:
+\ProvidesClass{epydoc-XXX}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+
+% Pass options to the epydoc base package.
+\RequirePackage{xkeyval}
+\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
+\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
+\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
+\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\ProcessOptionsX\relax
 
 \RequirePackage{epydoc-base}
 
