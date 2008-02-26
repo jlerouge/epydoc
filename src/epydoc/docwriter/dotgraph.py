@@ -93,6 +93,9 @@ class DotGraph(object):
     """The default minimum size in inches (width,height) for graphs
     when rendering with `to_html()`"""
     
+    DEFAULT_HTML_IMAGE_FORMAT = 'gif'
+    """The default format used to generate images by `to_html()`"""
+    
     def __init__(self, title, body='', node_defaults=None,
                  edge_defaults=None, caption=None):
         """
@@ -145,7 +148,7 @@ class DotGraph(object):
             self.uid = '%s_%s' % (self.uid, n)
         self._uids.add(self.uid)
 
-    def to_latex(self, image_file, center=True, size=None):
+    def to_latex(self, directory, center=True, size=None):
         """
         Return the LaTeX code that should be used to display this
         graph.  Two image files will be written: image_file+'.eps'
@@ -157,6 +160,8 @@ class DotGraph(object):
             Defaults to `DEFAULT_LATEX_SIZE`.
         :type size: ``str``
         """
+        eps_file = os.path.join(directory, self.uid+'.eps')
+        pdf_file = os.path.join(directory, self.uid+'.pdf')
         size = size or self.DEFAULT_LATEX_SIZE
         # Use dot2tex if requested (and if it's available).
         # Otherwise, render it to an image file & use \includgraphics.
@@ -170,21 +175,19 @@ class DotGraph(object):
         # Render the graph in postscript.
         ps = self._run_dot('-Tps', size=size)
         # Write the postscript output.
-        psfile = open(image_file+'.eps', 'wb')
+        psfile = open(eps_file, 'wb')
         psfile.write('%!PS-Adobe-2.0 EPSF-1.2\n')
         psfile.write(ps)
         psfile.close()
         # Use ps2pdf to generate the pdf output.
-        try: run_subprocess(('ps2pdf', '-dEPSCrop', image_file+'.eps',
-                             image_file+'.pdf'))
+        try: run_subprocess(('ps2pdf', '-dEPSCrop', eps_file, pdf_file))
         except RunSubprocessError, e:
             log.warning("Unable to render Graphviz dot graph (%s):\n"
                             "ps2pdf failed." % self.title)
             return None
         
         # Generate the latex code to display the graph.
-        name = os.path.splitext(os.path.split(image_file)[-1])[0]
-        s = '  \\includegraphics{%s}\n' % name
+        s = '  \\includegraphics{%s}\n' % self.uid
         if center: s = '\\begin{center}\n%s\\end{center}\n' % s
         return s
 
@@ -206,8 +209,8 @@ class DotGraph(object):
         s = conv.convert(s)
         if center: s = '\\begin{center}\n%s\\end{center}\n' % s
         return s
-    
-    def to_html(self, image_file, image_url, center=True, size=None):
+
+    def to_html(self, directory, center=True, size=None):
         """
         Return the HTML code that should be uesd to display this graph
         (including a client-side image map).
@@ -220,6 +223,8 @@ class DotGraph(object):
             Defaults to `DEFAULT_HTML_SIZE`.
         :type size: ``str``
         """
+        image_url = '%s.%s' % (self.uid, self.DEFAULT_HTML_IMAGE_FORMAT)
+        image_file = os.path.join(directory, image_url)
         size = size or self.DEFAULT_HTML_SIZE
         # If dotversion >1.8.10, then we can generate the image and
         # the cmapx with a single call to dot.  Otherwise, we need to
