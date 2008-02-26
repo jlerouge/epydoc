@@ -1009,7 +1009,10 @@ def write_latex(docindex, options):
     log.start_progress('Writing LaTeX docs')
     
     # Choose a pdfdriver if we're generating pdf output.
-    if 'pdf' in options.actions and options.pdfdriver=='auto':
+    if options.pdfdriver=='auto' and ('latex' in options.actions or
+                                      'dvi' in options.actions or
+                                      'ps' in options.actions or
+                                      'pdf' in options.actions):
         if 'dvi' in options.actions or 'ps' in options.actions:
             options.pdfdriver = 'latex'
         else:
