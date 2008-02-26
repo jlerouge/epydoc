@@ -77,6 +77,7 @@ import ConfigParser
 from epydoc.docwriter.html_css import STYLESHEETS as CSS_STYLESHEETS
 from epydoc.docwriter.latex_sty import STYLESHEETS as STY_STYLESHEETS
 from epydoc.docwriter.dotgraph import DotGraph
+from epydoc.docwriter.dotgraph import COLOR as GRAPH_COLOR
 
 # This module is only available if Docutils are in the system
 try:
@@ -714,6 +715,16 @@ def parse_configfiles(configfiles, options, names):
             options.max_html_graph_size = val
         elif optname in ('max-latex-graph-size', 'max_latex_graph_size'):
             options.max_latex_graph_size = val
+        elif optname.startswith('graph-'):
+            color = optname[6:].upper().strip()
+            color = color.replace('-', '_')
+            color = color.replace('_BACKGROUND', '_BG')
+            if color in GRAPH_COLOR:
+                if not re.match(r'#[a-fA-F0-9]+|\w+', val):
+                    raise ValueError('Bad color %r for %r' % (val, color))
+                GRAPH_COLOR[color] = val
+            else:
+                raise ValueError('Unknown option %s' % optname)
 
         # Return value options
         elif optname in ('failon', 'fail-on', 'fail_on'):
