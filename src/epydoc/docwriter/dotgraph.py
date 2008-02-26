@@ -33,15 +33,17 @@ from epydoc.compat import * # Backwards compatibility
 #: so it should be left False for now.
 USE_DOT2TEX = False
 
-# colors for graphs of APIDocs
-MODULE_BG = '#d8e8ff'
-CLASS_BG = '#d8ffe8'
-SELECTED_BG = '#ffd0d0'
-BASECLASS_BG = '#e0b0a0'
-SUBCLASS_BG = '#e0b0a0'
-UNDOCUMENTED_BG = '#c0c0c0'
-ROUTINE_BG = '#e8d0b0' # maybe?
-INH_LINK_COLOR = '#800000'
+#: colors for graphs of APIDocs
+COLOR = dict(
+    MODULE_BG = '#d8e8ff',
+    CLASS_BG = '#d8ffe8',
+    SELECTED_BG = '#ffd0d0',
+    BASECLASS_BG = '#e0b0a0',
+    SUBCLASS_BG = '#e0b0a0',
+    UNDOCUMENTED_BG = '#c0c0c0',
+    ROUTINE_BG = '#e8d0b0', # not used
+    INH_LINK = '#800000',
+    )
 
 ######################################################################
 #{ Dot Graphs
@@ -500,7 +502,7 @@ class DotGraphUmlClassNode(DotGraphNode):
       - use qualifiers
     """
     def __init__(self, class_doc, linker, context, collapsed=False,
-                 bgcolor=CLASS_BG, **options):
+                 bgcolor=COLOR['CLASS_BG'], **options):
         """
         Create a new `DotGraphUmlClassNode` based on the class
         `class_doc`.
@@ -1059,11 +1061,11 @@ class DotGraphUmlModuleNode(DotGraphNode):
 
     _COLOR_DIFF = 24
     def _color(self, package, depth):
-        if package == self.context: return SELECTED_BG
+        if package == self.context: return COLOR['SELECTED_BG']
         else: 
             # Parse the base color.
-            if re.match(MODULE_BG, 'r#[0-9a-fA-F]{6}$'):
-                base = int(MODULE_BG[1:], 16)
+            if re.match(COLOR['MODULE_BG'], 'r#[0-9a-fA-F]{6}$'):
+                base = int(COLOR['MODULE_BG'][1:], 16)
             else:
                 base = int('d8e8ff', 16)
             red = (base & 0xff0000) >> 16
@@ -1354,11 +1356,11 @@ def _uml_mknode(cls, nodetype, linker, context, options):
     if nodetype == 'subclass':
         return DotGraphUmlClassNode(
             cls, linker, context, collapsed=True,
-            bgcolor=SUBCLASS_BG, **options)
+            bgcolor=COLOR['SUBCLASS_BG'], **options)
     elif nodetype in ('selected', 'superclass', 'undocumented'):
-        if nodetype == 'selected': bgcolor = SELECTED_BG
-        if nodetype == 'superclass': bgcolor = BASECLASS_BG
-        if nodetype == 'undocumented': bgcolor = UNDOCUMENTED_BG
+        if nodetype == 'selected': bgcolor = COLOR['SELECTED_BG']
+        if nodetype == 'superclass': bgcolor = COLOR['BASECLASS_BG']
+        if nodetype == 'undocumented': bgcolor = COLOR['UNDOCUMENTED_BG']
         return DotGraphUmlClassNode(
             cls, linker, context, show_inherited_vars=False,
             collapsed=False, bgcolor=bgcolor, **options)
@@ -1369,12 +1371,12 @@ def _uml_mkedge(start, end, edgetype, options):
     if edgetype == 'subclass':
         return DotGraphEdge(
             start, end, dir='back', arrowtail='empty',
-            headport='body', tailport='body', color=INH_LINK_COLOR,
+            headport='body', tailport='body', color=COLOR['INH_LINK'],
             weight=100, style='bold')
     if edgetype == 'truncate-subclass':
         return DotGraphEdge(
             start, end, dir='back', arrowtail='empty',
-            tailport='body', color=INH_LINK_COLOR,
+            tailport='body', color=COLOR['INH_LINK'],
             weight=100, style='bold')
     assert 0, 'bad edgetype'    
 
@@ -1550,13 +1552,13 @@ def specialize_valdoc_node(node, val_doc, context, linker):
     if (url is None and
         hasattr(linker, 'docindex') and
         linker.docindex.find(identifier, self.container) is None):
-        node['fillcolor'] = UNDOCUMENTED_BG
+        node['fillcolor'] = COLOR['UNDOCUMENTED_BG']
         node['style'] = 'filled'
 
     if isinstance(val_doc, ModuleDoc) and dot_version >= [2]:
         node['shape'] = 'plaintext'
-        if val_doc == context: color = SELECTED_BG
-        else: color = MODULE_BG
+        if val_doc == context: color = COLOR['SELECTED_BG']
+        else: color = COLOR['MODULE_BG']
         node['tooltip'] = node['label']
         node['html_label'] = MODULE_NODE_HTML % (color, color, url,
                                                  val_doc.canonical_name,
@@ -1572,7 +1574,7 @@ def specialize_valdoc_node(node, val_doc, context, linker):
         node['label'] = '%s()' % node['label']
         node['tooltip'] = node['label']
         if val_doc == context:
-            node['fillcolor'] = SELECTED_BG
+            node['fillcolor'] = COLOR['SELECTED_BG']
             node['style'] = 'filled,rounded,bold'
             
     else:
@@ -1581,7 +1583,7 @@ def specialize_valdoc_node(node, val_doc, context, linker):
         node['height'] = 0
         node['tooltip'] = node['label']
         if val_doc == context:
-            node['fillcolor'] = SELECTED_BG
+            node['fillcolor'] = COLOR['SELECTED_BG']
             node['style'] = 'filled,bold'
 
 def name_list(api_docs, context=None):
