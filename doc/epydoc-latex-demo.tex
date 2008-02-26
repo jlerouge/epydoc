@@ -62,12 +62,25 @@ be able to determine how to write your own customized style file.
 \subsection{Indexing}
 
 % The \EpydocIndex command is used to mark items that should be included
-% in the index.  It takes one optional argument, specifying the 'kind'
-% of the object, and one required argument, the term that should be
-% included in the index.  (This command is used inside the \index
-% command.)  kind can be Package, Script, Module, Class, Class Method,
-% Static Method, Method, Function, or Variable.
-\index{\EpydocIndex[Script]{\EpydocDottedName{fooble}}}
+% in the index.  It takes three arguments.  The first argument is the
+% item's case-normalized name; this is typically discarded, and is
+% simply used to ensure the proper (i.e., case-insensitive) sort order
+% in the index.  The second argument is the item's name; and the
+% third item is the item's "kind".  "kind" can be Package, Script, Module,
+% Class, Class Method, Static Method, Method, Function, or Variable.
+% This command is used inside of the \index{...} command.
+%
+% For modules and classes, the \index formatting strings "|(" and
+% "|)" are appended to mark the beginning and end of the object's
+% documentation.  For methods, variables, and nested classes, the
+% index formatting string "!" is used to create nested index entries.
+% See the docs for the latex \index command for more information.
+\index{\EpydocIndex{mymodule}{mymodule}{module}|(}
+\index{\EpydocIndex{foo}{Foo}{class}|(}
+\index{\EpydocIndex{foo}{Foo}{class}!\EpydocIndex{foo.f}{Foo.f}{method}}
+\index{\EpydocIndex{foo}{Foo}{class}!\EpydocIndex{foo.f}{Foo.g}{method}}
+\index{\EpydocIndex{foo}{Foo}{class}|)}
+\index{\EpydocIndex{mymodule}{mymodule}{module}|)}
 
 \subsection{Source Code Syntax Highlighting}
 
@@ -181,7 +194,7 @@ be able to determine how to write your own customized style file.
   \subsection{Classes}
   \begin{EpydocClassList}
     \item[\EpydocHyperlink{my_module:Zip}
-          {\EpydocDottedName{my_module.Zipasdkfjsdflsd}}]
+          {\EpydocDottedName{my_module.Zip}}]
         Description of my\_module.Zip.
     \item[\EpydocHyperlink{my_module:Zap}
           {\EpydocDottedName{my_module.Zap}}]
