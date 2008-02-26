@@ -225,7 +225,8 @@ class DotGraph(object):
         # the cmapx with a single call to dot.  Otherwise, we need to
         # run dot twice.
         if get_dot_version() > [1,8,10]:
-            cmapx = self._run_dot('-Tgif', '-o%s' % image_file,
+            cmapx = self._run_dot('-T%s' % self._pick_language(image_file),
+                                  '-o%s' % image_file,
                                   '-Tcmapx', size=size)
             if cmapx is None: return '' # failed to render
         else:
@@ -307,8 +308,8 @@ class DotGraph(object):
                 except NotImplementedError: url = ''
                 if url: attribs['href'] = url
                 else: del attribs['href']
-                
-    def write(self, filename, language='gif', size=None):
+
+    def write(self, filename, language=None, size=None):
         """
         Render the graph using the output format `language`, and write
         the result to `filename`.
@@ -320,6 +321,7 @@ class DotGraph(object):
             If not specified, no size line will be added.
         :type size: ``str``
         """
+        if language is None: language = self._pick_language(filename)
         result = self._run_dot('-T%s' % language,
                                '-o%s' % filename,
                                size=size)
@@ -328,7 +330,14 @@ class DotGraph(object):
             result = result.decode('utf-8')
         return (result is not None)
 
-    def render(self, language='gif', size=None):
+    def _pick_language(self, filename):
+            ext = os.path.splitext(filename)[1]
+            if ext in ('.gif', '.png', '.jpg', '.jpeg'):
+                return ext[1:]
+            else:
+                return 'gif'
+                
+    def render(self, language=None, size=None):
         """
         Use the ``dot`` command to render this graph, using the output
         format `language`.  Return the result as a string, or ``None``
