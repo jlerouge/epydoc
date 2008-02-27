@@ -776,6 +776,12 @@ def _str_to_list(val):
 ######################################################################
 
 def main(options):
+    """
+    Perform all actions indicated by the given set of options.
+    
+    @return: the L{epydoc.apidoc.DocIndex} object created while
+        running epydoc (or None).
+    """
     # Set the debug flag, if '--debug' was specified.
     if options.debug:
         epydoc.DEBUG = True
@@ -982,6 +988,9 @@ def main(options):
 
     # Deregister our logger(s).
     for logger in loggers: log.remove_logger(logger)
+
+    # Return the docindex, in case someone wants to use it programatically.
+    return docindex
             
 def write_html(docindex, options):
     from epydoc.docwriter.html import HTMLWriter
@@ -1191,6 +1200,12 @@ def check_docs(docindex, options):
     DocChecker(docindex).check()
                 
 def cli():
+    """
+    Perform all actions indicated by the options in sys.argv.
+    
+    @return: the L{epydoc.apidoc.DocIndex} object created while
+        running epydoc (or None).
+    """
     # Parse command-line arguments.
     options = parse_arguments()
 
@@ -1199,7 +1214,7 @@ def cli():
             if options.profile:
                 _profile()
             else:
-                main(options)
+                return main(options)
         finally:
             log.close()
     except SystemExit:
