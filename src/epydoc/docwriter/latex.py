@@ -351,9 +351,7 @@ class LatexWriter:
     def render_graph(self, graph):
         if graph is None: return ''
         graph.caption = graph.title = None
-        image_url = '%s' % graph.uid
-        image_file = os.path.join(self._directory, image_url)
-        return graph.to_latex(image_file) or ''
+        return graph.to_latex(self._directory) or ''
 
     def write_class(self, out, doc, short_name=None):
         if short_name is None: short_name = doc.canonical_name[-1]

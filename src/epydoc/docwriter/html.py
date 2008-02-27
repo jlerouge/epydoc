@@ -1643,9 +1643,7 @@ class HTMLWriter:
     def render_graph(self, graph):
         if graph is None: return ''
         graph.caption = graph.title = None
-        image_url = '%s.gif' % graph.uid
-        image_file = os.path.join(self._directory, image_url)
-        return graph.to_html(image_file, image_url)
+        return graph.to_html(self._directory) or ''
     
     RE_CALLGRAPH_ID = re.compile(r"""["'](.+-div)['"]""")
     

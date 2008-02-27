@@ -1882,9 +1882,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                                       docindex, context)
             if not graph: return ''
             # Write the graph.
-            image_url = '%s.gif' % graph.uid
-            image_file = os.path.join(directory, image_url)
-            return graph.to_html(image_file, image_url)
+            return graph.to_html(directory)
         else:
             raise ValueError('Unknown epytext DOM element %r' % tree.tag)
 
@@ -2015,8 +2013,7 @@ class ParsedEpytextDocstring(ParsedDocstring):
                                       docindex, context)
             if not graph: return ''
             # Write the graph.
-            image_file = os.path.join(directory, graph.uid)
-            return graph.to_latex(image_file)
+            return graph.to_latex(directory)
         else:
             # Assume that anything else can be passed through.
             return childstr

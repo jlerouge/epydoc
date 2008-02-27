@@ -601,8 +601,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         if graph is None: raise SkipNode()
         
         # Write the graph.
-        image_file = os.path.join(self._directory, graph.uid)
-        self.body.append(graph.to_latex(image_file))
+        self.body.append(graph.to_latex(self._directory)
         raise SkipNode()
 
     def visit_doctest_block(self, node):
@@ -708,9 +707,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         if graph is None: raise SkipNode()
         
         # Write the graph.
-        image_url = '%s.gif' % graph.uid
-        image_file = os.path.join(self._directory, image_url)
-        self.body.append(graph.to_html(image_file, image_url))
+        self.body.append(graph.to_html(self._directory)
         raise SkipNode()
 
     def visit_doctest_block(self, node):
