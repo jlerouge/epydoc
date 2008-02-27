@@ -357,6 +357,7 @@ class DotGraph(object):
         return self._run_dot('-T%s' % language, size=size)
 
     def _run_dot(self, *options, **kwparam):
+        if get_dot_version() == (0,): return None
         try:
             result, err = run_subprocess((DOT_COMMAND,)+options,
                                          self.to_dotfile(**kwparam))
@@ -1507,6 +1508,10 @@ def get_dot_version():
             else:
                 _dot_version = (0,)
         except OSError, e:
+            log.error('dot executable not found; graphs will not be '
+                      'generated.  Adjust your shell\'s path, or use '
+                      '--dotpath to specify the path to the dot '
+                      'executable.' % DOT_COMMAND)
             _dot_version = (0,)
         log.info('Detected dot version %s' % _dot_version)
     return _dot_version
