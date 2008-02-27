@@ -462,6 +462,12 @@ def parse_arguments():
         "be a string of the form \"w,h\", specifying the maximum width "
         "and height in inches.  Default=%r" % DotGraph.DEFAULT_LATEX_SIZE)
 
+    graph_group.add_option('--graph-image-format',
+        dest='graph_image_format', metavar='FORMAT',
+        help="Specify the file format used for graph images in the HTML "
+             "output.  Can be one of gif, png, jpg.  Default=%r" %
+             DotGraph.DEFAULT_HTML_IMAGE_FORMAT)
+
     # this option is for developers, not users.
     graph_group.add_option("--profile-epydoc",
         action="store_true", dest="profile",
@@ -577,7 +583,7 @@ def parse_arguments():
         optparser.error("Use of the pdflatex driver is incompatible "
                         "with generating dvi or ps output.")
 
-    # Set max graph sizes
+    # Set graph defaults
     if options.max_html_graph_size:
         if not re.match(r'^\d+\s*,\s*\d+$', options.max_html_graph_size):
             optparser.error("Bad max-html-graph-size value: %r" %
@@ -588,6 +594,11 @@ def parse_arguments():
             optparser.error("Bad max-latex-graph-size value: %r" %
                             options.max_latex_graph_size)
         DotGraph.DEFAULT_LATEX_SIZE = options.max_latex_graph_size
+    if options.graph_image_format:
+        if options.graph_image_format not in ('jpg', 'png', 'gif'):
+            optparser.error("Bad graph-image-format %r; expected one of: "
+                            "jpg, png, gif." % options.graph_image_format)
+        DotGraph.DEFAULT_HTML_IMAGE_FORMAT = options.graph_image_format
 
     # Calculate verbosity.
     verbosity = getattr(options, 'verbosity', 0)
@@ -715,6 +726,8 @@ def parse_configfiles(configfiles, options, names):
             options.max_html_graph_size = val
         elif optname in ('max-latex-graph-size', 'max_latex_graph_size'):
             options.max_latex_graph_size = val
+        elif optname in ('graph-image-format', 'graph_image_format'):
+            options.graph_image_format = val
         elif optname.startswith('graph-'):
             color = optname[6:].upper().strip()
             color = color.replace('-', '_')
