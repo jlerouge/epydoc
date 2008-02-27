@@ -1502,6 +1502,7 @@ def to_debug(tree, indent=4, seclevel=0):
 ##################################################
 ## Top-Level Wrapper function
 ##################################################
+SCRWIDTH = 75
 def pparse(str, show_warnings=1, show_errors=1, stream=sys.stderr):
     """
     Pretty-parse the string.  This parses the string, and catches any
