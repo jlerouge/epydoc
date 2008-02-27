@@ -601,7 +601,7 @@ class _EpydocLaTeXTranslator(LaTeXTranslator):
         if graph is None: raise SkipNode()
         
         # Write the graph.
-        self.body.append(graph.to_latex(self._directory)
+        self.body.append(graph.to_latex(self._directory))
         raise SkipNode()
 
     def visit_doctest_block(self, node):
@@ -707,7 +707,7 @@ class _EpydocHTMLTranslator(HTMLTranslator):
         if graph is None: raise SkipNode()
         
         # Write the graph.
-        self.body.append(graph.to_html(self._directory)
+        self.body.append(graph.to_html(self._directory))
         raise SkipNode()
 
     def visit_doctest_block(self, node):
