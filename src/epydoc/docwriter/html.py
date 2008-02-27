@@ -848,7 +848,7 @@ class HTMLWriter:
 
         # Write the name of the class we're describing.
         if (doc.metaclass is not UNKNOWN and
-                doc.metaclass.canonical_name is not UNKNOWN and 
+                doc.metaclass.canonical_name not in (None, UNKNOWN) and 
                 doc.metaclass.canonical_name != 'type'):
             typ = self.href(doc.metaclass, doc.metaclass.canonical_name[-1])
         elif doc.is_type(): typ = 'Type'
@@ -1667,27 +1667,24 @@ class HTMLWriter:
         
         if isinstance(callgraph, basestring):
             uid = callgraph
-            rv = self._callgraph_cache.get(callgraph, "")
-
+            graph_html = self._callgraph_cache.get(callgraph, "")
+        elif callgraph.uid in self._callgraph_cache:
+            uid = callgraph.uid
+            graph_html = self._callgraph_cache.get(callgraph, "")
         else:
             uid = callgraph.uid
             graph_html = self.render_graph(callgraph)
-            if graph_html == '':
-                rv = ""
-            else:
-                rv = ('<div style="display:none" id="%%s-div"><center>\n'
-                      '<table border="0" cellpadding="0" cellspacing="0">\n'
-                      '  <tr><td>%s</td></tr>\n'
-                      '  <tr><th>Call Graph</th></tr>\n'
-                      '</table><br />\n</center></div>\n' % graph_html)
+            self._callgraph_cache[uid] = graph_html
 
-            # Store in the cache the complete HTML chunk without the
-            # div id, which may be made unambiguous by the token
-            self._callgraph_cache[uid] = rv
-
-        # Mangle with the graph
-        if rv: rv = rv % (uid + token)
-        return rv
+        if graph_html:
+            return ('<div style="display:none" id="%s-div"><center>\n'
+                    '<table border="0" cellpadding="0" cellspacing="0">\n'
+                    '  <tr><td>%s</td></tr>\n'
+                    '  <tr><th>Call Graph</th></tr>\n'
+                    '</table><br />\n</center></div>\n' %
+                    (uid+token, graph_html))
+        else:
+            return ''
 
     def callgraph_link(self, callgraph, token=""):
         """Render the HTML chunk of a callgraph link.
