@@ -75,6 +75,7 @@ BASE = r"""
 \RequirePackage[headings]{fullpage}
 \RequirePackage[usenames]{color}
 \RequirePackage{graphicx}
+\RequirePackage{url}
 
 \@ifclassloaded{memoir}{%
     \RequirePackage[other,notbib]{tocbibind}
@@ -129,6 +130,11 @@ BASE = r"""
 
 % Create a 'base class' length named EpydocBCL for use in base trees.
 \newlength{\EpydocBCL} % base class length, for base trees.
+
+% In xkeyval arguments, we're not allowed to use \par.  But we *are*
+% allowed to use a command that evaluates to \par, so define such a
+% command.
+\newcommand{\EpydocPar}{\par}
 
 % ======================================================================
 % Sections inside docstring
@@ -192,17 +198,17 @@ BASE = r"""
 % it to its default value).
 \newenvironment{EpydocDescription}{%
     \setlength{\parskip}{\EpydocParskip}%
-  }{}
+    \ignorespaces}{\ignorespacesafterend}
 
 % This environment is used to mark the description for a class
 % (which comes from the function's docstring).
 \newenvironment{EpydocClassDescription}{%
-  }{}
+    \ignorespaces}{\ignorespacesafterend}
 
 % This environment is used to mark the description for a module
 % (which comes from the function's docstring).
 \newenvironment{EpydocModuleDescription}{%
-  }{}
+    \ignorespaces}{\ignorespacesafterend}
 
 % ======================================================================
 % Python Source Code Syntax Highlighting.
@@ -323,36 +329,31 @@ BASE = r"""
 %
 % All arguments except for the first (the signature) may be empty.
 %
+\define@cmdkeys[Epydoc]{function}{signature,description,parameters,
+                                  returndescr,returntype,raises,
+                                  overrides,metadata}
 \newenvironment{EpydocFunctionList}{%
-    \newcommand{\EpydocFunction}[8]{
-        \gdef\@EpydocFunctionSignature{##1}%
-        \gdef\@EpydocFunctionDescription{##2}%
-        \gdef\@EpydocFunctionParameters{##3}%
-        \gdef\@EpydocFunctionReturnDescr{##4}%
-        \gdef\@EpydocFunctionReturnType{##5}%
-        \gdef\@EpydocFunctionRaises{##6}%
-        \gdef\@EpydocFunctionOverrides{##7}%
-        \gdef\@EpydocFunctionMetadata{##8}%
-    {\Large\raggedright\@EpydocFunctionSignature\par}
-    \begin{quote}%
-        \setlength{\parskip}{\EpydocParskip}%
-        \ifx\@EpydocFunctionDescription\empty\else
-            \par\@EpydocFunctionDescription\fi%
-        \ifx\@EpydocFunctionParameters\empty\else
-            \par\@EpydocFunctionParameters\fi%
-        \ifx\@EpydocFunctionReturnDescr\empty
-            \par\@EpydocFunctionReturnDescr\fi%
-        \ifx\@EpydocFunctionReturnType\empty
-            \par\@EpydocFunctionReturnType\fi%
-        \ifx\@EpydocFunctionRaises\empty\else
-            \par\@EpydocFunctionRaises\fi%
-        \ifx\@EpydocFunctionOverrides\empty\else
-            \par\@EpydocFunctionOverrides\fi%
-        \ifx\@EpydocFunctionMetadata\empty\else
-            \par\@EpydocFunctionMetadata\fi%
-    \end{quote}
-
-  }}
+    \newcommand{\EpydocFunction}[1]{{%
+        \setkeys[Epydoc]{function}{##1}%
+        {\Large\raggedright\cmdEpydoc@function@signature\par}
+        \begin{quote}%
+            \setlength{\parskip}{\EpydocParskip}%
+            \@ifundefined{cmdEpydoc@function@description}{}{
+                \par\cmdEpydoc@function@description}
+            \@ifundefined{cmdEpydoc@function@parameters}{}{
+                \par\cmdEpydoc@function@parameters}
+            \@ifundefined{cmdEpydoc@function@returndescr}{}{
+                \par \textbf{Returns:} \cmdEpydoc@function@returndescr}
+            \@ifundefined{cmdEpydoc@function@returntype}{}{
+                \par \textbf{Return Type:} \cmdEpydoc@function@returntype}
+            \@ifundefined{cmdEpydoc@function@raises}{}{
+                \par\cmdEpydoc@function@raises}
+            \@ifundefined{cmdEpydoc@function@overrides}{}{
+                \par\cmdEpydoc@function@overrides}
+            \@ifundefined{cmdEpydoc@function@metadata}{}{
+                \ifx\cmdEpydoc@function@metadata\empty\else
+                    \par\cmdEpydoc@function@metadata\fi}
+        \end{quote}\par}}}
   {}
 
 % The EpydocFunctionSignature environment is used to display a
@@ -382,7 +383,7 @@ BASE = r"""
         \textit{##2}%
         \ifthenelse{\equal{##1}{}}{}{=\texttt{##1}}}%
     \@hangfrom{\textbf{#1}(}%
-    }{)\par}
+    }{)}
 
 % The EpydocFunctionParameters environment is used to display 
 % descriptions for the parameters that a function can take.
@@ -439,23 +440,23 @@ BASE = r"""
 %
 % If any of these arguments is not available, then the empty
 % string will be used.
+\define@cmdkeys[Epydoc]{variable}{name,description,type,value,metadata}
 \newenvironment{EpydocVariableList}{%
-    \newcommand{\EpydocVariable}[4]{%
-        \gdef\@EpydocVariableName{##1}%
-        \gdef\@EpydocVariableDescription{##2}%
-        \gdef\@EpydocVariableType{##3}%
-        \gdef\@EpydocVariableValue{##4}%
-    {\Large\raggedright\@EpydocVariableName\par}
-    \begin{quote}
-        \setlength{\parskip}{\EpydocParskip}%
-        \ifx\@EpydocVariableDescription\empty\else
-            \par\@EpydocVariableDescription\fi%
-        \ifx\@EpydocVariableType\empty\else
-            \par\textbf{Type:} \@EpydocVariableType\fi%
-        \ifx\@EpydocVariableValue\empty
-            \par\textbf{Value:} \texttt{\@EpydocVariableValue}\fi%
-    \end{quote}
-  }}
+    \newcommand{\EpydocVariable}[1]{{%
+        \setkeys[Epydoc]{variable}{##1}%
+        {\Large\raggedright\cmdEpydoc@variable@name\par}
+        \begin{quote}
+            \setlength{\parskip}{\EpydocParskip}%
+            \@ifundefined{cmdEpydoc@variable@description}{}{%
+                \par\cmdEpydoc@variable@description}%
+            \@ifundefined{cmdEpydoc@variable@type}{}{%
+                \par\textbf{Type:} \cmdEpydoc@variable@type}%
+            \@ifundefined{cmdEpydoc@variable@value}{}{%
+                \par\textbf{Value:} \cmdEpydoc@variable@value}%
+            \@ifundefined{cmdEpydoc@variable@metadata}{}{%
+                \ifx\cmdEpydoc@variable@metadata\empty\else
+                    \par\cmdEpydoc@variable@metadata\fi}%
+        \end{quote}\par}}}
   {}
 
 % The EpydocClassVariableList environment is used the same way as
@@ -486,29 +487,28 @@ BASE = r"""
 %
 % If any of these arguments is not available, then the empty
 % string will be used.
+\define@cmdkeys[Epydoc]{property}{name,description,type,fget,
+                                  fset,fdel,metadata}
 \newenvironment{EpydocPropertyList}{%
-    \newcommand{\EpydocProperty}[6]{%
-        \gdef\@EpydocPropertyName{##1}%
-        \gdef\@EpydocPropertyDescription{##2}%
-        \gdef\@EpydocPropertyType{##3}%
-        \gdef\@EpydocPropertyGet{##4}%
-        \gdef\@EpydocPropertySet{##5}%
-        \gdef\@EpydocPropertyDel{##6}%
-    {\Large\raggedright\@EpydocPropertyName\par}
-    \begin{quote}
-        \setlength{\parskip}{\EpydocParskip}%
-        \ifx\@EpydocPropertyDescription\empty\else
-            \par\@EpydocPropertyDescription\fi%
-        \ifx\@EpydocPropertyType\empty\else
-            \par\textbf{Type:} \@EpydocPropertyType\fi%
-        \ifx\@EpydocPropertyGet\empty
-            \par\textbf{Get:} \texttt{\@EpydocPropertyGet}\fi%
-        \ifx\@EpydocPropertySet\empty
-            \par\textbf{Set:} \texttt{\@EpydocPropertySet}\fi%
-        \ifx\@EpydocPropertyDel\empty
-            \par\textbf{Delete:} \texttt{\@EpydocPropertyDel}\fi%
-    \end{quote}
-  }}
+    \newcommand{\EpydocProperty}[1]{{%
+        \setkeys[Epydoc]{property}{##1}%
+        {\Large\raggedright\cmdEpydoc@property@name\par}
+        \begin{quote}
+            \setlength{\parskip}{\EpydocParskip}%
+            \@ifundefined{cmdEpydoc@property@description}{}{
+                \par\cmdEpydoc@property@description}
+            \@ifundefined{cmdEpydoc@property@type}{}{
+                \par\textbf{Type:} \cmdEpydoc@property@type}
+            \@ifundefined{cmdEpydoc@property@fget}{}{
+                \par\textbf{Get:} \cmdEpydoc@property@fget}
+            \@ifundefined{cmdEpydoc@property@fset}{}{
+                \par\textbf{Set:} \cmdEpydoc@property@fset}
+            \@ifundefined{cmdEpydoc@property@fdel}{}{
+                \par\textbf{Delete:} \cmdEpydoc@property@fdel}
+            \@ifundefined{cmdEpydoc@property@metadata}{}{
+                \ifx\cmdEpydoc@property@metadata\empty\else
+                    \par\cmdEpydoc@property@metadata\fi}
+        \end{quote}\par}}}
   {}
 
 % ======================================================================
@@ -516,28 +516,32 @@ BASE = r"""
 
 % This command is used to display a metadata field with a single value
 \newcommand{\EpydocMetadataSingleValue}[2]{%
+    \par
     \begin{list}{}{\itemindent-\leftmargin}
     \item \textbf{#1:} #2
-    \end{list}
-  }
+    \end{list}\par\ignorespaces}
 
 % This environment is used to display a metadata field with multiple
 % values when the field declares that short=True; i.e., that multiple
 % values should be combined into a single comma-delimited list.
 \newenvironment{EpydocMetadataShortList}[1]{%
     \newcommand{\and}{, }%
-    \textbf{#1: }}
-    {}
+    \par
+    \begin{list}{}{\itemindent-\leftmargin}
+    \item \textbf{#1:} \ignorespaces}
+    {\end{list}\ignorespacesafterend\par}
 
 % This list environment is used to display a metadata field with
 % multiple values when the field declares that short=False; i.e., that
 % multiple values should be listed separately in a bulleted list.
 \newenvironment{EpydocMetadataLongList}[1]{%
+    \par
     \textbf{#1:}
     \setlength{\parskip}{0ex}
         \begin{itemize}
-            \setlength{\parskip}{\EpydocMetadataLongListParskip}}
-    {\end{itemize}}
+            \setlength{\parskip}{\EpydocMetadataLongListParskip}
+            \ignorespaces}
+    {\end{itemize}\ignorespacesafterend\par}
 
 % ======================================================================
 % reStructuredText Admonitions
@@ -545,19 +549,16 @@ BASE = r"""
 % This environment is used to display reStructuredText admonitions,
 % such as ``..warning::'' and ``..note::''.
 \newenvironment{reSTadmonition}[1][]{%
-    \begin{center}\begin{sffamily}
-        \begin{lrbox}{\@tempboxa}
-            \begin{minipage}{\admonitionwidth}
-                \textbf{\large #1}
-                \vspace{2mm}
-    }
-    {
-        \end{minipage}
-    \end{lrbox}
-    \fbox{\usebox{\@tempboxa}}
-    \end{sffamily}
-    \end{center}
-    }
+    \begin{center}\begin{sffamily}%
+        \begin{lrbox}{\@tempboxa}%
+            \begin{minipage}{\admonitionwidth}%
+                \textbf{\large #1}%
+                \vspace{2mm}}%
+    {\end{minipage}%
+    \end{lrbox}%
+    \fbox{\usebox{\@tempboxa}}%
+    \end{sffamily}%
+    \end{center}}
 
 % ======================================================================
 % Name Formatting    
@@ -565,27 +566,24 @@ BASE = r"""
 % This section defines the EpydocDottedName command, which is used to
 % display the names of Python objects.
 
-% Allows non-hyphenated wrapping at the '.' module separators.  The
-% rest is a simplified version of url.sty's tt style.
-\RequirePackage{url}
-\def\Url@pydo{% style assignments for tt fonts or T1 encoding
-\def\UrlBreaks{\do\]\do\)\do\_}%
-\def\UrlBigBreaks{\do@url@hyp\do\.}%
-% \def\UrlNoBreaks{\do\(\do\[\do\{\do\<\do\_}% (unnecessary)
-\def\UrlNoBreaks{\do\(\do\[\do\{\do\<}% (unnecessary)
-\def\UrlSpecials{\do\ {\ }}%
-\def\UrlOrds{\do\*\do\-\do\~}% any ordinary characters that aren't usually
-}
-
-\def\url@pystyle{%
-\@ifundefined{selectfont}{\def\UrlFont{\rm}}{\def\UrlFont{\rmfamily}}\Url@pydo
-}
-\newcommand\pymodule{\begingroup \urlstyle{py}\Url}
-
 % The \EpydocDottedName command is used to escape dotted names.  In
-% particular, it escapes underscores (_) and allows non-hyphenated
-% wrapping at '.' separator characters.
-\newcommand\EpydocDottedName[1]{\texorpdfstring{\protect\pymodule{#1}}{#1}}
+% particular, it escapes all characters except '#', '%', and newlines,
+% and allows non-hyphenated wrapping at '.' separator characters.
+% [xx] this generates a warning for names containing _ -- we need
+% to somehow strip that out of the second argument.
+\newcommand\EpydocDottedName[1]{%
+    \texorpdfstring{\protect\Epydoc@DottedName{#1}}{#1}}
+
+\DeclareUrlCommand\Epydoc@DottedName{%
+  \urlstyle{rm}%
+  \def\UrlBigBreaks{\do\.}%
+  % We should never see most of these chars in a name, but handle
+  % them if they happen to show up (eg script names)
+  \def\UrlOrds{\do\@\do\#\do\%\do\^\do\&\do\(\do\)\do\-\do\_%
+               \do\|\do\\\do\"\do\/\do\?\do\>\do\<\do\{\do\}%
+               \do\`\do\~}
+}
+
 """+NIST_DISCLAIMER
 ######################################################################
 ######################################################################
@@ -607,15 +605,14 @@ BOXES = r"""
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{epydoc-boxes}[2008/02/26 v3.0.1 Epydoc Python Documentation]
-
+% Pass options to the epydoc base package.
 \RequirePackage{xkeyval}
-\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
-\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-base}}
 \ProcessOptionsX\relax
-
+% Load the base epydoc package
 \RequirePackage{epydoc-base}
+
+% Use longtable for variable & property lists.
 \RequirePackage{longtable}
 
 % Double the standard size boxedminipage outlines.
@@ -636,60 +633,50 @@ BOXES = r"""
 \renewenvironment{EpydocFunctionList}{%
     \def\@EpydocSeparator{%
        \vspace{-2\EpydocParskip}
-       \rule{\dimexpr \textwidth-2\fboxsep \relax}{0.5\fboxrule}
+       \rule{\dimexpr \textwidth-2\fboxsep}{0.5\fboxrule}
        \aftergroup\def\aftergroup\@EpydocSeparator%
              \aftergroup{\aftergroup}}%
-    \newcommand{\EpydocFunction}[8]{
-        \gdef\@EpydocFunctionSignature{##1}%
-        \gdef\@EpydocFunctionDescription{##2}%
-        \gdef\@EpydocFunctionParameters{##3}%
-        \gdef\@EpydocFunctionReturnDescr{##4}%
-        \gdef\@EpydocFunctionReturnType{##5}%
-        \gdef\@EpydocFunctionRaises{##6}%
-        \gdef\@EpydocFunctionOverrides{##7}%
-        \gdef\@EpydocFunctionMetadata{##8}%
-    \begin{boxedminipage}{\dimexpr \textwidth-2\fboxsep \relax}
-        {\Large\raggedright\@EpydocFunctionSignature\par}
-        \setlength{\parskip}{\EpydocParskip}
-        \ifx\@EpydocFunctionDescription\empty\else%
-            {\@EpydocSeparator}%
-            \@EpydocFunctionDescription %
-        \fi%
-        \ifx\@EpydocFunctionParameters\empty\else%
-            {\@EpydocSeparator}%
-            \@EpydocFunctionParameters %
-        \fi%
-        \ifx\@EpydocFunctionReturnType\empty%
-            \ifx\@EpydocFunctionReturnDescr\empty\else%
+    \newcommand{\EpydocFunction}[1]{{%
+        \setkeys[Epydoc]{function}{##1}%
+        \begin{boxedminipage}{\dimexpr \textwidth-2\fboxsep}
+            {\Large\raggedright\cmdEpydoc@function@signature\par}
+            \setlength{\parskip}{\EpydocParskip}
+            \@ifundefined{cmdEpydoc@function@description}{}{%
                 {\@EpydocSeparator}%
-                \textbf{Return Value}%
-                \vspace{-\EpydocParskip}%
-                \begin{quote}\@EpydocFunctionReturnDescr\end{quote}%
-            \fi%
-        \else%
-            {\@EpydocSeparator}%
-            \textbf{Return Value}%
-            \vspace{-\EpydocParskip}%
-            \ifx\@EpydocFunctionReturnDescr\empty%
-                \begin{quote}\it \@EpydocFunctionReturnType\end{quote}%
-            \else%
-                \begin{quote}\@EpydocFunctionReturnDescr%
-                    \textit{(type=\@EpydocFunctionReturnType)}\end{quote}%
-            \fi%
-        \fi%
-        \ifx\@EpydocFunctionRaises\empty\else%
-            {\@EpydocSeparator}%
-            \@EpydocFunctionRaises %
-        \fi%
-        \ifx\@EpydocFunctionOverrides\empty\else%
-            {\@EpydocSeparator}%
-            \@EpydocFunctionOverrides %
-        \fi%
-        \ifx\@EpydocFunctionMetadata\empty\else%
-            {\@EpydocSeparator}%
-            \@EpydocFunctionMetadata %
-        \fi%
-    \end{boxedminipage}\par}}
+                \par\cmdEpydoc@function@description}%
+            \@ifundefined{cmdEpydoc@function@parameters}{}{%
+                {\@EpydocSeparator}%
+                \par\cmdEpydoc@function@parameters}%
+            \@ifundefined{cmdEpydoc@function@returntype}{
+                \@ifundefined{cmdEpydoc@function@returndescr}{}{
+                    {\@EpydocSeparator}%
+                    \par\textbf{Return Value}%
+                    \par\vspace{-\EpydocParskip}%
+                    \begin{quote}\cmdEpydoc@function@returndescr\end{quote}}%
+            }{
+                {\@EpydocSeparator}%
+                \par\textbf{Return Value}%
+                \par\vspace{-\EpydocParskip}%
+                \begin{quote}%
+                  \@ifundefined{cmdEpydoc@function@returndescr}{
+                      \textit{\cmdEpydoc@function@returntype}%
+                  }{%
+                      \cmdEpydoc@function@returndescr%
+                        \textit{(type=\cmdEpydoc@function@returntype)}}%
+                \end{quote}%
+            }
+            \@ifundefined{cmdEpydoc@function@raises}{}{%
+                {\@EpydocSeparator}%
+                \par\cmdEpydoc@function@raises}%
+            \@ifundefined{cmdEpydoc@function@overrides}{}{%
+                {\@EpydocSeparator}%
+                \par\cmdEpydoc@function@overrides}%
+            \@ifundefined{cmdEpydoc@function@metadata}{}{%
+                \ifx\cmdEpydoc@property@metadata\empty\else
+                    {\@EpydocSeparator}%
+                    \par\cmdEpydoc@function@metadata%
+                \fi}%
+        \end{boxedminipage}\par}}}
   {}
 
 % ======================================================================
@@ -718,7 +705,7 @@ BOXES = r"""
                          p{\EpydocVariableWidth}|
                          p{\dimexpr \textwidth%
                                 -4\tabcolsep-7pt
-                                -\EpydocVariableWidth \relax}
+                                -\EpydocVariableWidth}
                          @{\hspace \tabcolsep \vrule width \fboxrule}}
     % Set up the headers & footer (this makes the table span
     % multiple pages in a happy way).
@@ -738,28 +725,22 @@ BOXES = r"""
 % Variable Lists
 
 \renewenvironment{EpydocVariableList}{%
-    \newcommand{\EpydocVariable}[4]{%
-        \gdef\@EpydocVariableName{##1}%
-        \gdef\@EpydocVariableDescription{##2}%
-        \gdef\@EpydocVariableType{##3}%
-        \gdef\@EpydocVariableValue{##4}%
-        \raggedright\@EpydocVariableName & %
+    \newcommand{\EpydocVariable}[1]{{%
+        \setkeys[Epydoc]{variable}{##1}%
+        \raggedright\cmdEpydoc@variable@name &%
+        \setkeys[Epydoc]{variable}{##1}%
         \setlength{\parskip}{\EpydocParskip}\raggedright%
-        \@EpydocVariableDescription %
-        \ifx\@EpydocVariableValue\empty\relax%
-            \ifx\@EpydocVariableType\empty\else%
-                \ifx\@EpydocVariableDescription\empty\else\par\fi%
-                \textit{(type=\texttt{\@EpydocVariableType})}%
-            \fi%
-        \else\relax%
-            \ifx\@EpydocVariableDescription\empty\else\par\fi%
-            \textbf{Value:} \texttt{\@EpydocVariableValue}%
-            \ifx\@EpydocVariableType\empty\else%
-                \textit{(type=\texttt{\@EpydocVariableType})}%
-            \fi%
-        \fi%
+        \@ifundefined{cmdEpydoc@variable@description}{}{%
+            \cmdEpydoc@variable@description\relax}%
+        \@ifundefined{cmdEpydoc@variable@value}{}{%
+            \@ifundefined{cmdEpydoc@variable@description}{}{\par}%
+            \textbf{Value:} \texttt{\cmdEpydoc@variable@value}}%
+        \@ifundefined{cmdEpydoc@variable@type}{}{%
+            \@ifundefined{cmdEpydoc@variable@description}{%
+                \@ifundefined{cmdEpydoc@variable@value}{}{ }}{ }%
+            \textit{(type=\texttt{\cmdEpydoc@variable@type})}}%
         \tabularnewline
-        \hline}%
+        \hline}}%
     \begin{@EpydocGeneralList}%
     }
     {\end{@EpydocGeneralList}}
@@ -775,39 +756,30 @@ BOXES = r"""
 \renewenvironment{EpydocPropertyList}{%
     \def\@EpydocSeparator{%
        \aftergroup\def\aftergroup\@EpydocSeparator\aftergroup{%
-       \aftergroup\\\aftergroup[\aftergroup\EpydocParskip\aftergroup]%
+       \aftergroup\par%
        \aftergroup}}%
-    \newcommand{\EpydocProperty}[6]{%
-        \gdef\@EpydocPropertyName{##1}%
-        \gdef\@EpydocPropertyDescription{##2}%
-        \gdef\@EpydocPropertyType{##3}%
-        \gdef\@EpydocPropertyGet{##4}%
-        \gdef\@EpydocPropertySet{##5}%
-        \gdef\@EpydocPropertyDel{##6}%
-        \raggedright\@EpydocPropertyName & %
+    \newcommand{\EpydocProperty}[1]{{%
+        \setkeys[Epydoc]{property}{##1}%
+        \raggedright\cmdEpydoc@property@name & %
+        \setkeys[Epydoc]{property}{##1}%
         \setlength{\parskip}{\EpydocParskip}\raggedright%
-        \ifx\@EpydocPropertyDescription\empty\else%
+        \@ifundefined{cmdEpydoc@property@description}{}{%
             {\@EpydocSeparator}%
-            \@EpydocPropertyDescription %
-        \fi%
-        \ifx\@EpydocPropertyType\empty\else%
+            \cmdEpydoc@property@description\relax}%
+        \@ifundefined{cmdEpydoc@property@type}{}{%
             {\@EpydocSeparator}%
-            \textbf{Type:} \@EpydocPropertyType
-        \fi%
-        \ifx\@EpydocPropertyGet\empty\else%
+            \textbf{Type:} \cmdEpydoc@property@type\relax}%
+        \@ifundefined{cmdEpydoc@property@fget}{}{%
             {\@EpydocSeparator}%
-            \textbf{Get:} \@EpydocPropertyGet%
-        \fi%
-        \ifx\@EpydocPropertySet\empty\else%
+            \textbf{Get:} \cmdEpydoc@property@fget\relax}%
+        \@ifundefined{cmdEpydoc@property@fset}{}{%
             {\@EpydocSeparator}%
-            \textbf{Set:} \@EpydocPropertySet%
-        \fi%
-        \ifx\@EpydocPropertyDel\empty\else%
+            \textbf{Set:} \cmdEpydoc@property@fset\relax}%
+        \@ifundefined{cmdEpydoc@property@fdel}{}{%
             {\@EpydocSeparator}%
-            \textbf{Delete:} \@EpydocPropertyDel%
-        \fi%
+            \textbf{Delete:} \cmdEpydoc@property@fdel\relax}%
         \tabularnewline
-        \hline}
+        \hline}}
     \begin{@EpydocGeneralList}}
     {\end{@EpydocGeneralList}}
 """+NIST_DISCLAIMER
@@ -839,203 +811,204 @@ SHADED = r"""
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
 \ProvidesClass{epydoc-shaded}[2008/02/26 v3.0.1 Epydoc Python Documentation]
-
+% Pass options to the epydoc base package.
 \RequirePackage{xkeyval}
-\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
-\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-base}}
 \ProcessOptionsX\relax
-
+% Load the base epydoc package
 \RequirePackage{epydoc-base}
 
-\definecolor{gray95}{gray}{0.95}
-\definecolor{gray90}{gray}{0.90}
-\definecolor{gray85}{gray}{0.85}
-\definecolor{gray80}{gray}{0.8}
-\definecolor{gray55}{gray}{0.55}
+% ======================================================================
+% Customization hooks
+
+% These colors 
+\definecolor{EpydocNameColor}{gray}{0.95}
+\definecolor{EpydocDetailsColor}{gray}{0.90}
+\definecolor{EpydocValueColor}{gray}{0.85}
+\definecolor{EpydocGroupColor}{gray}{0.8}
+\definecolor{EpydocInheritanceListColor}{gray}{0.95}
+
+% This length controls how tightly function, variable, and property
+% entries are spaced.
+\newlength{\EpydocListsep}
+\setlength{\EpydocListsep}{\baselineskip}
+
+% This length is used to dedent the section headings.
+\newlength{\EpydocSectionHeaderDedent}
+\setlength{\EpydocSectionHeaderDedent}{1cm}
+
+% ======================================================================
+% Colored minipage
 
 % adapted from <http://www.texnik.de/color/color.phtml> for colored 
 % paragraph boxes
 \newcommand{\cmcolor}{}
-\newenvironment{cminipage}[2][gray90]%
-  {%
-   \renewcommand{\cmcolor}{#1}%
-   \begin{lrbox}{\@tempboxa}%
-     \begin{minipage}{#2}}%
-  {  \end{minipage}%
-   \end{lrbox}%
-   \colorbox{\cmcolor}{\usebox{\@tempboxa}}
-   }%
+\newenvironment{cminipage}[2][white]{%
+    \renewcommand{\cmcolor}{#1}%
+    \begin{lrbox}{\@tempboxa}%
+      \begin{minipage}{#2}%
+      \setlength{\parskip}{\EpydocParskip}%
+  }{%
+      \end{minipage}%
+    \end{lrbox}%
+    \colorbox{\cmcolor}{\usebox{\@tempboxa}}}
+
+% ======================================================================
+% Redefinitions
 
 \renewenvironment{EpydocFunctionList}{%
-    \newcommand{\EpydocFunction}[8]{
-        \gdef\@EpydocFunctionSignature{##1}%
-        \gdef\@EpydocFunctionDescription{##2}%
-        \gdef\@EpydocFunctionParameters{##3}%
-        \gdef\@EpydocFunctionReturnDescr{##4}%
-        \gdef\@EpydocFunctionReturnType{##5}%
-        \gdef\@EpydocFunctionRaises{##6}%
-        \gdef\@EpydocFunctionOverrides{##7}%
-        \gdef\@EpydocFunctionMetadata{##8}%
-    \newif\if@EpydocFunctionDetails%
-    \@EpydocFunctionDetailsfalse%
-    \ifx\@EpydocFunctionDescription\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionParameters\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionReturnDescr\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionReturnType\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionRaises\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionOverrides\empty\else\@EpydocFunctionDetailstrue\fi%
-    \ifx\@EpydocFunctionMetadata\empty\else\@EpydocFunctionDetailstrue\fi%
-    \vspace{0.5ex}
+  \setlength{\parskip}{\EpydocListsep}%
+  \newcommand{\EpydocFunction}[1]{{
+    \setkeys[Epydoc]{function}{##1}%
+    % Decide whether to include a 'details' block
+    \newif\ifEpydoc@details%
+    \@ifundefined{cmdEpydoc@function@description}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@parameters}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@returndescr}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@returntype}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@raises}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@overrides}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@function@metadata}{}{\Epydoc@detailstrue}%
+    % Add some vertical space.
+    \par
+    % Put a box around the whole thing, so the signature line and the
+    % body don't get split across pages.
     \begin{minipage}{\textwidth}%
-      \raggedleft%
-      \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
-        \Large\raggedright\@EpydocFunctionSignature
-      \end{cminipage}%
-      \if@EpydocFunctionDetails
-        \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}%
-          \setlength{\parskip}{\EpydocParskip}
-          \ifx\@EpydocFunctionDescription\empty\else%
-              \@EpydocFunctionDescription %
-          \fi%
-          \ifx\@EpydocFunctionParameters\empty\else%
-              \@EpydocFunctionParameters %
-          \fi%
-          \ifx\@EpydocFunctionReturnType\empty%
-              \ifx\@EpydocFunctionReturnDescr\empty\else%
-                  \textbf{Return Value}%
-                  \vspace{-\EpydocParskip}%
-                  \begin{quote}\@EpydocFunctionReturnDescr\end{quote}%
-              \fi%
-          \else%
-              \textbf{Return Value}%
-              \vspace{-\EpydocParskip}%
-              \ifx\@EpydocFunctionReturnDescr\empty%
-                  \begin{quote}\it \@EpydocFunctionReturnType\end{quote}%
-              \else%
-                  \begin{quote}\@EpydocFunctionReturnDescr%
-                      \textit{(type=\@EpydocFunctionReturnType)}\end{quote}%
-              \fi%
-          \fi%
-          \ifx\@EpydocFunctionRaises\empty\else%
-              \@EpydocFunctionRaises %
-          \fi%
-          \ifx\@EpydocFunctionOverrides\empty\else%
-              \@EpydocFunctionOverrides %
-          \fi%
-          \ifx\@EpydocFunctionMetadata\empty\else%
-              \@EpydocFunctionMetadata %
-          \fi%
-        \end{cminipage}%
+      \setlength{\parskip}{-1pt}\raggedleft%
+      % Add the function signature in a gray95 box.
+      \begin{cminipage}[EpydocNameColor]%
+                       {\dimexpr \textwidth-2\fboxsep}
+        \Large\raggedright\cmdEpydoc@function@signature
+      \end{cminipage}\par
+      % Add the details in a gray90 box.
+      \ifEpydoc@details
+        \begin{cminipage}[EpydocDetailsColor]%
+                         {\dimexpr 0.95\linewidth-2\fboxsep}%
+          \@ifundefined{cmdEpydoc@function@description}{}{%
+              \par\cmdEpydoc@function@description}%
+          \@ifundefined{cmdEpydoc@function@parameters}{}{%
+              \par\cmdEpydoc@function@parameters}%
+          \@ifundefined{cmdEpydoc@function@returntype}{
+              \@ifundefined{cmdEpydoc@function@returndescr}{}{
+                  \par\textbf{Return Value}%
+                  \par\vspace{-\EpydocParskip}%
+                  \begin{quote}\cmdEpydoc@function@returndescr%
+                  \end{quote}}%
+          }{
+              \par\textbf{Return Value}%
+              \par\vspace{-\EpydocParskip}%
+              \begin{quote}%
+                \@ifundefined{cmdEpydoc@function@returndescr}{
+                    \textit{\cmdEpydoc@function@returntype}%
+                }{%
+                    \cmdEpydoc@function@returndescr%
+                      \textit{(type=\cmdEpydoc@function@returntype)}}%
+              \end{quote}}%
+          \@ifundefined{cmdEpydoc@function@raises}{}{%
+              \par\cmdEpydoc@function@raises}%
+          \@ifundefined{cmdEpydoc@function@overrides}{}{%
+              \par\cmdEpydoc@function@overrides}%
+          \@ifundefined{cmdEpydoc@function@metadata}{}{%
+              \par\cmdEpydoc@function@metadata}%
+        \end{cminipage}\par
       \fi%
-    \end{minipage}\par}}
+   \end{minipage}\par}}}
   {}
-    
-\newenvironment{@EpydocGeneralList}{%
-  \renewcommand{\EpydocGroup}[1]{\par
-    \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
-      {\Large\bf\center ##1\\}
-    \end{cminipage}\par}
-  \renewcommand{\EpydocInheritanceList}[2]{\par
-    \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
-    Inherited from {##1}: ##2%
-    \end{cminipage}\par}}{}
-  
-\newlength{\EpydocValueWidth}
 
+\newlength{\EpydocValueWidth}
 \renewenvironment{EpydocVariableList}{%
-  \newcommand{\EpydocVariable}[4]{
-    \gdef\@EpydocVariableName{##1}%
-    \gdef\@EpydocVariableDescription{##2}%
-    \gdef\@EpydocVariableType{##3}%
-    \gdef\@EpydocVariableValue{##4}%
+  \setlength{\parskip}{\EpydocListsep}%
+  \newcommand{\EpydocVariable}[1]{{
+    \setkeys[Epydoc]{variable}{##1}%
+    % Decide whether to include a 'details' block
+    \newif\ifEpydoc@details%
+    \@ifundefined{cmdEpydoc@variable@description}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@variable@value}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@variable@type}{}{\Epydoc@detailstrue}%
+    % Put a box around the whole thing, so the variable's name line 
+    % and the body don't get split across pages.
     \begin{minipage}{\linewidth}%
-    \raggedleft%
-    \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
-      {\Large \@EpydocVariableName}%
-    \end{cminipage}%
-    \newif\if@EpydocVariableDetails
-    \@EpydocVariableDetailsfalse
-    \ifx\@EpydocVariableDescription\empty\else \@EpydocVariableDetailstrue\fi%
-    \ifx\@EpydocVariableType\empty\else \@EpydocVariableDetailstrue\fi%
-    \ifx\@EpydocVariableValue\empty\else \@EpydocVariableDetailstrue\fi%
-    \if@EpydocVariableDetails
-      \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}
-        \setlength{\parskip}{\EpydocParskip}
-        \ifx\@EpydocVariableDescription\empty\else
-            \par\@EpydocVariableDescription
-        \fi%
-        \ifx\@EpydocVariableType\empty\else
-            \par\textbf{Type:} \texttt{\@EpydocVariableType}
-        \fi%
-        \ifx\@EpydocVariableValue\empty\else
-          \par\settowidth{\EpydocValueWidth}{Value:w}%
-          Value:
-          \begin{cminipage}[gray85]{\dimexpr \textwidth-2\fboxsep-
-                                             \EpydocValueWidth \relax}
-            \texttt{\@EpydocVariableValue}
-          \end{cminipage}%
-        \fi%
-      \end{cminipage}%
-    \fi%
-    \end{minipage}\par}
-    \begin{@EpydocGeneralList}}
-    {\end{@EpydocGeneralList}}
+      \setlength{\parskip}{-1pt}\raggedleft%
+      % Add the variable name in a gray95 box.
+      \begin{cminipage}[EpydocNameColor]%
+                       {\dimexpr \textwidth-2\fboxsep}
+        \Large \bfseries \cmdEpydoc@variable@name%
+      \end{cminipage}\par
+      % Add the details in a gray90 box.
+      \ifEpydoc@details
+        \begin{cminipage}[EpydocDetailsColor]%
+                         {\dimexpr 0.95\linewidth-2\fboxsep}%
+          \setlength{\parskip}{\EpydocParskip}%
+          \@ifundefined{cmdEpydoc@variable@description}{}{%
+              \par\cmdEpydoc@variable@description}%
+          \@ifundefined{cmdEpydoc@variable@type}{}{%
+              \par\textbf{Type:} \texttt{\cmdEpydoc@variable@type}}%
+          \@ifundefined{cmdEpydoc@variable@value}{}{%
+            \settowidth{\EpydocValueWidth}{Value:w}%
+            \par Value:
+            \begin{cminipage}[EpydocValueColor]%
+                             {\dimexpr \textwidth-2\fboxsep-\EpydocValueWidth}
+              \texttt{\cmdEpydoc@variable@value}%
+            \end{cminipage}}\par
+        \end{cminipage}\par
+      \fi%
+    \end{minipage}\par}}}
+  {}
 
 \renewenvironment{EpydocPropertyList}{%
-  \newcommand{\EpydocProperty}[6]{%
-    \gdef\@EpydocPropertyName{##1}%
-    \gdef\@EpydocPropertyDescription{##2}%
-    \gdef\@EpydocPropertyType{##3}%
-    \gdef\@EpydocPropertyGet{##4}%
-    \gdef\@EpydocPropertySet{##5}%
-    \gdef\@EpydocPropertyDel{##6}%
+  \setlength{\parskip}{\EpydocListsep}%
+  \newcommand{\EpydocProperty}[1]{{%
+    \setkeys[Epydoc]{property}{##1}%
+    % Decide whether to include a 'details' block
+    \newif\ifEpydoc@details%
+    \@ifundefined{cmdEpydoc@property@description}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@property@type}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@property@fget}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@property@fset}{}{\Epydoc@detailstrue}%
+    \@ifundefined{cmdEpydoc@property@fdel}{}{\Epydoc@detailstrue}%
+    % Put a box around the whole thing, so the property's name line 
+    % and the body don't get split across pages.
     \begin{minipage}{\linewidth}%
-    \raggedleft%
-    \begin{cminipage}[gray95]{\dimexpr \textwidth-2\fboxsep \relax}
-      {\Large \@EpydocPropertyName}%
-    \end{cminipage}%
-    \newif\if@EpydocPropertyDetails
-    \@EpydocPropertyDetailsfalse
-    \ifx\@EpydocPropertyDescription\empty\else \@EpydocPropertyDetailstrue\fi%
-    \ifx\@EpydocPropertyType\empty\else \@EpydocPropertyDetailstrue\fi%
-    \ifx\@EpydocPropertyGet\empty\else \@EpydocPropertyDetailstrue\fi%
-    \ifx\@EpydocPropertySet\empty\else \@EpydocPropertyDetailstrue\fi%
-    \ifx\@EpydocPropertyDel\empty\else \@EpydocPropertyDetailstrue\fi%
-    \if@EpydocPropertyDetails
-      \begin{cminipage}{\dimexpr 0.95\linewidth-2\fboxsep \relax}
-        \setlength{\parskip}{\EpydocParskip}
-        \ifx\@EpydocPropertyDescription\empty\else%
-            \par\@EpydocPropertyDescription
-        \fi%
-        \ifx\@EpydocPropertyType\empty\else
-            \par\textbf{Type:} \@EpydocPropertyType
-        \fi%
-        \ifx\@EpydocPropertyGet\empty\else
-            \par\textbf{Get:} \@EpydocPropertyGet%
-        \fi%
-        \ifx\@EpydocPropertySet\empty\else
-            \par\textbf{Set:} \@EpydocPropertySet%
-        \fi%
-        \ifx\@EpydocPropertyDel\empty\else
-            \par\textbf{Delete:} \@EpydocPropertyDel%
-        \fi%
-      \end{cminipage}%
+      \setlength{\parskip}{-1pt}\raggedleft%
+      % Add the variable name in a gray95 box.
+      \begin{cminipage}[EpydocNameColor]
+                       {\dimexpr \textwidth-2\fboxsep}
+        \Large \bfseries \cmdEpydoc@property@name%
+      \end{cminipage}\par
+      % Add the details in a gray90 box.
+      \ifEpydoc@details
+        \begin{cminipage}[EpydocDetailsColor]
+                         {\dimexpr 0.95\linewidth-2\fboxsep}
+          \setlength{\parskip}{\EpydocParskip}
+          \@ifundefined{cmdEpydoc@property@description}{}{%
+              \par\cmdEpydoc@property@description}%
+          \@ifundefined{cmdEpydoc@property@type}{}{%
+              \par\textbf{Type:} \cmdEpydoc@property@type}%
+          \@ifundefined{cmdEpydoc@property@fget}{}{%
+              \par\textbf{Get:} \cmdEpydoc@property@fget}%
+          \@ifundefined{cmdEpydoc@property@fset}{}{%
+              \par\textbf{Set:} \cmdEpydoc@property@fset}%
+          \@ifundefined{cmdEpydoc@property@fdel}{}{%
+              \par\textbf{Delete:} \cmdEpydoc@property@fdel}%
+        \end{cminipage}\par
       \fi%
-    \end{minipage}\par}
-    \begin{@EpydocGeneralList}}
-    {\end{@EpydocGeneralList}}
+    \end{minipage}\par}}}
+  {}
 
 \renewcommand{\EpydocGroup}[1]{\par
-  \begin{cminipage}[gray80]{\dimexpr \linewidth-2\fboxsep \relax}
+  \begin{cminipage}[EpydocGroupColor]
+                   {\dimexpr \linewidth-2\fboxsep}
     {\Large\bf\center #1\\}
+  \end{cminipage}\par}
+\renewcommand{\EpydocInheritanceList}[2]{\par
+  \begin{cminipage}[EpydocInheritanceListColor]
+                   {\dimexpr \textwidth-2\fboxsep}
+  \raggedright%
+  Inherited from {#1}: #2%
   \end{cminipage}\par}
 
 % This is just like the default definitions, except that we use
 % \raggedright, and dedent by \EpydocSectionHeaderDedent
-\newlength{\EpydocSectionHeaderDedent}
-\setlength{\EpydocSectionHeaderDedent}{1cm}
 \renewcommand\section{\@startsection {section}{1}%
               {-\EpydocSectionHeaderDedent}%
               {-3.5ex \@plus -1ex \@minus -.2ex}%
@@ -1056,6 +1029,32 @@ SHADED = r"""
 ######################################################################
 ######################################################################
 
+BLUE = r"""
+% epydoc-blue.sty
+%
+% A relatively minimal customization of a builtin epydoc style file,
+% showing the basic pieces that need to be present.
+%
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{epydoc-blue}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+
+% Load our base package (epydoc-shaded in this case).
+\RequirePackage{xkeyval}
+\DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-shaded}}
+\ProcessOptionsX\relax
+\RequirePackage{epydoc-shaded}
+
+% Perform some customizations
+\definecolor{EpydocNameColor}{rgb}{.9,.95,1}
+\definecolor{EpydocDetailsColor}{rgb}{.8,.9,1}
+\definecolor{EpydocValueColor}{rgb}{.7,.85,1}
+\definecolor{EpydocGroupColor}{rgb}{.6,.8,1}
+\definecolor{EpydocInheritanceListColor}{rgb}{.9,.95,1}
+"""
+
+######################################################################
+######################################################################
+
 TEMPLATE = r"""
 % epydoc-template.sty
 %
@@ -1065,15 +1064,12 @@ TEMPLATE = r"""
 %
 \NeedsTeXFormat{LaTeX2e}
 
-% Replace 'XXX' with a new name:
+% Replace 'XXX' with a new name, and put in the current date:
 \ProvidesClass{epydoc-XXX}[2008/02/26 v3.0.1 Epydoc Python Documentation]
 
 % Pass options to the epydoc base package.
 \RequirePackage{xkeyval}
-\DeclareOptionX{index}{\PassOptionsToPackage{index}{epydoc-base}}
-\DeclareOptionX{hyperlink}{\PassOptionsToPackage{hyperlink}{epydoc-base}}
-\DeclareOptionX{title}[]{\PassOptionsToPackage{title={#1}}{epydoc-base}}
-\DeclareOptionX{creator}[]{\PassOptionsToPackage{creator={#1}}{epydoc-base}}
+\DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-base}}
 \ProcessOptionsX\relax
 
 \RequirePackage{epydoc-base}
@@ -1091,4 +1087,5 @@ STYLESHEETS = {
     'shaded': SHADED,
     'default': BOXES,
     'template': TEMPLATE,
+    'blue': BLUE,
 }
