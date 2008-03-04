@@ -1056,9 +1056,16 @@ def write_latex(docindex, options):
                 options.pdfdriver = 'latex'
     log.info('%r pdfdriver selected' % options.pdfdriver)
     
-    from epydoc.docwriter.latex import LatexWriter
+    from epydoc.docwriter.latex import LatexWriter, show_latex_warnings
     latex_writer = LatexWriter(docindex, **options.__dict__)
-    latex_writer.write(latex_target)
+    try:
+        latex_writer.write(latex_target)
+    except IOError, e:
+        log.error(e)
+        log.end_progress()
+        log.start_progress()
+        log.end_progress()
+        return
     log.end_progress()
 
     # Decide how many steps we need to go through.
@@ -1119,16 +1126,20 @@ def write_latex(docindex, options):
                 # The third pass is only necessary if the second pass
                 # changed what page some things are on.
                 running = latex_command
-                if _RERUN_LATEX_RE.match(out):
+                if _RERUN_LATEX_RE.search(out):
                     log.progress(step/steps, '%s (Third pass)' % LaTeX)
                     out, err = run_subprocess('%s api.tex' % latex_command)
                     
                 # A fourth path should (almost?) never be necessary.
                 running = latex_command
-                if _RERUN_LATEX_RE.match(out):
+                if _RERUN_LATEX_RE.search(out):
                     log.progress(step/steps, '%s (Fourth pass)' % LaTeX)
-                    run_subprocess('%s api.tex' % latex_command)
+                    out, err = run_subprocess('%s api.tex' % latex_command)
                 step += 1
+
+                # Show the output, if verbosity is high:
+                if options.verbosity > 2 or epydoc.DEBUG:
+                    show_latex_warnings(out)
 
             # If requested, convert to postscript.
             if ('ps' in options.actions or
