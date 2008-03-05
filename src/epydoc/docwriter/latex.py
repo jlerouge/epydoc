@@ -405,7 +405,9 @@ class LatexWriter:
                 len(doc.subclasses) > 0):
                 sc_items = [_hyperlink(sc, '%s' % sc.canonical_name)
                             for sc in doc.subclasses]
+                out('{\\raggedright%\n')
                 out(self._descrlist(sc_items, 'Known Subclasses', short=1))
+                out('}%\n')
 
         # The class's description.
         if doc.descr not in (None, UNKNOWN):
@@ -1161,7 +1163,7 @@ class LatexWriter:
 
     #: Map the Python encoding representation into mismatching LaTeX ones.
     latex_encodings = {
-        'utf-8': 'utf8',
+        'utf-8': 'utf8x',
     }
 
     def get_latex_encoding(self):
@@ -1202,20 +1204,17 @@ def _hypertarget(uid, sig):
 
 def _dotted(name):
     if not name: return ''
-    name = '%s' % name
-    # There are a couple of characters that even \\EpydocDottedName
-    # can't cope with; so filter them out.
-    name = re.sub('[%#]|\^\^+|\n', '?', name)
-    return '\\EpydocDottedName{%s}' % name
+    return '\\EpydocDottedName{%s}' % plaintext_to_latex('%s' % name)
 
 LATEX_WARNING_RE = re.compile('|'.join([
-    r'(?P<file>\([\.a-zA-Z_\-/\\ \n0-9]+[.\n][a-z]{2,3}\b)',
+    r'(?P<file>\([\.a-zA-Z_\-/\\0-9]+[.\n][a-z]{2,3}\b)',
     (r'(?P<pkgwarn>^(Package|Latex) (?P<pkgname>[\w-]+) '+
      r'Warning:[^\n]*\n(\((?P=pkgname)\)[^\n]*\n)*)'),
     r'(?P<overfull>^(Overfull|Underfull)[^\n]*\n[^\n]*)',
     r'(?P<latexwarn>^LaTeX\s+Warning:\s+[^\n]*)',
     r'(?P<otherwarn>^[^\n]*Warning:[^\n]*)',
-    r'(?P<paren>[()])']),
+    r'(?P<paren>[()])',
+    r'(?P<pageno>\[\d+({[^\}]+})?\])']),
                               re.MULTILINE+re.IGNORECASE)
 
 OVERFULL_RE = re.compile(
@@ -1235,7 +1234,11 @@ def show_latex_warnings(s):
     #[xx] we should probably pay special attention to overfull \vboxes.
     overfull = underfull = 0
     filestack = ['latex']
+    block = None
+    BLOCK = 'LaTeX Warnings: %s'
+    pageno = 1
     for m in LATEX_WARNING_RE.finditer(s):
+        #log.debug(m.group())
         # Check if it's something we don't care about.
         for regexp in IGNORE_WARNING_REGEXPS:
             if regexp.match(m.group()):
@@ -1245,47 +1248,66 @@ def show_latex_warnings(s):
         if m.group('file'):
             filename = ''.join(m.group('file')[1:].split())
             filename = re.sub(r'^\./', '', filename)
+            if filename == 'api.toc': filename = 'Table of contents (api.toc)'
+            if filename == 'api.ind': filename = 'Index (api.ind)'
             filestack.append(filename)
-        # Latex reported an overfull/underfull warning:
+            if block is not None: epydoc.log.end_block()
+            epydoc.log.start_block(BLOCK % filename)
+            block = filename
+        # LaTeX started writing a new page
+        elif m.group('pageno'):
+            if pageno == int(m.group()[1:-1].split('{')[0]):
+                pageno += 1
+        # LateX reported an overfull/underfull warning:
         elif m.group('overfull'):
             msg = m.group('overfull').strip().split('\n')[0]
+            msg = re.sub(r'(\d+)\.\d+', r'\1', msg)
+            msg = re.sub(r'(lines \d+)--(\d+)', r'\1-\2', msg)
             if msg.lower().startswith('overfull'): overfull += 1
             else: underfull += 1
-            m2 = OVERFULL_RE.match(msg)
-            if m2:
-                if m2.group('boxtype') == 'vbox':
-                    log.warning('%s: %s' % (filestack[-1], msg))
-                elif (m2.group('typ').lower()=='overfull' and
-                      int(m2.group('size')) > 50):
-                    log.warning('%s: %s' % (filestack[-1], msg))
-                else:
-                    log.debug('%s: %s' % (filestack[-1], msg))
-            else:
-                log.debug('%s: %s' % (filestack[-1], msg))
+            log.warning(msg)#+' (page %d)' % pageno)
+#             m2 = OVERFULL_RE.match(msg)
+#             if m2:
+#                 if m2.group('boxtype') == 'vbox':
+#                     log.warning(msg)
+#                 elif (m2.group('typ').lower()=='overfull' and
+#                       int(m2.group('size')) > 50):
+#                     log.warning(msg)
+#                 else:
+#                     log.debug(msg)
+#             else:
+#                 log.debug(msg)
         # Latex reported a warning:
         elif m.group('latexwarn'):
-            msg = m.group('latexwarn').strip()
-            log.warning('%s: %s' % (filestack[-1], msg))
+            log.warning(m.group('latexwarn').strip()+' (page %d)' % pageno)
         # A package reported a warning:
         elif m.group('pkgwarn'):
-            msg = m.group('pkgwarn').strip()
-            log.warning('%s:\n%s' % (filestack[-1], msg))
+            log.warning(m.group('pkgwarn').strip())
         else:
             # Display anything else that looks like a warning:
             if m.group('otherwarn'):
-                msg = m.group('otherwarn').strip()
-                log.warning('%s: %s' % (filestack[-1], msg))
+                log.warning(m.group('otherwarn').strip())
             # Update to account for parens.
             n = m.group().count('(') - m.group().count(')')
             if n > 0: filestack += [None] * n
             if n < 0: del filestack[n:]
-    if overfull or underfull:
-        msgs = []
-        if overfull == 1: msgs.append('1 overfull box')
-        elif overfull: msgs.append('%d overfull boxes' % overfull)
-        if underfull == 1: msgs.append('1 underfull box')
-        elif underfull: msgs.append('%d underfull boxes' % underfull)
-        log.warning('LaTeX reported %s' % ' and '.join(msgs))
+            # Don't let filestack become empty:
+            if not filestack: filestack.append('latex')
+            if (filestack[-1] is not None and
+                block is not None and block != filestack[-1]):
+                epydoc.log.end_block()
+                epydoc.log.start_block(BLOCK % filestack[-1])
+
+    if block:
+        epydoc.log.end_block()
+            
+#     if overfull or underfull:
+#         msgs = []
+#         if overfull == 1: msgs.append('1 overfull box')
+#         elif overfull: msgs.append('%d overfull boxes' % overfull)
+#         if underfull == 1: msgs.append('1 underfull box')
+#         elif underfull: msgs.append('%d underfull boxes' % underfull)
+#         log.warning('LaTeX reported %s' % ' and '.join(msgs))
 
 #log.register_logger(log.SimpleLogger(log.DEBUG))
 #show_latex_warnings(open('/tmp/po.test').read())
