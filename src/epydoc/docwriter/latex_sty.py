@@ -75,7 +75,6 @@ BASE = r"""
 \RequirePackage[headings]{fullpage}
 \RequirePackage[usenames]{color}
 \RequirePackage{graphicx}
-\RequirePackage{url}
 
 \@ifclassloaded{memoir}{%
     \RequirePackage[other,notbib]{tocbibind}
@@ -106,6 +105,9 @@ BASE = r"""
 
 % ======================================================================
 % General Formatting
+
+% Setting this will make us less likely to get overfull hboxes:
+%\setlength{\emergencystretch}{1in}
 
 % Separate paragraphs by a blank line (do not indent them).  We define
 % a new length variable. \EpydocParskip, for the paragraph-skip length.
@@ -566,23 +568,28 @@ BASE = r"""
 % This section defines the EpydocDottedName command, which is used to
 % display the names of Python objects.
 
-% The \EpydocDottedName command is used to escape dotted names.  In
-% particular, it escapes all characters except '#', '%', and newlines,
-% and allows non-hyphenated wrapping at '.' separator characters.
-% [xx] this generates a warning for names containing _ -- we need
-% to somehow strip that out of the second argument.
-\newcommand\EpydocDottedName[1]{%
-    \texorpdfstring{\protect\Epydoc@DottedName{#1}}{#1}}
+% The \EpydocDottedName command adds a possible break-point after every
+% period in the given string.  It no longer escapes characters such as
+% underscore, since this interfered with the hyperref package; instead,
+% epydoc is responsible for escaping them.  E.g., correct usage for a
+% name with an underscore is \EpydocDottedName{some\_name}.
+\newcommand\EpydocDottedName[1]{
+  \Epydoc@DottedName #1.@}
 
-\DeclareUrlCommand\Epydoc@DottedName{%
-  \urlstyle{rm}%
-  \def\UrlBigBreaks{\do\.}%
-  % We should never see most of these chars in a name, but handle
-  % them if they happen to show up (eg script names)
-  \def\UrlOrds{\do\@\do\#\do\%\do\^\do\&\do\(\do\)\do\-\do\_%
-               \do\|\do\\\do\"\do\/\do\?\do\>\do\<\do\{\do\}%
-               \do\`\do\~}
-}
+% This helper function performs the work of \EpydocDottedName. It
+% scans forward, looking for a period, and putting all text up to the
+% period into #1.  The single character after the period is put in
+% #2.  This function then checks if #2 is '@', indicating that we're
+% done, or some other character, indicating that we should continue.
+% Note that \ifx tests character codes; and that when '@' appears
+% in user code, it gets the character code 'other', but when it
+% appears here, it gets the character code 'letter'.
+\def\Epydoc@DottedName#1.#2{%
+  \ifx#2@\relax #1\else 
+    #1\discretionary{.}{}{.}%
+    \expandafter\expandafter\expandafter\Epydoc@DottedName
+    \expandafter #2\fi%
+  }
 
 """+NIST_DISCLAIMER
 ######################################################################
