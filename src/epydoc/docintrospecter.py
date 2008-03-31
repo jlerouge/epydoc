@@ -267,10 +267,11 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
         # Create a VariableDoc for the child, and introspect its
         # value if it's defined in this module.
         container = get_containing_module(child)
-        if ((container is not None and
-             container == name_without_primes) or
-            (public_names is not None and
-             child_name in public_names)):
+        if (((container is not None and
+              container == name_without_primes) or
+             (public_names is not None and
+              child_name in public_names))
+            and not inspect.ismodule(child)):
             # Local variable.
             child_val_doc = introspect_docs(child, context=module_doc,
                                             module_name=dotted_name)
@@ -279,7 +280,8 @@ def introspect_module(module, module_doc, module_name=None, preliminary=False):
                                         is_imported=False,
                                         container=module_doc,
                                         docs_extracted_by='introspecter')
-        elif container is None or module_doc.canonical_name is UNKNOWN:
+        elif ((container is None or module_doc.canonical_name is UNKNOWN)
+              and not inspect.ismodule(child)):
 
             # Don't introspect stuff "from __future__"
             if is_future_feature(child): continue
