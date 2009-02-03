@@ -72,7 +72,7 @@ class PlaintextWriter:
                 s += str(base.canonical_name[-1])
             else:
                 s += str(base.canonical_name)
-            if i < len(class_doc.bases)-1: out(', ')
+            if i < len(class_doc.bases)-1: s += ', '
         return s+')'
 
     def write_class(self, out, class_doc, name=None, prefix='', verbose=True):

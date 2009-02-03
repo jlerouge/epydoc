@@ -3468,11 +3468,12 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
         if label is None: label = plaintext_to_html(identifier)
 
         # Find the APIDoc for it (if it's available).
-        doc = self.docindex.find(identifier, self.container)
+        try: doc = self.docindex.find(identifier, self.container, True)
+        except: doc = 'notfound'
 
         # If we didn't find a target, then try checking in the contexts
         # of the ancestor classes. 
-        if doc is None and isinstance(self.container, RoutineDoc):
+        if doc == 'notfound' and isinstance(self.container, RoutineDoc):
             container = self.docindex.get_vardoc(
                 self.container.canonical_name)
             while (doc is None and container not in (None, UNKNOWN)
@@ -3481,8 +3482,9 @@ class _HTMLDocstringLinker(epydoc.markup.DocstringLinker):
                 doc = self.docindex.find(identifier, container)
                 
         # Translate it into HTML.
-        if doc is None:
-            self._failed_xref(identifier)
+        if doc in (None, 'notfound'):
+            if doc == 'notfound':
+                self._failed_xref(identifier)
             return '<code class="link">%s</code>' % label
         else:
             return self.htmlwriter.href(doc, label, 'link')
