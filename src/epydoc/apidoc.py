@@ -1859,7 +1859,7 @@ class DocIndex:
 
         return None, None
 
-    def find(self, name, context):
+    def find(self, name, context, not_found_exception=False):
         """
         Look for an C{APIDoc} named C{name}, relative to C{context}.
         Return the C{APIDoc} if one is found; otherwise, return
@@ -1874,12 +1874,17 @@ class DocIndex:
         
         @type name: C{str} or L{DottedName}
         @type context: L{APIDoc}
+
+        @param not_found_exception: If true, then raise an exception
+            if the name is not found anywhere (including builtins,
+            function parameters, etc.)
         """
         if isinstance(name, basestring):
             name = re.sub(r'\(.*\)$', '', name.strip())
             if re.match('^([a-zA-Z_]\w*)(\.[a-zA-Z_]\w*)*$', name):
                 name = DottedName(name)
             else:
+                if not_found_exception: raise ValueError(name)
                 return None
         elif not isinstance(name, DottedName):
             raise TypeError("'name' should be a string or DottedName")
@@ -1931,6 +1936,9 @@ class DocIndex:
             # Drop this item so that the warning is reported only once.
             # fail() will fail anyway.
             del self.mlclasses[name[-1]]
+        else:
+            if not_found_exception: raise ValueError(name)
+            return None
 
     def _get_module_classes(self, docs):
         """
