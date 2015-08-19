@@ -18,7 +18,7 @@ DOCTESTS = $(wildcard src/epydoc/test/*.doctest)
 MANUAL_SRC = $(wildcard doc/manual-*.txt)
 
 # What version of python to use?
-PYTHON = python2.5
+PYTHON = python2.7
 export PYTHONPATH=src/
 
 # The location of the webpage.

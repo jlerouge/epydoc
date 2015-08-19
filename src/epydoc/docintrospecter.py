@@ -185,7 +185,7 @@ def _get_valuedoc(value):
 #: module's API documentation.
 UNDOCUMENTED_MODULE_VARS = (
     '__builtins__', '__doc__', '__all__', '__file__', '__path__',
-    '__name__', '__extra_epydoc_fields__', '__docformat__')
+    '__name__', '__extra_epydoc_fields__', '__docformat__', '__package__')
 
 def introspect_module(module, module_doc, module_name=None, preliminary=False):
     """
