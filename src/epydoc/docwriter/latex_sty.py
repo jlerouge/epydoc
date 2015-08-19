@@ -41,7 +41,7 @@ BASE = r"""
 % $Id:$
 
 \NeedsTeXFormat{LaTeX2e}%
-\ProvidesClass{epydoc-base}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-base}[2008/02/26 v3.0.2 Epydoc Python Documentation]
 
 % ======================================================================
 % Options
@@ -611,7 +611,7 @@ BOXES = r"""
 %
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc-boxes}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-boxes}[2008/02/26 v3.0.2 Epydoc Python Documentation]
 % Pass options to the epydoc base package.
 \RequirePackage{xkeyval}
 \DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-base}}
@@ -817,7 +817,7 @@ SHADED = r"""
 %
 % $Id:$
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc-shaded}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-shaded}[2008/02/26 v3.0.2 Epydoc Python Documentation]
 % Pass options to the epydoc base package.
 \RequirePackage{xkeyval}
 \DeclareOptionX*{\PassOptionsToPackage{\CurrentOption}{epydoc-base}}
@@ -1043,7 +1043,7 @@ BLUE = r"""
 % showing the basic pieces that need to be present.
 %
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{epydoc-blue}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-blue}[2008/02/26 v3.0.2 Epydoc Python Documentation]
 
 % Load our base package (epydoc-shaded in this case).
 \RequirePackage{xkeyval}
@@ -1072,7 +1072,7 @@ TEMPLATE = r"""
 \NeedsTeXFormat{LaTeX2e}
 
 % Replace 'XXX' with a new name, and put in the current date:
-\ProvidesClass{epydoc-XXX}[2008/02/26 v3.0.1 Epydoc Python Documentation]
+\ProvidesClass{epydoc-XXX}[2008/02/26 v3.0.2 Epydoc Python Documentation]
 
 % Pass options to the epydoc base package.
 \RequirePackage{xkeyval}

@@ -9,7 +9,7 @@ Automatic API Documentation Generation for Python
 
 :Author: `Edward Loper <edloper@gradient.cis.upenn.edu>`__
 
-:Version: 3.0b1
+:Version: 3.0.2
 
 :Abstract:
     Epydoc is a tool for generating API documentation for Python modules,
